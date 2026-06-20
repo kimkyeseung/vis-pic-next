@@ -1,6 +1,5 @@
 use std::process::{Command, Child, Stdio};
 use std::sync::Mutex;
-use tauri::Manager;
 
 static SERVER_PROCESS: Mutex<Option<Child>> = Mutex::new(None);
 
