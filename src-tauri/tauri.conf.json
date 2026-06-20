@@ -4,10 +4,8 @@
   "version": "0.1.0",
   "identifier": "net.viswave.arpic",
   "build": {
-    "frontendDist": "../out",
     "devUrl": "http://localhost:3000",
-    "beforeDevCommand": "npm run dev",
-    "beforeBuildCommand": "npm run build"
+    "beforeDevCommand": "npm run dev"
   },
   "app": {
     "windows": [

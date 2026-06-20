@@ -1,5 +1,47 @@
-use std::process::Command;
+use std::process::{Command, Child, Stdio};
+use std::sync::Mutex;
 use tauri::Manager;
+
+static SERVER_PROCESS: Mutex<Option<Child>> = Mutex::new(None);
+
+fn start_server() -> Result<(), String> {
+    #[cfg(target_os = "windows")]
+    {
+        let exe_dir = std::env::current_exe()
+            .map_err(|e| e.to_string())?
+            .parent()
+            .ok_or("No parent directory")?
+            .to_path_buf();
+
+        let server_dir = exe_dir.join("server");
+        let node_path = server_dir.join("node.exe");
+        let server_js = server_dir.join("server.js");
+
+        if server_js.exists() {
+            let child = Command::new(&node_path)
+                .arg(&server_js)
+                .current_dir(&server_dir)
+                .env("PORT", "3000")
+                .env("NODE_ENV", "production")
+                .stdout(Stdio::null())
+                .stderr(Stdio::null())
+                .spawn()
+                .map_err(|e| format!("Failed to start server: {}", e))?;
+
+            *SERVER_PROCESS.lock().unwrap() = Some(child);
+
+            // Wait for server to start
+            std::thread::sleep(std::time::Duration::from_secs(2));
+        }
+    }
+    Ok(())
+}
+
+fn stop_server() {
+    if let Some(mut child) = SERVER_PROCESS.lock().unwrap().take() {
+        let _ = child.kill();
+    }
+}
 
 #[tauri::command]
 fn get_printers() -> Result<Vec<String>, String> {
@@ -143,6 +185,11 @@ fn load_settings() -> Result<std::collections::HashMap<String, String>, String> 
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    // Start the embedded server in production
+    if !cfg!(debug_assertions) {
+        let _ = start_server();
+    }
+
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
         .invoke_handler(tauri::generate_handler![
@@ -161,6 +208,11 @@ pub fn run() {
                 )?;
             }
             Ok(())
+        })
+        .on_window_event(|_window, event| {
+            if let tauri::WindowEvent::Destroyed = event {
+                stop_server();
+            }
         })
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
