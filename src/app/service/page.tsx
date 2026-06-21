@@ -147,7 +147,8 @@ function ServiceContent() {
     setCompositeImage(null);
   };
 
-  const requiredPhotoCount = selectedFrame ? FRAME_INFO[selectedFrame]?.count || 1 : 1;
+  const slotsNeeded = selectedFrame ? FRAME_INFO[selectedFrame]?.count || 1 : 1;
+  const maxCaptures = slotsNeeded * config.captureCount;
 
   return (
     <div className="w-full h-screen overflow-hidden relative">
@@ -184,15 +185,14 @@ function ServiceContent() {
         <CameraSection
           config={config}
           photos={photos}
-          maxPhotos={requiredPhotoCount}
+          maxPhotos={maxCaptures}
+          minPhotos={slotsNeeded}
           onCapture={addPhoto}
           onNext={() => {
-            if (photos.length === requiredPhotoCount) {
+            if (photos.length <= slotsNeeded) {
               setSelectedPhotos(photos.map((_, i) => i));
-              goToStep("select");
-            } else {
-              goToStep("select");
             }
+            goToStep("select");
           }}
           onPrev={() => {
             setPhotos([]);
@@ -203,7 +203,7 @@ function ServiceContent() {
       {currentStep === "select" && (
         <SelectSection
           photos={photos}
-          requiredCount={requiredPhotoCount}
+          requiredCount={slotsNeeded}
           selectedPhotos={selectedPhotos}
           setSelectedPhotos={setSelectedPhotos}
           onNext={() => goToStep("complete")}
@@ -568,6 +568,7 @@ function CameraSection({
   config,
   photos,
   maxPhotos,
+  minPhotos,
   onCapture,
   onNext,
   onPrev,
@@ -575,6 +576,7 @@ function CameraSection({
   config: DeviceConfig;
   photos: string[];
   maxPhotos: number;
+  minPhotos: number;
   onCapture: (dataUrl: string) => void;
   onNext: () => void;
   onPrev: () => void;
@@ -645,7 +647,7 @@ function CameraSection({
     }, 1000);
   }, [countdown, photos.length, maxPhotos, config.captureSeconds, onCapture]);
 
-  const canProceed = photos.length >= maxPhotos;
+  const canProceed = photos.length >= minPhotos;
 
   return (
     <section className="w-full h-full flex relative z-10">
@@ -821,9 +823,11 @@ function CompleteSection({
     const frame = FRAME_INFO[selectedFrame];
     if (!frame) return;
 
-    const canvasWidth = 1200;
-    const canvasHeight = selectedFrame === "1x1" ? 1200 : selectedFrame === "1x2" ? 600 : 1200;
     const padding = 20;
+    const canvasWidth = 1200;
+    const cellW = (canvasWidth - padding * (frame.cols + 1)) / frame.cols;
+    const cellH = cellW * 3 / 4;
+    const canvasHeight = Math.round(cellH * frame.rows + padding * (frame.rows + 1));
 
     const canvas = document.createElement("canvas");
     canvas.width = canvasWidth;
@@ -852,9 +856,6 @@ function CompleteSection({
     }
 
     // Draw photos in grid
-    const cellW = (canvasWidth - padding * (frame.cols + 1)) / frame.cols;
-    const cellH = (canvasHeight - padding * (frame.rows + 1)) / frame.rows;
-
     for (let i = 0; i < selectedPhotos.length && i < frame.count; i++) {
       const photo = photos[selectedPhotos[i]];
       if (!photo) continue;
