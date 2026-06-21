@@ -114,20 +114,11 @@ function ServiceContent() {
 
   const loadBackgrounds = async (id: string) => {
     try {
-      const res = await fetch(`/api/image/list/1?device_id=${id}`);
+      const res = await fetch(`/api/image/list/1?device_id=${id}&check_files=1`);
       if (!res.ok) return;
       const data = await res.json();
       if (data.images?.length > 0) {
-        const available: BGImage[] = [];
-        for (const img of data.images) {
-          try {
-            const check = await fetch(`/static/images/${img.filename}`, { method: "HEAD" });
-            if (check.ok) available.push(img);
-          } catch {
-            // skip unavailable
-          }
-        }
-        setBackgroundImages(available);
+        setBackgroundImages(data.images);
       }
     } catch {
       // use fallback
@@ -606,11 +597,20 @@ function CameraSection({
   const startCamera = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { width: { ideal: 1920 }, height: { ideal: 1080 }, facingMode: "user" },
+        video: { width: { ideal: 1920 }, height: { ideal: 1080 } },
       });
       if (videoRef.current) videoRef.current.srcObject = stream;
-    } catch {
-      setCameraError("카메라를 사용할 수 없습니다");
+    } catch (err) {
+      const e = err as DOMException;
+      if (e.name === "NotAllowedError") {
+        setCameraError("카메라 권한이 거부되었습니다. 브라우저 설정에서 허용해 주세요.");
+      } else if (e.name === "NotFoundError") {
+        setCameraError("연결된 카메라가 없습니다.");
+      } else if (e.name === "NotReadableError") {
+        setCameraError("카메라가 다른 프로그램에서 사용 중입니다.");
+      } else {
+        setCameraError(`카메라를 사용할 수 없습니다 (${e.name || e.message})`);
+      }
     }
   };
 
@@ -658,7 +658,13 @@ function CameraSection({
           {cameraError ? (
             <div className="absolute inset-0 flex flex-col items-center justify-center bg-gradient-to-br from-gray-700 to-gray-900">
               <span className="text-6xl mb-5 opacity-30">&#128247;</span>
-              <p className="text-white/60">{cameraError}</p>
+              <p className="text-white/60 mb-6">{cameraError}</p>
+              <button
+                className="px-6 py-3 bg-white/10 hover:bg-white/20 text-white rounded-xl transition-colors"
+                onClick={() => { setCameraError(null); startCamera(); }}
+              >
+                다시 시도
+              </button>
             </div>
           ) : (
             <video ref={videoRef} autoPlay playsInline muted className="camera-video" />
