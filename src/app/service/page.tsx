@@ -86,21 +86,7 @@ function ServiceContent() {
   useEffect(() => {
     loadDeviceConfig(deviceId);
     loadBackgrounds(deviceId);
-    loadImageBaseUrl();
   }, [deviceId]);
-
-  const loadImageBaseUrl = async () => {
-    try {
-      const res = await fetch("/api/images/url");
-      if (!res.ok) return;
-      const data = await res.json();
-      if (data.baseUrl) {
-        setImageBaseUrl(data.baseUrl);
-      }
-    } catch {
-      // use default /static/images
-    }
-  };
 
   const loadDeviceConfig = async (id: string) => {
     try {
@@ -134,6 +120,9 @@ function ServiceContent() {
       const data = await res.json();
       if (data.images?.length > 0) {
         setBackgroundImages(data.images);
+      }
+      if (data.baseUrl) {
+        setImageBaseUrl(data.baseUrl);
       }
     } catch {
       // use fallback
