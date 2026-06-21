@@ -11,7 +11,7 @@ interface DeviceConfig {
   paymentEnabled: boolean;
   paymentAmount: number;
   captureSeconds: number;
-  captureCountMode: number;
+  captureCount: number;
   chromakeyRgb: string;
   captureModes: string[];
 }
@@ -28,9 +28,9 @@ const DEFAULT_CONFIG: DeviceConfig = {
   paymentEnabled: false,
   paymentAmount: 1000,
   captureSeconds: 3,
-  captureCountMode: 4,
+  captureCount: 4,
   chromakeyRgb: "0,255,0",
-  captureModes: ["1x1", "1x2", "2x2"],
+  captureModes: ["1x1", "2x2"],
 };
 
 const FALLBACK_BACKGROUNDS = [
@@ -45,7 +45,11 @@ const FALLBACK_BACKGROUNDS = [
 const FRAME_INFO: Record<string, { label: string; cols: number; rows: number; count: number }> = {
   "1x1": { label: "1컷", cols: 1, rows: 1, count: 1 },
   "1x2": { label: "2컷", cols: 2, rows: 1, count: 2 },
+  "2x1": { label: "2컷", cols: 1, rows: 2, count: 2 },
   "2x2": { label: "4컷", cols: 2, rows: 2, count: 4 },
+  "2x3": { label: "6컷", cols: 3, rows: 2, count: 6 },
+  "2x4": { label: "8컷", cols: 4, rows: 2, count: 8 },
+  "4x1": { label: "4컷", cols: 1, rows: 4, count: 4 },
 };
 
 function FloatingElements() {
@@ -70,7 +74,7 @@ function ServiceContent() {
 
   const [currentStep, setCurrentStep] = useState<Step>("start");
   const [config, setConfig] = useState<DeviceConfig>(DEFAULT_CONFIG);
-  const [sessionId, setSessionId] = useState<string | null>(null);
+  const [orderId, setOrderId] = useState<string | null>(null);
   const [selectedFrame, setSelectedFrame] = useState<string | null>(null);
   const [selectedBackground, setSelectedBackground] = useState<number | null>(null);
   const [backgroundImages, setBackgroundImages] = useState<BGImage[]>([]);
@@ -90,9 +94,8 @@ function ServiceContent() {
       const data = await res.json();
       const s = data.settings || {};
 
-      const settingsRes = await fetch("/api/setting");
-      const globalData = settingsRes.ok ? await settingsRes.json() : { settings: {} };
-      const g = globalData.settings || {};
+      const captureCount = parseInt(s.CAPTURE_COUNT_UNIFORM || "4", 10) || 4;
+      const modes = (s.CAPTURE_MODES || "1x1,2x2").split(",").map((m: string) => m.trim()).filter(Boolean);
 
       setConfig({
         deviceId: id,
@@ -100,9 +103,9 @@ function ServiceContent() {
         paymentEnabled: s.PAYMENT_ENABLED === "1",
         paymentAmount: parseInt(s.PAYMENT_AMOUNT || "1000", 10),
         captureSeconds: parseInt(s.CAPTURE_SECONDS || "3", 10),
-        captureCountMode: parseInt(s.CAPTURE_COUNT_MODE || "4", 10),
+        captureCount,
         chromakeyRgb: s.CHROMAKEY_RGB || "0,255,0",
-        captureModes: (g.CAPTURE_MODES || "1x1,1x2,2x2").split(","),
+        captureModes: modes,
       });
     } catch {
       // use defaults
@@ -115,7 +118,16 @@ function ServiceContent() {
       if (!res.ok) return;
       const data = await res.json();
       if (data.images?.length > 0) {
-        setBackgroundImages(data.images);
+        const available: BGImage[] = [];
+        for (const img of data.images) {
+          try {
+            const check = await fetch(`/static/images/${img.filename}`, { method: "HEAD" });
+            if (check.ok) available.push(img);
+          } catch {
+            // skip unavailable
+          }
+        }
+        setBackgroundImages(available);
       }
     } catch {
       // use fallback
@@ -136,7 +148,7 @@ function ServiceContent() {
 
   const resetAll = () => {
     setCurrentStep("start");
-    setSessionId(null);
+    setOrderId(null);
     setSelectedFrame(null);
     setSelectedBackground(null);
     setPhotos([]);
@@ -153,8 +165,8 @@ function ServiceContent() {
       {currentStep === "payment" && (
         <PaymentSection
           config={config}
-          sessionId={sessionId}
-          setSessionId={setSessionId}
+          orderId={orderId}
+          setOrderId={setOrderId}
           onNext={() => goToStep("frame")}
           onPrev={resetAll}
         />
@@ -266,14 +278,14 @@ function StartSection({ onNext }: { onNext: () => void }) {
 /* ───── Payment ───── */
 function PaymentSection({
   config,
-  sessionId,
-  setSessionId,
+  orderId,
+  setOrderId,
   onNext,
   onPrev,
 }: {
   config: DeviceConfig;
-  sessionId: string | null;
-  setSessionId: (id: string | null) => void;
+  orderId: string | null;
+  setOrderId: (id: string | null) => void;
   onNext: () => void;
   onPrev: () => void;
 }) {
@@ -297,10 +309,10 @@ function PaymentSection({
         body: JSON.stringify({ deviceId: config.deviceId, amount: config.paymentAmount }),
       });
       const data = await res.json();
-      if (data.sessionId) {
-        setSessionId(data.sessionId);
+      if (data.orderId) {
+        setOrderId(data.orderId);
         setStatus("waiting");
-        startPolling(data.sessionId);
+        startPolling(data.orderId);
       } else {
         setErrorMsg(data.error || "결제 요청 실패");
         setStatus("error");
@@ -311,7 +323,7 @@ function PaymentSection({
     }
   };
 
-  const startPolling = (sid: string) => {
+  const startPolling = (oid: string) => {
     if (pollRef.current) clearInterval(pollRef.current);
     let attempts = 0;
     pollRef.current = setInterval(async () => {
@@ -323,9 +335,9 @@ function PaymentSection({
         return;
       }
       try {
-        const res = await fetch(`/api/payments/status/${sid}`);
+        const res = await fetch(`/api/payments/status/${oid}`);
         const data = await res.json();
-        if (data.paymentStatus === "completed") {
+        if (data.paymentStatus === "paid") {
           if (pollRef.current) clearInterval(pollRef.current);
           setStatus("completed");
           setTimeout(onNext, 800);
@@ -503,23 +515,35 @@ function BackgroundSection({
 
       <div className="grid grid-cols-3 gap-8 mb-20 animate-fadeInUp">
         {hasDbImages
-          ? backgroundImages.map((bg) => (
-              <div
-                key={bg.id}
-                className={`background-option w-52 h-32 relative ${selectedBackground === bg.id ? "selected" : ""}`}
-                onClick={() => onSelect(bg.id)}
-              >
-                {selectedBackground === bg.id && <span className="check-mark">&#10003;</span>}
-                <img
-                  src={`/static/images/${bg.filename}`}
-                  alt={bg.name}
-                  className="w-full h-full object-cover rounded-[13px]"
-                  onError={(e) => {
-                    (e.target as HTMLImageElement).style.display = "none";
-                  }}
-                />
-              </div>
-            ))
+          ? backgroundImages.map((bg) => {
+              const isVideo = bg.filename.endsWith(".mp4") || bg.filename.endsWith(".webm");
+              return (
+                <div
+                  key={bg.id}
+                  className={`background-option w-52 h-32 relative ${selectedBackground === bg.id ? "selected" : ""}`}
+                  onClick={() => onSelect(bg.id)}
+                >
+                  {selectedBackground === bg.id && <span className="check-mark">&#10003;</span>}
+                  {isVideo ? (
+                    <video
+                      src={`/static/images/${bg.filename}`}
+                      className="w-full h-full object-cover rounded-[13px]"
+                      muted
+                      loop
+                      autoPlay
+                      playsInline
+                    />
+                  ) : (
+                    <img
+                      src={`/static/images/${bg.filename}`}
+                      alt={bg.name}
+                      className="w-full h-full object-cover rounded-[13px]"
+                      onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+                    />
+                  )}
+                </div>
+              );
+            })
           : FALLBACK_BACKGROUNDS.map((bg) => (
               <div
                 key={bg.id}
@@ -878,16 +902,6 @@ function CompleteSection({
 
     if (isTauri) {
       try {
-        const res = await fetch("/api/session", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            deviceId: "temp",
-            data: { compositeImage: compositeImage.substring(0, 100) },
-          }),
-        });
-        const data = await res.json();
-
         const blob = await fetch(compositeImage).then((r) => r.blob());
         const buffer = await blob.arrayBuffer();
         const uint8 = new Uint8Array(buffer);

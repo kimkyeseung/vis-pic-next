@@ -5,52 +5,45 @@ export async function POST(request: NextRequest) {
   try {
     const formData = await request.formData();
 
-    const mul_no = formData.get("mul_no") as string | null;
-    const pay_state = formData.get("pay_state") as string | null;
+    const mulNo = formData.get("mul_no") as string | null;
+    const payState = formData.get("pay_state") as string | null;
     const price = formData.get("price") as string | null;
-    const sessionId = formData.get("var1") as string | null;
+    const orderId = formData.get("var1") as string | null;
     const deviceId = formData.get("var2") as string | null;
 
-    if (!sessionId) {
-      console.error("PayApp feedback missing var1 (sessionId)");
+    if (!orderId) {
       return new Response("FAIL", { status: 400 });
     }
 
-    const session = await prisma.session.findUnique({
-      where: { id: sessionId },
+    const payment = await prisma.payappPayment.findUnique({
+      where: { orderId },
     });
 
-    if (!session) {
-      console.error(`PayApp feedback: session not found (id=${sessionId})`);
+    if (!payment) {
       return new Response("FAIL", { status: 404 });
     }
 
-    const existingData = JSON.parse(session.data);
-
-    let paymentStatus: string;
-    const payStateNum = Number(pay_state);
+    const payStateNum = Number(payState);
+    let status: string;
 
     if (payStateNum === 4) {
-      paymentStatus = "completed";
+      status = "paid";
     } else if (payStateNum === 5) {
-      paymentStatus = "refunded";
+      status = "refunded";
     } else {
-      paymentStatus = "failed";
+      status = "failed";
     }
 
-    const updatedData = {
-      ...existingData,
-      paymentStatus,
-      mul_no: mul_no || existingData.mul_no,
-      pay_state: payStateNum,
-      price: price ? Number(price) : existingData.amount,
-      deviceId: deviceId || existingData.deviceId,
-    };
-
-    await prisma.session.update({
-      where: { id: sessionId },
+    await prisma.payappPayment.update({
+      where: { orderId },
       data: {
-        data: JSON.stringify(updatedData),
+        status,
+        payState: payState || undefined,
+        mulNo: mulNo || undefined,
+        rawPayload: JSON.stringify(Object.fromEntries(formData.entries())),
+        paidAt: status === "paid" ? new Date() : undefined,
+        cancelledAt: status === "refunded" ? new Date() : undefined,
+        updatedAt: new Date(),
       },
     });
 

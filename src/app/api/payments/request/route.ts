@@ -7,46 +7,39 @@ export async function POST(request: NextRequest) {
     const { deviceId, amount } = body;
 
     if (!deviceId || typeof deviceId !== "string") {
-      return NextResponse.json(
-        { error: "deviceId is required" },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: "deviceId is required" }, { status: 400 });
     }
 
     if (!amount || typeof amount !== "number" || amount <= 0) {
-      return NextResponse.json(
-        { error: "amount must be a positive number" },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: "amount must be a positive number" }, { status: 400 });
     }
 
-    const expiresAt = new Date(Date.now() + 30 * 60 * 1000);
+    const orderId = `arpic-${deviceId}-${Date.now()}`;
+    const goodname = process.env.PAYAPP_GOODNAME || "AR-pic 촬영";
 
-    const session = await prisma.session.create({
+    const payment = await prisma.payappPayment.create({
       data: {
+        orderId,
         deviceId,
-        data: JSON.stringify({
-          paymentStatus: "pending",
-          amount,
-          mul_no: null,
-        }),
-        expiresAt,
+        amount,
+        goodname,
+        status: "pending",
+        createdAt: new Date(),
+        updatedAt: new Date(),
       },
     });
 
     const payappUserId = process.env.PAYAPP_USERID;
-    const goodname = process.env.PAYAPP_GOODNAME;
     const recvphone = process.env.PAYAPP_RECVPHONE;
     const feedbackurl = process.env.PAYAPP_FEEDBACK_URL;
     const returnurl = process.env.PAYAPP_RETURN_URL;
 
-    if (!payappUserId || !goodname || !recvphone || !feedbackurl || !returnurl) {
-      console.error("PayApp environment variables are not fully configured");
+    if (!payappUserId || !recvphone || !feedbackurl || !returnurl) {
       return NextResponse.json({
-        sessionId: session.id,
+        orderId: payment.orderId,
         payUrl: null,
-        mul_no: null,
-        warning: "PayApp is not configured. Payment session created but payment request was not sent.",
+        mulNo: null,
+        warning: "PayApp is not configured",
       });
     }
 
@@ -58,62 +51,49 @@ export async function POST(request: NextRequest) {
     params.append("recvphone", recvphone);
     params.append("feedbackurl", feedbackurl);
     params.append("returnurl", returnurl);
-    params.append("var1", session.id);
+    params.append("var1", orderId);
     params.append("var2", deviceId);
 
     try {
-      const payappResponse = await fetch(
-        "https://api.payapp.kr/oapi/apiLoad.html",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/x-www-form-urlencoded",
-          },
-          body: params.toString(),
-        }
-      );
-
-      const payappData = await payappResponse.json();
+      const payappRes = await fetch("https://api.payapp.kr/oapi/apiLoad.html", {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: params.toString(),
+      });
+      const payappData = await payappRes.json();
 
       if (payappData.state === 1) {
-        const sessionData = JSON.parse(session.data);
-        sessionData.mul_no = payappData.mul_no;
-
-        await prisma.session.update({
-          where: { id: session.id },
+        await prisma.payappPayment.update({
+          where: { orderId },
           data: {
-            data: JSON.stringify(sessionData),
+            mulNo: String(payappData.mul_no),
+            userid: payappUserId,
+            updatedAt: new Date(),
           },
         });
-
         return NextResponse.json({
-          sessionId: session.id,
+          orderId: payment.orderId,
           payUrl: payappData.payurl,
-          mul_no: payappData.mul_no,
+          mulNo: payappData.mul_no,
         });
       }
 
-      console.error("PayApp request failed:", payappData.errorMessage);
       return NextResponse.json({
-        sessionId: session.id,
+        orderId: payment.orderId,
         payUrl: null,
-        mul_no: null,
-        error: payappData.errorMessage || "PayApp payment request failed",
+        mulNo: null,
+        error: payappData.errorMessage || "PayApp request failed",
       });
-    } catch (fetchError) {
-      console.error("PayApp API unreachable:", fetchError);
+    } catch {
       return NextResponse.json({
-        sessionId: session.id,
+        orderId: payment.orderId,
         payUrl: null,
-        mul_no: null,
-        warning: "PayApp API is unreachable. Payment session created for polling.",
+        mulNo: null,
+        warning: "PayApp API unreachable",
       });
     }
   } catch (error) {
-    console.error("Error creating payment request:", error);
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
-    );
+    console.error("Error creating payment:", error);
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }

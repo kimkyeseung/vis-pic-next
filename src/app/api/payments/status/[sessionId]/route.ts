@@ -6,31 +6,23 @@ export async function GET(
   { params }: { params: Promise<{ sessionId: string }> }
 ) {
   try {
-    const { sessionId } = await params;
+    const { sessionId: orderId } = await params;
 
-    const session = await prisma.session.findUnique({
-      where: { id: sessionId },
+    const payment = await prisma.payappPayment.findUnique({
+      where: { orderId },
     });
 
-    if (!session) {
-      return NextResponse.json(
-        { error: "Session not found" },
-        { status: 404 }
-      );
+    if (!payment) {
+      return NextResponse.json({ error: "Payment not found" }, { status: 404 });
     }
 
-    const data = JSON.parse(session.data);
-
     return NextResponse.json({
-      sessionId: session.id,
-      paymentStatus: data.paymentStatus || null,
-      amount: data.amount || null,
+      orderId: payment.orderId,
+      paymentStatus: payment.status,
+      amount: payment.amount,
     });
   } catch (error) {
     console.error("Error fetching payment status:", error);
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }
