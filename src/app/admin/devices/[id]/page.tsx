@@ -111,7 +111,17 @@ export default function DeviceEditPage({
     { name: "PAYMENT_AMOUNT", label: "결제 금액 (원)", type: "number" },
     { name: "CAPTURE_SECONDS", label: "촬영 카운트다운 (초)", type: "number" },
     { name: "CAPTURE_COUNT_MODE", label: "촬영 횟수", type: "number" },
-    { name: "CHROMAKEY_RGB", label: "크로마키 RGB", type: "text" },
+    {
+      name: "CHROMAKEY_MODE",
+      label: "배경 제거 모드",
+      type: "select",
+      options: [
+        { value: "mediapipe", label: "AI 배경 제거" },
+        { value: "chromakey", label: "크로마키" },
+        { value: "off", label: "비활성" },
+      ],
+    },
+    { name: "CHROMAKEY_RGB", label: "크로마키 RGB (크로마키 모드)", type: "text" },
   ];
 
   if (loading) {

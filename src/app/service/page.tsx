@@ -5,6 +5,8 @@ import { useSearchParams } from "next/navigation";
 
 type Step = "start" | "payment" | "frame" | "background" | "camera" | "select" | "complete";
 
+type BgRemovalMode = "mediapipe" | "chromakey" | "off";
+
 interface DeviceConfig {
   deviceId: string;
   deviceName: string;
@@ -14,6 +16,7 @@ interface DeviceConfig {
   captureCount: number;
   chromakeyRgb: string;
   captureModes: string[];
+  bgRemovalMode: BgRemovalMode;
 }
 
 interface BGImage {
@@ -31,6 +34,7 @@ const DEFAULT_CONFIG: DeviceConfig = {
   captureCount: 4,
   chromakeyRgb: "0,255,0",
   captureModes: ["1x1", "2x2"],
+  bgRemovalMode: "mediapipe",
 };
 
 const FALLBACK_BACKGROUNDS = [
@@ -98,6 +102,12 @@ function ServiceContent() {
       const captureCount = parseInt(s.CAPTURE_COUNT_UNIFORM || "4", 10) || 4;
       const modes = (s.CAPTURE_MODES || "1x1,2x2").split(",").map((m: string) => m.trim()).filter(Boolean);
 
+      const modeRaw = s.CHROMAKEY_MODE || "mediapipe";
+      let bgRemovalMode: BgRemovalMode = "mediapipe";
+      if (modeRaw === "0" || modeRaw === "off") bgRemovalMode = "off";
+      else if (modeRaw === "1" || modeRaw === "chromakey") bgRemovalMode = "chromakey";
+      else if (modeRaw === "mediapipe") bgRemovalMode = "mediapipe";
+
       setConfig({
         deviceId: id,
         deviceName: data.device?.name || id,
@@ -107,6 +117,7 @@ function ServiceContent() {
         captureCount,
         chromakeyRgb: s.CHROMAKEY_RGB || "0,255,0",
         captureModes: modes,
+        bgRemovalMode,
       });
     } catch {
       // use defaults
@@ -601,10 +612,14 @@ function CameraSection({
   const videoRef = useRef<HTMLVideoElement>(null);
   const displayCanvasRef = useRef<HTMLCanvasElement>(null);
   const bgSourceRef = useRef<HTMLImageElement | HTMLVideoElement | null>(null);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const segmenterRef = useRef<any>(null);
   const animFrameRef = useRef<number>(0);
   const [countdown, setCountdown] = useState<number | null>(null);
   const [cameraError, setCameraError] = useState<string | null>(null);
   const [flash, setFlash] = useState(false);
+
+  const bgRemovalMode = config.bgRemovalMode;
 
   const chromaKey = useMemo(() => {
     const [r, g, b] = config.chromakeyRgb.split(",").map(Number);
@@ -613,6 +628,7 @@ function CameraSection({
 
   useEffect(() => {
     bgSourceRef.current = null;
+    if (bgRemovalMode === "off") return;
     if (selectedBackground === null || selectedBackground <= 0) return;
     const bgInfo = backgroundImages.find((b) => b.id === selectedBackground);
     if (!bgInfo) return;
@@ -636,7 +652,42 @@ function CameraSection({
       img.onload = () => { bgSourceRef.current = img; };
       img.src = url;
     }
-  }, [selectedBackground, backgroundImages, imageBaseUrl]);
+  }, [selectedBackground, backgroundImages, imageBaseUrl, bgRemovalMode]);
+
+  useEffect(() => {
+    if (bgRemovalMode !== "mediapipe") return;
+    let cancelled = false;
+
+    async function initSegmenter() {
+      try {
+        const { FilesetResolver, ImageSegmenter } = await import("@mediapipe/tasks-vision");
+        if (cancelled) return;
+        const vision = await FilesetResolver.forVisionTasks(
+          "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/wasm"
+        );
+        if (cancelled) return;
+        const segmenter = await ImageSegmenter.createFromOptions(vision, {
+          baseOptions: {
+            modelAssetPath:
+              "https://storage.googleapis.com/mediapipe-models/image_segmenter/selfie_segmenter_landscape/float16/latest/selfie_segmenter_landscape.tflite",
+          },
+          runningMode: "VIDEO",
+          outputConfidenceMasks: true,
+        });
+        if (cancelled) return;
+        segmenterRef.current = segmenter;
+      } catch (err) {
+        console.error("MediaPipe initialization failed:", err);
+      }
+    }
+
+    initSegmenter();
+    return () => {
+      cancelled = true;
+      segmenterRef.current?.close();
+      segmenterRef.current = null;
+    };
+  }, [bgRemovalMode]);
 
   useEffect(() => {
     startCamera();
@@ -669,55 +720,98 @@ function CameraSection({
 
       if (display.width !== w) display.width = w;
       if (display.height !== h) display.height = h;
-      if (offscreen.width !== w) offscreen.width = w;
-      if (offscreen.height !== h) offscreen.height = h;
 
       const ctx = display.getContext("2d")!;
+
+      if (bgRemovalMode === "off") {
+        ctx.save();
+        ctx.translate(w, 0);
+        ctx.scale(-1, 1);
+        ctx.drawImage(video, 0, 0, w, h);
+        ctx.restore();
+        animFrameRef.current = requestAnimationFrame(processFrame);
+        return;
+      }
+
+      if (offscreen.width !== w) offscreen.width = w;
+      if (offscreen.height !== h) offscreen.height = h;
       const offCtx = offscreen.getContext("2d")!;
 
-      if (bgSourceRef.current) {
-        ctx.drawImage(bgSourceRef.current, 0, 0, w, h);
-      } else if (selectedBackground !== null && selectedBackground < 0) {
-        const fb = FALLBACK_BACKGROUNDS.find((b) => b.id === selectedBackground);
-        if (fb) fillGradientFromCSS(ctx, w, h, fb.gradient);
-        else { ctx.fillStyle = "#333"; ctx.fillRect(0, 0, w, h); }
-      } else {
-        ctx.fillStyle = "#333";
-        ctx.fillRect(0, 0, w, h);
-      }
-
-      offCtx.save();
-      offCtx.translate(w, 0);
-      offCtx.scale(-1, 1);
       offCtx.drawImage(video, 0, 0, w, h);
-      offCtx.restore();
 
-      const imageData = offCtx.getImageData(0, 0, w, h);
-      const data = imageData.data;
-      const { r: kr, g: kg, b: kb } = chromaKey;
+      let processed = false;
 
-      for (let i = 0; i < data.length; i += 4) {
-        const dr = data[i] - kr;
-        const dg = data[i + 1] - kg;
-        const db = data[i + 2] - kb;
-        const distSq = dr * dr + dg * dg + db * db;
-
-        if (distSq < HARD) {
-          data[i + 3] = 0;
-        } else if (distSq < SOFT) {
-          data[i + 3] = Math.round(((Math.sqrt(distSq) - 50) / 50) * 255);
+      if (bgRemovalMode === "mediapipe" && segmenterRef.current) {
+        try {
+          const result = segmenterRef.current.segmentForVideo(video, performance.now());
+          const masks = result.confidenceMasks;
+          if (masks && masks.length > 0) {
+            const personIdx = masks.length > 1 ? 1 : 0;
+            const mask = masks[personIdx].getAsFloat32Array();
+            const imageData = offCtx.getImageData(0, 0, w, h);
+            const data = imageData.data;
+            for (let i = 0; i < mask.length; i++) {
+              data[i * 4 + 3] = Math.round(mask[i] * 255);
+            }
+            offCtx.putImageData(imageData, 0, 0);
+            processed = true;
+          }
+        } catch {
+          // segmenter not ready or error
         }
+      } else if (bgRemovalMode === "chromakey") {
+        const imageData = offCtx.getImageData(0, 0, w, h);
+        const data = imageData.data;
+        const { r: kr, g: kg, b: kb } = chromaKey;
+        for (let i = 0; i < data.length; i += 4) {
+          const dr = data[i] - kr;
+          const dg = data[i + 1] - kg;
+          const db = data[i + 2] - kb;
+          const distSq = dr * dr + dg * dg + db * db;
+          if (distSq < HARD) {
+            data[i + 3] = 0;
+          } else if (distSq < SOFT) {
+            data[i + 3] = Math.round(((Math.sqrt(distSq) - 50) / 50) * 255);
+          }
+        }
+        offCtx.putImageData(imageData, 0, 0);
+        processed = true;
       }
 
-      offCtx.putImageData(imageData, 0, 0);
-      ctx.drawImage(offscreen, 0, 0);
+      if (processed) {
+        drawBackground(ctx, w, h);
+        ctx.save();
+        ctx.translate(w, 0);
+        ctx.scale(-1, 1);
+        ctx.drawImage(offscreen, 0, 0, w, h);
+        ctx.restore();
+      } else {
+        ctx.save();
+        ctx.translate(w, 0);
+        ctx.scale(-1, 1);
+        ctx.drawImage(video, 0, 0, w, h);
+        ctx.restore();
+      }
 
       animFrameRef.current = requestAnimationFrame(processFrame);
     };
 
     animFrameRef.current = requestAnimationFrame(processFrame);
     return () => cancelAnimationFrame(animFrameRef.current);
-  }, [selectedBackground, chromaKey]);
+  }, [selectedBackground, chromaKey, bgRemovalMode]);
+
+  function drawBackground(ctx: CanvasRenderingContext2D, w: number, h: number) {
+    if (bgSourceRef.current) {
+      ctx.drawImage(bgSourceRef.current, 0, 0, w, h);
+    } else if (selectedBackground !== null && selectedBackground < 0) {
+      const fb = FALLBACK_BACKGROUNDS.find((b) => b.id === selectedBackground);
+      if (fb) fillGradientFromCSS(ctx, w, h, fb.gradient);
+      else { ctx.fillStyle = "#333"; ctx.fillRect(0, 0, w, h); }
+    } else {
+      ctx.fillStyle = "#333";
+      ctx.fillRect(0, 0, w, h);
+    }
+  }
 
   const startCamera = async () => {
     try {

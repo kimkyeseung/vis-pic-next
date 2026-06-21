@@ -39,7 +39,7 @@ const GROUPS: SettingGroup[] = [
     label: "크로마키",
     prefix: ["CHROMAKEY_"],
     fields: [
-      { name: "CHROMAKEY_MODE", label: "크로마키 모드", type: "select", options: [{ value: "0", label: "비활성" }, { value: "1", label: "활성" }] },
+      { name: "CHROMAKEY_MODE", label: "배경 제거 모드", type: "select", options: [{ value: "mediapipe", label: "AI 배경 제거 (기본)" }, { value: "chromakey", label: "크로마키 (그린스크린)" }, { value: "off", label: "비활성" }] },
       { name: "CHROMAKEY_RGB", label: "크로마키 색상 (R,G,B)" },
     ],
   },

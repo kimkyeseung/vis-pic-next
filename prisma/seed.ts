@@ -63,6 +63,7 @@ async function main() {
     { name: "PAYMENT_AMOUNT", value: "1000", description: "결제 금액" },
     { name: "CAPTURE_SECONDS", value: "3", description: "촬영 카운트다운" },
     { name: "CAPTURE_COUNT_MODE", value: "4", description: "촬영 횟수" },
+    { name: "CHROMAKEY_MODE", value: "mediapipe", description: "배경 제거 모드 (mediapipe/chromakey/off)" },
     { name: "CHROMAKEY_RGB", value: "0,255,0", description: "크로마키 색상" },
   ];
 
