@@ -22,6 +22,21 @@ export default function ImagesPage() {
   const [imageTypes, setImageTypes] = useState<ImageType[]>([]);
   const [selectedType, setSelectedType] = useState<number>(1);
   const [loading, setLoading] = useState(true);
+  const [imageBaseUrl, setImageBaseUrl] = useState<string>("/static/images");
+
+  useEffect(() => {
+    const loadImageBaseUrl = async () => {
+      try {
+        const res = await fetch("/api/images/url");
+        if (!res.ok) return;
+        const data = await res.json();
+        if (data.baseUrl) setImageBaseUrl(data.baseUrl);
+      } catch {
+        // use default
+      }
+    };
+    loadImageBaseUrl();
+  }, []);
 
   const fetchImages = async (typeId: number) => {
     setLoading(true);
@@ -123,7 +138,7 @@ export default function ImagesPage() {
             >
               <div className="aspect-video bg-gray-700 flex items-center justify-center">
                 <img
-                  src={`/static/images/${image.filename}`}
+                  src={`${imageBaseUrl}/${image.filename}`}
                   alt={image.name}
                   className="w-full h-full object-cover"
                   onError={(e) => {
