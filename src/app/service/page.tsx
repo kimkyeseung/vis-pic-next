@@ -81,11 +81,26 @@ function ServiceContent() {
   const [photos, setPhotos] = useState<string[]>([]);
   const [selectedPhotos, setSelectedPhotos] = useState<number[]>([]);
   const [compositeImage, setCompositeImage] = useState<string | null>(null);
+  const [imageBaseUrl, setImageBaseUrl] = useState<string>("/static/images");
 
   useEffect(() => {
     loadDeviceConfig(deviceId);
     loadBackgrounds(deviceId);
+    loadImageBaseUrl();
   }, [deviceId]);
+
+  const loadImageBaseUrl = async () => {
+    try {
+      const res = await fetch("/api/images/url");
+      if (!res.ok) return;
+      const data = await res.json();
+      if (data.baseUrl) {
+        setImageBaseUrl(data.baseUrl);
+      }
+    } catch {
+      // use default /static/images
+    }
+  };
 
   const loadDeviceConfig = async (id: string) => {
     try {
@@ -176,6 +191,7 @@ function ServiceContent() {
         <BackgroundSection
           backgroundImages={backgroundImages}
           selectedBackground={selectedBackground}
+          imageBaseUrl={imageBaseUrl}
           onSelect={setSelectedBackground}
           onNext={() => goToStep("camera")}
           onPrev={() => goToStep("frame")}
@@ -221,6 +237,7 @@ function ServiceContent() {
           selectedFrame={selectedFrame!}
           selectedBackground={selectedBackground}
           backgroundImages={backgroundImages}
+          imageBaseUrl={imageBaseUrl}
           compositeImage={compositeImage}
           setCompositeImage={setCompositeImage}
           onRestart={resetAll}
@@ -486,12 +503,14 @@ function FrameSection({
 function BackgroundSection({
   backgroundImages,
   selectedBackground,
+  imageBaseUrl,
   onSelect,
   onNext,
   onPrev,
 }: {
   backgroundImages: BGImage[];
   selectedBackground: number | null;
+  imageBaseUrl: string;
   onSelect: (bg: number) => void;
   onNext: () => void;
   onPrev: () => void;
@@ -517,7 +536,7 @@ function BackgroundSection({
                   {selectedBackground === bg.id && <span className="check-mark">&#10003;</span>}
                   {isVideo ? (
                     <video
-                      src={`/static/images/${bg.filename}`}
+                      src={`${imageBaseUrl}/${bg.filename}`}
                       className="w-full h-full object-cover rounded-[13px]"
                       muted
                       loop
@@ -526,7 +545,7 @@ function BackgroundSection({
                     />
                   ) : (
                     <img
-                      src={`/static/images/${bg.filename}`}
+                      src={`${imageBaseUrl}/${bg.filename}`}
                       alt={bg.name}
                       className="w-full h-full object-cover rounded-[13px]"
                       onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
@@ -796,6 +815,7 @@ function CompleteSection({
   selectedFrame,
   selectedBackground,
   backgroundImages,
+  imageBaseUrl,
   compositeImage,
   setCompositeImage,
   onRestart,
@@ -805,6 +825,7 @@ function CompleteSection({
   selectedFrame: string;
   selectedBackground: number | null;
   backgroundImages: BGImage[];
+  imageBaseUrl: string;
   compositeImage: string | null;
   setCompositeImage: (img: string | null) => void;
   onRestart: () => void;
@@ -841,7 +862,7 @@ function CompleteSection({
 
     if (bgInfo) {
       try {
-        const bgImg = await loadImage(`/static/images/${bgInfo.filename}`);
+        const bgImg = await loadImage(`${imageBaseUrl}/${bgInfo.filename}`);
         ctx.drawImage(bgImg, 0, 0, canvasWidth, canvasHeight);
       } catch {
         fillGradient(ctx, canvasWidth, canvasHeight);

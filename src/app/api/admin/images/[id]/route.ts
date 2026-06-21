@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/db";
-import { unlink } from "fs/promises";
-import path from "path";
+import { deleteImage } from "@/lib/storage";
 
 export async function DELETE(
   request: NextRequest,
@@ -21,19 +20,8 @@ export async function DELETE(
       );
     }
 
-    // Delete file from disk
-    try {
-      const filepath = path.join(
-        process.cwd(),
-        "public",
-        "static",
-        "images",
-        image.filename
-      );
-      await unlink(filepath);
-    } catch {
-      // File may not exist, continue with database deletion
-    }
+    // Delete file from storage (local + Supabase if configured)
+    await deleteImage(image.filename);
 
     // Delete from database
     await prisma.image.delete({

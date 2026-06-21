@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/db";
-import { writeFile, mkdir } from "fs/promises";
-import path from "path";
+import { uploadImage } from "@/lib/storage";
 
 const ALLOWED_EXTENSIONS = ["jpg", "jpeg", "png", "gif", "mp4", "webp"];
 const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB
@@ -50,14 +49,8 @@ export async function POST(request: NextRequest) {
     const timestamp = Date.now();
     const filename = `${timestamp}_${file.name.replace(/[^a-zA-Z0-9._-]/g, "_")}`;
 
-    // Ensure upload directory exists
-    const uploadDir = path.join(process.cwd(), "public", "static", "images");
-    await mkdir(uploadDir, { recursive: true });
-
-    // Write file
-    const buffer = Buffer.from(await file.arrayBuffer());
-    const filepath = path.join(uploadDir, filename);
-    await writeFile(filepath, buffer);
+    // Upload to storage (local + Supabase if configured)
+    await uploadImage(file, filename);
 
     // Save to database
     const image = await prisma.image.create({
