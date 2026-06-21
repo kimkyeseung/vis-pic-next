@@ -20,17 +20,21 @@ export default function AdminDashboardPage() {
   useEffect(() => {
     async function fetchStats() {
       try {
-        const [devicesRes, settingsRes] = await Promise.all([
+        const [devicesRes, settingsRes, bgRes, imgRes] = await Promise.all([
           fetch("/api/admin/devices"),
           fetch("/api/setting"),
+          fetch("/api/image/list/1"),
+          fetch("/api/image/list/2"),
         ]);
 
         const devicesData = await devicesRes.json();
         const settingsData = await settingsRes.json();
+        const bgData = await bgRes.json();
+        const imgData = await imgRes.json();
 
         setStats({
           deviceCount: devicesData.devices?.length || 0,
-          imageCount: 0,
+          imageCount: (bgData.images?.length || 0) + (imgData.images?.length || 0),
           settingCount: Object.keys(settingsData.settings || {}).length,
         });
       } catch (error) {
