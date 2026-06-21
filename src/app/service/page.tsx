@@ -5,6 +5,22 @@ import { useSearchParams } from "next/navigation";
 
 type Step = "start" | "payment" | "frame" | "background" | "camera" | "select" | "complete";
 
+function FloatingElements() {
+  return (
+    <>
+      <div className="pattern-overlay" />
+      <div className="floating-elements">
+        <div className="floating-element" />
+        <div className="floating-element" />
+        <div className="floating-element" />
+        <div className="floating-element" />
+        <div className="floating-element" />
+        <div className="floating-element" />
+      </div>
+    </>
+  );
+}
+
 function ServiceContent() {
   const searchParams = useSearchParams();
   const deviceId = searchParams.get("device") || "test";
@@ -13,14 +29,8 @@ function ServiceContent() {
   const [selectedBackground, setSelectedBackground] = useState<number | null>(null);
   const [photos, setPhotos] = useState<string[]>([]);
 
-  const goToStep = (step: Step) => {
-    setCurrentStep(step);
-  };
-
-  const addPhoto = (photo: string) => {
-    setPhotos((prev) => [...prev, photo]);
-  };
-
+  const goToStep = (step: Step) => setCurrentStep(step);
+  const addPhoto = (photo: string) => setPhotos((prev) => [...prev, photo]);
   const resetAll = () => {
     setCurrentStep("start");
     setSelectedFrame(null);
@@ -29,54 +39,28 @@ function ServiceContent() {
   };
 
   return (
-    <div className="w-full h-screen overflow-hidden">
-      {currentStep === "start" && (
-        <StartSection onNext={() => goToStep("payment")} />
-      )}
-      {currentStep === "payment" && (
-        <PaymentSection onNext={() => goToStep("frame")} onPrev={() => goToStep("start")} />
-      )}
+    <div className="w-full h-screen overflow-hidden relative">
+      <FloatingElements />
+      {currentStep === "start" && <StartSection onNext={() => goToStep("payment")} />}
+      {currentStep === "payment" && <PaymentSection onNext={() => goToStep("frame")} onPrev={() => goToStep("start")} />}
       {currentStep === "frame" && (
-        <FrameSection
-          selectedFrame={selectedFrame}
-          onSelect={setSelectedFrame}
-          onNext={() => goToStep("background")}
-          onPrev={() => goToStep("start")}
-        />
+        <FrameSection selectedFrame={selectedFrame} onSelect={setSelectedFrame} onNext={() => goToStep("background")} onPrev={() => goToStep("start")} />
       )}
       {currentStep === "background" && (
-        <BackgroundSection
-          selectedBackground={selectedBackground}
-          onSelect={setSelectedBackground}
-          onNext={() => goToStep("camera")}
-          onPrev={() => goToStep("frame")}
-        />
+        <BackgroundSection selectedBackground={selectedBackground} onSelect={setSelectedBackground} onNext={() => goToStep("camera")} onPrev={() => goToStep("frame")} />
       )}
       {currentStep === "camera" && (
-        <CameraSection
-          photos={photos}
-          onCapture={addPhoto}
-          onNext={() => goToStep("select")}
-          onPrev={() => goToStep("background")}
-        />
+        <CameraSection photos={photos} onCapture={addPhoto} onNext={() => goToStep("select")} onPrev={() => goToStep("background")} />
       )}
-      {currentStep === "select" && (
-        <SelectSection
-          photos={photos}
-          onNext={() => goToStep("complete")}
-          onPrev={() => goToStep("camera")}
-        />
-      )}
-      {currentStep === "complete" && (
-        <CompleteSection onRestart={resetAll} />
-      )}
+      {currentStep === "select" && <SelectSection photos={photos} onNext={() => goToStep("complete")} onPrev={() => goToStep("camera")} />}
+      {currentStep === "complete" && <CompleteSection onRestart={resetAll} />}
     </div>
   );
 }
 
 export default function ServicePage() {
   return (
-    <Suspense fallback={<div className="w-full h-screen bg-gray-900" />}>
+    <Suspense fallback={<div className="w-full h-screen bg-[#2a2a2a]" />}>
       <ServiceContent />
     </Suspense>
   );
@@ -84,18 +68,30 @@ export default function ServicePage() {
 
 function StartSection({ onNext }: { onNext: () => void }) {
   return (
-    <section
-      className="w-full h-full flex flex-col items-center justify-center cursor-pointer"
-      style={{ background: "linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%)" }}
-      onClick={onNext}
-    >
-      <div className="text-center animate-slide-up">
-        <h1 className="text-6xl font-bold mb-6 tracking-wider text-white">AR-pic</h1>
-        <p className="text-xl text-gray-400 mb-16">AI 포토부스</p>
+    <section className="w-full h-full flex flex-col items-center justify-center cursor-pointer relative z-10" onClick={onNext}>
+      <div className="main-container flex flex-col items-center">
+        <div className="logo-section text-center mb-24 animate-fadeInDown">
+          <h1 className="text-7xl font-extrabold mb-5 tracking-widest text-white" style={{ textShadow: "0 2px 15px rgba(0,0,0,0.5)" }}>
+            AR-pic
+          </h1>
+        </div>
+
+        <button
+          className="service-button touch-button animate-pulse-button"
+          style={{ animationDelay: "0.5s" }}
+          onClick={(e) => { e.stopPropagation(); onNext(); }}
+        >
+          <span className="animate-touchBounce inline-block mr-5 text-3xl">👆</span>
+          화면을 터치해주세요
+        </button>
+
+        <img src="/static/images/viswave_logo.png" className="mt-24 opacity-80" style={{ width: "200px" }} alt="Viswave" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
       </div>
-      <button className="btn btn-primary text-2xl px-16 py-6 rounded-3xl shadow-2xl animate-pulse-slow">
-        👆 화면을 터치해주세요
-      </button>
+
+      <div className="absolute bottom-16 text-center text-gray-500 animate-fadeInUp" style={{ animationDelay: "1s" }}>
+        <p className="mb-2">화면 아무 곳이나 터치하여 시작하세요</p>
+        <p className="animate-blink">● 대기중 ●</p>
+      </div>
     </section>
   );
 }
@@ -118,36 +114,35 @@ function PaymentSection({ onNext, onPrev }: { onNext: () => void; onPrev: () => 
   };
 
   return (
-    <section
-      className="w-full h-full flex flex-col items-center justify-center"
-      style={{ background: "linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%)" }}
-    >
-      <div className="bg-black/60 backdrop-blur-sm p-12 rounded-3xl border border-white/10 text-center max-w-lg">
+    <section className="w-full h-full flex flex-col items-center justify-center relative z-10">
+      <div className="text-center animate-fadeInDown">
+        <h2 className="text-4xl font-extrabold text-white mb-16" style={{ textShadow: "0 2px 15px rgba(0,0,0,0.5)" }}>
+          결제
+        </h2>
+      </div>
+
+      <div className="bg-black/30 backdrop-blur-sm p-16 rounded-3xl border border-white/10 text-center animate-fadeInUp">
         {!loading ? (
           <>
-            <h2 className="text-3xl font-bold text-white mb-4">카드 결제</h2>
-            <div className="text-5xl font-black text-white mb-4">1,000원</div>
-            <p className="text-gray-400 mb-8">카드 결제를 진행해 주세요</p>
-            <div className="flex gap-4 justify-center">
-              <button className="btn btn-primary px-12 py-4" onClick={handlePayment}>
+            <div className="text-6xl font-black text-white mb-4">1,000원</div>
+            <p className="text-gray-400 text-xl mb-12">카드 결제를 진행해 주세요</p>
+            <div className="flex gap-6 justify-center">
+              <button className="service-button nav-button" onClick={handlePayment}>
                 결제하기
               </button>
-              <button className="btn btn-secondary px-12 py-4" onClick={onPrev}>
+              <button className="service-button nav-button" style={{ background: "rgba(255,255,255,0.1)", color: "#fff" }} onClick={onPrev}>
                 처음으로
               </button>
             </div>
           </>
         ) : (
           <>
-            <div className="w-20 h-20 border-4 border-white/20 border-t-green-500 rounded-full animate-spin mx-auto mb-6" />
-            <p className="text-white text-xl mb-4">
+            <div className="w-24 h-24 border-4 border-white/20 border-t-green-500 rounded-full animate-spin mx-auto mb-8" />
+            <p className="text-white text-2xl mb-6">
               {progress < 30 ? "결제 처리 중..." : progress < 70 ? "결제 확인 중..." : "완료 처리 중..."}
             </p>
-            <div className="w-64 h-2 bg-white/20 rounded-full overflow-hidden mx-auto">
-              <div
-                className="h-full bg-green-500 rounded-full transition-all duration-100"
-                style={{ width: `${progress}%` }}
-              />
+            <div className="w-80 h-3 bg-white/20 rounded-full overflow-hidden mx-auto">
+              <div className="h-full bg-green-500 rounded-full transition-all duration-100" style={{ width: `${progress}%` }} />
             </div>
           </>
         )}
@@ -168,52 +163,45 @@ function FrameSection({
   onPrev: () => void;
 }) {
   const frames = [
-    { id: "1x1", label: "1x1", cols: 1, rows: 1 },
-    { id: "1x2", label: "1x2", cols: 2, rows: 1 },
-    { id: "2x2", label: "2x2", cols: 2, rows: 2 },
+    { id: "1x1", label: "1컷", cols: 1, rows: 1 },
+    { id: "1x2", label: "2컷", cols: 2, rows: 1 },
+    { id: "2x2", label: "4컷", cols: 2, rows: 2 },
   ];
 
   return (
-    <section
-      className="w-full h-full flex flex-col items-center justify-center"
-      style={{ background: "linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%)" }}
-    >
-      <h2 className="text-4xl font-bold text-white mb-12">프레임을 선택해 주세요</h2>
-      <div className="flex gap-8 mb-12">
+    <section className="w-full h-full flex flex-col items-center justify-center relative z-10">
+      <h2 className="text-4xl font-extrabold text-white mb-16 animate-fadeInDown" style={{ textShadow: "0 2px 15px rgba(0,0,0,0.5)" }}>
+        프레임을 선택해 주세요
+      </h2>
+
+      <div className="flex gap-10 mb-20 animate-fadeInUp">
         {frames.map((frame) => (
-          <button
+          <div
             key={frame.id}
-            className={`w-48 h-48 rounded-2xl flex flex-col items-center justify-center transition-all ${
-              selectedFrame === frame.id
-                ? "bg-white text-gray-900 scale-110"
-                : "bg-white/10 text-white hover:bg-white/20"
-            }`}
+            className={`frame-option w-64 text-center ${selectedFrame === frame.id ? "selected" : ""}`}
             onClick={() => onSelect(frame.id)}
           >
-            <div
-              className="grid gap-1 mb-3"
-              style={{
-                gridTemplateColumns: `repeat(${frame.cols}, 1fr)`,
-                gridTemplateRows: `repeat(${frame.rows}, 1fr)`,
-              }}
-            >
-              {Array.from({ length: frame.cols * frame.rows }).map((_, i) => (
-                <div key={i} className="w-8 h-6 bg-current opacity-50 rounded" />
-              ))}
+            {selectedFrame === frame.id && <span className="check-mark">✓</span>}
+            <div className="w-36 h-44 mx-auto mb-5 bg-black/30 rounded-xl flex items-center justify-center">
+              <div
+                className="grid gap-1"
+                style={{ gridTemplateColumns: `repeat(${frame.cols}, 1fr)`, gridTemplateRows: `repeat(${frame.rows}, 1fr)` }}
+              >
+                {Array.from({ length: frame.cols * frame.rows }).map((_, i) => (
+                  <div key={i} className="w-10 h-8 bg-white/40 rounded" />
+                ))}
+              </div>
             </div>
-            <span className="text-2xl font-bold">{frame.label}</span>
-          </button>
+            <span className="text-2xl font-bold text-white">{frame.label}</span>
+          </div>
         ))}
       </div>
-      <div className="flex gap-4">
-        <button className="btn btn-secondary px-12 py-4" onClick={onPrev}>
+
+      <div className="flex gap-6 animate-fadeInUp" style={{ animationDelay: "0.3s" }}>
+        <button className="service-button nav-button" style={{ background: "rgba(255,255,255,0.1)", color: "#fff" }} onClick={onPrev}>
           ◀ 이전으로
         </button>
-        <button
-          className="btn btn-primary px-12 py-4 disabled:opacity-50"
-          onClick={onNext}
-          disabled={!selectedFrame}
-        >
+        <button className={`service-button nav-button ${!selectedFrame ? "disabled" : ""}`} onClick={onNext} style={!selectedFrame ? { opacity: 0.5, pointerEvents: "none" } : {}}>
           다음으로 ▶
         </button>
       </div>
@@ -233,42 +221,38 @@ function BackgroundSection({
   onPrev: () => void;
 }) {
   const backgrounds = [
-    { id: 1, color: "from-pink-500 to-purple-500" },
-    { id: 2, color: "from-blue-500 to-cyan-500" },
-    { id: 3, color: "from-green-500 to-teal-500" },
-    { id: 4, color: "from-yellow-500 to-orange-500" },
-    { id: 5, color: "from-red-500 to-pink-500" },
-    { id: 6, color: "from-indigo-500 to-purple-500" },
+    { id: 1, gradient: "linear-gradient(135deg, #ff6b9d 0%, #c44fd5 100%)" },
+    { id: 2, gradient: "linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)" },
+    { id: 3, gradient: "linear-gradient(135deg, #43e97b 0%, #38f9d7 100%)" },
+    { id: 4, gradient: "linear-gradient(135deg, #fa709a 0%, #fee140 100%)" },
+    { id: 5, gradient: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)" },
+    { id: 6, gradient: "linear-gradient(135deg, #f093fb 0%, #f5576c 100%)" },
   ];
 
   return (
-    <section
-      className="w-full h-full flex flex-col items-center justify-center"
-      style={{ background: "linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%)" }}
-    >
-      <h2 className="text-4xl font-bold text-white mb-12">배경을 선택해 주세요</h2>
-      <div className="grid grid-cols-3 gap-6 mb-12">
+    <section className="w-full h-full flex flex-col items-center justify-center relative z-10">
+      <h2 className="text-4xl font-extrabold text-white mb-16 animate-fadeInDown" style={{ textShadow: "0 2px 15px rgba(0,0,0,0.5)" }}>
+        배경을 선택해 주세요
+      </h2>
+
+      <div className="grid grid-cols-3 gap-8 mb-20 animate-fadeInUp">
         {backgrounds.map((bg) => (
-          <button
+          <div
             key={bg.id}
-            className={`w-40 h-40 rounded-2xl bg-gradient-to-br ${bg.color} flex items-center justify-center text-4xl transition-all ${
-              selectedBackground === bg.id ? "ring-4 ring-white scale-110" : "hover:scale-105"
-            }`}
+            className={`background-option w-52 h-32 relative ${selectedBackground === bg.id ? "selected" : ""}`}
+            style={{ background: bg.gradient }}
             onClick={() => onSelect(bg.id)}
           >
-            {selectedBackground === bg.id && <span className="text-white">✓</span>}
-          </button>
+            {selectedBackground === bg.id && <span className="check-mark">✓</span>}
+          </div>
         ))}
       </div>
-      <div className="flex gap-4">
-        <button className="btn btn-secondary px-12 py-4" onClick={onPrev}>
+
+      <div className="flex gap-6 animate-fadeInUp" style={{ animationDelay: "0.3s" }}>
+        <button className="service-button nav-button" style={{ background: "rgba(255,255,255,0.1)", color: "#fff" }} onClick={onPrev}>
           ◀ 이전으로
         </button>
-        <button
-          className="btn btn-primary px-12 py-4 disabled:opacity-50"
-          onClick={onNext}
-          disabled={selectedBackground === null}
-        >
+        <button className={`service-button nav-button`} onClick={onNext} style={selectedBackground === null ? { opacity: 0.5, pointerEvents: "none" } : {}}>
           다음으로 ▶
         </button>
       </div>
@@ -309,14 +293,13 @@ function CameraSection({
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
       }
-    } catch (err) {
+    } catch {
       setCameraError("카메라를 사용할 수 없습니다");
     }
   };
 
   const capturePhoto = () => {
     if (countdown !== null || photos.length >= 4) return;
-
     setCountdown(3);
     let count = 3;
     const interval = setInterval(() => {
@@ -332,66 +315,62 @@ function CameraSection({
   };
 
   return (
-    <section
-      className="w-full h-full flex"
-      style={{ background: "linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%)" }}
-    >
-      <div className="flex-1 flex items-center justify-center relative p-8">
-        <div className="relative w-full max-w-4xl aspect-video bg-gray-900 rounded-2xl overflow-hidden">
+    <section className="w-full h-full flex relative z-10">
+      {/* 카메라 영역 */}
+      <div className="flex-[7.5] flex items-center justify-center p-8">
+        <div className="camera-preview w-full max-w-5xl aspect-video relative">
           {cameraError ? (
-            <div className="absolute inset-0 flex items-center justify-center">
-              <p className="text-red-400">{cameraError}</p>
+            <div className="absolute inset-0 flex flex-col items-center justify-center bg-gradient-to-br from-gray-700 to-gray-900">
+              <span className="text-6xl mb-5 opacity-30">📷</span>
+              <p className="text-white/60">{cameraError}</p>
             </div>
           ) : (
-            <video
-              ref={videoRef}
-              autoPlay
-              playsInline
-              muted
-              className="w-full h-full object-cover scale-x-[-1]"
-            />
+            <video ref={videoRef} autoPlay playsInline muted className="camera-video" />
           )}
           {countdown !== null && (
             <div className="absolute inset-0 flex items-center justify-center bg-black/50">
-              <span className="text-9xl font-bold text-white animate-pulse">{countdown}</span>
+              <span className="text-[200px] font-extrabold text-white animate-countdown" key={countdown} style={{ textShadow: "0 0 60px rgba(255,255,255,0.5)" }}>
+                {countdown}
+              </span>
             </div>
           )}
         </div>
       </div>
 
-      <div className="w-80 bg-black/40 p-6 flex flex-col">
-        <h3 className="text-xl font-bold text-white mb-4">촬영 ({photos.length}/4)</h3>
-        <div className="flex-1 grid grid-cols-2 gap-2 mb-4">
+      {/* 메뉴 영역 */}
+      <div className="flex-[2.5] p-8 flex flex-col">
+        <h3 className="text-2xl font-bold text-white mb-8">촬영 ({photos.length}/4)</h3>
+
+        <div className="grid grid-cols-2 gap-3 mb-8">
           {Array.from({ length: 4 }, (_, i) => (
-            <div
-              key={i}
-              className="aspect-[4/3] bg-gray-800 rounded-lg flex items-center justify-center"
-            >
+            <div key={i} className="aspect-[4/3] bg-black/30 rounded-xl flex items-center justify-center border-2 border-white/10">
               {photos[i] ? (
-                <span className="text-green-500 text-2xl">✓</span>
+                <span className="text-green-500 text-4xl">✓</span>
               ) : (
-                <span className="text-gray-600 text-xl">{i + 1}</span>
+                <span className="text-white/30 text-2xl">{i + 1}</span>
               )}
             </div>
           ))}
         </div>
+
         <button
-          className="btn btn-primary w-full py-4 mb-4 disabled:opacity-50"
+          className="service-button w-full py-5 rounded-2xl text-xl mb-6"
           onClick={capturePhoto}
-          disabled={countdown !== null || photos.length >= 4}
+          style={countdown !== null || photos.length >= 4 ? { opacity: 0.5, pointerEvents: "none" } : {}}
         >
           📸 촬영하기
         </button>
-        <div className="flex gap-2">
-          <button className="btn btn-secondary flex-1 py-3" onClick={onPrev}>
-            ◀ 이전
+
+        <div className="mt-auto flex flex-col gap-3">
+          <button className="service-button nav-button w-full" style={{ background: "rgba(255,255,255,0.1)", color: "#fff" }} onClick={onPrev}>
+            ◀ 이전으로
           </button>
           <button
-            className="btn btn-primary flex-1 py-3 disabled:opacity-50"
+            className="service-button nav-button w-full"
             onClick={onNext}
-            disabled={photos.length === 0}
+            style={photos.length === 0 ? { opacity: 0.5, pointerEvents: "none" } : {}}
           >
-            다음 ▶
+            다음으로 ▶
           </button>
         </div>
       </div>
@@ -411,43 +390,33 @@ function SelectSection({
   const [selectedPhotos, setSelectedPhotos] = useState<number[]>([]);
 
   const togglePhoto = (index: number) => {
-    setSelectedPhotos((prev) =>
-      prev.includes(index) ? prev.filter((i) => i !== index) : [...prev, index]
-    );
+    setSelectedPhotos((prev) => (prev.includes(index) ? prev.filter((i) => i !== index) : [...prev, index]));
   };
 
   return (
-    <section
-      className="w-full h-full flex flex-col items-center justify-center"
-      style={{ background: "linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%)" }}
-    >
-      <h2 className="text-4xl font-bold text-white mb-12">사진을 선택해 주세요</h2>
-      <div className="flex gap-6 mb-12">
+    <section className="w-full h-full flex flex-col items-center justify-center relative z-10">
+      <h2 className="text-4xl font-extrabold text-white mb-16 animate-fadeInDown" style={{ textShadow: "0 2px 15px rgba(0,0,0,0.5)" }}>
+        인화할 사진을 선택해 주세요
+      </h2>
+
+      <div className="flex gap-8 mb-20 animate-fadeInUp">
         {photos.map((_, i) => (
-          <button
+          <div
             key={i}
-            className={`w-48 h-36 bg-gray-800 rounded-2xl flex items-center justify-center text-4xl transition-all ${
-              selectedPhotos.includes(i) ? "ring-4 ring-green-500 scale-105" : "hover:scale-105"
-            }`}
+            className={`photo-thumbnail w-56 bg-black/30 flex items-center justify-center relative ${selectedPhotos.includes(i) ? "selected" : ""}`}
             onClick={() => togglePhoto(i)}
           >
-            {selectedPhotos.includes(i) ? (
-              <span className="text-green-500">✓</span>
-            ) : (
-              <span className="text-gray-500">{i + 1}</span>
-            )}
-          </button>
+            {selectedPhotos.includes(i) && <span className="check-mark">✓</span>}
+            <span className="text-white/30 text-4xl">{i + 1}</span>
+          </div>
         ))}
       </div>
-      <div className="flex gap-4">
-        <button className="btn btn-secondary px-12 py-4" onClick={onPrev}>
+
+      <div className="flex gap-6 animate-fadeInUp" style={{ animationDelay: "0.3s" }}>
+        <button className="service-button nav-button" style={{ background: "rgba(255,255,255,0.1)", color: "#fff" }} onClick={onPrev}>
           ◀ 이전으로
         </button>
-        <button
-          className="btn btn-primary px-12 py-4 disabled:opacity-50"
-          onClick={onNext}
-          disabled={selectedPhotos.length === 0}
-        >
+        <button className="service-button nav-button" onClick={onNext} style={selectedPhotos.length === 0 ? { opacity: 0.5, pointerEvents: "none" } : {}}>
           다음으로 ▶
         </button>
       </div>
@@ -457,18 +426,20 @@ function SelectSection({
 
 function CompleteSection({ onRestart }: { onRestart: () => void }) {
   return (
-    <section
-      className="w-full h-full flex flex-col items-center justify-center"
-      style={{ background: "linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%)" }}
-    >
-      <div className="text-center">
-        <h2 className="text-5xl font-bold text-white mb-4">🎉 완료!</h2>
-        <p className="text-xl text-gray-400 mb-8">사진이 인쇄중입니다</p>
-        <div className="w-64 h-64 bg-white rounded-2xl flex items-center justify-center mb-8 mx-auto shadow-2xl">
-          <span className="text-6xl">📸</span>
+    <section className="w-full h-full flex flex-col items-center justify-center relative z-10">
+      <div className="text-center animate-fadeInUp">
+        <h2 className="text-6xl font-extrabold text-white mb-6" style={{ textShadow: "0 2px 15px rgba(0,0,0,0.5)" }}>
+          🎉 완료!
+        </h2>
+        <p className="text-2xl text-gray-400 mb-12">사진이 인쇄중입니다</p>
+
+        <div className="w-72 h-72 bg-white rounded-3xl flex items-center justify-center mb-12 mx-auto" style={{ boxShadow: "0 20px 50px rgba(0,0,0,0.4)" }}>
+          <span className="text-8xl">📸</span>
         </div>
-        <p className="text-gray-400 mb-8">QR 코드를 스캔하여 사진을 다운로드하세요</p>
-        <button className="btn btn-primary px-12 py-4 text-xl" onClick={onRestart}>
+
+        <p className="text-gray-500 text-lg mb-12">QR 코드를 스캔하여 사진을 다운로드하세요</p>
+
+        <button className="service-button touch-button" style={{ width: "auto", minHeight: "auto", padding: "25px 60px", fontSize: "1.5em" }} onClick={onRestart}>
           처음으로 돌아가기
         </button>
       </div>

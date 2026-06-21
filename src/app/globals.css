@@ -1,29 +1,26 @@
 @import "tailwindcss";
-
-:root {
-  --background: #0a0a0a;
-  --foreground: #ffffff;
-  --primary: #6366f1;
-  --primary-hover: #4f46e5;
-  --secondary: #1f2937;
-  --accent: #10b981;
-}
+@import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css');
 
 * {
   margin: 0;
   padding: 0;
   box-sizing: border-box;
-  user-select: none;
-  -webkit-user-select: none;
 }
 
 html, body {
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+  font-family: 'Pretendard', 'Arial', sans-serif;
   width: 100%;
   height: 100%;
   overflow: hidden;
-  background: var(--background);
-  color: var(--foreground);
-  font-family: 'Pretendard', 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif;
+}
+
+body {
+  background: #2a2a2a;
+  color: #ffffff;
 }
 
 /* 스크롤바 숨기기 */
@@ -31,29 +28,78 @@ html, body {
   display: none;
 }
 
-/* 버튼 기본 스타일 */
-.btn {
-  @apply px-8 py-4 rounded-2xl font-bold text-lg transition-all duration-300;
+/* 배경 미세한 패턴 효과 */
+.pattern-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-image:
+    radial-gradient(circle at 25% 25%, rgba(255,255,255,0.02) 2px, transparent 2px),
+    radial-gradient(circle at 75% 75%, rgba(255,255,255,0.02) 2px, transparent 2px);
+  background-size: 50px 50px;
+  pointer-events: none;
+  z-index: 0;
 }
 
-.btn-primary {
-  @apply bg-white text-gray-900 hover:scale-105 hover:shadow-xl;
+/* 배경 떠다니는 요소들 */
+.floating-elements {
+  position: fixed;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  z-index: 0;
+  pointer-events: none;
 }
 
-.btn-secondary {
-  @apply bg-gray-800 text-white border border-gray-600 hover:bg-gray-700;
+.floating-element {
+  position: absolute;
+  width: 6px;
+  height: 6px;
+  background: rgba(255,255,255,0.1);
+  border-radius: 50%;
+  animation: float 10s infinite ease-in-out;
+}
+
+.floating-element:nth-child(1) { left: 10%; top: 20%; animation-delay: 0s; }
+.floating-element:nth-child(2) { left: 80%; top: 80%; animation-delay: 3s; }
+.floating-element:nth-child(3) { left: 20%; top: 60%; animation-delay: 6s; }
+.floating-element:nth-child(4) { left: 70%; top: 30%; animation-delay: 9s; }
+.floating-element:nth-child(5) { left: 50%; top: 10%; animation-delay: 1s; }
+.floating-element:nth-child(6) { left: 90%; top: 50%; animation-delay: 4s; }
+
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0) translateX(0);
+    opacity: 0.1;
+  }
+  33% {
+    transform: translateY(-30px) translateX(15px);
+    opacity: 0.3;
+  }
+  66% {
+    transform: translateY(20px) translateX(-10px);
+    opacity: 0.2;
+  }
 }
 
 /* 애니메이션 */
-@keyframes fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
-}
-
-@keyframes slideUp {
+@keyframes fadeInUp {
   from {
     opacity: 0;
-    transform: translateY(20px);
+    transform: translateY(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeInDown {
+  from {
+    opacity: 0;
+    transform: translateY(-30px);
   }
   to {
     opacity: 1;
@@ -62,18 +108,252 @@ html, body {
 }
 
 @keyframes pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.5; }
+  0% {
+    box-shadow: 0 15px 40px rgba(0,0,0,0.3), 0 0 0 0 rgba(255,255,255,0.7);
+  }
+  70% {
+    box-shadow: 0 15px 40px rgba(0,0,0,0.3), 0 0 0 20px rgba(255,255,255,0);
+  }
+  100% {
+    box-shadow: 0 15px 40px rgba(0,0,0,0.3), 0 0 0 0 rgba(255,255,255,0);
+  }
 }
 
-.animate-fade-in {
-  animation: fadeIn 0.5s ease-out;
+@keyframes blink {
+  0%, 50% { opacity: 1; }
+  51%, 100% { opacity: 0.3; }
 }
 
-.animate-slide-up {
-  animation: slideUp 0.5s ease-out;
+@keyframes touchBounce {
+  0%, 20%, 50%, 80%, 100% {
+    transform: translateY(0);
+  }
+  40% {
+    transform: translateY(-5px);
+  }
+  60% {
+    transform: translateY(-3px);
+  }
 }
 
-.animate-pulse-slow {
-  animation: pulse 2s ease-in-out infinite;
+@keyframes countdownPulse {
+  0% {
+    transform: scale(1.5);
+    opacity: 0;
+  }
+  50% {
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.animate-fadeInUp {
+  animation: fadeInUp 1s ease-out;
+}
+
+.animate-fadeInDown {
+  animation: fadeInDown 1s ease-out;
+}
+
+.animate-pulse-button {
+  animation: pulse 2s infinite;
+}
+
+.animate-blink {
+  animation: blink 2s infinite;
+}
+
+.animate-touchBounce {
+  animation: touchBounce 1.5s infinite;
+}
+
+.animate-countdown {
+  animation: countdownPulse 1s ease-out;
+}
+
+/* 공통 버튼 스타일 */
+.service-button {
+  background: #ffffff;
+  color: #2a2a2a;
+  border: none;
+  letter-spacing: 0;
+  box-shadow: 0 18px 28px rgba(80, 55, 145, 0.28), 0 7px 16px rgba(255,255,255,0.18) inset;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-family: inherit;
+  font-weight: 800;
+  text-decoration: none;
+  -webkit-tap-highlight-color: transparent;
+  transition: all 0.4s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.service-button::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
+  transition: left 0.6s;
+}
+
+.service-button:hover {
+  background: #f8f8f8;
+  box-shadow: 0 24px 38px rgba(80, 55, 145, 0.34), 0 7px 16px rgba(255,255,255,0.18) inset;
+}
+
+.service-button:hover::before {
+  left: 100%;
+}
+
+.service-button:active {
+  box-shadow: 0 14px 24px rgba(80, 55, 145, 0.26);
+}
+
+/* 터치 버튼 */
+.touch-button {
+  width: 500px;
+  min-height: 188px;
+  padding: 40px 80px;
+  font-size: 2em;
+  border-radius: 18px;
+}
+
+/* 네비게이션 버튼 */
+.nav-button {
+  min-height: 95px;
+  border-radius: 14px;
+  padding: 20px 50px;
+  font-size: 1.4em;
+}
+
+.nav-button.disabled {
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+/* 프레임 옵션 */
+.frame-option {
+  border: 3px solid transparent;
+  border-radius: 20px;
+  padding: 30px 20px 25px;
+  cursor: pointer;
+  transition: all 0.4s ease;
+  position: relative;
+  overflow: hidden;
+  backdrop-filter: blur(10px);
+  background: rgba(255,255,255,0.05);
+}
+
+.frame-option::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.1), transparent);
+  transition: left 0.6s;
+}
+
+.frame-option:hover {
+  transform: translateY(-10px) scale(1.05);
+  background: rgba(255,255,255,0.1);
+  border-color: rgba(255,255,255,0.3);
+  box-shadow: 0 20px 40px rgba(0,0,0,0.3);
+}
+
+.frame-option:hover::before {
+  left: 100%;
+}
+
+.frame-option.selected {
+  border-color: #ffffff;
+  background: rgba(255,255,255,0.15);
+  transform: translateY(-5px);
+  box-shadow: 0 15px 35px rgba(0,0,0,0.4);
+}
+
+/* 배경 옵션 */
+.background-option {
+  aspect-ratio: 16/9;
+  border-radius: 16px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  border: 3px solid transparent;
+  overflow: hidden;
+}
+
+.background-option:hover {
+  transform: scale(1.05);
+  box-shadow: 0 15px 30px rgba(0,0,0,0.4);
+}
+
+.background-option.selected {
+  border-color: #ffffff;
+  transform: scale(1.02);
+  box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+}
+
+/* 카메라 프리뷰 */
+.camera-preview {
+  border: 3px solid rgba(255, 255, 255, 0.2);
+  border-radius: 20px;
+  position: relative;
+  overflow: hidden;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+  background: #000;
+}
+
+.camera-video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 17px;
+  transform: scaleX(-1);
+}
+
+/* 촬영된 사진 */
+.photo-thumbnail {
+  aspect-ratio: 3/4;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  border: 3px solid transparent;
+  overflow: hidden;
+  background: rgba(255,255,255,0.1);
+}
+
+.photo-thumbnail:hover {
+  transform: scale(1.05);
+}
+
+.photo-thumbnail.selected {
+  border-color: #4CAF50;
+  box-shadow: 0 0 20px rgba(76, 175, 80, 0.5);
+}
+
+/* 선택 체크마크 */
+.check-mark {
+  position: absolute;
+  top: 10px;
+  right: 15px;
+  background: #4CAF50;
+  color: white;
+  border-radius: 50%;
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  font-weight: bold;
 }
