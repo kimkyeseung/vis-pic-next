@@ -20,7 +20,10 @@ if (existsSync(SERVER_DIR)) {
   rmSync(SERVER_DIR, { recursive: true, force: true });
 }
 
-cpSync(join(ROOT, ".next", "standalone"), SERVER_DIR, { recursive: true });
+cpSync(join(ROOT, ".next", "standalone"), SERVER_DIR, {
+  recursive: true,
+  dereference: true,
+});
 
 cpSync(
   join(ROOT, ".next", "static"),
