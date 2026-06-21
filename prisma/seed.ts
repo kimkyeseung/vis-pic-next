@@ -4,6 +4,13 @@ import bcrypt from "bcryptjs";
 const prisma = new PrismaClient();
 
 async function main() {
+  const dbUrl = process.env.DATABASE_URL || "";
+  if (dbUrl.includes("supabase.com") && !process.env.SEED_FORCE) {
+    console.error("운영 DB에 시드를 실행하려면 SEED_FORCE=1 환경변수를 설정하세요.");
+    console.error("예: SEED_FORCE=1 npm run db:seed");
+    process.exit(1);
+  }
+
   console.log("Seeding database...");
 
   // Create image types
