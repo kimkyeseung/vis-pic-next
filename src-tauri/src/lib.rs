@@ -74,7 +74,56 @@ fn get_printers() -> Result<Vec<String>, String> {
 }
 
 #[tauri::command]
-fn print_image(printer_name: String, image_path: String) -> Result<bool, String> {
+fn print_image(printer_name: String, image_data: String) -> Result<bool, String> {
+    use std::io::Write;
+
+    let bytes = base64_decode(&image_data)?;
+
+    let temp_dir = std::env::temp_dir();
+    let temp_path = temp_dir.join(format!("arpic_print_{}.jpg", std::process::id()));
+    let temp_path_str = temp_path.to_string_lossy().to_string();
+
+    {
+        let mut file = std::fs::File::create(&temp_path).map_err(|e| e.to_string())?;
+        file.write_all(&bytes).map_err(|e| e.to_string())?;
+    }
+
+    let result = print_file(&printer_name, &temp_path_str);
+
+    let _ = std::fs::remove_file(&temp_path);
+
+    result
+}
+
+fn base64_decode(input: &str) -> Result<Vec<u8>, String> {
+    let cleaned: String = input.chars().filter(|c| !c.is_whitespace()).collect();
+    let table = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    let mut buf: Vec<u8> = Vec::new();
+    let mut bits: u32 = 0;
+    let mut count = 0;
+    for c in cleaned.bytes() {
+        if c == b'=' { break; }
+        let val = table.iter().position(|&b| b == c)
+            .ok_or_else(|| format!("Invalid base64 char: {}", c as char))? as u32;
+        bits = (bits << 6) | val;
+        count += 1;
+        if count == 4 {
+            buf.push((bits >> 16) as u8);
+            buf.push((bits >> 8) as u8);
+            buf.push(bits as u8);
+            bits = 0;
+            count = 0;
+        }
+    }
+    match count {
+        2 => { bits <<= 12; buf.push((bits >> 16) as u8); }
+        3 => { bits <<= 6; buf.push((bits >> 16) as u8); buf.push((bits >> 8) as u8); }
+        _ => {}
+    }
+    Ok(buf)
+}
+
+fn print_file(printer_name: &str, file_path: &str) -> Result<bool, String> {
     #[cfg(target_os = "windows")]
     {
         let script = format!(
@@ -90,7 +139,7 @@ fn print_image(printer_name: String, image_path: String) -> Result<bool, String>
             $pd.Print()
             $img.Dispose()
             "#,
-            image_path.replace("\\", "\\\\"),
+            file_path.replace("\\", "\\\\"),
             printer_name
         );
 
@@ -110,7 +159,7 @@ fn print_image(printer_name: String, image_path: String) -> Result<bool, String>
     #[cfg(not(target_os = "windows"))]
     {
         let output = Command::new("lp")
-            .args(["-d", &printer_name, &image_path])
+            .args(["-d", printer_name, file_path])
             .output()
             .map_err(|e| e.to_string())?;
 

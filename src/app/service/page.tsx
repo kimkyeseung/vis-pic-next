@@ -920,7 +920,7 @@ function CompleteSection({
         const printerName = settings?.printer || "";
 
         if (printerName) {
-          await tauri.core.invoke("print_image", { printerName, imagePath: base64 });
+          await tauri.core.invoke("print_image", { printerName, imageData: base64 });
         }
 
         setPrintStatus("done");
