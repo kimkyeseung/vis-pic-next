@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback, Suspense } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 
 type Step = "start" | "payment" | "frame" | "background" | "camera" | "select" | "complete";
@@ -192,6 +192,9 @@ function ServiceContent() {
           photos={photos}
           maxPhotos={maxCaptures}
           minPhotos={slotsNeeded}
+          selectedBackground={selectedBackground}
+          backgroundImages={backgroundImages}
+          imageBaseUrl={imageBaseUrl}
           onCapture={addPhoto}
           onNext={() => {
             if (photos.length <= slotsNeeded) {
@@ -577,6 +580,9 @@ function CameraSection({
   photos,
   maxPhotos,
   minPhotos,
+  selectedBackground,
+  backgroundImages,
+  imageBaseUrl,
   onCapture,
   onNext,
   onPrev,
@@ -585,15 +591,52 @@ function CameraSection({
   photos: string[];
   maxPhotos: number;
   minPhotos: number;
+  selectedBackground: number | null;
+  backgroundImages: BGImage[];
+  imageBaseUrl: string;
   onCapture: (dataUrl: string) => void;
   onNext: () => void;
   onPrev: () => void;
 }) {
   const videoRef = useRef<HTMLVideoElement>(null);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const displayCanvasRef = useRef<HTMLCanvasElement>(null);
+  const bgSourceRef = useRef<HTMLImageElement | HTMLVideoElement | null>(null);
+  const animFrameRef = useRef<number>(0);
   const [countdown, setCountdown] = useState<number | null>(null);
   const [cameraError, setCameraError] = useState<string | null>(null);
   const [flash, setFlash] = useState(false);
+
+  const chromaKey = useMemo(() => {
+    const [r, g, b] = config.chromakeyRgb.split(",").map(Number);
+    return { r: r ?? 0, g: g ?? 255, b: b ?? 0 };
+  }, [config.chromakeyRgb]);
+
+  useEffect(() => {
+    bgSourceRef.current = null;
+    if (selectedBackground === null || selectedBackground <= 0) return;
+    const bgInfo = backgroundImages.find((b) => b.id === selectedBackground);
+    if (!bgInfo) return;
+
+    const url = `${imageBaseUrl}/${bgInfo.filename}`;
+    const isVideo = bgInfo.filename.endsWith(".mp4") || bgInfo.filename.endsWith(".webm");
+
+    if (isVideo) {
+      const vid = document.createElement("video");
+      vid.crossOrigin = "anonymous";
+      vid.muted = true;
+      vid.loop = true;
+      vid.playsInline = true;
+      vid.src = url;
+      vid.play();
+      bgSourceRef.current = vid;
+      return () => { vid.pause(); vid.src = ""; };
+    } else {
+      const img = new Image();
+      img.crossOrigin = "anonymous";
+      img.onload = () => { bgSourceRef.current = img; };
+      img.src = url;
+    }
+  }, [selectedBackground, backgroundImages, imageBaseUrl]);
 
   useEffect(() => {
     startCamera();
@@ -603,6 +646,78 @@ function CameraSection({
       }
     };
   }, []);
+
+  useEffect(() => {
+    const offscreen = document.createElement("canvas");
+    const HARD = 50 * 50;
+    const SOFT = 100 * 100;
+
+    const processFrame = () => {
+      const video = videoRef.current;
+      const display = displayCanvasRef.current;
+      if (!video || !display || video.readyState < 2) {
+        animFrameRef.current = requestAnimationFrame(processFrame);
+        return;
+      }
+
+      const w = video.videoWidth;
+      const h = video.videoHeight;
+      if (!w || !h) {
+        animFrameRef.current = requestAnimationFrame(processFrame);
+        return;
+      }
+
+      if (display.width !== w) display.width = w;
+      if (display.height !== h) display.height = h;
+      if (offscreen.width !== w) offscreen.width = w;
+      if (offscreen.height !== h) offscreen.height = h;
+
+      const ctx = display.getContext("2d")!;
+      const offCtx = offscreen.getContext("2d")!;
+
+      if (bgSourceRef.current) {
+        ctx.drawImage(bgSourceRef.current, 0, 0, w, h);
+      } else if (selectedBackground !== null && selectedBackground < 0) {
+        const fb = FALLBACK_BACKGROUNDS.find((b) => b.id === selectedBackground);
+        if (fb) fillGradientFromCSS(ctx, w, h, fb.gradient);
+        else { ctx.fillStyle = "#333"; ctx.fillRect(0, 0, w, h); }
+      } else {
+        ctx.fillStyle = "#333";
+        ctx.fillRect(0, 0, w, h);
+      }
+
+      offCtx.save();
+      offCtx.translate(w, 0);
+      offCtx.scale(-1, 1);
+      offCtx.drawImage(video, 0, 0, w, h);
+      offCtx.restore();
+
+      const imageData = offCtx.getImageData(0, 0, w, h);
+      const data = imageData.data;
+      const { r: kr, g: kg, b: kb } = chromaKey;
+
+      for (let i = 0; i < data.length; i += 4) {
+        const dr = data[i] - kr;
+        const dg = data[i + 1] - kg;
+        const db = data[i + 2] - kb;
+        const distSq = dr * dr + dg * dg + db * db;
+
+        if (distSq < HARD) {
+          data[i + 3] = 0;
+        } else if (distSq < SOFT) {
+          data[i + 3] = Math.round(((Math.sqrt(distSq) - 50) / 50) * 255);
+        }
+      }
+
+      offCtx.putImageData(imageData, 0, 0);
+      ctx.drawImage(offscreen, 0, 0);
+
+      animFrameRef.current = requestAnimationFrame(processFrame);
+    };
+
+    animFrameRef.current = requestAnimationFrame(processFrame);
+    return () => cancelAnimationFrame(animFrameRef.current);
+  }, [selectedBackground, chromaKey]);
 
   const startCamera = async () => {
     try {
@@ -636,16 +751,8 @@ function CameraSection({
         clearInterval(interval);
         setCountdown(null);
 
-        if (videoRef.current && canvasRef.current) {
-          const video = videoRef.current;
-          const canvas = canvasRef.current;
-          canvas.width = video.videoWidth || 1920;
-          canvas.height = video.videoHeight || 1080;
-          const ctx = canvas.getContext("2d")!;
-          ctx.translate(canvas.width, 0);
-          ctx.scale(-1, 1);
-          ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-          const dataUrl = canvas.toDataURL("image/jpeg", 0.92);
+        if (displayCanvasRef.current) {
+          const dataUrl = displayCanvasRef.current.toDataURL("image/jpeg", 0.92);
           onCapture(dataUrl);
         }
 
@@ -659,7 +766,7 @@ function CameraSection({
 
   return (
     <section className="w-full h-full flex relative z-10">
-      <canvas ref={canvasRef} className="hidden" />
+      <video ref={videoRef} autoPlay playsInline muted className="hidden" />
 
       {flash && <div className="fixed inset-0 bg-white z-50 pointer-events-none animate-flash" />}
 
@@ -677,7 +784,7 @@ function CameraSection({
               </button>
             </div>
           ) : (
-            <video ref={videoRef} autoPlay playsInline muted className="camera-video" />
+            <canvas ref={displayCanvasRef} className="camera-video" />
           )}
           {countdown !== null && (
             <div className="absolute inset-0 flex items-center justify-center bg-black/50">
