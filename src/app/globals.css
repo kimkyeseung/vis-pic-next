@@ -321,7 +321,6 @@ body {
   height: 100%;
   object-fit: cover;
   border-radius: 17px;
-  transform: scaleX(-1);
 }
 
 /* 촬영된 사진 */

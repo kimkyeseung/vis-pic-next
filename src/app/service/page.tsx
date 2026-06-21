@@ -618,6 +618,7 @@ function CameraSection({
   const [countdown, setCountdown] = useState<number | null>(null);
   const [cameraError, setCameraError] = useState<string | null>(null);
   const [flash, setFlash] = useState(false);
+  const [segmenterStatus, setSegmenterStatus] = useState<"idle" | "loading" | "ready" | "error">("idle");
 
   const bgRemovalMode = config.bgRemovalMode;
 
@@ -655,15 +656,19 @@ function CameraSection({
   }, [selectedBackground, backgroundImages, imageBaseUrl, bgRemovalMode]);
 
   useEffect(() => {
-    if (bgRemovalMode !== "mediapipe") return;
+    if (bgRemovalMode !== "mediapipe") {
+      setSegmenterStatus("idle");
+      return;
+    }
     let cancelled = false;
+    setSegmenterStatus("loading");
 
     async function initSegmenter() {
       try {
         const { FilesetResolver, ImageSegmenter } = await import("@mediapipe/tasks-vision");
         if (cancelled) return;
         const vision = await FilesetResolver.forVisionTasks(
-          "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/wasm"
+          "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.35/wasm"
         );
         if (cancelled) return;
         const segmenter = await ImageSegmenter.createFromOptions(vision, {
@@ -676,8 +681,10 @@ function CameraSection({
         });
         if (cancelled) return;
         segmenterRef.current = segmenter;
+        setSegmenterStatus("ready");
       } catch (err) {
         console.error("MediaPipe initialization failed:", err);
+        if (!cancelled) setSegmenterStatus("error");
       }
     }
 
@@ -756,8 +763,8 @@ function CameraSection({
             offCtx.putImageData(imageData, 0, 0);
             processed = true;
           }
-        } catch {
-          // segmenter not ready or error
+        } catch (err) {
+          console.error("Segmentation error:", err);
         }
       } else if (bgRemovalMode === "chromakey") {
         const imageData = offCtx.getImageData(0, 0, w, h);
@@ -879,6 +886,16 @@ function CameraSection({
             </div>
           ) : (
             <canvas ref={displayCanvasRef} className="camera-video" />
+          )}
+          {bgRemovalMode === "mediapipe" && segmenterStatus === "loading" && (
+            <div className="absolute bottom-4 left-4 bg-black/70 text-white text-sm px-4 py-2 rounded-lg">
+              AI 모델 로딩 중...
+            </div>
+          )}
+          {bgRemovalMode === "mediapipe" && segmenterStatus === "error" && (
+            <div className="absolute bottom-4 left-4 bg-red-900/80 text-white text-sm px-4 py-2 rounded-lg">
+              AI 모델 로드 실패
+            </div>
           )}
           {countdown !== null && (
             <div className="absolute inset-0 flex items-center justify-center bg-black/50">
