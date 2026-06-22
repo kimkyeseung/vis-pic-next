@@ -1,0 +1,4 @@
+src-tauri/target
+src-tauri/server
+.next
+node_modules

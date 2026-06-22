@@ -51,3 +51,5 @@ next-env.d.ts
 
 # Tauri server bundle
 /src-tauri/server/
+
+.vercel
