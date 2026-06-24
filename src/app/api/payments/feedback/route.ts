@@ -7,9 +7,7 @@ export async function POST(request: NextRequest) {
 
     const mulNo = formData.get("mul_no") as string | null;
     const payState = formData.get("pay_state") as string | null;
-    const price = formData.get("price") as string | null;
     const orderId = formData.get("var1") as string | null;
-    const deviceId = formData.get("var2") as string | null;
 
     if (!orderId) {
       return new Response("FAIL", { status: 400 });

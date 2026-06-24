@@ -703,11 +703,45 @@ function CameraSection({
     };
   }, [bgRemovalMode]);
 
+  const drawBackground = useCallback((ctx: CanvasRenderingContext2D, w: number, h: number) => {
+    if (bgSourceRef.current) {
+      ctx.drawImage(bgSourceRef.current, 0, 0, w, h);
+    } else if (selectedBackground !== null && selectedBackground < 0) {
+      const fb = FALLBACK_BACKGROUNDS.find((b) => b.id === selectedBackground);
+      if (fb) fillGradientFromCSS(ctx, w, h, fb.gradient);
+      else { ctx.fillStyle = "#333"; ctx.fillRect(0, 0, w, h); }
+    } else {
+      ctx.fillStyle = "#333";
+      ctx.fillRect(0, 0, w, h);
+    }
+  }, [selectedBackground]);
+
+  const startCamera = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { width: { ideal: 1920 }, height: { ideal: 1080 } },
+      });
+      if (videoRef.current) videoRef.current.srcObject = stream;
+    } catch (err) {
+      const e = err as DOMException;
+      if (e.name === "NotAllowedError") {
+        setCameraError("카메라 권한이 거부되었습니다. 브라우저 설정에서 허용해 주세요.");
+      } else if (e.name === "NotFoundError") {
+        setCameraError("연결된 카메라가 없습니다.");
+      } else if (e.name === "NotReadableError") {
+        setCameraError("카메라가 다른 프로그램에서 사용 중입니다.");
+      } else {
+        setCameraError(`카메라를 사용할 수 없습니다 (${e.name || e.message})`);
+      }
+    }
+  };
+
   useEffect(() => {
     startCamera();
+    const video = videoRef.current;
     return () => {
-      if (videoRef.current?.srcObject) {
-        (videoRef.current.srcObject as MediaStream).getTracks().forEach((t) => t.stop());
+      if (video?.srcObject) {
+        (video.srcObject as MediaStream).getTracks().forEach((t) => t.stop());
       }
     };
   }, []);
@@ -812,40 +846,7 @@ function CameraSection({
 
     animFrameRef.current = requestAnimationFrame(processFrame);
     return () => cancelAnimationFrame(animFrameRef.current);
-  }, [selectedBackground, chromaKey, bgRemovalMode]);
-
-  function drawBackground(ctx: CanvasRenderingContext2D, w: number, h: number) {
-    if (bgSourceRef.current) {
-      ctx.drawImage(bgSourceRef.current, 0, 0, w, h);
-    } else if (selectedBackground !== null && selectedBackground < 0) {
-      const fb = FALLBACK_BACKGROUNDS.find((b) => b.id === selectedBackground);
-      if (fb) fillGradientFromCSS(ctx, w, h, fb.gradient);
-      else { ctx.fillStyle = "#333"; ctx.fillRect(0, 0, w, h); }
-    } else {
-      ctx.fillStyle = "#333";
-      ctx.fillRect(0, 0, w, h);
-    }
-  }
-
-  const startCamera = async () => {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { width: { ideal: 1920 }, height: { ideal: 1080 } },
-      });
-      if (videoRef.current) videoRef.current.srcObject = stream;
-    } catch (err) {
-      const e = err as DOMException;
-      if (e.name === "NotAllowedError") {
-        setCameraError("카메라 권한이 거부되었습니다. 브라우저 설정에서 허용해 주세요.");
-      } else if (e.name === "NotFoundError") {
-        setCameraError("연결된 카메라가 없습니다.");
-      } else if (e.name === "NotReadableError") {
-        setCameraError("카메라가 다른 프로그램에서 사용 중입니다.");
-      } else {
-        setCameraError(`카메라를 사용할 수 없습니다 (${e.name || e.message})`);
-      }
-    }
-  };
+  }, [selectedBackground, chromaKey, bgRemovalMode, drawBackground]);
 
   const capturePhoto = useCallback(() => {
     if (countdown !== null || photos.length >= maxPhotos) return;
@@ -1087,13 +1088,6 @@ function CompleteSection({
   const [qrExpiryDate, setQrExpiryDate] = useState<string | null>(null);
   const compositeRef = useRef(false);
 
-  useEffect(() => {
-    if (!compositeRef.current) {
-      compositeRef.current = true;
-      createComposite();
-    }
-  }, []);
-
   const toFullUrl = (url: string) =>
     url.startsWith("http") ? url : window.location.origin + url;
 
@@ -1116,7 +1110,6 @@ function CompleteSection({
       // photo upload failed silently
     }
 
-    // GIF 생성 — 중간 프레임 또는 선택 사진을 축소하여 전송
     const selectedIndices = selectedPhotos;
     const allFrames = selectedIndices
       .flatMap((i) => intermediateFrames[i] || [])
@@ -1234,6 +1227,13 @@ function CompleteSection({
 
     uploadForQR(dataUrl);
   };
+
+  useEffect(() => {
+    if (!compositeRef.current) {
+      compositeRef.current = true;
+      createComposite();
+    }
+  }, []);
 
   const handlePrint = async () => {
     if (!compositeImage) return;
