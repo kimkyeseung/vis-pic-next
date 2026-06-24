@@ -62,8 +62,9 @@ function AdminLayoutInner({ children }: AdminLayoutProps) {
 
   const deviceMenuItems = [
     { href: "/admin/images", label: "이미지 관리", icon: "🖼️" },
+    { href: "/admin/print-setting", label: "인화 설정", icon: "🖨️" },
     { href: "/admin/settings", label: "설정", icon: "⚙️" },
-    { href: "/admin/printer", label: "프린터/카메라", icon: "🖨️" },
+    { href: "/admin/printer", label: "프린터/카메라", icon: "🔌" },
   ];
 
   const currentLabel =

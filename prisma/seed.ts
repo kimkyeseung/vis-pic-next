@@ -114,8 +114,8 @@ async function main() {
 
   // Create global settings
   const globalSettings = [
-    { name: "PICTURE_WIDTH", value: "15", description: "인화 가로 크기(cm)" },
-    { name: "PICTURE_HEIGHT", value: "10", description: "인화 세로 크기(cm)" },
+    { name: "PICTURE_WIDTH", value: "10", description: "인화 가로 크기(cm)" },
+    { name: "PICTURE_HEIGHT", value: "15", description: "인화 세로 크기(cm)" },
     { name: "CAPTURE_MODES", value: "1x1,1x2,2x2", description: "지원 프레임" },
   ];
 

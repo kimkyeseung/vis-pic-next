@@ -47,14 +47,15 @@ const FALLBACK_BACKGROUNDS = [
   { id: -6, gradient: "linear-gradient(135deg, #f093fb 0%, #f5576c 100%)", name: "Pink Red" },
 ];
 
-const FRAME_INFO: Record<string, { label: string; cols: number; rows: number; count: number }> = {
-  "1x1": { label: "1컷", cols: 1, rows: 1, count: 1 },
-  "1x2": { label: "2컷", cols: 2, rows: 1, count: 2 },
-  "2x1": { label: "2컷", cols: 1, rows: 2, count: 2 },
-  "2x2": { label: "4컷", cols: 2, rows: 2, count: 4 },
-  "2x3": { label: "6컷", cols: 3, rows: 2, count: 6 },
-  "2x4": { label: "8컷", cols: 4, rows: 2, count: 8 },
-  "4x1": { label: "4컷", cols: 1, rows: 4, count: 4 },
+type Orientation = "landscape" | "portrait";
+
+const FRAME_INFO: Record<string, { label: string; cols: number; rows: number; count: number; orientation: Orientation }> = {
+  "1x1": { label: "1컷", cols: 1, rows: 1, count: 1, orientation: "landscape" },
+  "2x1": { label: "2컷", cols: 1, rows: 2, count: 2, orientation: "portrait" },
+  "2x2": { label: "4컷", cols: 2, rows: 2, count: 4, orientation: "landscape" },
+  "2x3": { label: "6컷", cols: 3, rows: 2, count: 6, orientation: "landscape" },
+  "2x4": { label: "8컷", cols: 2, rows: 4, count: 8, orientation: "portrait" },
+  "4x1": { label: "4컷", cols: 1, rows: 4, count: 4, orientation: "portrait" },
 };
 
 function FloatingElements() {
@@ -475,7 +476,7 @@ function FrameSection({
             onClick={() => onSelect(frame.id)}
           >
             {selectedFrame === frame.id && <span className="check-mark">&#10003;</span>}
-            <div className="w-36 h-44 mx-auto mb-5 bg-black/30 rounded-xl flex items-center justify-center">
+            <div className={`${frame.orientation === "landscape" ? "w-44 h-32" : "w-32 h-44"} mx-auto mb-5 bg-black/30 rounded-xl flex items-center justify-center`}>
               <div
                 className="grid gap-1"
                 style={{
@@ -1151,11 +1152,18 @@ function CompleteSection({
     const frame = FRAME_INFO[selectedFrame];
     if (!frame) return;
 
+    const basePx = 1800;
+    const paperRatio = 3 / 2;
+    let canvasWidth: number, canvasHeight: number;
+    if (frame.orientation === "landscape") {
+      canvasWidth = basePx;
+      canvasHeight = Math.round(basePx / paperRatio);
+    } else {
+      canvasHeight = basePx;
+      canvasWidth = Math.round(basePx / paperRatio);
+    }
+
     const padding = 20;
-    const canvasWidth = 1200;
-    const cellW = (canvasWidth - padding * (frame.cols + 1)) / frame.cols;
-    const cellH = cellW * 3 / 4;
-    const canvasHeight = Math.round(cellH * frame.rows + padding * (frame.rows + 1));
 
     const canvas = document.createElement("canvas");
     canvas.width = canvasWidth;
@@ -1182,14 +1190,29 @@ function CompleteSection({
       }
     }
 
+    const allocW = (canvasWidth - padding * (frame.cols + 1)) / frame.cols;
+    const allocH = (canvasHeight - padding * (frame.rows + 1)) / frame.rows;
+
+    const photoRatio = 4 / 3;
+    let cellW: number, cellH: number;
+    if (allocW / allocH > photoRatio) {
+      cellH = allocH;
+      cellW = cellH * photoRatio;
+    } else {
+      cellW = allocW;
+      cellH = cellW / photoRatio;
+    }
+
     for (let i = 0; i < selectedPhotos.length && i < frame.count; i++) {
       const photo = photos[selectedPhotos[i]];
       if (!photo) continue;
 
       const col = i % frame.cols;
       const row = Math.floor(i / frame.cols);
-      const x = padding + col * (cellW + padding);
-      const y = padding + row * (cellH + padding);
+      const ax = padding + col * (allocW + padding);
+      const ay = padding + row * (allocH + padding);
+      const x = ax + (allocW - cellW) / 2;
+      const y = ay + (allocH - cellH) / 2;
 
       try {
         const img = await loadImage(photo);

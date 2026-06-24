@@ -78,6 +78,13 @@ export default function AdminPage() {
       color: "from-purple-500 to-purple-600",
     },
     {
+      title: "인화 설정",
+      description: "인화지 크기, 촬영 모드, 배경을 설정합니다",
+      href: "/admin/print-setting",
+      icon: "🖨️",
+      color: "from-cyan-500 to-cyan-600",
+    },
+    {
       title: "설정",
       description: "시스템 설정을 관리합니다",
       href: "/admin/settings",
@@ -88,7 +95,7 @@ export default function AdminPage() {
       title: "프린터/카메라",
       description: "프린터와 카메라를 설정합니다",
       href: "/admin/printer",
-      icon: "🖨️",
+      icon: "🔌",
       color: "from-orange-500 to-orange-600",
     },
     {
