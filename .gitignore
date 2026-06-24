@@ -52,4 +52,8 @@ next-env.d.ts
 # Tauri server bundle
 /src-tauri/server/
 
-.vercel
+# Generated print/GIF files
+/public/static/prints/
+
+# Test results
+/test-results/
