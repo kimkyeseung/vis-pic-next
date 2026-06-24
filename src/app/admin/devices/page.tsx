@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useAdmin } from "../AdminContext";
 
 interface Device {
   id: number;
@@ -13,6 +14,7 @@ interface Device {
 }
 
 export default function DevicesPage() {
+  const { refreshDevices } = useAdmin();
   const [devices, setDevices] = useState<Device[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -42,6 +44,7 @@ export default function DevicesPage() {
 
       if (res.ok) {
         setDevices(devices.filter((d) => d.id !== id));
+        refreshDevices();
       }
     } catch (error) {
       console.error("Failed to delete device:", error);
@@ -62,6 +65,7 @@ export default function DevicesPage() {
             d.id === device.id ? { ...d, isActive: !d.isActive } : d
           )
         );
+        refreshDevices();
       }
     } catch (error) {
       console.error("Failed to toggle device:", error);
