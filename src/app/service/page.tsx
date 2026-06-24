@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback, useMemo, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
+import { QRCodeSVG } from "qrcode.react";
 
 type Step = "start" | "payment" | "frame" | "background" | "camera" | "select" | "complete";
 
@@ -83,6 +84,7 @@ function ServiceContent() {
   const [selectedBackground, setSelectedBackground] = useState<number | null>(null);
   const [backgroundImages, setBackgroundImages] = useState<BGImage[]>([]);
   const [photos, setPhotos] = useState<string[]>([]);
+  const [intermediateFrames, setIntermediateFrames] = useState<string[][]>([]);
   const [selectedPhotos, setSelectedPhotos] = useState<number[]>([]);
   const [compositeImage, setCompositeImage] = useState<string | null>(null);
   const [imageBaseUrl, setImageBaseUrl] = useState<string>("/static/images");
@@ -150,7 +152,10 @@ function ServiceContent() {
     }
   };
 
-  const addPhoto = (dataUrl: string) => setPhotos((prev) => [...prev, dataUrl]);
+  const addPhoto = (dataUrl: string, frames?: string[]) => {
+    setPhotos((prev) => [...prev, dataUrl]);
+    setIntermediateFrames((prev) => [...prev, frames || []]);
+  };
 
   const resetAll = () => {
     setCurrentStep("start");
@@ -158,6 +163,7 @@ function ServiceContent() {
     setSelectedFrame(null);
     setSelectedBackground(null);
     setPhotos([]);
+    setIntermediateFrames([]);
     setSelectedPhotos([]);
     setCompositeImage(null);
   };
@@ -243,6 +249,7 @@ function ServiceContent() {
           imageBaseUrl={imageBaseUrl}
           compositeImage={compositeImage}
           setCompositeImage={setCompositeImage}
+          intermediateFrames={intermediateFrames}
           onRestart={resetAll}
         />
       )}
@@ -314,7 +321,7 @@ function PaymentSection({
     setStatus("requesting");
     setErrorMsg("");
     try {
-      const res = await fetch("/api/payments/request", {
+      const res = await fetch("/api/payments/request/", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ deviceId: config.deviceId, amount: config.paymentAmount }),
@@ -605,7 +612,7 @@ function CameraSection({
   selectedBackground: number | null;
   backgroundImages: BGImage[];
   imageBaseUrl: string;
-  onCapture: (dataUrl: string) => void;
+  onCapture: (dataUrl: string, frames?: string[]) => void;
   onNext: () => void;
   onPrev: () => void;
 }) {
@@ -844,17 +851,30 @@ function CameraSection({
     if (countdown !== null || photos.length >= maxPhotos) return;
     let count = config.captureSeconds;
     setCountdown(count);
+    const frames: string[] = [];
+
+    // 카운트다운 시작 시 첫 중간 프레임 캡처
+    if (displayCanvasRef.current) {
+      frames.push(displayCanvasRef.current.toDataURL("image/jpeg", 0.85));
+    }
+
     const interval = setInterval(() => {
       count--;
       if (count > 0) {
         setCountdown(count);
+        // 매초 중간 프레임 캡처
+        if (displayCanvasRef.current) {
+          frames.push(displayCanvasRef.current.toDataURL("image/jpeg", 0.85));
+        }
       } else {
         clearInterval(interval);
         setCountdown(null);
 
         if (displayCanvasRef.current) {
+          // 최종 프레임도 중간 프레임에 추가
+          frames.push(displayCanvasRef.current.toDataURL("image/jpeg", 0.85));
           const dataUrl = displayCanvasRef.current.toDataURL("image/jpeg", 0.92);
-          onCapture(dataUrl);
+          onCapture(dataUrl, frames);
         }
 
         setFlash(true);
@@ -877,12 +897,34 @@ function CameraSection({
             <div className="absolute inset-0 flex flex-col items-center justify-center bg-gradient-to-br from-gray-700 to-gray-900">
               <span className="text-6xl mb-5 opacity-30">&#128247;</span>
               <p className="text-white/60 mb-6">{cameraError}</p>
-              <button
-                className="px-6 py-3 bg-white/10 hover:bg-white/20 text-white rounded-xl transition-colors"
-                onClick={() => { setCameraError(null); startCamera(); }}
-              >
-                다시 시도
-              </button>
+              <div className="flex gap-3">
+                <button
+                  className="px-6 py-3 bg-white/10 hover:bg-white/20 text-white rounded-xl transition-colors"
+                  onClick={() => { setCameraError(null); startCamera(); }}
+                >
+                  다시 시도
+                </button>
+                <button
+                  className="px-6 py-3 bg-blue-600/80 hover:bg-blue-500 text-white rounded-xl transition-colors"
+                  onClick={() => {
+                    const c = document.createElement("canvas");
+                    c.width = 640; c.height = 480;
+                    const ctx = c.getContext("2d")!;
+                    const colors = ["#e74c3c","#3498db","#2ecc71","#f39c12","#9b59b6","#1abc9c","#e67e22","#34495e"];
+                    const color = colors[photos.length % colors.length];
+                    ctx.fillStyle = color;
+                    ctx.fillRect(0, 0, 640, 480);
+                    ctx.fillStyle = "#fff";
+                    ctx.font = "bold 80px sans-serif";
+                    ctx.textAlign = "center";
+                    ctx.textBaseline = "middle";
+                    ctx.fillText(`${photos.length + 1}`, 320, 240);
+                    onCapture(c.toDataURL("image/jpeg", 0.9));
+                  }}
+                >
+                  테스트 사진 추가
+                </button>
+              </div>
             </div>
           ) : (
             <canvas ref={displayCanvasRef} className="camera-video" />
@@ -1025,6 +1067,7 @@ function CompleteSection({
   imageBaseUrl,
   compositeImage,
   setCompositeImage,
+  intermediateFrames,
   onRestart,
 }: {
   photos: string[];
@@ -1035,9 +1078,13 @@ function CompleteSection({
   imageBaseUrl: string;
   compositeImage: string | null;
   setCompositeImage: (img: string | null) => void;
+  intermediateFrames: string[][];
   onRestart: () => void;
 }) {
   const [printStatus, setPrintStatus] = useState<"compositing" | "ready" | "printing" | "done" | "error">("compositing");
+  const [qrPhotoUrl, setQrPhotoUrl] = useState<string | null>(null);
+  const [qrGifUrl, setQrGifUrl] = useState<string | null>(null);
+  const [qrExpiryDate, setQrExpiryDate] = useState<string | null>(null);
   const compositeRef = useRef(false);
 
   useEffect(() => {
@@ -1046,6 +1093,66 @@ function CompleteSection({
       createComposite();
     }
   }, []);
+
+  const toFullUrl = (url: string) =>
+    url.startsWith("http") ? url : window.location.origin + url;
+
+  const uploadForQR = async (dataUrl: string) => {
+    let photoUrl: string | null = null;
+
+    try {
+      const res = await fetch("/api/print/upload-image/", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ image_data: dataUrl, image_type: "photo" }),
+      });
+      const data = await res.json();
+      if (data.success && data.image_url) {
+        photoUrl = toFullUrl(data.image_url);
+        setQrPhotoUrl(photoUrl);
+        setQrExpiryDate(data.expiry_date);
+      }
+    } catch {
+      // photo upload failed silently
+    }
+
+    // GIF 생성 — 중간 프레임 또는 선택 사진을 축소하여 전송
+    const selectedIndices = selectedPhotos;
+    const allFrames = selectedIndices
+      .flatMap((i) => intermediateFrames[i] || [])
+      .filter(Boolean);
+    const gifSources =
+      allFrames.length >= 2
+        ? allFrames
+        : selectedIndices.map((i) => photos[i]).filter(Boolean);
+    const gifDuration = allFrames.length >= 2 ? 500 : 800;
+
+    if (gifSources.length >= 2) {
+      try {
+        const resizedImages = await Promise.all(
+          gifSources.map((src) => resizeForGif(src, 400))
+        );
+        const gifRes = await fetch("/api/gif/create/", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ images: resizedImages, duration: gifDuration }),
+        });
+        const gifData = await gifRes.json();
+        if (gifData.success && gifData.gif_url) {
+          setQrGifUrl(toFullUrl(gifData.gif_url));
+          if (!qrExpiryDate && gifData.expiry_date) {
+            setQrExpiryDate(gifData.expiry_date);
+          }
+        } else if (photoUrl) {
+          setQrGifUrl(photoUrl);
+        }
+      } catch {
+        if (photoUrl) setQrGifUrl(photoUrl);
+      }
+    } else if (photoUrl) {
+      setQrGifUrl(photoUrl);
+    }
+  };
 
   const createComposite = async () => {
     const frame = FRAME_INFO[selectedFrame];
@@ -1062,7 +1169,6 @@ function CompleteSection({
     canvas.height = canvasHeight;
     const ctx = canvas.getContext("2d")!;
 
-    // Draw background
     const bgInfo = selectedBackground !== null && selectedBackground > 0
       ? backgroundImages.find((b) => b.id === selectedBackground)
       : null;
@@ -1083,7 +1189,6 @@ function CompleteSection({
       }
     }
 
-    // Draw photos in grid
     for (let i = 0; i < selectedPhotos.length && i < frame.count; i++) {
       const photo = photos[selectedPhotos[i]];
       if (!photo) continue;
@@ -1114,7 +1219,6 @@ function CompleteSection({
 
         ctx.restore();
 
-        // Border
         ctx.strokeStyle = "rgba(255,255,255,0.8)";
         ctx.lineWidth = 3;
         roundRect(ctx, x, y, cellW, cellH, 12);
@@ -1127,6 +1231,8 @@ function CompleteSection({
     const dataUrl = canvas.toDataURL("image/jpeg", 0.95);
     setCompositeImage(dataUrl);
     setPrintStatus("ready");
+
+    uploadForQR(dataUrl);
   };
 
   const handlePrint = async () => {
@@ -1196,8 +1302,52 @@ function CompleteSection({
               {printStatus === "done" ? "완료!" : "사진이 완성되었습니다!"}
             </h2>
 
-            <div className="mx-auto mb-10 rounded-2xl overflow-hidden" style={{ maxWidth: "500px", boxShadow: "0 20px 50px rgba(0,0,0,0.4)" }}>
-              <img src={compositeImage} alt="Composite" className="w-full" />
+            <div className="flex items-start justify-center gap-12 mb-10">
+              <div className="rounded-2xl overflow-hidden" style={{ maxWidth: "500px", boxShadow: "0 20px 50px rgba(0,0,0,0.4)" }}>
+                <img src={compositeImage} alt="Composite" className="w-full" />
+              </div>
+
+              {(qrPhotoUrl || qrGifUrl) && (
+                <div className="flex flex-col items-center gap-6">
+                  <div className="flex gap-6">
+                    {qrPhotoUrl && (
+                      <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-5 border border-white/20 text-center">
+                        <div className="text-2xl mb-1">📷</div>
+                        <p className="text-white font-semibold mb-3">사진 다운로드</p>
+                        <div
+                          className="bg-white p-3 rounded-xl cursor-pointer"
+                          onDoubleClick={() => window.open(qrPhotoUrl, "_blank")}
+                        >
+                          <QRCodeSVG value={qrPhotoUrl} size={120} />
+                        </div>
+                        <p className="text-gray-400 text-xs mt-2">QR 스캔</p>
+                      </div>
+                    )}
+                    {qrGifUrl && (
+                      <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-5 border border-white/20 text-center">
+                        <div className="text-2xl mb-1">🎬</div>
+                        <p className="text-white font-semibold mb-3">GIF 다운로드</p>
+                        <div
+                          className="bg-white p-3 rounded-xl cursor-pointer"
+                          onDoubleClick={() => window.open(qrGifUrl, "_blank")}
+                        >
+                          <QRCodeSVG value={qrGifUrl} size={120} />
+                        </div>
+                        <p className="text-gray-400 text-xs mt-2">QR 스캔</p>
+                      </div>
+                    )}
+                  </div>
+
+                  {qrExpiryDate && (
+                    <div className="flex items-center gap-2 bg-black/40 px-4 py-2 rounded-full text-sm">
+                      <span>⏰</span>
+                      <span className="text-gray-300">
+                        <strong className="text-white">{qrExpiryDate}</strong> 까지 다운로드 가능
+                      </span>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
 
             <div className="flex gap-6 justify-center mb-8">
@@ -1249,6 +1399,25 @@ function CompleteSection({
 }
 
 /* ───── Helpers ───── */
+function resizeForGif(src: string, maxWidth: number): Promise<string> {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.onload = () => {
+      const scale = Math.min(1, maxWidth / img.width);
+      const w = Math.round(img.width * scale);
+      const h = Math.round(img.height * scale);
+      const c = document.createElement("canvas");
+      c.width = w;
+      c.height = h;
+      c.getContext("2d")!.drawImage(img, 0, 0, w, h);
+      resolve(c.toDataURL("image/jpeg", 0.7));
+    };
+    img.onerror = () => resolve(src);
+    img.src = src;
+  });
+}
+
 function loadImage(src: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
     const img = new Image();
