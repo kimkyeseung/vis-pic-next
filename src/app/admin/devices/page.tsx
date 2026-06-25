@@ -9,6 +9,8 @@ export default function DevicesPage() {
   const { refreshDevices } = useAdmin();
   const [devices, setDevices] = useState<Device[]>([]);
   const [loading, setLoading] = useState(true);
+  const [cloneTarget, setCloneTarget] = useState<Device | null>(null);
+  const [cloneForm, setCloneForm] = useState({ deviceId: "", name: "", description: "" });
 
   const fetchDevices = async () => {
     try {
@@ -40,6 +42,33 @@ export default function DevicesPage() {
       }
     } catch (error) {
       console.error("Failed to delete device:", error);
+    }
+  };
+
+  const handleClone = async () => {
+    if (!cloneTarget || !cloneForm.deviceId || !cloneForm.name) return;
+    try {
+      const res = await fetch("/api/admin/devices/clone", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          sourceDeviceId: cloneTarget.deviceId,
+          newDeviceId: cloneForm.deviceId,
+          newName: cloneForm.name,
+          newDescription: cloneForm.description || null,
+        }),
+      });
+      if (res.ok) {
+        setCloneTarget(null);
+        setCloneForm({ deviceId: "", name: "", description: "" });
+        fetchDevices();
+        refreshDevices();
+      } else {
+        const data = await res.json();
+        alert(data.error || "복제 실패");
+      }
+    } catch {
+      alert("서버 연결 실패");
     }
   };
 
@@ -148,6 +177,15 @@ export default function DevicesPage() {
                       편집
                     </Link>
                     <button
+                      onClick={() => {
+                        setCloneTarget(device);
+                        setCloneForm({ deviceId: "", name: `${device.name} (복사)`, description: device.description || "" });
+                      }}
+                      className="px-3 py-1 bg-indigo-600 text-white rounded hover:bg-indigo-500 transition-colors"
+                    >
+                      복제
+                    </button>
+                    <button
                       onClick={() => handleDelete(device.id)}
                       className="px-3 py-1 bg-red-600 text-white rounded hover:bg-red-500 transition-colors"
                     >
@@ -158,6 +196,61 @@ export default function DevicesPage() {
               ))}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {cloneTarget && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
+          <div className="bg-gray-800 rounded-xl p-6 w-full max-w-md border border-gray-700">
+            <h3 className="text-lg font-bold text-white mb-4">
+              장치 복제: {cloneTarget.name}
+            </h3>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-gray-400 text-sm mb-1">새 장치 ID</label>
+                <input
+                  type="text"
+                  value={cloneForm.deviceId}
+                  onChange={(e) => setCloneForm({ ...cloneForm, deviceId: e.target.value })}
+                  className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-blue-500"
+                  placeholder="예: device_02"
+                />
+              </div>
+              <div>
+                <label className="block text-gray-400 text-sm mb-1">장치 이름</label>
+                <input
+                  type="text"
+                  value={cloneForm.name}
+                  onChange={(e) => setCloneForm({ ...cloneForm, name: e.target.value })}
+                  className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-blue-500"
+                />
+              </div>
+              <div>
+                <label className="block text-gray-400 text-sm mb-1">설명 (선택)</label>
+                <input
+                  type="text"
+                  value={cloneForm.description}
+                  onChange={(e) => setCloneForm({ ...cloneForm, description: e.target.value })}
+                  className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-blue-500"
+                />
+              </div>
+            </div>
+            <div className="flex justify-end gap-3 mt-6">
+              <button
+                onClick={() => setCloneTarget(null)}
+                className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-500 transition-colors"
+              >
+                취소
+              </button>
+              <button
+                onClick={handleClone}
+                disabled={!cloneForm.deviceId || !cloneForm.name}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
+              >
+                복제
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
