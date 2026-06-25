@@ -103,7 +103,7 @@ model Image {
   deviceId  String?   @map("device_id") @db.VarChar(64)
   imageType Int       @map("image_type")
   name      String    @db.VarChar(32)
-  filename  String    @db.VarChar(64)
+  filename  String    @db.VarChar(128)
   width     Int?
   height    Int?
   left      Int?

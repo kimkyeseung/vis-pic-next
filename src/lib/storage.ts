@@ -28,27 +28,32 @@ export async function uploadImage(
   const buffer =
     Buffer.isBuffer(file) ? file : Buffer.from(await (file as File).arrayBuffer());
 
-  // Always write to local filesystem
-  const uploadDir = getLocalDir();
-  await mkdir(uploadDir, { recursive: true });
-  const filepath = path.join(uploadDir, filename);
-  await writeFile(filepath, buffer);
-
-  // Attempt Supabase Storage upload (best-effort)
+  // Upload to Supabase Storage first (required on Vercel where FS is read-only)
   const supabase = getSupabaseClient();
   if (supabase) {
-    try {
-      const { error } = await supabase.storage
-        .from(BUCKET_NAME)
-        .upload(filename, buffer, {
-          contentType: getContentType(filename),
-          upsert: true,
-        });
-      if (error) {
-        console.warn("Supabase Storage upload failed, using local only:", error.message);
-      }
-    } catch (err) {
-      console.warn("Supabase Storage upload error, using local only:", err);
+    const { error } = await supabase.storage
+      .from(BUCKET_NAME)
+      .upload(filename, buffer, {
+        contentType: getContentType(filename),
+        upsert: true,
+      });
+    if (error) {
+      console.warn("Supabase Storage upload failed:", error.message);
+    }
+  }
+
+  // Write to local filesystem (best-effort: fails silently on read-only FS like Vercel)
+  try {
+    const uploadDir = getLocalDir();
+    await mkdir(uploadDir, { recursive: true });
+    await writeFile(path.join(uploadDir, filename), buffer);
+  } catch (err) {
+    if (supabase) {
+      // Local write failed but Supabase succeeded — acceptable on Vercel
+      console.warn("Local filesystem write skipped:", (err as Error).message);
+    } else {
+      // No Supabase and no local FS — propagate error
+      throw err;
     }
   }
 

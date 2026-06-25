@@ -84,7 +84,7 @@ export default function PrintSettingPage() {
         const formData = new FormData();
         formData.append("file", bgFile);
         formData.append("name", "인화 배경");
-        formData.append("imageType", "3");
+        formData.append("imageType", "2");
         formData.append("priority", "0");
 
         const uploadRes = await fetch("/api/admin/images/upload", {
@@ -202,7 +202,12 @@ export default function PrintSettingPage() {
     roundRect(ctx, ox, oy, drawW, drawH, 6);
     ctx.clip();
 
-    const bgUrl = bgPreviewUrl || (existingBgUrl ? `${imageBaseUrl}/${existingBgUrl}` : null);
+    const resolveUrl = (value: string) => {
+      if (value.startsWith("http://") || value.startsWith("https://")) return value;
+      if (value.startsWith("/")) return value;
+      return `${imageBaseUrl}/${value.split("/").pop()}`;
+    };
+    const bgUrl = bgPreviewUrl || (existingBgUrl ? resolveUrl(existingBgUrl) : null);
     if (bgUrl) {
       const img = new Image();
       img.crossOrigin = "anonymous";

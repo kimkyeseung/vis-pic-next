@@ -45,9 +45,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Generate unique filename
-    const timestamp = Date.now();
-    const filename = `${timestamp}_${file.name.replace(/[^a-zA-Z0-9._-]/g, "_")}`;
+    // Generate unique filename (short UUID to fit VarChar(64))
+    const uid = crypto.randomUUID().replace(/-/g, "").slice(0, 12);
+    const filename = `${uid}.${ext}`;
 
     // Upload to storage (local + Supabase if configured)
     await uploadImage(file, filename);

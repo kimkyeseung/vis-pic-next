@@ -40,6 +40,15 @@ export function CompleteSection({
   const toFullUrl = (url: string) =>
     url.startsWith("http") ? url : window.location.origin + url;
 
+  const resolveImageUrl = (value: string, baseUrl: string) => {
+    if (!value) return "";
+    if (value.startsWith("http://") || value.startsWith("https://")) return value;
+    if (value.startsWith("/")) return value;
+    // strip any accidental path prefix (e.g. "static/images/file.jpg")
+    const filename = value.split("/").pop()!;
+    return `${baseUrl}/${filename}`;
+  };
+
   const uploadForQR = async (dataUrl: string) => {
     let photoUrl: string | null = null;
 
@@ -212,7 +221,7 @@ export function CompleteSection({
     let bgDrawn = false;
     if (printSettings.PRINT_BACKGROUND) {
       try {
-        const bgImg = await loadImage(`${imageBaseUrl}/${printSettings.PRINT_BACKGROUND}`);
+        const bgImg = await loadImage(resolveImageUrl(printSettings.PRINT_BACKGROUND, imageBaseUrl));
         ctx.drawImage(bgImg, 0, 0, canvasWidth, canvasHeight);
         bgDrawn = true;
       } catch {
