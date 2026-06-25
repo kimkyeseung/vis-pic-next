@@ -65,7 +65,6 @@ function AdminLayoutInner({ children }: AdminLayoutProps) {
     { href: "/admin/print-setting", label: "인화 설정", icon: "🖨️" },
     { href: "/admin/payment", label: "결제 설정", icon: "💳" },
     { href: "/admin/settings", label: "설정", icon: "⚙️" },
-    { href: "/admin/printer", label: "프린터/카메라", icon: "🔌" },
   ];
 
   const currentLabel =

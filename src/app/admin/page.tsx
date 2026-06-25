@@ -99,13 +99,6 @@ export default function AdminPage() {
       color: "from-green-500 to-green-600",
     },
     {
-      title: "프린터/카메라",
-      description: "프린터와 카메라를 설정합니다",
-      href: "/admin/printer",
-      icon: "🔌",
-      color: "from-orange-500 to-orange-600",
-    },
-    {
       title: "장치 편집",
       description: "장치 정보와 장치별 설정을 수정합니다",
       href: `/admin/devices/${selectedDevice.id}`,

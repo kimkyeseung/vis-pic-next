@@ -363,47 +363,23 @@ export function CompleteSection({
     }
   }, []);
 
-  const handlePrint = async () => {
+  const handlePrint = () => {
     if (!compositeImage) return;
     setPrintStatus("printing");
 
-    const isTauri = typeof window !== "undefined" && "__TAURI__" in window;
-
-    if (isTauri) {
-      try {
-        const blob = await fetch(compositeImage).then((r) => r.blob());
-        const buffer = await blob.arrayBuffer();
-        const uint8 = new Uint8Array(buffer);
-        const binary = Array.from(uint8).map((b) => String.fromCharCode(b)).join("");
-        const base64 = btoa(binary);
-
-        const tauri = (window as unknown as { __TAURI__: { core: { invoke: (cmd: string, args?: Record<string, unknown>) => Promise<unknown> } } }).__TAURI__;
-        const settings = await tauri.core.invoke("load_settings", {}) as Record<string, string>;
-        const printerName = settings?.printer || "";
-
-        if (printerName) {
-          await tauri.core.invoke("print_image", { printerName, imageData: base64 });
-        }
-
-        setPrintStatus("done");
-      } catch {
-        setPrintStatus("done");
-      }
-    } else {
-      const printWindow = window.open("", "_blank");
-      if (printWindow) {
-        printWindow.document.write(`
-          <html><head><title>AR-pic</title>
-          <style>body{margin:0;display:flex;justify-content:center;align-items:center;min-height:100vh;background:#000;}
-          img{max-width:100%;max-height:100vh;object-fit:contain;}
-          @media print{body{background:#fff;}img{max-width:100%;max-height:100%;}}
-          </style></head>
-          <body><img src="${compositeImage}" onload="window.print();"/></body></html>
-        `);
-        printWindow.document.close();
-      }
-      setPrintStatus("done");
+    const printWindow = window.open("", "_blank");
+    if (printWindow) {
+      printWindow.document.write(`
+        <html><head><title>AR-pic</title>
+        <style>body{margin:0;display:flex;justify-content:center;align-items:center;min-height:100vh;background:#000;}
+        img{max-width:100%;max-height:100vh;object-fit:contain;}
+        @media print{body{background:#fff;}img{max-width:100%;max-height:100%;}}
+        </style></head>
+        <body><img src="${compositeImage}" onload="window.print();"/></body></html>
+      `);
+      printWindow.document.close();
     }
+    setPrintStatus("done");
   };
 
   const handleDownload = () => {
