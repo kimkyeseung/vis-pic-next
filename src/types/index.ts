@@ -22,6 +22,7 @@ export interface DeviceConfig {
   chromakeyRgb: string;
   captureModes: string[];
   bgRemovalMode: BgRemovalMode;
+  idleTimeoutSeconds: number;
 }
 
 export interface BGImage {
