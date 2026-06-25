@@ -157,7 +157,7 @@ export function CompleteSection({
     if (gifSources.length >= 2) {
       try {
         const resizedImages = await Promise.all(
-          gifSources.map((src) => resizeForGif(src, 400))
+          gifSources.map((src) => resizeForGif(src, 800))
         );
         const gifRes = await fetch("/api/gif/create/", {
           method: "POST",

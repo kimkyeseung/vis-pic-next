@@ -8,7 +8,7 @@ const GIFEncoder = require("gif-encoder-2");
 
 const BUCKET_NAME = "prints";
 const EXPIRY_DAYS = 3;
-const MAX_GIF_WIDTH = 400;
+const MAX_GIF_WIDTH = 800;
 
 function getSupabaseClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
