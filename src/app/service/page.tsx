@@ -24,6 +24,7 @@ const DEFAULT_CONFIG: DeviceConfig = {
   captureModes: ["1x1", "2x2"],
   bgRemovalMode: "mediapipe",
   idleTimeoutSeconds: 30,
+  cameraAutoTimerSeconds: 60,
 };
 
 function ServiceContent() {
@@ -111,6 +112,7 @@ function ServiceContent() {
         captureModes: modes,
         bgRemovalMode,
         idleTimeoutSeconds: parseInt(s.IDLE_TIMEOUT_SECONDS || "30", 10) || 30,
+        cameraAutoTimerSeconds: parseInt(s.CAMERA_AUTO_TIMER || "60", 10) || 60,
       });
     } catch {
       // use defaults

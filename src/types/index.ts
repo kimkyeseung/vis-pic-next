@@ -23,6 +23,7 @@ export interface DeviceConfig {
   captureModes: string[];
   bgRemovalMode: BgRemovalMode;
   idleTimeoutSeconds: number;
+  cameraAutoTimerSeconds: number;
 }
 
 export interface BGImage {

@@ -107,6 +107,7 @@ export default function DeviceEditPage({
       ],
     },
     { name: "CHROMAKEY_RGB", label: "크로마키 RGB (크로마키 모드)", type: "text" },
+    { name: "CAMERA_AUTO_TIMER", label: "자동 촬영 타이머 (초, 기본 60)", type: "number" },
     { name: "IDLE_TIMEOUT_SECONDS", label: "비활성 타임아웃 (초, 기본 30)", type: "number" },
   ];
 

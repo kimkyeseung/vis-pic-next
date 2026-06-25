@@ -38,6 +38,8 @@ export function CameraSection({
   const [cameraError, setCameraError] = useState<string | null>(null);
   const [flash, setFlash] = useState(false);
   const [segmenterStatus, setSegmenterStatus] = useState<"idle" | "loading" | "ready" | "error">("idle");
+  const [autoTimer, setAutoTimer] = useState<number | null>(null);
+  const autoTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const bgRemovalMode = config.bgRemovalMode;
 
@@ -293,6 +295,39 @@ export function CameraSection({
     }, 1000);
   }, [countdown, photos.length, maxPhotos, config.captureSeconds, onCapture]);
 
+  const startAutoTimer = useCallback(() => {
+    if (autoTimerRef.current) clearInterval(autoTimerRef.current);
+    const seconds = config.cameraAutoTimerSeconds;
+    if (seconds <= 0) return;
+    setAutoTimer(seconds);
+    const deadline = Date.now() + seconds * 1000;
+    autoTimerRef.current = setInterval(() => {
+      const remaining = Math.ceil((deadline - Date.now()) / 1000);
+      if (remaining <= 0) {
+        if (autoTimerRef.current) clearInterval(autoTimerRef.current);
+        autoTimerRef.current = null;
+        setAutoTimer(null);
+        capturePhoto();
+      } else {
+        setAutoTimer(remaining);
+      }
+    }, 1000);
+  }, [config.cameraAutoTimerSeconds, capturePhoto]);
+
+  useEffect(() => {
+    if (photos.length >= maxPhotos || countdown !== null) return;
+    startAutoTimer();
+    return () => {
+      if (autoTimerRef.current) { clearInterval(autoTimerRef.current); autoTimerRef.current = null; }
+    };
+  }, [photos.length, maxPhotos, countdown, startAutoTimer]);
+
+  const handleManualCapture = useCallback(() => {
+    if (autoTimerRef.current) { clearInterval(autoTimerRef.current); autoTimerRef.current = null; }
+    setAutoTimer(null);
+    capturePhoto();
+  }, [capturePhoto]);
+
   const canProceed = photos.length >= minPhotos;
 
   return (
@@ -378,11 +413,17 @@ export function CameraSection({
 
         <button
           className="service-button w-full py-5 rounded-2xl text-xl mb-6"
-          onClick={capturePhoto}
+          onClick={handleManualCapture}
           style={countdown !== null || photos.length >= maxPhotos ? { opacity: 0.5, pointerEvents: "none" } : {}}
         >
           &#128248; 촬영하기
         </button>
+
+        {autoTimer !== null && countdown === null && photos.length < maxPhotos && (
+          <div className="text-center text-gray-400 text-sm mb-4">
+            자동 촬영까지 <span className="text-white font-semibold">{autoTimer}</span>초
+          </div>
+        )}
 
         <div className="mt-auto flex flex-col gap-3">
           <button className="service-button nav-button w-full" style={{ background: "rgba(255,255,255,0.1)", color: "#fff" }} onClick={onPrev}>

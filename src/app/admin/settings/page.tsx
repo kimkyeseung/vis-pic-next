@@ -24,13 +24,14 @@ const GROUPS: SettingGroup[] = [
   {
     key: "capture",
     label: "촬영 설정",
-    prefix: ["CAPTURE_"],
+    prefix: ["CAPTURE_", "CAMERA_"],
     fields: [
       { name: "CAPTURE_SECONDS", label: "카운트다운 (초)", type: "number" },
       { name: "CAPTURE_MODES", label: "지원 프레임 (예: 1x1,2x2,2x1)" },
       { name: "CAPTURE_COUNT_MODE", label: "촬영 횟수 모드", type: "select", options: [{ value: "uniform", label: "균일" }, { value: "custom", label: "커스텀" }] },
       { name: "CAPTURE_COUNT_UNIFORM", label: "슬롯당 촬영 횟수", type: "number" },
       { name: "CAPTURE_COUNT_CUSTOM", label: "커스텀 촬영 횟수 (JSON)" },
+      { name: "CAMERA_AUTO_TIMER", label: "자동 촬영 타이머 (초, 기본 60)", type: "number" },
       { name: "CAPTURE_THRESHOLD", label: "캡처 임계값", type: "number" },
       { name: "CAPTURE_SMOOTHNESS", label: "캡처 부드러움", type: "number" },
     ],
