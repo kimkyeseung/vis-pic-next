@@ -12,22 +12,11 @@ interface SettingGroup {
 
 const GROUPS: SettingGroup[] = [
   {
-    key: "basic",
-    label: "기본 설정",
-    prefix: ["PICTURE_", "PRINT_"],
-    fields: [
-      { name: "PICTURE_WIDTH", label: "인화 가로 (cm)", type: "number" },
-      { name: "PICTURE_HEIGHT", label: "인화 세로 (cm)", type: "number" },
-      { name: "PRINT_BACKGROUND", label: "인쇄 배경 이미지 경로" },
-    ],
-  },
-  {
     key: "capture",
     label: "촬영 설정",
     prefix: ["CAPTURE_", "CAMERA_"],
     fields: [
       { name: "CAPTURE_SECONDS", label: "카운트다운 (초)", type: "number" },
-      { name: "CAPTURE_MODES", label: "지원 프레임 (예: 1x1,2x2,2x1)" },
       { name: "CAPTURE_COUNT_MODE", label: "촬영 횟수 모드", type: "select", options: [{ value: "uniform", label: "균일" }, { value: "custom", label: "커스텀" }] },
       { name: "CAPTURE_COUNT_UNIFORM", label: "슬롯당 촬영 횟수", type: "number" },
       { name: "CAPTURE_COUNT_CUSTOM", label: "커스텀 촬영 횟수 (JSON)" },
@@ -248,11 +237,16 @@ export default function SettingsPage() {
       });
   };
 
+  // Keys managed in dedicated pages (print-setting) — hide from this page
+  const PRINT_SETTING_KEYS = new Set(["PICTURE_WIDTH", "PICTURE_HEIGHT", "PRINT_BACKGROUND", "CAPTURE_MODES"]);
+
   const assignedKeys = new Set(GROUPS.flatMap((g) => {
     if (g.fields) return g.fields.map((f) => f.name);
     return Object.keys(settings).filter((k) => g.prefix.some((p) => k.startsWith(p)));
   }));
-  const otherKeys = Object.keys(settings).filter((k) => !assignedKeys.has(k)).sort();
+  const otherKeys = Object.keys(settings)
+    .filter((k) => !assignedKeys.has(k) && !PRINT_SETTING_KEYS.has(k))
+    .sort();
 
   if (loading) return <div className="text-gray-400">로딩중...</div>;
 
