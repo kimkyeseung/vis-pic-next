@@ -3,22 +3,7 @@
 import { useEffect, useState, use } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-
-interface DeviceSetting {
-  id: number;
-  name: string;
-  value: string;
-  description: string | null;
-}
-
-interface Device {
-  id: number;
-  deviceId: string;
-  name: string;
-  description: string | null;
-  isActive: boolean;
-  settings: DeviceSetting[];
-}
+import type { DeviceWithSettings } from "@/types";
 
 export default function DeviceEditPage({
   params,
@@ -27,7 +12,7 @@ export default function DeviceEditPage({
 }) {
   const { id } = use(params);
   const router = useRouter();
-  const [device, setDevice] = useState<Device | null>(null);
+  const [device, setDevice] = useState<DeviceWithSettings | null>(null);
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [settings, setSettings] = useState<Record<string, string>>({});

@@ -3,15 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useAdmin } from "../AdminContext";
-
-interface Device {
-  id: number;
-  deviceId: string;
-  name: string;
-  description: string | null;
-  isActive: boolean;
-  createdAt: string;
-}
+import type { Device } from "@/types";
 
 export default function DevicesPage() {
   const { refreshDevices } = useAdmin();

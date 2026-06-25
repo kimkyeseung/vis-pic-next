@@ -3,13 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-
-interface Device {
-  id: number;
-  deviceId: string;
-  name: string;
-  isActive: boolean;
-}
+import type { Device } from "@/types";
 
 export default function Home() {
   const router = useRouter();

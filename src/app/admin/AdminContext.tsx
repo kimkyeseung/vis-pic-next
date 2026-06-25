@@ -1,15 +1,7 @@
 "use client";
 
 import { createContext, useContext, useState, useEffect, useCallback } from "react";
-
-interface Device {
-  id: number;
-  deviceId: string;
-  name: string;
-  description: string | null;
-  isActive: boolean;
-  createdAt: string;
-}
+import type { Device } from "@/types";
 
 interface AdminContextType {
   devices: Device[];

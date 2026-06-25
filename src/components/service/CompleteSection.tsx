@@ -1,0 +1,368 @@
+"use client";
+
+import { useState, useEffect, useRef } from "react";
+import { QRCodeSVG } from "qrcode.react";
+import type { BGImage } from "@/types";
+import { FRAME_INFO, FALLBACK_BACKGROUNDS } from "@/constants/frames";
+import { roundRect, fillGradient, fillGradientFromCSS, loadImage, resizeForGif } from "@/lib/canvas";
+
+export function CompleteSection({
+  photos,
+  selectedPhotos,
+  selectedFrame,
+  selectedBackground,
+  backgroundImages,
+  imageBaseUrl,
+  compositeImage,
+  setCompositeImage,
+  intermediateFrames,
+  onRestart,
+}: {
+  photos: string[];
+  selectedPhotos: number[];
+  selectedFrame: string;
+  selectedBackground: number | null;
+  backgroundImages: BGImage[];
+  imageBaseUrl: string;
+  compositeImage: string | null;
+  setCompositeImage: (img: string | null) => void;
+  intermediateFrames: string[][];
+  onRestart: () => void;
+}) {
+  const [printStatus, setPrintStatus] = useState<"compositing" | "ready" | "printing" | "done" | "error">("compositing");
+  const [qrPhotoUrl, setQrPhotoUrl] = useState<string | null>(null);
+  const [qrGifUrl, setQrGifUrl] = useState<string | null>(null);
+  const [qrExpiryDate, setQrExpiryDate] = useState<string | null>(null);
+  const compositeRef = useRef(false);
+
+  const toFullUrl = (url: string) =>
+    url.startsWith("http") ? url : window.location.origin + url;
+
+  const uploadForQR = async (dataUrl: string) => {
+    let photoUrl: string | null = null;
+
+    try {
+      const res = await fetch("/api/print/upload-image/", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ image_data: dataUrl, image_type: "photo" }),
+      });
+      const data = await res.json();
+      if (data.success && data.image_url) {
+        photoUrl = toFullUrl(data.image_url);
+        setQrPhotoUrl(photoUrl);
+        setQrExpiryDate(data.expiry_date);
+      }
+    } catch {
+      // photo upload failed silently
+    }
+
+    const selectedIndices = selectedPhotos;
+    const allFrames = selectedIndices
+      .flatMap((i) => intermediateFrames[i] || [])
+      .filter(Boolean);
+    const gifSources =
+      allFrames.length >= 2
+        ? allFrames
+        : selectedIndices.map((i) => photos[i]).filter(Boolean);
+    const gifDuration = allFrames.length >= 2 ? 500 : 800;
+
+    if (gifSources.length >= 2) {
+      try {
+        const resizedImages = await Promise.all(
+          gifSources.map((src) => resizeForGif(src, 400))
+        );
+        const gifRes = await fetch("/api/gif/create/", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ images: resizedImages, duration: gifDuration }),
+        });
+        const gifData = await gifRes.json();
+        if (gifData.success && gifData.gif_url) {
+          setQrGifUrl(toFullUrl(gifData.gif_url));
+          if (!qrExpiryDate && gifData.expiry_date) {
+            setQrExpiryDate(gifData.expiry_date);
+          }
+        } else if (photoUrl) {
+          setQrGifUrl(photoUrl);
+        }
+      } catch {
+        if (photoUrl) setQrGifUrl(photoUrl);
+      }
+    } else if (photoUrl) {
+      setQrGifUrl(photoUrl);
+    }
+  };
+
+  const createComposite = async () => {
+    const frame = FRAME_INFO[selectedFrame];
+    if (!frame) return;
+
+    const basePx = 1800;
+    const paperRatio = 3 / 2;
+    let canvasWidth: number, canvasHeight: number;
+    if (frame.orientation === "landscape") {
+      canvasWidth = basePx;
+      canvasHeight = Math.round(basePx / paperRatio);
+    } else {
+      canvasHeight = basePx;
+      canvasWidth = Math.round(basePx / paperRatio);
+    }
+
+    const padding = 20;
+
+    const canvas = document.createElement("canvas");
+    canvas.width = canvasWidth;
+    canvas.height = canvasHeight;
+    const ctx = canvas.getContext("2d")!;
+
+    const bgInfo = selectedBackground !== null && selectedBackground > 0
+      ? backgroundImages.find((b) => b.id === selectedBackground)
+      : null;
+
+    if (bgInfo) {
+      try {
+        const bgImg = await loadImage(`${imageBaseUrl}/${bgInfo.filename}`);
+        ctx.drawImage(bgImg, 0, 0, canvasWidth, canvasHeight);
+      } catch {
+        fillGradient(ctx, canvasWidth, canvasHeight);
+      }
+    } else {
+      const fb = FALLBACK_BACKGROUNDS.find((b) => b.id === selectedBackground);
+      if (fb) {
+        fillGradientFromCSS(ctx, canvasWidth, canvasHeight, fb.gradient);
+      } else {
+        fillGradient(ctx, canvasWidth, canvasHeight);
+      }
+    }
+
+    const allocW = (canvasWidth - padding * (frame.cols + 1)) / frame.cols;
+    const allocH = (canvasHeight - padding * (frame.rows + 1)) / frame.rows;
+
+    const photoRatio = 4 / 3;
+    let cellW: number, cellH: number;
+    if (allocW / allocH > photoRatio) {
+      cellH = allocH;
+      cellW = cellH * photoRatio;
+    } else {
+      cellW = allocW;
+      cellH = cellW / photoRatio;
+    }
+
+    for (let i = 0; i < selectedPhotos.length && i < frame.count; i++) {
+      const photo = photos[selectedPhotos[i]];
+      if (!photo) continue;
+
+      const col = i % frame.cols;
+      const row = Math.floor(i / frame.cols);
+      const ax = padding + col * (allocW + padding);
+      const ay = padding + row * (allocH + padding);
+      const x = ax + (allocW - cellW) / 2;
+      const y = ay + (allocH - cellH) / 2;
+
+      try {
+        const img = await loadImage(photo);
+
+        ctx.save();
+        roundRect(ctx, x, y, cellW, cellH, 12);
+        ctx.clip();
+
+        const imgAspect = img.width / img.height;
+        const cellAspect = cellW / cellH;
+        let sx = 0, sy = 0, sw = img.width, sh = img.height;
+        if (imgAspect > cellAspect) {
+          sw = img.height * cellAspect;
+          sx = (img.width - sw) / 2;
+        } else {
+          sh = img.width / cellAspect;
+          sy = (img.height - sh) / 2;
+        }
+        ctx.drawImage(img, sx, sy, sw, sh, x, y, cellW, cellH);
+
+        ctx.restore();
+
+        ctx.strokeStyle = "rgba(255,255,255,0.8)";
+        ctx.lineWidth = 3;
+        roundRect(ctx, x, y, cellW, cellH, 12);
+        ctx.stroke();
+      } catch {
+        // skip failed photo
+      }
+    }
+
+    const dataUrl = canvas.toDataURL("image/jpeg", 0.95);
+    setCompositeImage(dataUrl);
+    setPrintStatus("ready");
+
+    uploadForQR(dataUrl);
+  };
+
+  useEffect(() => {
+    if (!compositeRef.current) {
+      compositeRef.current = true;
+      createComposite();
+    }
+  }, []);
+
+  const handlePrint = async () => {
+    if (!compositeImage) return;
+    setPrintStatus("printing");
+
+    const isTauri = typeof window !== "undefined" && "__TAURI__" in window;
+
+    if (isTauri) {
+      try {
+        const blob = await fetch(compositeImage).then((r) => r.blob());
+        const buffer = await blob.arrayBuffer();
+        const uint8 = new Uint8Array(buffer);
+        const binary = Array.from(uint8).map((b) => String.fromCharCode(b)).join("");
+        const base64 = btoa(binary);
+
+        const tauri = (window as unknown as { __TAURI__: { core: { invoke: (cmd: string, args?: Record<string, unknown>) => Promise<unknown> } } }).__TAURI__;
+        const settings = await tauri.core.invoke("load_settings", {}) as Record<string, string>;
+        const printerName = settings?.printer || "";
+
+        if (printerName) {
+          await tauri.core.invoke("print_image", { printerName, imageData: base64 });
+        }
+
+        setPrintStatus("done");
+      } catch {
+        setPrintStatus("done");
+      }
+    } else {
+      const printWindow = window.open("", "_blank");
+      if (printWindow) {
+        printWindow.document.write(`
+          <html><head><title>AR-pic</title>
+          <style>body{margin:0;display:flex;justify-content:center;align-items:center;min-height:100vh;background:#000;}
+          img{max-width:100%;max-height:100vh;object-fit:contain;}
+          @media print{body{background:#fff;}img{max-width:100%;max-height:100%;}}
+          </style></head>
+          <body><img src="${compositeImage}" onload="window.print();"/></body></html>
+        `);
+        printWindow.document.close();
+      }
+      setPrintStatus("done");
+    }
+  };
+
+  const handleDownload = () => {
+    if (!compositeImage) return;
+    const link = document.createElement("a");
+    link.download = `arpic-${Date.now()}.jpg`;
+    link.href = compositeImage;
+    link.click();
+  };
+
+  return (
+    <section className="w-full h-full flex flex-col items-center justify-center relative z-10">
+      <div className="text-center animate-fadeInUp">
+        {printStatus === "compositing" && (
+          <>
+            <div className="w-20 h-20 border-4 border-white/20 border-t-blue-500 rounded-full animate-spin mx-auto mb-8" />
+            <p className="text-white text-2xl">사진 합성 중...</p>
+          </>
+        )}
+
+        {(printStatus === "ready" || printStatus === "done") && compositeImage && (
+          <>
+            <h2 className="text-5xl font-extrabold text-white mb-6" style={{ textShadow: "0 2px 15px rgba(0,0,0,0.5)" }}>
+              {printStatus === "done" ? "완료!" : "사진이 완성되었습니다!"}
+            </h2>
+
+            <div className="flex items-start justify-center gap-12 mb-10">
+              <div className="rounded-2xl overflow-hidden" style={{ maxWidth: "500px", boxShadow: "0 20px 50px rgba(0,0,0,0.4)" }}>
+                <img src={compositeImage} alt="Composite" className="w-full" />
+              </div>
+
+              {(qrPhotoUrl || qrGifUrl) && (
+                <div className="flex flex-col items-center gap-6">
+                  <div className="flex gap-6">
+                    {qrPhotoUrl && (
+                      <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-5 border border-white/20 text-center">
+                        <div className="text-2xl mb-1">📷</div>
+                        <p className="text-white font-semibold mb-3">사진 다운로드</p>
+                        <div
+                          className="bg-white p-3 rounded-xl cursor-pointer"
+                          onDoubleClick={() => window.open(qrPhotoUrl, "_blank")}
+                        >
+                          <QRCodeSVG value={qrPhotoUrl} size={120} />
+                        </div>
+                        <p className="text-gray-400 text-xs mt-2">QR 스캔</p>
+                      </div>
+                    )}
+                    {qrGifUrl && (
+                      <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-5 border border-white/20 text-center">
+                        <div className="text-2xl mb-1">🎬</div>
+                        <p className="text-white font-semibold mb-3">GIF 다운로드</p>
+                        <div
+                          className="bg-white p-3 rounded-xl cursor-pointer"
+                          onDoubleClick={() => window.open(qrGifUrl, "_blank")}
+                        >
+                          <QRCodeSVG value={qrGifUrl} size={120} />
+                        </div>
+                        <p className="text-gray-400 text-xs mt-2">QR 스캔</p>
+                      </div>
+                    )}
+                  </div>
+
+                  {qrExpiryDate && (
+                    <div className="flex items-center gap-2 bg-black/40 px-4 py-2 rounded-full text-sm">
+                      <span>⏰</span>
+                      <span className="text-gray-300">
+                        <strong className="text-white">{qrExpiryDate}</strong> 까지 다운로드 가능
+                      </span>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            <div className="flex gap-6 justify-center mb-8">
+              {printStatus === "ready" && (
+                <button className="service-button nav-button" onClick={handlePrint}>
+                  &#128424; 인쇄하기
+                </button>
+              )}
+              <button className="service-button nav-button" onClick={handleDownload}>
+                &#128190; 다운로드
+              </button>
+            </div>
+
+            {printStatus === "done" && (
+              <p className="text-gray-400 text-lg mb-8">인쇄가 완료되었습니다</p>
+            )}
+
+            <button
+              className="service-button touch-button"
+              style={{ width: "auto", minHeight: "auto", padding: "25px 60px", fontSize: "1.5em" }}
+              onClick={onRestart}
+            >
+              처음으로 돌아가기
+            </button>
+          </>
+        )}
+
+        {printStatus === "printing" && (
+          <>
+            <div className="w-20 h-20 border-4 border-white/20 border-t-green-500 rounded-full animate-spin mx-auto mb-8" />
+            <p className="text-white text-2xl">인쇄 중...</p>
+          </>
+        )}
+
+        {printStatus === "error" && (
+          <>
+            <p className="text-red-400 text-xl mb-8">인쇄 중 오류가 발생했습니다</p>
+            <button className="service-button nav-button" onClick={handlePrint}>
+              다시 시도
+            </button>
+            <button className="service-button touch-button mt-6" style={{ width: "auto", minHeight: "auto", padding: "25px 60px", fontSize: "1.5em" }} onClick={onRestart}>
+              처음으로 돌아가기
+            </button>
+          </>
+        )}
+      </div>
+    </section>
+  );
+}
