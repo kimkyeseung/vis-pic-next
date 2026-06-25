@@ -41,10 +41,12 @@ function ServiceContent() {
   const [selectedPhotos, setSelectedPhotos] = useState<number[]>([]);
   const [compositeImage, setCompositeImage] = useState<string | null>(null);
   const [imageBaseUrl, setImageBaseUrl] = useState<string>("/static/images");
+  const [printSettings, setPrintSettings] = useState<Record<string, string>>({});
 
   useEffect(() => {
     loadDeviceConfig(deviceId);
     loadBackgrounds(deviceId);
+    loadPrintSettings();
   }, [deviceId]);
 
   const loadDeviceConfig = async (id: string) => {
@@ -93,6 +95,17 @@ function ServiceContent() {
       }
     } catch {
       // use fallback
+    }
+  };
+
+  const loadPrintSettings = async () => {
+    try {
+      const res = await fetch("/api/setting");
+      if (!res.ok) return;
+      const data = await res.json();
+      if (data.settings) setPrintSettings(data.settings);
+    } catch {
+      // use defaults
     }
   };
 
@@ -293,6 +306,7 @@ function ServiceContent() {
           compositeImage={compositeImage}
           setCompositeImage={setCompositeImage}
           intermediateFrames={intermediateFrames}
+          printSettings={printSettings}
           onRestart={resetAll}
         />
       )}

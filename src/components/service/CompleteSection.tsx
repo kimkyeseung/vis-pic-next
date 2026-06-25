@@ -16,6 +16,7 @@ export function CompleteSection({
   compositeImage,
   setCompositeImage,
   intermediateFrames,
+  printSettings,
   onRestart,
 }: {
   photos: string[];
@@ -27,6 +28,7 @@ export function CompleteSection({
   compositeImage: string | null;
   setCompositeImage: (img: string | null) => void;
   intermediateFrames: string[][];
+  printSettings: Record<string, string>;
   onRestart: () => void;
 }) {
   const [printStatus, setPrintStatus] = useState<"compositing" | "ready" | "printing" | "done" | "error">("compositing");
@@ -99,76 +101,140 @@ export function CompleteSection({
     if (!frame) return;
 
     const basePx = 1800;
-    const paperRatio = 3 / 2;
+
+    const paperWCm = parseFloat(printSettings.PICTURE_WIDTH || "10");
+    const paperHCm = parseFloat(printSettings.PICTURE_HEIGHT || "15");
+    const longer = Math.max(paperWCm, paperHCm);
+    const shorter = Math.min(paperWCm, paperHCm);
+    const pw = frame.orientation === "landscape" ? longer : shorter;
+    const ph = frame.orientation === "landscape" ? shorter : longer;
+
     let canvasWidth: number, canvasHeight: number;
-    if (frame.orientation === "landscape") {
+    if (pw >= ph) {
       canvasWidth = basePx;
-      canvasHeight = Math.round(basePx / paperRatio);
+      canvasHeight = Math.round(basePx * (ph / pw));
     } else {
       canvasHeight = basePx;
-      canvasWidth = Math.round(basePx / paperRatio);
+      canvasWidth = Math.round(basePx * (pw / ph));
     }
-
-    const padding = 20;
 
     const canvas = document.createElement("canvas");
     canvas.width = canvasWidth;
     canvas.height = canvasHeight;
     const ctx = canvas.getContext("2d")!;
 
-    const bgInfo = selectedBackground !== null && selectedBackground > 0
-      ? backgroundImages.find((b) => b.id === selectedBackground)
-      : null;
-
-    if (bgInfo) {
+    // Background: PRINT_BACKGROUND > user-selected > fallback gradient
+    let bgDrawn = false;
+    if (printSettings.PRINT_BACKGROUND) {
       try {
-        const bgImg = await loadImage(`${imageBaseUrl}/${bgInfo.filename}`);
+        const bgImg = await loadImage(`${imageBaseUrl}/${printSettings.PRINT_BACKGROUND}`);
         ctx.drawImage(bgImg, 0, 0, canvasWidth, canvasHeight);
+        bgDrawn = true;
       } catch {
-        fillGradient(ctx, canvasWidth, canvasHeight);
+        // fall through
       }
-    } else {
-      const fb = FALLBACK_BACKGROUNDS.find((b) => b.id === selectedBackground);
-      if (fb) {
-        fillGradientFromCSS(ctx, canvasWidth, canvasHeight, fb.gradient);
+    }
+
+    if (!bgDrawn) {
+      const bgInfo = selectedBackground !== null && selectedBackground > 0
+        ? backgroundImages.find((b) => b.id === selectedBackground)
+        : null;
+
+      if (bgInfo) {
+        try {
+          const bgImg = await loadImage(`${imageBaseUrl}/${bgInfo.filename}`);
+          ctx.drawImage(bgImg, 0, 0, canvasWidth, canvasHeight);
+        } catch {
+          fillGradient(ctx, canvasWidth, canvasHeight);
+        }
       } else {
-        fillGradient(ctx, canvasWidth, canvasHeight);
+        const fb = FALLBACK_BACKGROUNDS.find((b) => b.id === selectedBackground);
+        if (fb) {
+          fillGradientFromCSS(ctx, canvasWidth, canvasHeight, fb.gradient);
+        } else {
+          fillGradient(ctx, canvasWidth, canvasHeight);
+        }
       }
     }
 
-    const allocW = (canvasWidth - padding * (frame.cols + 1)) / frame.cols;
-    const allocH = (canvasHeight - padding * (frame.rows + 1)) / frame.rows;
+    // Calculate photo slot positions
+    const slots: { x: number; y: number; w: number; h: number }[] = [];
+    const modePrefix = `MODE_${selectedFrame.replace("x", "_")}_`;
+    const photoWCm = parseFloat(printSettings[modePrefix + "WIDTH"] || "0");
+    const photoHCm = parseFloat(printSettings[modePrefix + "HEIGHT"] || "0");
 
-    const photoRatio = 4 / 3;
-    let cellW: number, cellH: number;
-    if (allocW / allocH > photoRatio) {
-      cellH = allocH;
-      cellW = cellH * photoRatio;
+    if (photoWCm > 0 && photoHCm > 0) {
+      const cmToPx = canvasWidth / pw;
+      const cellW = photoWCm * cmToPx;
+      const cellH = photoHCm * cmToPx;
+      const hGapPx = parseFloat(printSettings[modePrefix + "HGAP"] || "0") * cmToPx;
+      const vGapPx = parseFloat(printSettings[modePrefix + "VGAP"] || "0") * cmToPx;
+
+      const totalW = frame.cols * cellW + (frame.cols - 1) * hGapPx;
+      const totalH = frame.rows * cellH + (frame.rows - 1) * vGapPx;
+
+      const marginTopStr = printSettings[modePrefix + "MARGIN_TOP"];
+      const marginLeftStr = printSettings[modePrefix + "MARGIN_LEFT"];
+      const startX = marginTopStr !== undefined && marginLeftStr !== undefined
+        ? parseFloat(marginLeftStr) * cmToPx
+        : (canvasWidth - totalW) / 2;
+      const startY = marginTopStr !== undefined
+        ? parseFloat(marginTopStr) * cmToPx
+        : (canvasHeight - totalH) / 2;
+
+      for (let i = 0; i < frame.count; i++) {
+        const col = i % frame.cols;
+        const row = Math.floor(i / frame.cols);
+        slots.push({
+          x: startX + col * (cellW + hGapPx),
+          y: startY + row * (cellH + vGapPx),
+          w: cellW,
+          h: cellH,
+        });
+      }
     } else {
-      cellW = allocW;
-      cellH = cellW / photoRatio;
+      // Fallback: padding-based layout
+      const padding = 20;
+      const allocW = (canvasWidth - padding * (frame.cols + 1)) / frame.cols;
+      const allocH = (canvasHeight - padding * (frame.rows + 1)) / frame.rows;
+      const photoRatio = 4 / 3;
+      let cellW: number, cellH: number;
+      if (allocW / allocH > photoRatio) {
+        cellH = allocH;
+        cellW = cellH * photoRatio;
+      } else {
+        cellW = allocW;
+        cellH = cellW / photoRatio;
+      }
+
+      for (let i = 0; i < frame.count; i++) {
+        const col = i % frame.cols;
+        const row = Math.floor(i / frame.cols);
+        const ax = padding + col * (allocW + padding);
+        const ay = padding + row * (allocH + padding);
+        slots.push({
+          x: ax + (allocW - cellW) / 2,
+          y: ay + (allocH - cellH) / 2,
+          w: cellW,
+          h: cellH,
+        });
+      }
     }
 
-    for (let i = 0; i < selectedPhotos.length && i < frame.count; i++) {
+    // Draw photos in slots
+    for (let i = 0; i < selectedPhotos.length && i < slots.length; i++) {
       const photo = photos[selectedPhotos[i]];
       if (!photo) continue;
-
-      const col = i % frame.cols;
-      const row = Math.floor(i / frame.cols);
-      const ax = padding + col * (allocW + padding);
-      const ay = padding + row * (allocH + padding);
-      const x = ax + (allocW - cellW) / 2;
-      const y = ay + (allocH - cellH) / 2;
+      const { x, y, w, h } = slots[i];
 
       try {
         const img = await loadImage(photo);
-
         ctx.save();
-        roundRect(ctx, x, y, cellW, cellH, 12);
+        roundRect(ctx, x, y, w, h, 12);
         ctx.clip();
 
         const imgAspect = img.width / img.height;
-        const cellAspect = cellW / cellH;
+        const cellAspect = w / h;
         let sx = 0, sy = 0, sw = img.width, sh = img.height;
         if (imgAspect > cellAspect) {
           sw = img.height * cellAspect;
@@ -177,13 +243,12 @@ export function CompleteSection({
           sh = img.width / cellAspect;
           sy = (img.height - sh) / 2;
         }
-        ctx.drawImage(img, sx, sy, sw, sh, x, y, cellW, cellH);
-
+        ctx.drawImage(img, sx, sy, sw, sh, x, y, w, h);
         ctx.restore();
 
         ctx.strokeStyle = "rgba(255,255,255,0.8)";
         ctx.lineWidth = 3;
-        roundRect(ctx, x, y, cellW, cellH, 12);
+        roundRect(ctx, x, y, w, h, 12);
         ctx.stroke();
       } catch {
         // skip failed photo
