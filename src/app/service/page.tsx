@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback, Suspense } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import type { Step, BgRemovalMode, DeviceConfig, BGImage } from "@/types";
 import { FRAME_INFO } from "@/constants/frames";
@@ -23,7 +23,6 @@ const DEFAULT_CONFIG: DeviceConfig = {
   chromakeyRgb: "0,255,0",
   captureModes: ["1x1", "2x2"],
   bgRemovalMode: "mediapipe",
-  idleTimeoutSeconds: 30,
 };
 
 function ServiceContent() {
@@ -73,7 +72,6 @@ function ServiceContent() {
         chromakeyRgb: s.CHROMAKEY_RGB || "0,255,0",
         captureModes: modes,
         bgRemovalMode,
-        idleTimeoutSeconds: parseInt(s.IDLE_TIMEOUT_SECONDS || "30", 10) || 30,
       });
     } catch {
       // use defaults
@@ -125,64 +123,8 @@ function ServiceContent() {
   const slotsNeeded = selectedFrame ? FRAME_INFO[selectedFrame]?.count || 1 : 1;
   const maxCaptures = slotsNeeded * config.captureCount;
 
-  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const [idleRemaining, setIdleRemaining] = useState<number | null>(null);
-  const tickRef = useRef<ReturnType<typeof setInterval> | null>(null);
-
-  const clearIdleTimer = useCallback(() => {
-    if (timerRef.current) { clearTimeout(timerRef.current); timerRef.current = null; }
-    if (tickRef.current) { clearInterval(tickRef.current); tickRef.current = null; }
-    setIdleRemaining(null);
-  }, []);
-
-  const startIdleTimer = useCallback(() => {
-    clearIdleTimer();
-    const seconds = config.idleTimeoutSeconds;
-    if (seconds <= 0) return;
-
-    const deadline = Date.now() + seconds * 1000;
-    setIdleRemaining(seconds);
-
-    tickRef.current = setInterval(() => {
-      const left = Math.max(0, Math.ceil((deadline - Date.now()) / 1000));
-      setIdleRemaining(left);
-    }, 1000);
-
-    timerRef.current = setTimeout(() => {
-      clearIdleTimer();
-      resetAll();
-    }, seconds * 1000);
-  }, [config.idleTimeoutSeconds, clearIdleTimer]);
-
-  useEffect(() => {
-    if (currentStep === "camera") {
-      clearIdleTimer();
-      return;
-    }
-    startIdleTimer();
-    return clearIdleTimer;
-  }, [currentStep, startIdleTimer, clearIdleTimer]);
-
-  const handleInteraction = useCallback(() => {
-    if (currentStep !== "camera") startIdleTimer();
-  }, [currentStep, startIdleTimer]);
-
-  const showTimer = currentStep !== "start" && currentStep !== "camera" && idleRemaining !== null && config.idleTimeoutSeconds > 0;
-
   return (
-    <div
-      className="w-full h-screen overflow-hidden relative"
-      onClick={handleInteraction}
-      onTouchStart={handleInteraction}
-    >
-      {showTimer && (
-        <div className="absolute top-0 left-0 right-0 z-50 h-1 bg-black/20">
-          <div
-            className="h-full bg-white/40 transition-all duration-1000 ease-linear"
-            style={{ width: `${(idleRemaining! / config.idleTimeoutSeconds) * 100}%` }}
-          />
-        </div>
-      )}
+    <div className="w-full h-screen overflow-hidden relative">
       <FloatingElements />
       {currentStep === "start" && <StartSection onNext={handleStart} />}
       {currentStep === "payment" && (
