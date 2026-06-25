@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { readdir, unlink } from "fs/promises";
 import path from "path";
@@ -6,7 +6,14 @@ import path from "path";
 const BUCKET_NAME = "prints";
 const EXPIRY_DAYS = 3;
 
-export async function GET() {
+export async function GET(request: NextRequest) {
+  const cronSecret = process.env.CRON_SECRET;
+  if (cronSecret) {
+    const auth = request.headers.get("authorization");
+    if (auth !== `Bearer ${cronSecret}`) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+  }
   const cutoff = new Date();
   cutoff.setDate(cutoff.getDate() - EXPIRY_DAYS);
   const cutoffStr = cutoff.toISOString().slice(0, 10).replace(/-/g, "");
