@@ -47,7 +47,42 @@ function ServiceContent() {
     loadDeviceConfig(deviceId);
     loadBackgrounds(deviceId);
     loadPrintSettings();
+    restoreSession();
   }, [deviceId]);
+
+  const restoreSession = () => {
+    try {
+      const saved = sessionStorage.getItem("photobooth_session");
+      if (!saved) return;
+      const s = JSON.parse(saved);
+      if (s.deviceId !== deviceId) return;
+      if (s.step) setCurrentStep(s.step);
+      if (s.selectedFrame) setSelectedFrame(s.selectedFrame);
+      if (s.selectedBackground !== undefined) setSelectedBackground(s.selectedBackground);
+      if (s.photos?.length > 0) setPhotos(s.photos);
+      if (s.intermediateFrames?.length > 0) setIntermediateFrames(s.intermediateFrames);
+      if (s.selectedPhotos?.length > 0) setSelectedPhotos(s.selectedPhotos);
+    } catch {
+      // ignore parse errors
+    }
+  };
+
+  useEffect(() => {
+    if (currentStep === "start") return;
+    try {
+      sessionStorage.setItem("photobooth_session", JSON.stringify({
+        deviceId,
+        step: currentStep,
+        selectedFrame,
+        selectedBackground,
+        photos,
+        intermediateFrames,
+        selectedPhotos,
+      }));
+    } catch {
+      // sessionStorage full or unavailable
+    }
+  }, [currentStep, deviceId, selectedFrame, selectedBackground, photos, intermediateFrames, selectedPhotos]);
 
   const loadDeviceConfig = async (id: string) => {
     try {
@@ -133,6 +168,7 @@ function ServiceContent() {
     setIntermediateFrames([]);
     setSelectedPhotos([]);
     setCompositeImage(null);
+    try { sessionStorage.removeItem("photobooth_session"); } catch {}
   };
 
   const slotsNeeded = selectedFrame ? FRAME_INFO[selectedFrame]?.count || 1 : 1;
