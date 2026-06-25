@@ -26,7 +26,20 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const isValid = await bcrypt.compare(password, admin.password);
+    let isValid = false;
+    const isHashed = /^\$2[aby]\$/.test(admin.password);
+
+    if (isHashed) {
+      isValid = await bcrypt.compare(password, admin.password);
+    } else if (admin.password === password) {
+      isValid = true;
+      const hashed = await bcrypt.hash(password, 10);
+      await prisma.adminAccount.update({
+        where: { id: admin.id },
+        data: { password: hashed },
+      });
+    }
+
     if (!isValid) {
       return NextResponse.json(
         { error: "Invalid credentials" },
