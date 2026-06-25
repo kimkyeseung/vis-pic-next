@@ -419,6 +419,43 @@ export default function PrintSettingPage() {
                 ))}
               </div>
             )}
+
+            {/* Layout settings for selected mode */}
+            {previewMode && (
+              <div className="mt-4 pt-4 border-t border-gray-700">
+                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">
+                  {previewMode} 레이아웃 설정 (cm)
+                </p>
+                <div className="grid grid-cols-2 gap-3">
+                  {[
+                    { suffix: "WIDTH", label: "사진 가로" },
+                    { suffix: "HEIGHT", label: "사진 세로" },
+                    { suffix: "HGAP", label: "가로 간격" },
+                    { suffix: "VGAP", label: "세로 간격" },
+                    { suffix: "MARGIN_TOP", label: "상단 여백" },
+                    { suffix: "MARGIN_LEFT", label: "좌측 여백" },
+                    { suffix: "MARGIN_BOTTOM", label: "하단 여백" },
+                    { suffix: "MARGIN_RIGHT", label: "우측 여백" },
+                  ].map(({ suffix, label }) => {
+                    const key = `MODE_${previewMode.replace("x", "_")}_${suffix}`;
+                    return (
+                      <div key={suffix}>
+                        <label className="block text-gray-500 text-xs mb-1">{label}</label>
+                        <input
+                          type="number"
+                          value={settings[key] || ""}
+                          onChange={(e) => setSettings((prev) => ({ ...prev, [key]: e.target.value }))}
+                          placeholder="0"
+                          step="0.1"
+                          min="0"
+                          className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white text-sm focus:outline-none focus:border-blue-500 transition-colors"
+                        />
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Background Image */}
