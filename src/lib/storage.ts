@@ -4,12 +4,16 @@ import path from "path";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-const BUCKET_NAME = "images";
+const BUCKET_NAME = "pic-images";
 
 function getSupabaseClient() {
-  if (!supabaseUrl || !supabaseKey) return null;
-  return createClient(supabaseUrl, supabaseKey);
+  if (!supabaseUrl) return null;
+  // Use service role key for server-side uploads (bypasses RLS)
+  const key = supabaseServiceKey || supabaseKey;
+  if (!key) return null;
+  return createClient(supabaseUrl, key);
 }
 
 function getLocalDir() {
@@ -24,11 +28,12 @@ function getLocalDir() {
 export async function uploadImage(
   file: File | Buffer,
   filename: string
-): Promise<string> {
+): Promise<{ filename: string; supabaseOk: boolean }> {
   const buffer =
     Buffer.isBuffer(file) ? file : Buffer.from(await (file as File).arrayBuffer());
 
   // Upload to Supabase Storage first (required on Vercel where FS is read-only)
+  let supabaseOk = false;
   const supabase = getSupabaseClient();
   if (supabase) {
     const { error } = await supabase.storage
@@ -39,6 +44,8 @@ export async function uploadImage(
       });
     if (error) {
       console.warn("Supabase Storage upload failed:", error.message);
+    } else {
+      supabaseOk = true;
     }
   }
 
@@ -49,15 +56,13 @@ export async function uploadImage(
     await writeFile(path.join(uploadDir, filename), buffer);
   } catch (err) {
     if (supabase) {
-      // Local write failed but Supabase succeeded — acceptable on Vercel
       console.warn("Local filesystem write skipped:", (err as Error).message);
     } else {
-      // No Supabase and no local FS — propagate error
       throw err;
     }
   }
 
-  return filename;
+  return { filename, supabaseOk };
 }
 
 /**

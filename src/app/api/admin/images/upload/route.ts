@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/db";
-import { uploadImage } from "@/lib/storage";
+import { uploadImage, getImageBaseUrl } from "@/lib/storage";
 
 const ALLOWED_EXTENSIONS = ["jpg", "jpeg", "png", "gif", "mp4", "webp"];
 const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB
@@ -50,7 +50,7 @@ export async function POST(request: NextRequest) {
     const filename = `${uid}.${ext}`;
 
     // Upload to storage (local + Supabase if configured)
-    await uploadImage(file, filename);
+    const { supabaseOk } = await uploadImage(file, filename);
 
     // Save to database
     const image = await prisma.image.create({
@@ -69,6 +69,7 @@ export async function POST(request: NextRequest) {
         id: image.id,
         name: image.name,
         filename: image.filename,
+        url: supabaseOk ? `${getImageBaseUrl()}/${image.filename}` : `/static/images/${image.filename}`,
         imageType: image.imageType,
       },
     });

@@ -97,7 +97,7 @@ export default function PrintSettingPage() {
           updatedSettings.PRINT_BACKGROUND = uploadData.image.filename;
           setExistingBgUrl(uploadData.image.filename);
           setBgFile(null);
-          setBgPreviewUrl(null);
+          setBgPreviewUrl(uploadData.image.url || null);
         }
       }
 
@@ -154,6 +154,12 @@ export default function PrintSettingPage() {
     });
   };
 
+  const resolveUrl = (value: string) => {
+    if (value.startsWith("http://") || value.startsWith("https://")) return value;
+    if (value.startsWith("/")) return value;
+    return `${imageBaseUrl}/${value.split("/").pop()}`;
+  };
+
   const getPaperDimensions = useCallback((mode: string | null) => {
     const w = parseFloat(paperWidth) || 10;
     const h = parseFloat(paperHeight) || 15;
@@ -202,11 +208,6 @@ export default function PrintSettingPage() {
     roundRect(ctx, ox, oy, drawW, drawH, 6);
     ctx.clip();
 
-    const resolveUrl = (value: string) => {
-      if (value.startsWith("http://") || value.startsWith("https://")) return value;
-      if (value.startsWith("/")) return value;
-      return `${imageBaseUrl}/${value.split("/").pop()}`;
-    };
     const bgUrl = bgPreviewUrl || (existingBgUrl ? resolveUrl(existingBgUrl) : null);
     if (bgUrl) {
       const img = new Image();
@@ -446,7 +447,7 @@ export default function PrintSettingPage() {
               {(bgPreviewUrl || existingBgUrl) && (
                 <div className="relative group">
                   <img
-                    src={bgPreviewUrl || `${imageBaseUrl}/${existingBgUrl}`}
+                    src={bgPreviewUrl || (existingBgUrl ? resolveUrl(existingBgUrl) : "")}
                     alt="배경 미리보기"
                     className="w-full max-h-48 object-cover rounded-lg border border-gray-600"
                   />
