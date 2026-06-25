@@ -59,7 +59,92 @@ export function CompleteSection({
       // photo upload failed silently
     }
 
+    const frame = FRAME_INFO[selectedFrame];
     const selectedIndices = selectedPhotos;
+
+    // Try layout GIF for multi-slot frames with admin settings
+    if (frame && frame.count > 1) {
+      const modePrefix = `MODE_${selectedFrame.replace("x", "_")}_`;
+      const photoWCm = parseFloat(printSettings[modePrefix + "WIDTH"] || "0");
+      const photoHCm = parseFloat(printSettings[modePrefix + "HEIGHT"] || "0");
+
+      if (photoWCm > 0 && photoHCm > 0) {
+        const intermediatePictures: Record<string, string[]> = {};
+        selectedIndices.forEach((photoIdx, slotIdx) => {
+          const frames = intermediateFrames[photoIdx];
+          if (frames && frames.length > 0) {
+            intermediatePictures[`position_${slotIdx}`] = frames;
+          }
+        });
+
+        if (Object.keys(intermediatePictures).length >= 2) {
+          try {
+            const paperWCm = parseFloat(printSettings.PICTURE_WIDTH || "10");
+            const paperHCm = parseFloat(printSettings.PICTURE_HEIGHT || "15");
+            const longer = Math.max(paperWCm, paperHCm);
+            const shorter = Math.min(paperWCm, paperHCm);
+            const pw = frame.orientation === "landscape" ? longer : shorter;
+            const ph = frame.orientation === "landscape" ? shorter : longer;
+
+            const maxGifDim = 800;
+            const gifScale = Math.min(maxGifDim / pw, maxGifDim / ph);
+            const gifCanvasW = Math.round(pw * gifScale);
+            const gifCanvasH = Math.round(ph * gifScale);
+
+            const hGapCm = parseFloat(printSettings[modePrefix + "HGAP"] || "0");
+            const vGapCm = parseFloat(printSettings[modePrefix + "VGAP"] || "0");
+            const photoWPx = Math.round(photoWCm * gifScale);
+            const photoHPx = Math.round(photoHCm * gifScale);
+            const hGapPx = Math.round(hGapCm * gifScale);
+            const vGapPx = Math.round(vGapCm * gifScale);
+
+            const totalW = frame.cols * photoWPx + (frame.cols - 1) * hGapPx;
+            const totalH = frame.rows * photoHPx + (frame.rows - 1) * vGapPx;
+            const marginTopStr = printSettings[modePrefix + "MARGIN_TOP"];
+            const marginLeftStr = printSettings[modePrefix + "MARGIN_LEFT"];
+            const startX = marginLeftStr
+              ? Math.round(parseFloat(marginLeftStr) * gifScale)
+              : Math.round((gifCanvasW - totalW) / 2);
+            const startY = marginTopStr
+              ? Math.round(parseFloat(marginTopStr) * gifScale)
+              : Math.round((gifCanvasH - totalH) / 2);
+
+            const gifRes = await fetch("/api/gif/create-layout/", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                intermediate_pictures: intermediatePictures,
+                layout_cols: frame.cols,
+                layout_rows: frame.rows,
+                photo_width: photoWPx,
+                photo_height: photoHPx,
+                h_gap: hGapPx,
+                v_gap: vGapPx,
+                duration: 500,
+                background_color: "#ffffff",
+                background_image: printSettings.PRINT_BACKGROUND || null,
+                canvas_width: gifCanvasW,
+                canvas_height: gifCanvasH,
+                start_x: startX,
+                start_y: startY,
+              }),
+            });
+            const gifData = await gifRes.json();
+            if (gifData.success && gifData.gif_url) {
+              setQrGifUrl(toFullUrl(gifData.gif_url));
+              if (!qrExpiryDate && gifData.expiry_date) {
+                setQrExpiryDate(gifData.expiry_date);
+              }
+              return;
+            }
+          } catch {
+            // fall through to simple GIF
+          }
+        }
+      }
+    }
+
+    // Simple GIF fallback
     const allFrames = selectedIndices
       .flatMap((i) => intermediateFrames[i] || [])
       .filter(Boolean);
