@@ -26,30 +26,6 @@ const GROUPS: SettingGroup[] = [
     ],
   },
   {
-    key: "payment",
-    label: "결제",
-    prefix: ["PAYMENT_"],
-    fields: [
-      { name: "PAYMENT_ENABLED", label: "결제 사용", type: "select", options: [{ value: "1", label: "사용" }, { value: "0", label: "사용 안함" }] },
-      { name: "PAYMENT_AMOUNT", label: "결제 금액 (원)", type: "number" },
-      { name: "PAYMENT_TERMINAL_MODE", label: "결제 방식", type: "select", options: [{ value: "manual", label: "수동" }, { value: "payapp_lite", label: "PayApp Lite" }] },
-    ],
-  },
-  {
-    key: "payapp",
-    label: "PayApp 연동",
-    prefix: ["PAYAPP_"],
-    fields: [
-      { name: "PAYAPP_USERID", label: "판매자 ID" },
-      { name: "PAYAPP_SHOPNAME", label: "상점명" },
-      { name: "PAYAPP_GOODNAME", label: "상품명" },
-      { name: "PAYAPP_RECVPHONE", label: "수신 전화번호" },
-      { name: "PAYAPP_FEEDBACK_URL", label: "피드백 URL" },
-      { name: "PAYAPP_RETURN_URL", label: "리턴 URL" },
-      { name: "PAYAPP_OPENPAYTYPE", label: "결제 수단 (card,phone,...)" },
-    ],
-  },
-  {
     key: "admin",
     label: "관리자",
     prefix: ["ADMIN_"],
@@ -119,7 +95,7 @@ export default function SettingsPage() {
   // Keys managed in dedicated pages (print-setting) — hide from this page
   const PRINT_SETTING_KEYS = new Set([
     "PICTURE_WIDTH", "PICTURE_HEIGHT", "PRINT_BACKGROUND", "CAPTURE_MODES",
-    ...Object.keys(settings).filter((k) => k.startsWith("MODE_")),
+    ...Object.keys(settings).filter((k) => k.startsWith("MODE_") || k.startsWith("PAYMENT_") || k.startsWith("PAYAPP_")),
   ]);
 
   const assignedKeys = new Set(GROUPS.flatMap((g) => {

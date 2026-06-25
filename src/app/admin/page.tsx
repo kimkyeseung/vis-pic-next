@@ -85,8 +85,15 @@ export default function AdminPage() {
       color: "from-cyan-500 to-cyan-600",
     },
     {
+      title: "결제 설정",
+      description: "결제 활성화, 금액, PayApp 연동을 설정합니다",
+      href: "/admin/payment",
+      icon: "💳",
+      color: "from-yellow-500 to-yellow-600",
+    },
+    {
       title: "설정",
-      description: "시스템 설정을 관리합니다",
+      description: "촬영, 크로마키 등 시스템 설정을 관리합니다",
       href: "/admin/settings",
       icon: "⚙️",
       color: "from-green-500 to-green-600",
