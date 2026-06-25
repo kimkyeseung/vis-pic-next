@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { FRAME_INFO } from "@/constants/frames";
 
 interface SettingGroup {
   key: string;
@@ -96,6 +97,100 @@ const FRAME_FIELD_LABELS: Record<string, string> = {
   MARGIN_RIGHT: "우측 여백 (cm)",
 };
 
+function FrameLayoutPreview({ groupKey, prefix, settings }: {
+  groupKey: string;
+  prefix: string;
+  settings: Record<string, string>;
+}) {
+  const frameMode = groupKey.replace("mode_", "").replace(/_/g, "x");
+  const frameInfo = FRAME_INFO[frameMode];
+  if (!frameInfo) return null;
+
+  const photoW = parseFloat(settings[`${prefix}WIDTH`]) || 0;
+  const photoH = parseFloat(settings[`${prefix}HEIGHT`]) || 0;
+
+  if (photoW <= 0 || photoH <= 0) {
+    return (
+      <div className="text-center text-gray-500 text-sm py-2">
+        가로/세로 값을 입력하면 미리보기가 표시됩니다.
+      </div>
+    );
+  }
+
+  const hGap = parseFloat(settings[`${prefix}HGAP`]) || 0;
+  const vGap = parseFloat(settings[`${prefix}VGAP`]) || 0;
+  const marginTop = parseFloat(settings[`${prefix}MARGIN_TOP`]) || 0;
+  const marginBottom = parseFloat(settings[`${prefix}MARGIN_BOTTOM`]) || 0;
+  const marginLeft = parseFloat(settings[`${prefix}MARGIN_LEFT`]) || 0;
+  const marginRight = parseFloat(settings[`${prefix}MARGIN_RIGHT`]) || 0;
+
+  const basePW = parseFloat(settings.PICTURE_WIDTH || "10");
+  const basePH = parseFloat(settings.PICTURE_HEIGHT || "15");
+  const longer = Math.max(basePW, basePH);
+  const shorter = Math.min(basePW, basePH);
+  const pw = frameInfo.orientation === "landscape" ? longer : shorter;
+  const ph = frameInfo.orientation === "landscape" ? shorter : longer;
+
+  const maxSize = 240;
+  const scale = Math.min(maxSize / pw, maxSize / ph);
+  const paperWpx = pw * scale;
+  const paperHpx = ph * scale;
+
+  const slots: { x: number; y: number; w: number; h: number; idx: number }[] = [];
+  for (let r = 0; r < frameInfo.rows; r++) {
+    for (let c = 0; c < frameInfo.cols; c++) {
+      if (slots.length >= frameInfo.count) break;
+      slots.push({
+        x: marginLeft * scale + c * (photoW + hGap) * scale,
+        y: marginTop * scale + r * (photoH + vGap) * scale,
+        w: photoW * scale,
+        h: photoH * scale,
+        idx: slots.length,
+      });
+    }
+  }
+
+  const contentW = marginLeft + marginRight + photoW * frameInfo.cols + hGap * (frameInfo.cols - 1);
+  const contentH = marginTop + marginBottom + photoH * frameInfo.rows + vGap * (frameInfo.rows - 1);
+  const overflows = contentW > pw || contentH > ph;
+
+  return (
+    <div className="flex flex-col items-center gap-2 py-2">
+      <span className="text-gray-500 text-xs">레이아웃 미리보기</span>
+      <div className="bg-gray-900/50 rounded-lg p-4 inline-flex flex-col items-center gap-2">
+        <div
+          className="relative bg-white rounded shadow-lg overflow-hidden"
+          style={{ width: paperWpx, height: paperHpx }}
+        >
+          {slots.map((slot) => (
+            <div
+              key={slot.idx}
+              className="absolute border border-dashed border-gray-300 bg-gray-200/60 flex items-center justify-center text-gray-400 text-xs font-medium rounded-sm"
+              style={{
+                left: slot.x,
+                top: slot.y,
+                width: Math.max(slot.w, 0),
+                height: Math.max(slot.h, 0),
+              }}
+            >
+              {slot.idx + 1}
+            </div>
+          ))}
+        </div>
+        <span className="text-gray-500 text-xs">
+          {pw}cm × {ph}cm
+          {frameInfo.orientation === "landscape" ? " (가로)" : " (세로)"}
+        </span>
+        {overflows && (
+          <span className="text-amber-400 text-xs">
+            콘텐츠({contentW.toFixed(1)} × {contentH.toFixed(1)}cm)가 인화지를 초과합니다
+          </span>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function SettingsPage() {
   const [settings, setSettings] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
@@ -187,6 +282,13 @@ export default function SettingsPage() {
 
             {isOpen && (
               <div className="px-6 pb-6 space-y-4 border-t border-gray-700 pt-4">
+                {group.key.startsWith("mode_") && (
+                  <FrameLayoutPreview
+                    groupKey={group.key}
+                    prefix={group.prefix[0]}
+                    settings={settings}
+                  />
+                )}
                 {fields.map((field) => (
                   <div key={field.name} className="grid grid-cols-[200px_1fr] gap-4 items-center">
                     <label className="text-gray-400 text-sm truncate" title={field.name}>
