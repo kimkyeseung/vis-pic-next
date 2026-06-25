@@ -84,20 +84,6 @@ export async function deleteImage(filename: string): Promise<void> {
   }
 }
 
-/**
- * Get the public URL for an image.
- * Returns Supabase public URL if configured, otherwise local path.
- */
-export function getImageUrl(filename: string): string {
-  if (supabaseUrl) {
-    return `${supabaseUrl}/storage/v1/object/public/${BUCKET_NAME}/${filename}`;
-  }
-  return `/static/images/${filename}`;
-}
-
-/**
- * Get the base URL for images (without trailing slash or filename).
- */
 export function getImageBaseUrl(): string {
   if (supabaseUrl) {
     return `${supabaseUrl}/storage/v1/object/public/${BUCKET_NAME}`;
