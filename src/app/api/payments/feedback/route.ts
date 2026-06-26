@@ -22,14 +22,11 @@ export async function POST(request: NextRequest) {
     }
 
     const payStateNum = Number(payState);
-    let status: string;
-
-    if (payStateNum === 4) {
-      status = "paid";
-    } else if (payStateNum === 5) {
-      status = "refunded";
-    } else {
-      status = "failed";
+    // PayApp 상태 코드: 4=결제완료, 5=환불. 그 외(처리 중 등)는 DB 갱신 없이 수신 확인만 반환.
+    const statusMap: Record<number, string> = { 4: "paid", 5: "refunded" };
+    const status = statusMap[payStateNum];
+    if (!status) {
+      return new Response("SUCCESS", { status: 200 });
     }
 
     await prisma.payappPayment.update({
