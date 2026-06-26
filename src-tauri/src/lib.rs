@@ -1,4 +1,79 @@
 use std::process::Command;
+use tauri::Manager;
+use serde::Serialize;
+
+#[derive(Serialize)]
+struct MonitorInfo {
+    index: usize,
+    name: String,
+    width: u32,
+    height: u32,
+    x: i32,
+    y: i32,
+}
+
+#[tauri::command]
+fn get_monitors(app: tauri::AppHandle) -> Vec<MonitorInfo> {
+    app.available_monitors()
+        .unwrap_or_default()
+        .iter()
+        .enumerate()
+        .map(|(i, m)| MonitorInfo {
+            index: i,
+            name: m.name().unwrap_or("모니터").to_string(),
+            width: m.size().width,
+            height: m.size().height,
+            x: m.position().x,
+            y: m.position().y,
+        })
+        .collect()
+}
+
+#[tauri::command]
+async fn open_camera_window(
+    app: tauri::AppHandle,
+    x: i32,
+    y: i32,
+    width: u32,
+    height: u32,
+) -> Result<(), String> {
+    use tauri::webview::WebviewWindowBuilder;
+    use tauri::WebviewUrl;
+
+    if let Some(existing) = app.get_webview_window("camera-output") {
+        existing.close().ok();
+    }
+
+    let window = WebviewWindowBuilder::new(
+        &app,
+        "camera-output",
+        WebviewUrl::App("/output".into()),
+    )
+    .title("Camera Output")
+    .inner_size(width as f64, height as f64)
+    .decorations(false)
+    .always_on_top(true)
+    .resizable(false)
+    .visible(false)
+    .build()
+    .map_err(|e| e.to_string())?;
+
+    window
+        .set_position(tauri::PhysicalPosition { x, y })
+        .map_err(|e| e.to_string())?;
+
+    window.show().map_err(|e| e.to_string())?;
+    window.set_fullscreen(true).map_err(|e| e.to_string())?;
+
+    Ok(())
+}
+
+#[tauri::command]
+fn close_camera_window(app: tauri::AppHandle) {
+    if let Some(window) = app.get_webview_window("camera-output") {
+        window.close().ok();
+    }
+}
 
 #[tauri::command]
 fn get_printers() -> Result<Vec<String>, String> {
@@ -198,7 +273,10 @@ pub fn run() {
             print_image,
             get_cameras,
             save_settings,
-            load_settings
+            load_settings,
+            get_monitors,
+            open_camera_window,
+            close_camera_window
         ])
         .setup(|app| {
             if cfg!(debug_assertions) {
