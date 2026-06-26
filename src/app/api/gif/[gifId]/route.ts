@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { readdir } from "fs/promises";
 import path from "path";
-
-const EXPIRY_DAYS = 3;
+import { EXPIRY_DAYS } from "@/lib/prints";
 
 export async function GET(
   request: NextRequest,
