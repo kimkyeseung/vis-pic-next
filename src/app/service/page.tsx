@@ -2,8 +2,9 @@
 
 import { useState, useEffect, useRef, useCallback, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
-import type { Step, BgRemovalMode, DeviceConfig, BGImage } from "@/types";
+import type { Step, BgRemovalMode, DeviceConfig, BGImage, Sticker, MonitorInfo } from "@/types";
 import { FRAME_INFO } from "@/constants/frames";
+import { useSceneSyncSender } from "@/hooks/useSceneSync";
 import { FloatingElements } from "@/components/service/FloatingElements";
 import { StartSection } from "@/components/service/StartSection";
 import { PaymentSection } from "@/components/service/PaymentSection";
@@ -38,6 +39,11 @@ function ServiceContent() {
   const [selectedBackground, setSelectedBackground] = useState<number | null>(null);
   const [backgroundImages, setBackgroundImages] = useState<BGImage[]>([]);
   const [photos, setPhotos] = useState<string[]>([]);
+  const [stickers, setStickers] = useState<Sticker[]>([]);
+  const [monitors, setMonitors] = useState<MonitorInfo[]>([]);
+  const [syncEnabled, setSyncEnabled] = useState(false);
+  const [selectedMonitorIndex, setSelectedMonitorIndex] = useState<number | null>(null);
+  const broadcastScene = useSceneSyncSender(syncEnabled);
   const [intermediateFrames, setIntermediateFrames] = useState<string[][]>([]);
   const [selectedPhotos, setSelectedPhotos] = useState<number[]>([]);
   const [compositeImage, setCompositeImage] = useState<string | null>(null);
@@ -50,6 +56,42 @@ function ServiceContent() {
     loadPrintSettings();
     restoreSession();
   }, [deviceId]);
+
+  // Tauri 환경에서 모니터 목록 조회
+  useEffect(() => {
+    const isTauri = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
+    if (!isTauri) return;
+    import("@tauri-apps/api/core").then(({ invoke }) => {
+      invoke<MonitorInfo[]>("get_monitors").then(setMonitors).catch(console.error);
+    });
+  }, []);
+
+  // 서브 모니터 출력 창 열기/닫기
+  useEffect(() => {
+    const isTauri = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
+    if (!isTauri) return;
+    import("@tauri-apps/api/core").then(({ invoke }) => {
+      if (syncEnabled && selectedMonitorIndex !== null && monitors[selectedMonitorIndex]) {
+        const m = monitors[selectedMonitorIndex];
+        invoke("open_camera_window", { x: m.x, y: m.y, width: m.width, height: m.height }).catch(console.error);
+      } else if (!syncEnabled) {
+        invoke("close_camera_window").catch(console.error);
+      }
+    });
+  }, [syncEnabled, selectedMonitorIndex, monitors]);
+
+  // 씬 상태 브로드캐스트
+  useEffect(() => {
+    if (!syncEnabled) return;
+    broadcastScene({
+      selectedBackground,
+      backgroundImages,
+      imageBaseUrl,
+      bgRemovalMode: config.bgRemovalMode,
+      chromakeyRgb: config.chromakeyRgb,
+      stickers,
+    });
+  }, [syncEnabled, selectedBackground, backgroundImages, imageBaseUrl, config.bgRemovalMode, config.chromakeyRgb, stickers, broadcastScene]);
 
   const restoreSession = () => {
     try {
@@ -172,6 +214,7 @@ function ServiceContent() {
     setIntermediateFrames([]);
     setSelectedPhotos([]);
     setCompositeImage(null);
+    setStickers([]);
     try { sessionStorage.removeItem("photobooth_session"); } catch {}
   };
 
@@ -270,7 +313,16 @@ function ServiceContent() {
         </div>
       )}
       <FloatingElements />
-      {currentStep === "start" && <StartSection onNext={handleStart} />}
+      {currentStep === "start" && (
+        <StartSection
+          onNext={handleStart}
+          monitors={monitors}
+          syncEnabled={syncEnabled}
+          selectedMonitorIndex={selectedMonitorIndex}
+          onSyncEnabledChange={setSyncEnabled}
+          onMonitorIndexChange={setSelectedMonitorIndex}
+        />
+      )}
       {currentStep === "payment" && (
         <PaymentSection
           config={config}
@@ -308,6 +360,8 @@ function ServiceContent() {
           selectedBackground={selectedBackground}
           backgroundImages={backgroundImages}
           imageBaseUrl={imageBaseUrl}
+          stickers={stickers}
+          onStickersChange={setStickers}
           onCapture={addPhoto}
           onNext={() => {
             if (photos.length <= slotsNeeded) {
