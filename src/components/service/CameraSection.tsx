@@ -1,9 +1,10 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
-import type { DeviceConfig, BGImage } from "@/types";
+import type { DeviceConfig, BGImage, Sticker } from "@/types";
 import { FALLBACK_BACKGROUNDS } from "@/constants/frames";
 import { fillGradientFromCSS } from "@/lib/canvas";
+import { AVAILABLE_STICKERS } from "@/constants/stickers";
 
 export function CameraSection({
   config,
@@ -13,9 +14,11 @@ export function CameraSection({
   selectedBackground,
   backgroundImages,
   imageBaseUrl,
+  stickers,
   onCapture,
   onNext,
   onPrev,
+  onStickersChange,
 }: {
   config: DeviceConfig;
   photos: string[];
@@ -24,9 +27,11 @@ export function CameraSection({
   selectedBackground: number | null;
   backgroundImages: BGImage[];
   imageBaseUrl: string;
+  stickers: Sticker[];
   onCapture: (dataUrl: string, frames?: string[]) => void;
   onNext: () => void;
   onPrev: () => void;
+  onStickersChange: (stickers: Sticker[]) => void;
 }) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const displayCanvasRef = useRef<HTMLCanvasElement>(null);
@@ -40,6 +45,20 @@ export function CameraSection({
   const [segmenterStatus, setSegmenterStatus] = useState<"idle" | "loading" | "ready" | "error">("idle");
   const [autoTimer, setAutoTimer] = useState<number | null>(null);
   const autoTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const [showStickerPicker, setShowStickerPicker] = useState(false);
+  const [stickerTab, setStickerTab] = useState<"emoji" | "image">("emoji");
+  const [dbStickerImages, setDbStickerImages] = useState<Array<{ id: number; filename: string; name: string }>>([]);
+  const [draggingId, setDraggingId] = useState<string | null>(null);
+  const [selectedStickerId, setSelectedStickerId] = useState<string | null>(null);
+  const dragOffsetRef = useRef<{ ox: number; oy: number }>({ ox: 0, oy: 0 });
+  const overlayRef = useRef<HTMLDivElement>(null);
+  const stickerImgCacheRef = useRef<Map<string, HTMLImageElement>>(new Map());
+
+  type TouchGesture =
+    | { mode: "drag"; stickerId: string; touchId: number; ox: number; oy: number; startX: number; startY: number; didMove: boolean }
+    | { mode: "pinch"; stickerId: string; touch1Id: number; touch2Id: number; initialDist: number; initialScale: number };
+  const touchGestureRef = useRef<TouchGesture | null>(null);
+  const TAP_THRESHOLD = 10;
 
   const bgRemovalMode = config.bgRemovalMode;
 
@@ -160,6 +179,26 @@ export function CameraSection({
     };
   }, []);
 
+  // DB 스티커 이미지 목록 로드
+  useEffect(() => {
+    fetch(`/api/image/list/3?device_id=${config.deviceId}`)
+      .then((r) => r.json())
+      .then((data) => setDbStickerImages(data.images || []))
+      .catch(() => {});
+  }, [config.deviceId]);
+
+  // 이미지 스티커 프리로드
+  useEffect(() => {
+    stickers.forEach((s) => {
+      if (s.src && !stickerImgCacheRef.current.has(s.src)) {
+        const img = new Image();
+        img.crossOrigin = "anonymous";
+        img.onload = () => stickerImgCacheRef.current.set(s.src!, img);
+        img.src = s.src;
+      }
+    });
+  }, [stickers]);
+
   useEffect(() => {
     const offscreen = document.createElement("canvas");
     const HARD = 50 * 50;
@@ -255,12 +294,29 @@ export function CameraSection({
         ctx.restore();
       }
 
+      // 스티커 렌더링
+      stickers.forEach((s) => {
+        if (s.src) {
+          const img = stickerImgCacheRef.current.get(s.src);
+          if (img) {
+            const size = Math.round(s.scale * 120);
+            ctx.drawImage(img, s.x * w - size / 2, s.y * h - size / 2, size, size);
+          }
+        } else if (s.emoji) {
+          const fontSize = Math.round(s.scale * 72);
+          ctx.font = `${fontSize}px serif`;
+          ctx.textAlign = "center";
+          ctx.textBaseline = "middle";
+          ctx.fillText(s.emoji, s.x * w, s.y * h);
+        }
+      });
+
       animFrameRef.current = requestAnimationFrame(processFrame);
     };
 
     animFrameRef.current = requestAnimationFrame(processFrame);
     return () => cancelAnimationFrame(animFrameRef.current);
-  }, [selectedBackground, chromaKey, bgRemovalMode, drawBackground]);
+  }, [selectedBackground, chromaKey, bgRemovalMode, drawBackground, stickers]);
 
   const capturePhoto = useCallback(() => {
     if (countdown !== null || photos.length >= maxPhotos) return;
@@ -328,6 +384,148 @@ export function CameraSection({
     capturePhoto();
   }, [capturePhoto]);
 
+  const addSticker = useCallback((opts: { emoji?: string; src?: string }) => {
+    const newSticker: Sticker = {
+      id: `${Date.now()}-${Math.random()}`,
+      ...opts,
+      x: 0.5,
+      y: 0.5,
+      scale: 1,
+    };
+    onStickersChange([...stickers, newSticker]);
+    setShowStickerPicker(false);
+  }, [stickers, onStickersChange]);
+
+  const removeSticker = useCallback((id: string) => {
+    onStickersChange(stickers.filter((s) => s.id !== id));
+  }, [stickers, onStickersChange]);
+
+  const handleStickerMouseDown = useCallback((e: React.MouseEvent, id: string) => {
+    e.stopPropagation();
+    e.preventDefault();
+    const overlay = overlayRef.current;
+    if (!overlay) return;
+    const rect = overlay.getBoundingClientRect();
+    const sticker = stickers.find((s) => s.id === id);
+    if (!sticker) return;
+    dragOffsetRef.current = {
+      ox: e.clientX / rect.width - sticker.x,
+      oy: e.clientY / rect.height - sticker.y,
+    };
+    setDraggingId(id);
+  }, [stickers]);
+
+  const handleOverlayMouseMove = useCallback((e: React.MouseEvent) => {
+    if (!draggingId) return;
+    const overlay = overlayRef.current;
+    if (!overlay) return;
+    const rect = overlay.getBoundingClientRect();
+    const x = Math.max(0, Math.min(1, e.clientX / rect.width - dragOffsetRef.current.ox));
+    const y = Math.max(0, Math.min(1, e.clientY / rect.height - dragOffsetRef.current.oy));
+    onStickersChange(stickers.map((s) => s.id === draggingId ? { ...s, x, y } : s));
+  }, [draggingId, stickers, onStickersChange]);
+
+  const handleOverlayMouseUp = useCallback(() => {
+    setDraggingId(null);
+  }, []);
+
+  // ── 터치 핸들러 ──────────────────────────────────────────
+  const handleStickerTouchStart = useCallback((e: React.TouchEvent, id: string) => {
+    e.stopPropagation();
+    e.preventDefault();
+    if (e.touches.length !== 1) return;
+    const overlay = overlayRef.current;
+    if (!overlay) return;
+    const rect = overlay.getBoundingClientRect();
+    const sticker = stickers.find((s) => s.id === id);
+    if (!sticker) return;
+    const t = e.touches[0];
+    touchGestureRef.current = {
+      mode: "drag",
+      stickerId: id,
+      touchId: t.identifier,
+      ox: t.clientX / rect.width - sticker.x,
+      oy: t.clientY / rect.height - sticker.y,
+      startX: t.clientX,
+      startY: t.clientY,
+      didMove: false,
+    };
+    setDraggingId(id);
+  }, [stickers]);
+
+  const handleOverlayTouchMove = useCallback((e: React.TouchEvent) => {
+    const gesture = touchGestureRef.current;
+    if (!gesture) return;
+    const overlay = overlayRef.current;
+    if (!overlay) return;
+    const rect = overlay.getBoundingClientRect();
+
+    if (gesture.mode === "drag") {
+      if (e.touches.length === 2) {
+        // 드래그 → 핀치 전환
+        const sticker = stickers.find((s) => s.id === gesture.stickerId);
+        if (!sticker) return;
+        const t1 = e.touches[0], t2 = e.touches[1];
+        touchGestureRef.current = {
+          mode: "pinch",
+          stickerId: gesture.stickerId,
+          touch1Id: t1.identifier,
+          touch2Id: t2.identifier,
+          initialDist: Math.hypot(t1.clientX - t2.clientX, t1.clientY - t2.clientY),
+          initialScale: sticker.scale,
+        };
+        return;
+      }
+      const t = Array.from(e.touches).find((t) => t.identifier === gesture.touchId);
+      if (!t) return;
+      const moved = Math.hypot(t.clientX - gesture.startX, t.clientY - gesture.startY);
+      if (moved > TAP_THRESHOLD) gesture.didMove = true;
+      const x = Math.max(0, Math.min(1, t.clientX / rect.width - gesture.ox));
+      const y = Math.max(0, Math.min(1, t.clientY / rect.height - gesture.oy));
+      onStickersChange(stickers.map((s) => s.id === gesture.stickerId ? { ...s, x, y } : s));
+
+    } else if (gesture.mode === "pinch" && e.touches.length >= 2) {
+      const t1 = Array.from(e.touches).find((t) => t.identifier === gesture.touch1Id);
+      const t2 = Array.from(e.touches).find((t) => t.identifier === gesture.touch2Id);
+      if (!t1 || !t2) return;
+      const dist = Math.hypot(t1.clientX - t2.clientX, t1.clientY - t2.clientY);
+      const newScale = Math.max(0.3, Math.min(5, (dist / gesture.initialDist) * gesture.initialScale));
+      onStickersChange(stickers.map((s) => s.id === gesture.stickerId ? { ...s, scale: newScale } : s));
+    }
+  }, [stickers, onStickersChange]);
+
+  const handleOverlayTouchEnd = useCallback((e: React.TouchEvent) => {
+    const gesture = touchGestureRef.current;
+    if (!gesture) return;
+
+    if (e.touches.length === 0) {
+      // 탭 감지: 움직임이 없었으면 선택 토글 (삭제 버튼 표시)
+      if (gesture.mode === "drag" && !gesture.didMove) {
+        setSelectedStickerId((prev) => prev === gesture.stickerId ? null : gesture.stickerId);
+      }
+      touchGestureRef.current = null;
+      setDraggingId(null);
+    } else if (gesture.mode === "pinch" && e.touches.length === 1) {
+      // 핀치 → 드래그로 복귀
+      const overlay = overlayRef.current;
+      if (!overlay) return;
+      const rect = overlay.getBoundingClientRect();
+      const sticker = stickers.find((s) => s.id === gesture.stickerId);
+      if (!sticker) return;
+      const t = e.touches[0];
+      touchGestureRef.current = {
+        mode: "drag",
+        stickerId: gesture.stickerId,
+        touchId: t.identifier,
+        ox: t.clientX / rect.width - sticker.x,
+        oy: t.clientY / rect.height - sticker.y,
+        startX: t.clientX,
+        startY: t.clientY,
+        didMove: false,
+      };
+    }
+  }, [stickers]);
+
   const canProceed = photos.length >= minPhotos;
 
   return (
@@ -338,6 +536,61 @@ export function CameraSection({
 
       <div className="flex-[7.5] flex items-center justify-center p-8">
         <div className="camera-preview w-full max-w-5xl aspect-video relative">
+          {/* 스티커 드래그 오버레이 */}
+          <div
+            ref={overlayRef}
+            className="absolute inset-0 z-10"
+            style={{ cursor: draggingId ? "grabbing" : "default", touchAction: "none" }}
+            onMouseMove={handleOverlayMouseMove}
+            onMouseUp={handleOverlayMouseUp}
+            onMouseLeave={handleOverlayMouseUp}
+            onTouchMove={handleOverlayTouchMove}
+            onTouchEnd={handleOverlayTouchEnd}
+            onClick={() => setSelectedStickerId(null)}
+          >
+            {stickers.map((s) => {
+              const isSelected = selectedStickerId === s.id;
+              return (
+                <div
+                  key={s.id}
+                  className="absolute"
+                  style={{
+                    left: `${s.x * 100}%`,
+                    top: `${s.y * 100}%`,
+                    transform: "translate(-50%, -50%)",
+                    cursor: draggingId === s.id ? "grabbing" : "grab",
+                    userSelect: "none",
+                    touchAction: "none",
+                    width: s.src ? `${s.scale * 80}px` : undefined,
+                    height: s.src ? `${s.scale * 80}px` : undefined,
+                    fontSize: s.emoji ? `${s.scale * 48}px` : undefined,
+                    lineHeight: 1,
+                    outline: isSelected ? "2px dashed rgba(255,255,255,0.7)" : undefined,
+                    borderRadius: "4px",
+                  }}
+                  onMouseDown={(e) => handleStickerMouseDown(e, s.id)}
+                  onTouchStart={(e) => handleStickerTouchStart(e, s.id)}
+                >
+                  {s.src ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={s.src} alt="sticker" style={{ width: "100%", height: "100%", objectFit: "contain", pointerEvents: "none" }} />
+                  ) : (
+                    s.emoji
+                  )}
+                  {/* 데스크톱: hover 시 삭제 / 터치: 탭 선택 후 삭제 */}
+                  <button
+                    className={`absolute -top-3 -right-3 w-6 h-6 bg-red-500 text-white rounded-full text-sm flex items-center justify-center leading-none shadow-md transition-opacity ${isSelected ? "opacity-100" : "opacity-0 group-hover:opacity-100"}`}
+                    style={{ pointerEvents: "auto" }}
+                    onMouseDown={(e) => { e.stopPropagation(); removeSticker(s.id); setSelectedStickerId(null); }}
+                    onTouchStart={(e) => { e.stopPropagation(); removeSticker(s.id); setSelectedStickerId(null); }}
+                  >
+                    ×
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+
           {cameraError ? (
             <div className="absolute inset-0 flex flex-col items-center justify-center bg-gradient-to-br from-gray-700 to-gray-900">
               <span className="text-6xl mb-5 opacity-30">&#128247;</span>
@@ -418,6 +671,83 @@ export function CameraSection({
         >
           &#128248; 촬영하기
         </button>
+
+        {/* 스티커 버튼 */}
+        <div className="relative mb-4">
+          <button
+            className="w-full py-3 rounded-2xl text-sm font-medium transition-colors"
+            style={{ background: showStickerPicker ? "rgba(99,102,241,0.6)" : "rgba(255,255,255,0.1)", color: "#fff" }}
+            onClick={() => setShowStickerPicker((v) => !v)}
+          >
+            ✨ 스티커 추가
+          </button>
+          {showStickerPicker && (
+            <div className="absolute bottom-full mb-2 left-0 right-0 bg-black/80 border border-white/20 rounded-2xl p-3 backdrop-blur-sm">
+              {/* 탭 */}
+              <div className="flex gap-1 mb-3">
+                {(["emoji", "image"] as const).map((tab) => (
+                  <button
+                    key={tab}
+                    className={`flex-1 py-1 rounded-lg text-xs font-medium transition-colors ${stickerTab === tab ? "bg-white/20 text-white" : "text-white/50 hover:text-white/70"}`}
+                    onClick={() => setStickerTab(tab)}
+                  >
+                    {tab === "emoji" ? "이모지" : "이미지"}
+                  </button>
+                ))}
+              </div>
+
+              {stickerTab === "emoji" && (
+                <div className="grid grid-cols-4 gap-2">
+                  {AVAILABLE_STICKERS.map((def) => (
+                    <button
+                      key={def.emoji}
+                      className="aspect-square flex items-center justify-center text-2xl rounded-xl hover:bg-white/20 transition-colors"
+                      onClick={() => addSticker({ emoji: def.emoji })}
+                      title={def.label}
+                    >
+                      {def.emoji}
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {stickerTab === "image" && (
+                dbStickerImages.length === 0 ? (
+                  <p className="text-center text-white/40 text-xs py-4">
+                    업로드된 스티커가 없습니다
+                  </p>
+                ) : (
+                  <div className="grid grid-cols-4 gap-2 max-h-40 overflow-y-auto">
+                    {dbStickerImages.map((img) => (
+                      <button
+                        key={img.id}
+                        className="aspect-square rounded-xl overflow-hidden hover:ring-2 hover:ring-white/50 transition-all bg-white/5"
+                        onClick={() => addSticker({ src: `${imageBaseUrl}/${img.filename}` })}
+                        title={img.name}
+                      >
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={`${imageBaseUrl}/${img.filename}`}
+                          alt={img.name}
+                          className="w-full h-full object-contain"
+                        />
+                      </button>
+                    ))}
+                  </div>
+                )
+              )}
+
+              {stickers.length > 0 && (
+                <button
+                  className="mt-2 w-full text-xs text-white/40 hover:text-white/70 transition-colors py-1"
+                  onClick={() => { onStickersChange([]); setShowStickerPicker(false); }}
+                >
+                  전체 삭제
+                </button>
+              )}
+            </div>
+          )}
+        </div>
 
         {autoTimer !== null && countdown === null && photos.length < maxPhotos && (
           <div className="text-center text-gray-400 text-sm mb-4">
