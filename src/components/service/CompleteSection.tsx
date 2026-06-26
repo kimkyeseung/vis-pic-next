@@ -269,7 +269,7 @@ export function CompleteSection({
 
       const marginTopStr = printSettings[modePrefix + "MARGIN_TOP"];
       const marginLeftStr = printSettings[modePrefix + "MARGIN_LEFT"];
-      const startX = marginTopStr !== undefined && marginLeftStr !== undefined
+      const startX = marginLeftStr !== undefined
         ? parseFloat(marginLeftStr) * cmToPx
         : (canvasWidth - totalW) / 2;
       const startY = marginTopStr !== undefined
