@@ -1,5 +1,32 @@
 export type Orientation = "landscape" | "portrait";
 
+export interface Sticker {
+  id: string;
+  emoji?: string; // 이모지 스티커
+  src?: string;   // 이미지 스티커 URL
+  x: number;      // 0-1, canvas 너비 비율
+  y: number;      // 0-1, canvas 높이 비율
+  scale: number;
+}
+
+export interface SceneState {
+  selectedBackground: number | null;
+  backgroundImages: BGImage[];
+  imageBaseUrl: string;
+  bgRemovalMode: BgRemovalMode;
+  chromakeyRgb: string;
+  stickers: Sticker[];
+}
+
+export interface MonitorInfo {
+  index: number;
+  name: string;
+  width: number;
+  height: number;
+  x: number;
+  y: number;
+}
+
 export type Step = "start" | "payment" | "frame" | "background" | "camera" | "select" | "complete";
 
 export type BgRemovalMode = "mediapipe" | "chromakey" | "off";
