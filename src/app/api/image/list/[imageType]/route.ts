@@ -45,7 +45,10 @@ export async function GET(
     const publicDir = join(process.cwd(), "public", "static", "images");
     let baseUrl = getImageBaseUrl();
 
-    if (checkFiles) {
+    // Only filter by local file existence when Supabase is not configured.
+    // On Vercel (read-only FS), existsSync always returns false even for
+    // images stored in Supabase, which would incorrectly hide all images.
+    if (checkFiles && !process.env.NEXT_PUBLIC_SUPABASE_URL) {
       result = result.filter((img) => existsSync(join(publicDir, img.filename)));
       baseUrl = "/static/images";
     }
