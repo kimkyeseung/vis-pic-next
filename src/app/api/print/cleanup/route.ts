@@ -1,10 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
 import { readdir, unlink } from "fs/promises";
 import path from "path";
-
-const BUCKET_NAME = "prints";
-const EXPIRY_DAYS = 3;
+import { PRINTS_BUCKET, EXPIRY_DAYS, getPrintsClient } from "@/lib/prints";
 
 export async function GET(request: NextRequest) {
   const cronSecret = process.env.CRON_SECRET;
@@ -21,13 +18,11 @@ export async function GET(request: NextRequest) {
   let deletedSupabase = 0;
   let deletedLocal = 0;
 
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
-  if (url && key) {
+  const supabase = getPrintsClient();
+  if (supabase) {
     try {
-      const supabase = createClient(url, key);
       const { data: files } = await supabase.storage
-        .from(BUCKET_NAME)
+        .from(PRINTS_BUCKET)
         .list("", { limit: 1000 });
 
       if (files) {
@@ -40,7 +35,7 @@ export async function GET(request: NextRequest) {
 
         if (expired.length > 0) {
           const { error } = await supabase.storage
-            .from(BUCKET_NAME)
+            .from(PRINTS_BUCKET)
             .remove(expired);
           if (!error) deletedSupabase = expired.length;
         }
