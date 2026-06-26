@@ -26,7 +26,13 @@ async function main() {
     create: { id: 2, name: "image" },
   });
 
-  console.log("Created image types:", { backgroundType, imageType });
+  const stickerType = await prisma.imageType.upsert({
+    where: { id: 3 },
+    update: {},
+    create: { id: 3, name: "sticker" },
+  });
+
+  console.log("Created image types:", { backgroundType, imageType, stickerType });
 
   // Create default admin account
   const hashedPassword = await bcrypt.hash("admin", 10);

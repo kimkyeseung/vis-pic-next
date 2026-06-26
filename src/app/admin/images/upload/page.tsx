@@ -147,7 +147,13 @@ export default function ImageUploadPage() {
           >
             <option value="1">배경 (Background)</option>
             <option value="2">이미지 (Image)</option>
+            <option value="3">스티커 (Sticker)</option>
           </select>
+          {imageType === "3" && (
+            <p className="mt-1 text-sm text-yellow-400">
+              스티커는 PNG 파일 권장 (투명 배경 지원)
+            </p>
+          )}
         </div>
 
         <div>
