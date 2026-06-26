@@ -85,7 +85,7 @@ function ServiceContent() {
     } catch {
       // sessionStorage full or unavailable
     }
-  }, [currentStep, deviceId, selectedFrame, selectedBackground, photos, intermediateFrames, selectedPhotos]);
+  }, [currentStep, deviceId, orderId, selectedFrame, selectedBackground, photos, intermediateFrames, selectedPhotos]);
 
   const loadDeviceConfig = async (id: string) => {
     try {
