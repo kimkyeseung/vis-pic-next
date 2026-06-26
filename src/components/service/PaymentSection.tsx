@@ -16,39 +16,11 @@ export function PaymentSection({
   onNext: () => void;
   onPrev: () => void;
 }) {
-  const [status, setStatus] = useState<"idle" | "requesting" | "waiting" | "completed" | "error">("idle");
+  const [status, setStatus] = useState<"idle" | "requesting" | "waiting" | "completed" | "error">(
+    orderId ? "waiting" : "idle"
+  );
   const [errorMsg, setErrorMsg] = useState("");
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
-
-  useEffect(() => {
-    return () => {
-      if (pollRef.current) clearInterval(pollRef.current);
-    };
-  }, []);
-
-  const requestPayment = async () => {
-    setStatus("requesting");
-    setErrorMsg("");
-    try {
-      const res = await fetch("/api/payments/request/", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ deviceId: config.deviceId, amount: config.paymentAmount }),
-      });
-      const data = await res.json();
-      if (data.orderId) {
-        setOrderId(data.orderId);
-        setStatus("waiting");
-        startPolling(data.orderId);
-      } else {
-        setErrorMsg(data.error || "결제 요청 실패");
-        setStatus("error");
-      }
-    } catch {
-      setErrorMsg("서버에 연결할 수 없습니다");
-      setStatus("error");
-    }
-  };
 
   const startPolling = (oid: string) => {
     if (pollRef.current) clearInterval(pollRef.current);
@@ -73,6 +45,39 @@ export function PaymentSection({
         // keep polling
       }
     }, 2000);
+  };
+
+  useEffect(() => {
+    if (orderId) startPolling(orderId);
+    return () => {
+      if (pollRef.current) clearInterval(pollRef.current);
+    };
+  // orderId는 마운트 시점에만 읽어 폴링 재개 여부를 결정하므로 deps 생략
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const requestPayment = async () => {
+    setStatus("requesting");
+    setErrorMsg("");
+    try {
+      const res = await fetch("/api/payments/request/", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ deviceId: config.deviceId, amount: config.paymentAmount }),
+      });
+      const data = await res.json();
+      if (data.orderId) {
+        setOrderId(data.orderId);
+        setStatus("waiting");
+        startPolling(data.orderId);
+      } else {
+        setErrorMsg(data.error || "결제 요청 실패");
+        setStatus("error");
+      }
+    } catch {
+      setErrorMsg("서버에 연결할 수 없습니다");
+      setStatus("error");
+    }
   };
 
   const devBypass = () => {

@@ -58,6 +58,7 @@ function ServiceContent() {
       const s = JSON.parse(saved);
       if (s.deviceId !== deviceId) return;
       if (s.step) setCurrentStep(s.step);
+      if (s.orderId) setOrderId(s.orderId);
       if (s.selectedFrame) setSelectedFrame(s.selectedFrame);
       if (s.selectedBackground !== undefined) setSelectedBackground(s.selectedBackground);
       if (s.photos?.length > 0) setPhotos(s.photos);
@@ -74,6 +75,7 @@ function ServiceContent() {
       sessionStorage.setItem("photobooth_session", JSON.stringify({
         deviceId,
         step: currentStep,
+        orderId,
         selectedFrame,
         selectedBackground,
         photos,
