@@ -85,9 +85,11 @@ export default function AdminLoginPage() {
           </button>
         </form>
 
-        <p className="mt-6 text-center text-gray-500 text-sm">
-          기본 계정: admin / admin
-        </p>
+        {process.env.NODE_ENV === "development" && (
+          <p className="mt-6 text-center text-gray-500 text-sm">
+            기본 계정: admin / admin
+          </p>
+        )}
       </div>
     </div>
   );
