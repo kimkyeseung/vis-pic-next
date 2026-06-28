@@ -456,14 +456,6 @@ export function CompleteSection({
     setPrintStatus("done");
   };
 
-  const handleDownload = () => {
-    if (!compositeImage) return;
-    const link = document.createElement("a");
-    link.download = `arpic-${Date.now()}.jpg`;
-    link.href = compositeImage;
-    link.click();
-  };
-
   return (
     <section className="w-full h-full flex flex-col items-center justify-center relative z-10">
       <div className="text-center animate-fadeInUp">
@@ -528,16 +520,13 @@ export function CompleteSection({
               )}
             </div>
 
-            <div className="flex gap-6 justify-center mb-8">
-              {printStatus === "ready" && (
+            {printStatus === "ready" && (
+              <div className="flex gap-6 justify-center mb-8">
                 <button className="service-button nav-button" onClick={handlePrint}>
                   &#128424; 인쇄하기
                 </button>
-              )}
-              <button className="service-button nav-button" onClick={handleDownload}>
-                &#128190; 다운로드
-              </button>
-            </div>
+              </div>
+            )}
 
             {printStatus === "done" && (
               <p className="text-gray-400 text-lg mb-8">인쇄가 완료되었습니다</p>
