@@ -64,6 +64,7 @@ function AdminLayoutInner({ children }: AdminLayoutProps) {
     { href: "/admin/images", label: "이미지 관리", icon: "🖼️" },
     { href: "/admin/print-setting", label: "인화 설정", icon: "🖨️" },
     { href: "/admin/payment", label: "결제 설정", icon: "💳" },
+    { href: "/admin/payment-history", label: "결제 내역", icon: "📋" },
     { href: "/admin/settings", label: "설정", icon: "⚙️" },
   ];
 

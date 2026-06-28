@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
-import type { Step, BgRemovalMode, DeviceConfig, BGImage, Sticker, MonitorInfo } from "@/types";
+import type { Step, BgRemovalMode, PaymentTerminalMode, DeviceConfig, BGImage, Sticker, MonitorInfo } from "@/types";
 import { FRAME_INFO } from "@/constants/frames";
 import { useSceneSyncSender } from "@/hooks/useSceneSync";
 import { FloatingElements } from "@/components/service/FloatingElements";
@@ -19,6 +19,7 @@ const DEFAULT_CONFIG: DeviceConfig = {
   deviceName: "테스트 장치",
   paymentEnabled: false,
   paymentAmount: 1000,
+  paymentTerminalMode: "payapp_lite",
   captureSeconds: 3,
   captureCount: 4,
   chromakeyRgb: "0,255,0",
@@ -145,11 +146,16 @@ function ServiceContent() {
       else if (modeRaw === "1" || modeRaw === "chromakey") bgRemovalMode = "chromakey";
       else if (modeRaw === "mediapipe") bgRemovalMode = "mediapipe";
 
+      const terminalModeRaw = s.PAYMENT_TERMINAL_MODE || "payapp_lite";
+      const paymentTerminalMode: PaymentTerminalMode =
+        terminalModeRaw === "manual" ? "manual" : "payapp_lite";
+
       setConfig({
         deviceId: id,
         deviceName: data.device?.name || id,
         paymentEnabled: s.PAYMENT_ENABLED === "1",
         paymentAmount: parseInt(s.PAYMENT_AMOUNT || "1000", 10),
+        paymentTerminalMode,
         captureSeconds: parseInt(s.CAPTURE_SECONDS || "3", 10),
         captureCount,
         chromakeyRgb: s.CHROMAKEY_RGB || "0,255,0",
@@ -361,6 +367,7 @@ function ServiceContent() {
           backgroundImages={backgroundImages}
           imageBaseUrl={imageBaseUrl}
           stickers={stickers}
+          syncEnabled={syncEnabled}
           onStickersChange={setStickers}
           onCapture={addPhoto}
           onNext={() => {

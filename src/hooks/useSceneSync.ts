@@ -4,6 +4,44 @@ import { useEffect, useRef, useCallback } from "react";
 import type { SceneState } from "@/types";
 
 const CHANNEL_NAME = "scene-sync";
+const FRAME_CHANNEL_NAME = "scene-frames";
+
+// ── 프레임 채널 (CameraSection → output 페이지) ─────────────────
+export function useFrameSender(enabled: boolean) {
+  const channelRef = useRef<BroadcastChannel | null>(null);
+
+  useEffect(() => {
+    if (!enabled) {
+      channelRef.current?.close();
+      channelRef.current = null;
+      return;
+    }
+    channelRef.current = new BroadcastChannel(FRAME_CHANNEL_NAME);
+    return () => {
+      channelRef.current?.close();
+      channelRef.current = null;
+    };
+  }, [enabled]);
+
+  return channelRef;
+}
+
+export function useFrameReceiver(
+  onFrame: (bitmap: ImageBitmap) => void
+) {
+  const onFrameRef = useRef(onFrame);
+  onFrameRef.current = onFrame;
+
+  useEffect(() => {
+    const channel = new BroadcastChannel(FRAME_CHANNEL_NAME);
+    channel.onmessage = (e: MessageEvent) => {
+      if (e.data?.type === "frame" && e.data.bitmap) {
+        onFrameRef.current(e.data.bitmap);
+      }
+    };
+    return () => channel.close();
+  }, []);
+}
 
 type SyncMessage =
   | { type: "state"; payload: SceneState }

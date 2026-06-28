@@ -31,6 +31,8 @@ export type Step = "start" | "payment" | "frame" | "background" | "camera" | "se
 
 export type BgRemovalMode = "mediapipe" | "chromakey" | "off";
 
+export type PaymentTerminalMode = "manual" | "payapp_lite";
+
 export interface FrameInfoEntry {
   label: string;
   cols: number;
@@ -44,6 +46,7 @@ export interface DeviceConfig {
   deviceName: string;
   paymentEnabled: boolean;
   paymentAmount: number;
+  paymentTerminalMode: PaymentTerminalMode;
   captureSeconds: number;
   captureCount: number;
   chromakeyRgb: string;

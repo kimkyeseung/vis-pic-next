@@ -5,6 +5,7 @@ import type { DeviceConfig, BGImage, Sticker } from "@/types";
 import { FALLBACK_BACKGROUNDS } from "@/constants/frames";
 import { fillGradientFromCSS } from "@/lib/canvas";
 import { AVAILABLE_STICKERS } from "@/constants/stickers";
+import { useFrameSender } from "@/hooks/useSceneSync";
 
 export function CameraSection({
   config,
@@ -15,6 +16,7 @@ export function CameraSection({
   backgroundImages,
   imageBaseUrl,
   stickers,
+  syncEnabled = false,
   onCapture,
   onNext,
   onPrev,
@@ -28,6 +30,7 @@ export function CameraSection({
   backgroundImages: BGImage[];
   imageBaseUrl: string;
   stickers: Sticker[];
+  syncEnabled?: boolean;
   onCapture: (dataUrl: string, frames?: string[]) => void;
   onNext: () => void;
   onPrev: () => void;
@@ -53,6 +56,9 @@ export function CameraSection({
   const dragOffsetRef = useRef<{ ox: number; oy: number }>({ ox: 0, oy: 0 });
   const overlayRef = useRef<HTMLDivElement>(null);
   const stickerImgCacheRef = useRef<Map<string, HTMLImageElement>>(new Map());
+  const cameraStreamRef = useRef<MediaStream | null>(null);
+  const frameChannelRef = useFrameSender(syncEnabled);
+  const lastFrameSentRef = useRef(0);
 
   type TouchGesture =
     | { mode: "drag"; stickerId: string; touchId: number; ox: number; oy: number; startX: number; startY: number; didMove: boolean }
@@ -149,12 +155,27 @@ export function CameraSection({
     }
   }, [selectedBackground]);
 
-  const startCamera = async () => {
+  const stopCamera = useCallback(() => {
+    cameraStreamRef.current?.getTracks().forEach((t) => t.stop());
+    cameraStreamRef.current = null;
+    if (videoRef.current) videoRef.current.srcObject = null;
+  }, []);
+
+  const startCamera = useCallback(async (retryMs?: number) => {
+    // 기존 스트림 먼저 정리
+    stopCamera();
+
+    if (retryMs) {
+      await new Promise((r) => setTimeout(r, retryMs));
+    }
+
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { width: { ideal: 1920 }, height: { ideal: 1080 } },
       });
+      cameraStreamRef.current = stream;
       if (videoRef.current) videoRef.current.srcObject = stream;
+      setCameraError(null);
     } catch (err) {
       const e = err as DOMException;
       if (e.name === "NotAllowedError") {
@@ -162,22 +183,22 @@ export function CameraSection({
       } else if (e.name === "NotFoundError") {
         setCameraError("연결된 카메라가 없습니다.");
       } else if (e.name === "NotReadableError") {
-        setCameraError("카메라가 다른 프로그램에서 사용 중입니다.");
+        // 다른 컨텍스트가 아직 카메라를 점유 중 → 800ms 후 한 번 재시도
+        if (!retryMs) {
+          startCamera(800);
+        } else {
+          setCameraError("카메라가 다른 프로그램에서 사용 중입니다. 잠시 후 다시 시도하세요.");
+        }
       } else {
         setCameraError(`카메라를 사용할 수 없습니다 (${e.name || e.message})`);
       }
     }
-  };
+  }, [stopCamera]);
 
   useEffect(() => {
     startCamera();
-    const video = videoRef.current;
-    return () => {
-      if (video?.srcObject) {
-        (video.srcObject as MediaStream).getTracks().forEach((t) => t.stop());
-      }
-    };
-  }, []);
+    return stopCamera;
+  }, [startCamera, stopCamera]);
 
   // DB 스티커 이미지 목록 로드
   useEffect(() => {
@@ -311,12 +332,23 @@ export function CameraSection({
         }
       });
 
+      // syncEnabled 시 ~30fps로 합성 프레임을 output 창에 전송
+      if (frameChannelRef.current) {
+        const now = performance.now();
+        if (now - lastFrameSentRef.current > 33) {
+          lastFrameSentRef.current = now;
+          createImageBitmap(display).then((bitmap) => {
+            frameChannelRef.current?.postMessage({ type: "frame", bitmap });
+          }).catch(() => {});
+        }
+      }
+
       animFrameRef.current = requestAnimationFrame(processFrame);
     };
 
     animFrameRef.current = requestAnimationFrame(processFrame);
     return () => cancelAnimationFrame(animFrameRef.current);
-  }, [selectedBackground, chromaKey, bgRemovalMode, drawBackground, stickers]);
+  }, [selectedBackground, chromaKey, bgRemovalMode, drawBackground, stickers, frameChannelRef]);
 
   const capturePhoto = useCallback(() => {
     if (countdown !== null || photos.length >= maxPhotos) return;
@@ -598,7 +630,7 @@ export function CameraSection({
               <div className="flex gap-3">
                 <button
                   className="px-6 py-3 bg-white/10 hover:bg-white/20 text-white rounded-xl transition-colors"
-                  onClick={() => { setCameraError(null); startCamera(); }}
+                  onClick={() => startCamera()}
                 >
                   다시 시도
                 </button>

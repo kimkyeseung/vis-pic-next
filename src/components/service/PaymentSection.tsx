@@ -22,6 +22,8 @@ export function PaymentSection({
   const [errorMsg, setErrorMsg] = useState("");
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  const isManual = config.paymentTerminalMode === "manual";
+
   const startPolling = (oid: string) => {
     if (pollRef.current) clearInterval(pollRef.current);
     let attempts = 0;
@@ -80,6 +82,11 @@ export function PaymentSection({
     }
   };
 
+  const confirmManualPayment = () => {
+    setStatus("completed");
+    setTimeout(onNext, 800);
+  };
+
   const devBypass = () => {
     setStatus("completed");
     setTimeout(onNext, 500);
@@ -94,7 +101,26 @@ export function PaymentSection({
       </div>
 
       <div className="bg-black/30 backdrop-blur-sm p-16 rounded-3xl border border-white/10 text-center animate-fadeInUp min-w-[500px]">
-        {status === "idle" && (
+        {/* 수동 결제 모드 */}
+        {status === "idle" && isManual && (
+          <>
+            <div className="text-6xl font-black text-white mb-4">
+              {config.paymentAmount.toLocaleString()}원
+            </div>
+            <p className="text-gray-400 text-xl mb-12">결제 후 아래 버튼을 눌러주세요</p>
+            <div className="flex gap-6 justify-center">
+              <button className="service-button nav-button" onClick={confirmManualPayment}>
+                결제 확인
+              </button>
+              <button className="service-button nav-button" style={{ background: "rgba(255,255,255,0.1)", color: "#fff" }} onClick={onPrev}>
+                처음으로
+              </button>
+            </div>
+          </>
+        )}
+
+        {/* PayApp Lite 모드 */}
+        {status === "idle" && !isManual && (
           <>
             <div className="text-6xl font-black text-white mb-4">
               {config.paymentAmount.toLocaleString()}원
@@ -123,9 +149,11 @@ export function PaymentSection({
             <div className="w-20 h-20 border-4 border-white/20 border-t-green-500 rounded-full animate-spin mx-auto mb-8" />
             <p className="text-white text-2xl mb-4">결제 대기중</p>
             <p className="text-gray-400 text-lg mb-8">카드를 리더기에 대주세요</p>
-            <button className="text-gray-500 text-sm underline" onClick={devBypass}>
-              결제 건너뛰기 (개발 모드)
-            </button>
+            {process.env.NODE_ENV === "development" && (
+              <button className="text-gray-500 text-sm underline" onClick={devBypass}>
+                결제 건너뛰기 (개발 모드)
+              </button>
+            )}
           </div>
         )}
 
@@ -140,12 +168,15 @@ export function PaymentSection({
           <>
             <p className="text-red-400 text-xl mb-6">{errorMsg}</p>
             <div className="flex gap-4 justify-center">
-              <button className="service-button nav-button" onClick={requestPayment}>
-                다시 시도
-              </button>
-              <button className="service-button nav-button" style={{ background: "rgba(255,255,255,0.1)", color: "#fff" }} onClick={devBypass}>
-                건너뛰기
-              </button>
+              {isManual ? (
+                <button className="service-button nav-button" onClick={confirmManualPayment}>
+                  결제 확인
+                </button>
+              ) : (
+                <button className="service-button nav-button" onClick={requestPayment}>
+                  다시 시도
+                </button>
+              )}
               <button className="service-button nav-button" style={{ background: "rgba(255,255,255,0.1)", color: "#fff" }} onClick={onPrev}>
                 처음으로
               </button>
