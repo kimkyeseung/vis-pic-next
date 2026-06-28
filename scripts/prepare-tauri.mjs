@@ -6,16 +6,12 @@ import { fileURLToPath } from "url";
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const SERVER_DIR = join(ROOT, "src-tauri", "server");
 
-// 1. Prisma client
-console.log("[1/5] Generating Prisma client...");
-execSync("npx prisma generate", { cwd: ROOT, stdio: "inherit" });
-
-// 2. Next.js build
-console.log("[2/5] Building Next.js...");
+// 1. Next.js build (prisma generate included in npm run build)
+console.log("[1/4] Building Next.js...");
 execSync("npm run build", { cwd: ROOT, stdio: "inherit" });
 
-// 3. Server bundle
-console.log("[3/5] Preparing server bundle...");
+// 2. Server bundle
+console.log("[2/4] Preparing server bundle...");
 if (existsSync(SERVER_DIR)) {
   rmSync(SERVER_DIR, { recursive: true, force: true });
 }
@@ -39,14 +35,14 @@ if (existsSync(cacheDir)) {
   rmSync(cacheDir, { recursive: true, force: true });
 }
 
-// 4. Node.js runtime
-console.log("[4/5] Copying Node.js runtime...");
+// 3. Node.js runtime
+console.log("[3/4] Copying Node.js runtime...");
 const nodeExeDest = join(SERVER_DIR, "node.exe");
 copyFileSync(process.execPath, nodeExeDest);
 console.log(`  Copied ${process.execPath} (${process.version})`);
 
-// 5. Environment files
-console.log("[5/5] Copying environment files...");
+// 4. Environment files
+console.log("[4/4] Copying environment files...");
 for (const f of [".env", ".env.local", ".env.production"]) {
   const src = join(ROOT, f);
   if (existsSync(src)) {

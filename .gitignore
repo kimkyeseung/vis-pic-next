@@ -49,8 +49,6 @@ next-env.d.ts
 *.db
 *.db-journal
 
-# Tauri server bundle
-/src-tauri/server/
 
 # Generated print/GIF files
 /public/static/prints/

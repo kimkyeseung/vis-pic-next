@@ -20,7 +20,7 @@ fn get_monitors(app: tauri::AppHandle) -> Vec<MonitorInfo> {
         .enumerate()
         .map(|(i, m)| MonitorInfo {
             index: i,
-            name: m.name().unwrap_or("모니터").to_string(),
+            name: m.name().map_or("모니터", |v| v).to_string(),
             width: m.size().width,
             height: m.size().height,
             x: m.position().x,
@@ -286,6 +286,50 @@ pub fn run() {
                         .build(),
                 )?;
             }
+
+            // 프로덕션 빌드에서만 임베디드 Next.js 서버 시작
+            #[cfg(not(debug_assertions))]
+            {
+                use tauri::Manager;
+
+                let exe_dir = std::env::current_exe()
+                    .expect("실행 파일 경로를 찾을 수 없습니다")
+                    .parent()
+                    .expect("실행 파일의 부모 디렉터리를 찾을 수 없습니다")
+                    .to_path_buf();
+                let server_dir = exe_dir.join("server");
+                let node_exe = server_dir.join("node.exe");
+                let server_js = server_dir.join("server.js");
+
+                let stdout_log = std::fs::File::create(exe_dir.join("server-stdout.log")).ok();
+                let stderr_log = std::fs::File::create(exe_dir.join("server-stderr.log")).ok();
+
+                let mut cmd = std::process::Command::new(&node_exe);
+                cmd.arg(&server_js)
+                    .env("PORT", "3001")
+                    .env("HOSTNAME", "127.0.0.1")
+                    .current_dir(&server_dir);
+                if let Some(f) = stdout_log { cmd.stdout(f); }
+                if let Some(f) = stderr_log { cmd.stderr(f); }
+                let _ = cmd.spawn();
+
+                // 백그라운드에서 서버 준비 대기 후 창 표시
+                let app_handle = app.handle().clone();
+                std::thread::spawn(move || {
+                    // 포트가 열릴 때까지 폴링 (최대 30초)
+                    for _ in 0..60 {
+                        std::thread::sleep(std::time::Duration::from_millis(500));
+                        if std::net::TcpStream::connect("127.0.0.1:3001").is_ok() {
+                            break;
+                        }
+                    }
+                    if let Some(window) = app_handle.get_webview_window("main") {
+                        let _ = window.show();
+                        let _ = window.set_focus();
+                    }
+                });
+            }
+
             Ok(())
         })
         .run(tauri::generate_context!())
