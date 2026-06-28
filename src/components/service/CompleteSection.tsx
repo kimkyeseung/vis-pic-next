@@ -391,22 +391,68 @@ export function CompleteSection({
     }
   }, []);
 
-  const handlePrint = () => {
+  // hasPreparedImage 경로에서 GIF 생성이 실패한 경우 fallback 시도
+  useEffect(() => {
+    if (!hasPreparedImage || qrGifUrl) return;
+
+    const frames = selectedPhotos.flatMap((i) => intermediateFrames[i] || []).filter(Boolean);
+    const sources = frames.length >= 2
+      ? frames
+      : selectedPhotos.map((i) => photos[i]).filter(Boolean);
+
+    if (sources.length < 2) return;
+
+    (async () => {
+      try {
+        const resized = await Promise.all(sources.map((src) => resizeForGif(src, 800)));
+        const res = await fetch("/api/gif/create/", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ images: resized, duration: 500 }),
+        });
+        const data = await res.json();
+        if (data.success && data.gif_url) {
+          setQrGifUrl(toFullUrl(data.gif_url));
+          if (!qrExpiryDate && data.expiry_date) setQrExpiryDate(data.expiry_date);
+        }
+      } catch { /* silent */ }
+    })();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hasPreparedImage]);
+
+  const handlePrint = async () => {
     if (!compositeImage) return;
     setPrintStatus("printing");
 
-    const printWindow = window.open("", "_blank");
-    if (printWindow) {
-      printWindow.document.write(`
-        <html><head><title>AR-pic</title>
-        <style>body{margin:0;display:flex;justify-content:center;align-items:center;min-height:100vh;background:#000;}
-        img{max-width:100%;max-height:100vh;object-fit:contain;}
-        @media print{body{background:#fff;}img{max-width:100%;max-height:100%;}}
-        </style></head>
-        <body><img src="${compositeImage}" onload="window.print();"/></body></html>
-      `);
-      printWindow.document.close();
+    const isTauri = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
+
+    if (isTauri) {
+      try {
+        const { invoke } = await import("@tauri-apps/api/core");
+        const base64 = compositeImage.replace(/^data:image\/\w+;base64,/, "");
+        const printerName = printSettings.PRINTER_NAME || "";
+        await invoke("print_image", { printer_name: printerName, image_data: base64 });
+      } catch (err) {
+        console.error("Print failed:", err);
+      }
+    } else {
+      const style = document.createElement("style");
+      style.textContent = `@media print { body > * { display: none !important; } #__print_target__ { display: block !important; position: fixed; inset: 0; background: #fff; } #__print_target__ img { width: 100%; height: 100%; object-fit: contain; } }`;
+
+      const container = document.createElement("div");
+      container.id = "__print_target__";
+      container.style.display = "none";
+      const img = document.createElement("img");
+      img.src = compositeImage;
+      container.appendChild(img);
+
+      document.head.appendChild(style);
+      document.body.appendChild(container);
+      window.print();
+      document.head.removeChild(style);
+      document.body.removeChild(container);
     }
+
     setPrintStatus("done");
   };
 
