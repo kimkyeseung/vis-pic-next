@@ -134,6 +134,9 @@ export function PaymentSection({
                 처음으로
               </button>
             </div>
+            <button className="text-gray-500 text-sm underline mt-8 block mx-auto" onClick={devBypass}>
+              결제완료(개발)
+            </button>
           </>
         )}
 
