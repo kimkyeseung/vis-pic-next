@@ -2,12 +2,12 @@ import { createClient } from "@supabase/supabase-js";
 import { writeFile, mkdir } from "fs/promises";
 import path from "path";
 
-export const PRINTS_BUCKET = "prints";
+export const PRINTS_BUCKET = "pic-prints";
 export const EXPIRY_DAYS = 3;
 
 export function getPrintsClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!url || !key) return null;
   return createClient(url, key);
 }
