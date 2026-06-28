@@ -7,14 +7,20 @@ export default function OutputPage() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [hasFrame, setHasFrame] = useState(false);
 
-  useFrameReceiver((bitmap) => {
+  const imgRef = useRef<HTMLImageElement | null>(null);
+
+  useFrameReceiver((dataUrl) => {
     const canvas = canvasRef.current;
-    if (!canvas) { bitmap.close(); return; }
-    if (canvas.width !== bitmap.width) canvas.width = bitmap.width;
-    if (canvas.height !== bitmap.height) canvas.height = bitmap.height;
-    canvas.getContext("2d")!.drawImage(bitmap, 0, 0);
-    bitmap.close();
-    if (!hasFrame) setHasFrame(true);
+    if (!canvas) return;
+    if (!imgRef.current) imgRef.current = new Image();
+    const img = imgRef.current;
+    img.onload = () => {
+      if (canvas.width !== img.naturalWidth) canvas.width = img.naturalWidth;
+      if (canvas.height !== img.naturalHeight) canvas.height = img.naturalHeight;
+      canvas.getContext("2d")!.drawImage(img, 0, 0);
+      if (!hasFrame) setHasFrame(true);
+    };
+    img.src = dataUrl;
   });
 
   return (

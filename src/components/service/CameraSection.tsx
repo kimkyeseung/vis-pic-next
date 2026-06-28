@@ -498,11 +498,10 @@ export function CameraSection({
       // syncEnabled 시 ~30fps로 합성 프레임을 output 창에 전송
       if (frameChannelRef.current) {
         const now = performance.now();
-        if (now - lastFrameSentRef.current > 33) {
+        if (now - lastFrameSentRef.current > 100) {
           lastFrameSentRef.current = now;
-          createImageBitmap(display).then((bitmap) => {
-            frameChannelRef.current?.postMessage({ type: "frame", bitmap });
-          }).catch(() => {});
+          const dataUrl = display.toDataURL("image/jpeg", 0.5);
+          frameChannelRef.current?.postMessage({ type: "frame", dataUrl });
         }
       }
 

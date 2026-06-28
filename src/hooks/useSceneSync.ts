@@ -27,7 +27,7 @@ export function useFrameSender(enabled: boolean) {
 }
 
 export function useFrameReceiver(
-  onFrame: (bitmap: ImageBitmap) => void
+  onFrame: (dataUrl: string) => void
 ) {
   const onFrameRef = useRef(onFrame);
   onFrameRef.current = onFrame;
@@ -35,8 +35,8 @@ export function useFrameReceiver(
   useEffect(() => {
     const channel = new BroadcastChannel(FRAME_CHANNEL_NAME);
     channel.onmessage = (e: MessageEvent) => {
-      if (e.data?.type === "frame" && e.data.bitmap) {
-        onFrameRef.current(e.data.bitmap);
+      if (e.data?.type === "frame" && e.data.dataUrl) {
+        onFrameRef.current(e.data.dataUrl);
       }
     };
     return () => channel.close();
