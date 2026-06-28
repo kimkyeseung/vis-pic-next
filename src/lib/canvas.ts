@@ -45,7 +45,12 @@ export function fillGradientFromCSS(
 export function loadImage(src: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
     const img = new Image();
-    img.crossOrigin = "anonymous";
+    // data: URL에는 crossOrigin을 설정하지 않음.
+    // Chromium에서 WebRTC 캔버스로 캡처한 data: URL에 crossOrigin을 설정하면
+    // 보안 컨텍스트 검사가 실패해 onerror가 발생한다.
+    if (!src.startsWith("data:")) {
+      img.crossOrigin = "anonymous";
+    }
     img.onload = () => resolve(img);
     img.onerror = reject;
     img.src = src;

@@ -344,8 +344,8 @@ export function CompleteSection({
         ctx.lineWidth = 3;
         roundRect(ctx, x, y, w, h, 12);
         ctx.stroke();
-      } catch {
-        // skip failed photo
+      } catch (err) {
+        console.error(`[createComposite] 사진 ${i} 로드 실패:`, err);
       }
     }
 
