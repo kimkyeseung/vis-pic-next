@@ -25,7 +25,7 @@ export default function RootLayout({
         {children}
         <script
           dangerouslySetInnerHTML={{
-            __html: `if("serviceWorker"in navigator){navigator.serviceWorker.register("/sw.js")}`,
+            __html: `if("serviceWorker"in navigator){if(location.hostname==="localhost"){navigator.serviceWorker.getRegistrations().then(function(r){r.forEach(function(s){s.unregister()})})}else{navigator.serviceWorker.register("/sw.js")}}`,
           }}
         />
       </body>
