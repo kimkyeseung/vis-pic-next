@@ -768,9 +768,9 @@ export function CameraSection({
                 >
                   {s.src ? (
                     // eslint-disable-next-line @next/next/no-img-element
-                    <img src={s.src} alt="sticker" style={{ width: "100%", height: "100%", objectFit: "contain", pointerEvents: "none" }} />
+                    <img src={s.src} alt="sticker" style={{ width: "100%", height: "100%", objectFit: "contain", pointerEvents: "none", opacity: 0 }} />
                   ) : (
-                    s.emoji
+                    <span style={{ color: "transparent" }}>{s.emoji}</span>
                   )}
                   {/* 데스크톱: hover 시 삭제 / 터치: 탭 선택 후 삭제 */}
                   <button
