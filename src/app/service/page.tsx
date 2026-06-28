@@ -29,6 +29,8 @@ const DEFAULT_CONFIG: DeviceConfig = {
   cameraAutoTimerSeconds: 60,
 };
 
+const SESSION_KEY = "photobooth_session_v2";
+
 function ServiceContent() {
   const searchParams = useSearchParams();
   const deviceId = searchParams.get("device") || "test";
@@ -48,6 +50,10 @@ function ServiceContent() {
   const [intermediateFrames, setIntermediateFrames] = useState<string[][]>([]);
   const [selectedPhotos, setSelectedPhotos] = useState<number[]>([]);
   const [compositeImage, setCompositeImage] = useState<string | null>(null);
+  const [preparedPhotoUrl, setPreparedPhotoUrl] = useState<string | null>(null);
+  const [preparedGifUrl, setPreparedGifUrl] = useState<string | null>(null);
+  const [preparedExpiryDate, setPreparedExpiryDate] = useState<string | null>(null);
+  const [isPreparingComplete, setIsPreparingComplete] = useState(false);
   const [imageBaseUrl, setImageBaseUrl] = useState<string>("/static/images");
   const [printSettings, setPrintSettings] = useState<Record<string, string>>({});
 
@@ -96,7 +102,7 @@ function ServiceContent() {
 
   const restoreSession = () => {
     try {
-      const saved = sessionStorage.getItem("photobooth_session");
+      const saved = sessionStorage.getItem(SESSION_KEY);
       if (!saved) return;
       const s = JSON.parse(saved);
       if (s.deviceId !== deviceId) return;
@@ -115,7 +121,7 @@ function ServiceContent() {
   useEffect(() => {
     if (currentStep === "start") return;
     try {
-      sessionStorage.setItem("photobooth_session", JSON.stringify({
+      sessionStorage.setItem(SESSION_KEY, JSON.stringify({
         deviceId,
         step: currentStep,
         orderId,
@@ -211,6 +217,78 @@ function ServiceContent() {
     setIntermediateFrames((prev) => [...prev, frames || []]);
   };
 
+  const toFullUrl = (url: string) =>
+    url.startsWith("http") ? url : window.location.origin + url;
+
+  const uploadPreparedPhoto = async (dataUrl: string, frames: string[]) => {
+    const res = await fetch("/api/print/upload-image/", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ image_data: dataUrl, image_type: "photo" }),
+    });
+    const data = await res.json();
+    if (!res.ok || !data.success || !data.image_url) {
+      throw new Error(data.error || "Failed to upload photo");
+    }
+    const fullUrl = toFullUrl(data.image_url);
+    setPreparedPhotoUrl(fullUrl);
+    setPreparedExpiryDate(data.expiry_date || null);
+
+    const gifSources = frames.length >= 2 ? frames : [];
+    if (gifSources.length < 2) {
+      setPreparedGifUrl(null);
+      return;
+    }
+
+    try {
+      const gifRes = await fetch("/api/gif/create/", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ images: gifSources, duration: 500 }),
+      });
+      const gifData = await gifRes.json();
+      if (gifRes.ok && gifData.success && gifData.gif_url) {
+        setPreparedGifUrl(toFullUrl(gifData.gif_url));
+        setPreparedExpiryDate(gifData.expiry_date || data.expiry_date || null);
+      } else {
+        setPreparedGifUrl(null);
+      }
+    } catch (error) {
+      console.error("Failed to create prepared GIF:", error);
+      setPreparedGifUrl(null);
+    }
+  };
+
+  const handleSelectNext = async () => {
+    const selected = selectedPhotos.length === slotsNeeded
+      ? selectedPhotos
+      : photos.map((_, i) => i).slice(0, slotsNeeded);
+    setSelectedPhotos(selected);
+    setPreparedPhotoUrl(null);
+    setPreparedGifUrl(null);
+    setPreparedExpiryDate(null);
+    setCompositeImage(null);
+
+    const selectedPhoto = slotsNeeded === 1 ? photos[selected[0]] : null;
+    if (!selectedPhoto) {
+      goToStep("complete");
+      return;
+    }
+
+    setIsPreparingComplete(true);
+    clearIdleTimer();
+    try {
+      setCompositeImage(selectedPhoto);
+      await uploadPreparedPhoto(selectedPhoto, intermediateFrames[selected[0]] || []);
+      goToStep("complete");
+    } catch (error) {
+      console.error("Failed to prepare selected photo:", error);
+      goToStep("complete");
+    } finally {
+      setIsPreparingComplete(false);
+    }
+  };
+
   const resetAll = () => {
     setCurrentStep("start");
     setOrderId(null);
@@ -220,8 +298,12 @@ function ServiceContent() {
     setIntermediateFrames([]);
     setSelectedPhotos([]);
     setCompositeImage(null);
+    setPreparedPhotoUrl(null);
+    setPreparedGifUrl(null);
+    setPreparedExpiryDate(null);
+    setIsPreparingComplete(false);
     setStickers([]);
-    try { sessionStorage.removeItem("photobooth_session"); } catch {}
+    try { sessionStorage.removeItem(SESSION_KEY); } catch {}
   };
 
   const slotsNeeded = selectedFrame ? FRAME_INFO[selectedFrame]?.count || 1 : 1;
@@ -318,6 +400,12 @@ function ServiceContent() {
           />
         </div>
       )}
+      {isPreparingComplete && (
+        <div className="absolute inset-0 z-[100] bg-black/70 backdrop-blur-sm flex flex-col items-center justify-center">
+          <div className="w-16 h-16 border-4 border-white/20 border-t-white rounded-full animate-spin mb-6" />
+          <p className="text-white text-2xl font-bold">사진 저장 중...</p>
+        </div>
+      )}
       <FloatingElements />
       {currentStep === "start" && (
         <StartSection
@@ -388,10 +476,14 @@ function ServiceContent() {
           requiredCount={slotsNeeded}
           selectedPhotos={selectedPhotos}
           setSelectedPhotos={setSelectedPhotos}
-          onNext={() => goToStep("complete")}
+          onNext={handleSelectNext}
           onPrev={() => {
             setPhotos([]);
             setSelectedPhotos([]);
+            setCompositeImage(null);
+            setPreparedPhotoUrl(null);
+            setPreparedGifUrl(null);
+            setPreparedExpiryDate(null);
             goToStep("camera");
           }}
         />
@@ -408,6 +500,9 @@ function ServiceContent() {
           setCompositeImage={setCompositeImage}
           intermediateFrames={intermediateFrames}
           printSettings={printSettings}
+          preparedPhotoUrl={preparedPhotoUrl}
+          preparedGifUrl={preparedGifUrl}
+          preparedExpiryDate={preparedExpiryDate}
           onRestart={resetAll}
         />
       )}

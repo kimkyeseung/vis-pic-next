@@ -60,7 +60,9 @@ export function loadImage(src: string): Promise<HTMLImageElement> {
 export function resizeForGif(src: string, maxWidth: number): Promise<string> {
   return new Promise((resolve) => {
     const img = new Image();
-    img.crossOrigin = "anonymous";
+    if (!src.startsWith("data:")) {
+      img.crossOrigin = "anonymous";
+    }
     img.onload = () => {
       const scale = Math.min(1, maxWidth / img.width);
       const w = Math.round(img.width * scale);

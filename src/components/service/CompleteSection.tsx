@@ -17,6 +17,9 @@ export function CompleteSection({
   setCompositeImage,
   intermediateFrames,
   printSettings,
+  preparedPhotoUrl,
+  preparedGifUrl,
+  preparedExpiryDate,
   onRestart,
 }: {
   photos: string[];
@@ -29,12 +32,18 @@ export function CompleteSection({
   setCompositeImage: (img: string | null) => void;
   intermediateFrames: string[][];
   printSettings: Record<string, string>;
+  preparedPhotoUrl?: string | null;
+  preparedGifUrl?: string | null;
+  preparedExpiryDate?: string | null;
   onRestart: () => void;
 }) {
-  const [printStatus, setPrintStatus] = useState<"compositing" | "ready" | "printing" | "done" | "error">("compositing");
-  const [qrPhotoUrl, setQrPhotoUrl] = useState<string | null>(null);
-  const [qrGifUrl, setQrGifUrl] = useState<string | null>(null);
-  const [qrExpiryDate, setQrExpiryDate] = useState<string | null>(null);
+  const hasPreparedImage = Boolean(compositeImage && preparedPhotoUrl);
+  const [printStatus, setPrintStatus] = useState<"compositing" | "ready" | "printing" | "done" | "error">(
+    hasPreparedImage ? "ready" : "compositing",
+  );
+  const [qrPhotoUrl, setQrPhotoUrl] = useState<string | null>(preparedPhotoUrl ?? null);
+  const [qrGifUrl, setQrGifUrl] = useState<string | null>(preparedGifUrl ?? null);
+  const [qrExpiryDate, setQrExpiryDate] = useState<string | null>(preparedExpiryDate ?? null);
   const compositeRef = useRef(false);
 
   const toFullUrl = (url: string) =>
@@ -318,11 +327,26 @@ export function CompleteSection({
     // Draw photos in slots
     for (let i = 0; i < selectedPhotos.length && i < slots.length; i++) {
       const photo = photos[selectedPhotos[i]];
-      if (!photo) continue;
+      if (!photo) {
+        continue;
+      }
       const { x, y, w, h } = slots[i];
 
       try {
-        const img = await loadImage(photo);
+        // data: URL은 fetch+createImageBitmap 방식이 crossOrigin 문제 없이 더 안정적
+        let img: HTMLImageElement | ImageBitmap;
+        if (photo.startsWith("data:")) {
+          try {
+            const res = await fetch(photo);
+            const blob = await res.blob();
+            img = await createImageBitmap(blob);
+          } catch {
+            img = await loadImage(photo);
+          }
+        } else {
+          img = await loadImage(photo);
+        }
+
         ctx.save();
         roundRect(ctx, x, y, w, h, 12);
         ctx.clip();
@@ -351,12 +375,16 @@ export function CompleteSection({
 
     const dataUrl = canvas.toDataURL("image/jpeg", 0.95);
     setCompositeImage(dataUrl);
-    setPrintStatus("ready");
 
-    uploadForQR(dataUrl);
+    await uploadForQR(dataUrl);
+    setPrintStatus("ready");
   };
 
   useEffect(() => {
+    if (hasPreparedImage) {
+      setPrintStatus("ready");
+      return;
+    }
     if (!compositeRef.current) {
       compositeRef.current = true;
       createComposite();

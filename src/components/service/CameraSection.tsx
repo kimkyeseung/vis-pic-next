@@ -7,6 +7,148 @@ import { fillGradientFromCSS } from "@/lib/canvas";
 import { AVAILABLE_STICKERS } from "@/constants/stickers";
 import { useFrameSender } from "@/hooks/useSceneSync";
 
+type ConfidenceMask = {
+  getAsFloat32Array: () => Float32Array;
+};
+
+type CategoryMask = {
+  width: number;
+  height: number;
+  getAsUint8Array: () => Uint8Array;
+};
+
+type CategoryMaskSelection = {
+  category: number;
+  score: number;
+  source: "labels" | "distribution";
+};
+
+function applyCategoryMaskAlpha(
+  data: Uint8ClampedArray,
+  categoryMask: CategoryMask,
+  width: number,
+  height: number,
+  labels: string[],
+) {
+  const categories = categoryMask.getAsUint8Array();
+  const maskWidth = categoryMask.width || width;
+  const maskHeight = categoryMask.height || height;
+  const foreground = resolveForegroundCategory(categories, maskWidth, maskHeight, labels);
+
+  if (categories.length === width * height) {
+    for (let i = 0; i < categories.length; i++) {
+      data[i * 4 + 3] = categories[i] === foreground.category ? 255 : 0;
+    }
+    return foreground;
+  }
+
+  for (let y = 0; y < height; y++) {
+    const maskY = Math.min(maskHeight - 1, Math.floor((y / height) * maskHeight));
+    for (let x = 0; x < width; x++) {
+      const maskX = Math.min(maskWidth - 1, Math.floor((x / width) * maskWidth));
+      const pixelIdx = y * width + x;
+      data[pixelIdx * 4 + 3] =
+        categories[maskY * maskWidth + maskX] === foreground.category ? 255 : 0;
+    }
+  }
+
+  return foreground;
+}
+
+function resolveForegroundCategory(
+  categories: Uint8Array,
+  width: number,
+  height: number,
+  labels: string[],
+): CategoryMaskSelection {
+  const personLabelIndex = labels.findIndex((label) =>
+    /person|human|foreground|selfie/i.test(label),
+  );
+  if (personLabelIndex >= 0) {
+    return { category: personLabelIndex, score: 1, source: "labels" };
+  }
+
+  const centerCounts = new Map<number, number>();
+  const borderCounts = new Map<number, number>();
+  let centerTotal = 0;
+  let borderTotal = 0;
+
+  for (let y = 0; y < height; y++) {
+    const yr = height <= 1 ? 0 : y / (height - 1);
+    for (let x = 0; x < width; x++) {
+      const xr = width <= 1 ? 0 : x / (width - 1);
+      const category = categories[y * width + x] ?? 0;
+      const inPersonZone = xr >= 0.25 && xr <= 0.75 && yr >= 0.15 && yr <= 0.9;
+      const inBorderZone = xr <= 0.1 || xr >= 0.9 || yr <= 0.1 || yr >= 0.9;
+
+      if (inPersonZone) {
+        centerCounts.set(category, (centerCounts.get(category) ?? 0) + 1);
+        centerTotal++;
+      }
+      if (inBorderZone) {
+        borderCounts.set(category, (borderCounts.get(category) ?? 0) + 1);
+        borderTotal++;
+      }
+    }
+  }
+
+  let best = { category: 1, score: -Infinity, source: "distribution" as const };
+  const observedCategories = new Set([...centerCounts.keys(), ...borderCounts.keys()]);
+  for (const category of observedCategories) {
+    const centerRatio = (centerCounts.get(category) ?? 0) / Math.max(centerTotal, 1);
+    const borderRatio = (borderCounts.get(category) ?? 0) / Math.max(borderTotal, 1);
+    const score = centerRatio - borderRatio;
+    if (score > best.score) {
+      best = { category, score, source: "distribution" };
+    }
+  }
+
+  return best;
+}
+
+function resolvePersonMask(masks: ConfidenceMask[], width: number, height: number) {
+  if (masks.length === 1) {
+    return { mask: masks[0].getAsFloat32Array(), inverted: false, index: 0 };
+  }
+
+  let best:
+    | { mask: Float32Array; inverted: boolean; index: number; score: number }
+    | null = null;
+
+  for (let index = 0; index < Math.min(masks.length, 2); index++) {
+    const mask = masks[index].getAsFloat32Array();
+    const centerVal = sampleMask(mask, width, height, 0.5, 0.5);
+    const upperVal = sampleMask(mask, width, height, 0.5, 0.35);
+    const cornerVal =
+      (sampleMask(mask, width, height, 0.05, 0.05) +
+        sampleMask(mask, width, height, 0.95, 0.05) +
+        sampleMask(mask, width, height, 0.05, 0.95) +
+        sampleMask(mask, width, height, 0.95, 0.95)) /
+      4;
+
+    for (const inverted of [false, true]) {
+      const fgCenter = inverted ? 1 - centerVal : centerVal;
+      const fgUpper = inverted ? 1 - upperVal : upperVal;
+      const fgCorner = inverted ? 1 - cornerVal : cornerVal;
+      const centerScore = (fgCenter + fgUpper) / 2;
+      const contrastScore = centerScore - fgCorner;
+      const score = contrastScore + centerScore * 0.15;
+
+      if (!best || score > best.score) {
+        best = { mask, inverted, index, score };
+      }
+    }
+  }
+
+  return best ?? { mask: masks[0].getAsFloat32Array(), inverted: false, index: 0 };
+}
+
+function sampleMask(mask: Float32Array, width: number, height: number, xRatio: number, yRatio: number) {
+  const x = Math.max(0, Math.min(width - 1, Math.round((width - 1) * xRatio)));
+  const y = Math.max(0, Math.min(height - 1, Math.round((height - 1) * yRatio)));
+  return mask[y * width + x] ?? 0;
+}
+
 export function CameraSection({
   config,
   photos,
@@ -123,6 +265,7 @@ export function CameraSection({
               "https://storage.googleapis.com/mediapipe-models/image_segmenter/selfie_segmenter_landscape/float16/latest/selfie_segmenter_landscape.tflite",
           },
           runningMode: "VIDEO",
+          outputCategoryMask: true,
           outputConfidenceMasks: true,
         });
         if (cancelled) return;
@@ -266,14 +409,34 @@ export function CameraSection({
       if (bgRemovalMode === "mediapipe" && segmenterRef.current) {
         try {
           const result = segmenterRef.current.segmentForVideo(video, performance.now());
-          const masks = result.confidenceMasks;
-          if (masks && masks.length > 0) {
-            const personIdx = masks.length > 1 ? 1 : 0;
-            const mask = masks[personIdx].getAsFloat32Array();
+          const categoryMask = result.categoryMask as CategoryMask | undefined;
+          const masks = result.confidenceMasks as ConfidenceMask[] | undefined;
+          if (categoryMask || (masks && masks.length > 0)) {
+            const debugWindow = window as Window & { __MEDIA_PIPE_MASK_LOGGED__?: boolean };
             const imageData = offCtx.getImageData(0, 0, w, h);
             const data = imageData.data;
-            for (let i = 0; i < mask.length; i++) {
-              data[i * 4 + 3] = Math.round(mask[i] * 255);
+            if (categoryMask) {
+              const labels = segmenterRef.current.getLabels?.() ?? [];
+              const foreground = applyCategoryMaskAlpha(data, categoryMask, w, h, labels);
+              if (process.env.NODE_ENV === "development" && !debugWindow.__MEDIA_PIPE_MASK_LOGGED__) {
+                debugWindow.__MEDIA_PIPE_MASK_LOGGED__ = true;
+                console.warn("[MediaPipe] using category mask", {
+                  width: categoryMask.width,
+                  height: categoryMask.height,
+                  labels,
+                  foreground,
+                });
+              }
+            } else if (masks) {
+              const { mask: rawMask, inverted, index } = resolvePersonMask(masks, w, h);
+              if (process.env.NODE_ENV === "development" && !debugWindow.__MEDIA_PIPE_MASK_LOGGED__) {
+                debugWindow.__MEDIA_PIPE_MASK_LOGGED__ = true;
+                console.warn("[MediaPipe] using confidence mask fallback", { count: masks.length, index, inverted });
+              }
+              for (let i = 0; i < rawMask.length; i++) {
+                const alpha = inverted ? 1 - rawMask[i] : rawMask[i];
+                data[i * 4 + 3] = Math.round(alpha * 255);
+              }
             }
             offCtx.putImageData(imageData, 0, 0);
             processed = true;
