@@ -121,7 +121,8 @@ fn print_image(printer_name: String, image_data: String) -> Result<bool, String>
         file.write_all(&bytes).map_err(|e| e.to_string())?;
     }
 
-    let result = print_file(&printer_name, &temp_path_str);
+    let temp_path_forward = temp_path_str.replace('\\', "/");
+    let result = print_file(&printer_name, &temp_path_forward);
 
     let _ = std::fs::remove_file(&temp_path);
 
@@ -159,12 +160,19 @@ fn base64_decode(input: &str) -> Result<Vec<u8>, String> {
 fn print_file(printer_name: &str, file_path: &str) -> Result<bool, String> {
     #[cfg(target_os = "windows")]
     {
+        // Only set PrinterName when non-empty; empty string causes .NET to throw.
+        let set_printer = if printer_name.is_empty() {
+            String::new()
+        } else {
+            format!(r#"$pd.PrinterSettings.PrinterName = "{}""#, printer_name)
+        };
+
         let script = format!(
             r#"
             Add-Type -AssemblyName System.Drawing
             $img = [System.Drawing.Image]::FromFile("{}")
             $pd = New-Object System.Drawing.Printing.PrintDocument
-            $pd.PrinterSettings.PrinterName = "{}"
+            {}
             $pd.add_PrintPage({{
                 param($sender, $e)
                 $e.Graphics.DrawImage($img, $e.MarginBounds)
@@ -172,8 +180,8 @@ fn print_file(printer_name: &str, file_path: &str) -> Result<bool, String> {
             $pd.Print()
             $img.Dispose()
             "#,
-            file_path.replace("\\", "\\\\"),
-            printer_name
+            file_path,
+            set_printer
         );
 
         let output = Command::new("powershell")
@@ -334,4 +342,55 @@ pub fn run() {
         })
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn base64_decode_hello() {
+        let decoded = base64_decode("SGVsbG8=").unwrap();
+        assert_eq!(decoded, b"Hello");
+    }
+
+    #[test]
+    fn base64_decode_empty() {
+        let decoded = base64_decode("").unwrap();
+        assert!(decoded.is_empty());
+    }
+
+    #[test]
+    fn base64_decode_ignores_whitespace() {
+        // Base64 chunks with embedded newlines (as received from JS canvas.toDataURL)
+        let encoded = "SGVs\nbG8=";
+        let decoded = base64_decode(encoded).unwrap();
+        assert_eq!(decoded, b"Hello");
+    }
+
+    #[test]
+    fn base64_decode_invalid_char_returns_err() {
+        let result = base64_decode("SGVsbG8!"); // '!' is not valid base64
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn path_forward_slash_has_no_backslash() {
+        let win_path = r"C:\Users\test\AppData\Local\Temp\arpic_print_1234.jpg";
+        let converted = win_path.replace('\\', "/");
+        assert!(!converted.contains('\\'));
+        assert_eq!(converted, "C:/Users/test/AppData/Local/Temp/arpic_print_1234.jpg");
+    }
+
+    #[test]
+    fn old_double_escape_produces_invalid_path() {
+        // This documents the previous bug: replacing \ with \\ created C:\\Users\\...
+        // which PowerShell passes as a literal double-backslash path to .NET — invalid.
+        let win_path = r"C:\Users\file.jpg";
+        let buggy = win_path.replace('\\', "\\\\");
+        assert!(buggy.contains("\\\\"), "old code produced double backslashes");
+        // Fixed path has neither double backslashes nor any backslash
+        let fixed = win_path.replace('\\', "/");
+        assert!(!fixed.contains('\\'));
+    }
 }
