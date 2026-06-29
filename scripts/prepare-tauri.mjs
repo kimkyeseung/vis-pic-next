@@ -1,5 +1,5 @@
 import { execSync } from "child_process";
-import { cpSync, mkdirSync, rmSync, existsSync, copyFileSync } from "fs";
+import { cpSync, mkdirSync, rmSync, existsSync, copyFileSync, writeFileSync } from "fs";
 import { join, dirname } from "path";
 import { fileURLToPath } from "url";
 
@@ -7,11 +7,11 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const SERVER_DIR = join(ROOT, "src-tauri", "server");
 
 // 1. Next.js build (prisma generate included in npm run build)
-console.log("[1/5] Building Next.js...");
+console.log("[1/6] Building Next.js...");
 execSync("npm run build", { cwd: ROOT, stdio: "inherit" });
 
 // 2. Server bundle
-console.log("[2/5] Preparing server bundle...");
+console.log("[2/6] Preparing server bundle...");
 if (existsSync(SERVER_DIR)) {
   rmSync(SERVER_DIR, { recursive: true, force: true });
 }
@@ -36,13 +36,13 @@ if (existsSync(cacheDir)) {
 }
 
 // 3. Node.js runtime
-console.log("[3/5] Copying Node.js runtime...");
+console.log("[3/6] Copying Node.js runtime...");
 const nodeExeDest = join(SERVER_DIR, "node.exe");
 copyFileSync(process.execPath, nodeExeDest);
 console.log(`  Copied ${process.execPath} (${process.version})`);
 
 // 4. Sharp native DLLs (file tracer only copies the .node file, not the companion DLLs)
-console.log("[4/5] Copying sharp native DLLs...");
+console.log("[4/6] Copying sharp native DLLs...");
 const sharpPkg = `@img/sharp-${process.platform}-${process.arch}`;
 const sharpLibSrc = join(ROOT, "node_modules", "@img", `sharp-${process.platform}-${process.arch}`, "lib");
 const sharpLibDest = join(SERVER_DIR, "node_modules", "@img", `sharp-${process.platform}-${process.arch}`, "lib");
@@ -54,7 +54,7 @@ if (existsSync(sharpLibSrc)) {
 }
 
 // 5. Environment files
-console.log("[5/5] Copying environment files...");
+console.log("[5/6] Copying environment files...");
 for (const f of [".env", ".env.local", ".env.production"]) {
   const src = join(ROOT, f);
   if (existsSync(src)) {
@@ -63,4 +63,15 @@ for (const f of [".env", ".env.local", ".env.production"]) {
   }
 }
 
-console.log("\nServer bundle ready at src-tauri/server/");
+// 6. Zip server bundle into single archive for embedding
+console.log("[6/6] Zipping server bundle...");
+const zipPath = join(ROOT, "src-tauri", "server.zip");
+if (existsSync(zipPath)) rmSync(zipPath);
+// Write a temp PS1 to avoid shell quoting issues with long paths
+const tmpPs1 = join(ROOT, "src-tauri", "_zip_tmp.ps1");
+writeFileSync(tmpPs1, `Compress-Archive -Path "${SERVER_DIR}\\*" -DestinationPath "${zipPath}" -Force\n`);
+execSync(`powershell -NoProfile -ExecutionPolicy Bypass -File "${tmpPs1}"`, { stdio: "inherit" });
+rmSync(tmpPs1);
+console.log(`  Created server.zip`);
+
+console.log("\nDone — server.zip embedded into binary at next cargo build.");

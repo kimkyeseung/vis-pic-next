@@ -55,3 +55,7 @@ next-env.d.ts
 
 # Test results
 /test-results/
+
+# Tauri build artifacts
+/src-tauri/server/
+/src-tauri/server.zip

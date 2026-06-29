@@ -1,6 +1,46 @@
 use std::process::Command;
 use tauri::Manager;
 use serde::Serialize;
+#[cfg(target_os = "windows")]
+use std::os::windows::process::CommandExt;
+
+// server.zip is created by prepare-tauri.mjs and embedded at compile time.
+// In debug builds this file may not exist, so the static is only declared for release.
+#[cfg(not(debug_assertions))]
+static SERVER_ARCHIVE: &[u8] = include_bytes!("../server.zip");
+
+/// Extracts the embedded server archive to %LOCALAPPDATA%\ar-pic\server on first run
+/// (or when the app version changes). Returns the path to the extracted server directory.
+#[cfg(not(debug_assertions))]
+fn prepare_server_dir() -> std::path::PathBuf {
+    let base = dirs::data_local_dir()
+        .expect("LOCALAPPDATA를 찾을 수 없습니다")
+        .join("ar-pic");
+    let server_dir = base.join("server");
+    let version_file = base.join(".version");
+    let current_version = env!("CARGO_PKG_VERSION");
+
+    let up_to_date = version_file.exists()
+        && std::fs::read_to_string(&version_file)
+            .unwrap_or_default()
+            .trim()
+            == current_version;
+
+    if !up_to_date {
+        if server_dir.exists() {
+            std::fs::remove_dir_all(&server_dir).ok();
+        }
+        std::fs::create_dir_all(&server_dir).expect("server 디렉터리 생성 실패");
+
+        let cursor = std::io::Cursor::new(SERVER_ARCHIVE);
+        let mut archive = zip::ZipArchive::new(cursor).expect("서버 아카이브 열기 실패");
+        archive.extract(&server_dir).expect("서버 파일 압축 해제 실패");
+
+        std::fs::write(&version_file, current_version).ok();
+    }
+
+    server_dir
+}
 
 #[derive(Serialize)]
 struct MonitorInfo {
@@ -84,6 +124,7 @@ fn get_printers() -> Result<Vec<String>, String> {
                 "-Command",
                 "Get-Printer | Select-Object -ExpandProperty Name",
             ])
+            .creation_flags(0x08000000)
             .output()
             .map_err(|e| e.to_string())?;
 
@@ -186,6 +227,7 @@ fn print_file(printer_name: &str, file_path: &str) -> Result<bool, String> {
 
         let output = Command::new("powershell")
             .args(["-Command", &script])
+            .creation_flags(0x08000000)
             .output()
             .map_err(|e| e.to_string())?;
 
@@ -217,6 +259,7 @@ fn get_cameras() -> Result<Vec<String>, String> {
                 "-Command",
                 "Get-PnpDevice -Class Camera -Status OK | Select-Object -ExpandProperty FriendlyName",
             ])
+            .creation_flags(0x08000000)
             .output()
             .map_err(|e| e.to_string())?;
 
@@ -298,34 +341,32 @@ pub fn run() {
             // 프로덕션 빌드에서만 임베디드 Next.js 서버 시작
             #[cfg(not(debug_assertions))]
             {
-                use tauri::Manager;
-
-                let exe_dir = std::env::current_exe()
-                    .expect("실행 파일 경로를 찾을 수 없습니다")
-                    .parent()
-                    .expect("실행 파일의 부모 디렉터리를 찾을 수 없습니다")
-                    .to_path_buf();
-                let server_dir = exe_dir.join("server");
-                let node_exe = server_dir.join("node.exe");
-                let server_js = server_dir.join("server.js");
-
-                let stdout_log = std::fs::File::create(exe_dir.join("server-stdout.log")).ok();
-                let stderr_log = std::fs::File::create(exe_dir.join("server-stderr.log")).ok();
-
-                let mut cmd = std::process::Command::new(&node_exe);
-                cmd.arg(&server_js)
-                    .env("PORT", "3001")
-                    .env("HOSTNAME", "127.0.0.1")
-                    .current_dir(&server_dir);
-                if let Some(f) = stdout_log { cmd.stdout(f); }
-                if let Some(f) = stderr_log { cmd.stderr(f); }
-                let _ = cmd.spawn();
-
-                // 백그라운드에서 서버 준비 대기 후 창 표시
                 let app_handle = app.handle().clone();
                 std::thread::spawn(move || {
-                    // 포트가 열릴 때까지 폴링 (최대 30초)
-                    for _ in 0..60 {
+                    // 최초 실행(또는 버전 변경) 시 embedded zip을 LOCALAPPDATA에 압축 해제
+                    let server_dir = prepare_server_dir();
+                    let node_exe = server_dir.join("node.exe");
+                    let server_js = server_dir.join("server.js");
+
+                    let log_base = dirs::data_local_dir()
+                        .unwrap_or_else(|| std::path::PathBuf::from("."))
+                        .join("ar-pic");
+                    let stdout_log = std::fs::File::create(log_base.join("server-stdout.log")).ok();
+                    let stderr_log = std::fs::File::create(log_base.join("server-stderr.log")).ok();
+
+                    let mut cmd = std::process::Command::new(&node_exe);
+                    cmd.arg(&server_js)
+                        .env("PORT", "3001")
+                        .env("HOSTNAME", "127.0.0.1")
+                        .current_dir(&server_dir);
+                    if let Some(f) = stdout_log { cmd.stdout(f); }
+                    if let Some(f) = stderr_log { cmd.stderr(f); }
+                    #[cfg(target_os = "windows")]
+                    cmd.creation_flags(0x08000000); // CREATE_NO_WINDOW
+                    let _ = cmd.spawn();
+
+                    // 포트가 열릴 때까지 폴링 (최대 60초)
+                    for _ in 0..120 {
                         std::thread::sleep(std::time::Duration::from_millis(500));
                         if std::net::TcpStream::connect("127.0.0.1:3001").is_ok() {
                             break;
