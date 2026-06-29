@@ -7,11 +7,11 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const SERVER_DIR = join(ROOT, "src-tauri", "server");
 
 // 1. Next.js build (prisma generate included in npm run build)
-console.log("[1/4] Building Next.js...");
+console.log("[1/5] Building Next.js...");
 execSync("npm run build", { cwd: ROOT, stdio: "inherit" });
 
 // 2. Server bundle
-console.log("[2/4] Preparing server bundle...");
+console.log("[2/5] Preparing server bundle...");
 if (existsSync(SERVER_DIR)) {
   rmSync(SERVER_DIR, { recursive: true, force: true });
 }
@@ -36,13 +36,25 @@ if (existsSync(cacheDir)) {
 }
 
 // 3. Node.js runtime
-console.log("[3/4] Copying Node.js runtime...");
+console.log("[3/5] Copying Node.js runtime...");
 const nodeExeDest = join(SERVER_DIR, "node.exe");
 copyFileSync(process.execPath, nodeExeDest);
 console.log(`  Copied ${process.execPath} (${process.version})`);
 
-// 4. Environment files
-console.log("[4/4] Copying environment files...");
+// 4. Sharp native DLLs (file tracer only copies the .node file, not the companion DLLs)
+console.log("[4/5] Copying sharp native DLLs...");
+const sharpPkg = `@img/sharp-${process.platform}-${process.arch}`;
+const sharpLibSrc = join(ROOT, "node_modules", "@img", `sharp-${process.platform}-${process.arch}`, "lib");
+const sharpLibDest = join(SERVER_DIR, "node_modules", "@img", `sharp-${process.platform}-${process.arch}`, "lib");
+if (existsSync(sharpLibSrc)) {
+  cpSync(sharpLibSrc, sharpLibDest, { recursive: true });
+  console.log(`  Copied ${sharpPkg}/lib`);
+} else {
+  console.warn(`  Warning: ${sharpPkg}/lib not found, skipping`);
+}
+
+// 5. Environment files
+console.log("[5/5] Copying environment files...");
 for (const f of [".env", ".env.local", ".env.production"]) {
   const src = join(ROOT, f);
   if (existsSync(src)) {
