@@ -41,6 +41,7 @@ export function CompleteSection({
   const [printStatus, setPrintStatus] = useState<"compositing" | "ready" | "printing" | "done" | "error">(
     hasPreparedImage ? "ready" : "compositing",
   );
+  const [printError, setPrintError] = useState<string | null>(null);
   const [qrPhotoUrl, setQrPhotoUrl] = useState<string | null>(preparedPhotoUrl ?? null);
   const [qrGifUrl, setQrGifUrl] = useState<string | null>(preparedGifUrl ?? null);
   const [qrExpiryDate, setQrExpiryDate] = useState<string | null>(preparedExpiryDate ?? null);
@@ -431,9 +432,13 @@ export function CompleteSection({
         const { invoke } = await import("@tauri-apps/api/core");
         const base64 = compositeImage.replace(/^data:image\/\w+;base64,/, "");
         const printerName = printSettings.PRINTER_NAME || "";
-        await invoke("print_image", { printer_name: printerName, image_data: base64 });
+        await invoke("print_image", { printerName, imageData: base64 });
+        setPrintStatus("done");
       } catch (err) {
-        console.error("Print failed:", err);
+        const msg = err instanceof Error ? err.message : String(err);
+        console.error("Print failed:", msg);
+        setPrintError(msg);
+        setPrintStatus("error");
       }
     } else {
       const style = document.createElement("style");
@@ -451,9 +456,8 @@ export function CompleteSection({
       window.print();
       document.head.removeChild(style);
       document.body.removeChild(container);
+      setPrintStatus("done");
     }
-
-    setPrintStatus("done");
   };
 
   return (
@@ -551,7 +555,10 @@ export function CompleteSection({
 
         {printStatus === "error" && (
           <>
-            <p className="text-red-400 text-xl mb-8">인쇄 중 오류가 발생했습니다</p>
+            <p className="text-red-400 text-xl mb-4">인쇄 중 오류가 발생했습니다</p>
+            {printError && (
+              <p className="text-red-300 text-sm mb-8 font-mono bg-black/40 px-4 py-2 rounded max-w-lg break-all">{printError}</p>
+            )}
             <button className="service-button nav-button" onClick={handlePrint}>
               다시 시도
             </button>
