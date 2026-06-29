@@ -4,29 +4,26 @@ import { useEffect, useRef, useState } from "react";
 import { useFrameReceiver } from "@/hooks/useSceneSync";
 
 export default function OutputPage() {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const imgRef = useRef<HTMLImageElement | null>(null);
+  const hasFrameRef = useRef(false);
   const [hasFrame, setHasFrame] = useState(false);
 
-  const imgRef = useRef<HTMLImageElement | null>(null);
-
   useFrameReceiver((dataUrl) => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    if (!imgRef.current) imgRef.current = new Image();
-    const img = imgRef.current;
-    img.onload = () => {
-      if (canvas.width !== img.naturalWidth) canvas.width = img.naturalWidth;
-      if (canvas.height !== img.naturalHeight) canvas.height = img.naturalHeight;
-      canvas.getContext("2d")!.drawImage(img, 0, 0);
-      if (!hasFrame) setHasFrame(true);
-    };
-    img.src = dataUrl;
+    if (imgRef.current) {
+      imgRef.current.src = dataUrl;
+    }
+    if (!hasFrameRef.current) {
+      hasFrameRef.current = true;
+      setHasFrame(true);
+    }
   });
 
   return (
     <div style={{ width: "100vw", height: "100vh", background: "#000", overflow: "hidden", position: "relative" }}>
-      <canvas
-        ref={canvasRef}
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        ref={imgRef}
+        alt=""
         style={{ width: "100%", height: "100%", objectFit: "contain", display: "block" }}
       />
       {!hasFrame && (

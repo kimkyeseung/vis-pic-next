@@ -4,42 +4,46 @@ import { useEffect, useRef, useCallback } from "react";
 import type { SceneState } from "@/types";
 
 const CHANNEL_NAME = "scene-sync";
-const FRAME_CHANNEL_NAME = "scene-frames";
 
 // ── 프레임 채널 (CameraSection → output 페이지) ─────────────────
+// Next.js SSE API(/api/camera-frame)를 중계 서버로 사용한다.
+// Tauri/브라우저 모두 동일하게 작동하며 BroadcastChannel/Tauri IPC 의존성이 없다.
 export function useFrameSender(enabled: boolean) {
-  const channelRef = useRef<BroadcastChannel | null>(null);
+  const channelRef = useRef<{ postMessage: (msg: { type: string; dataUrl: string }) => void } | null>(null);
 
   useEffect(() => {
     if (!enabled) {
-      channelRef.current?.close();
       channelRef.current = null;
       return;
     }
-    channelRef.current = new BroadcastChannel(FRAME_CHANNEL_NAME);
-    return () => {
-      channelRef.current?.close();
-      channelRef.current = null;
+    channelRef.current = {
+      postMessage: ({ dataUrl }) => {
+        fetch("/api/camera-frame/", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ dataUrl }),
+        }).catch(() => {});
+      },
     };
+    return () => { channelRef.current = null; };
   }, [enabled]);
 
   return channelRef;
 }
 
-export function useFrameReceiver(
-  onFrame: (dataUrl: string) => void
-) {
+export function useFrameReceiver(onFrame: (dataUrl: string) => void) {
   const onFrameRef = useRef(onFrame);
   onFrameRef.current = onFrame;
 
   useEffect(() => {
-    const channel = new BroadcastChannel(FRAME_CHANNEL_NAME);
-    channel.onmessage = (e: MessageEvent) => {
-      if (e.data?.type === "frame" && e.data.dataUrl) {
-        onFrameRef.current(e.data.dataUrl);
-      }
+    const es = new EventSource("/api/camera-frame/");
+    es.onmessage = (e: MessageEvent) => {
+      try {
+        const { dataUrl } = JSON.parse(e.data as string) as { dataUrl: string };
+        if (dataUrl) onFrameRef.current(dataUrl);
+      } catch { /* 무시 */ }
     };
-    return () => channel.close();
+    return () => es.close();
   }, []);
 }
 
