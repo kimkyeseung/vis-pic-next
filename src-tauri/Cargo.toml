@@ -26,3 +26,6 @@ tauri-plugin-log = "2"
 tauri-plugin-shell = "2"
 dirs = "5"
 zip = "2"
+
+[target.'cfg(windows)'.dependencies]
+webview2-com = "0.38.2"

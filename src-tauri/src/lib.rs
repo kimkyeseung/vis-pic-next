@@ -338,6 +338,45 @@ pub fn run() {
                 )?;
             }
 
+            // WebView2는 PermissionRequested 핸들러가 없으면 기본으로 카메라를 거부한다.
+            // 창이 숨겨진 상태에서 권한 프롬프트가 발생하면 자동 거부되어 NotFoundError가 발생하므로
+            // 핸들러를 등록해 localhost 카메라 요청을 자동 허용한다.
+            #[cfg(windows)]
+            {
+                use webview2_com::{
+                    Microsoft::Web::WebView2::Win32::{
+                        COREWEBVIEW2_PERMISSION_KIND,
+                        COREWEBVIEW2_PERMISSION_KIND_CAMERA,
+                        COREWEBVIEW2_PERMISSION_STATE_ALLOW,
+                    },
+                    PermissionRequestedEventHandler,
+                };
+                if let Some(window) = app.get_webview_window("main") {
+                    let _ = window.with_webview(|wv| {
+                        unsafe {
+                            if let Ok(wv2) = wv.controller().CoreWebView2() {
+                                let mut token = std::mem::zeroed();
+                                let _ = wv2.add_PermissionRequested(
+                                    &PermissionRequestedEventHandler::create(Box::new(
+                                        |_sender, args| {
+                                            if let Some(args) = args {
+                                                let mut kind = std::mem::zeroed::<COREWEBVIEW2_PERMISSION_KIND>();
+                                                args.PermissionKind(&mut kind)?;
+                                                if kind == COREWEBVIEW2_PERMISSION_KIND_CAMERA {
+                                                    args.SetState(COREWEBVIEW2_PERMISSION_STATE_ALLOW)?;
+                                                }
+                                            }
+                                            Ok(())
+                                        },
+                                    )),
+                                    &mut token,
+                                );
+                            }
+                        }
+                    });
+                }
+            }
+
             // 프로덕션 빌드에서만 임베디드 Next.js 서버 시작
             #[cfg(not(debug_assertions))]
             {
@@ -375,6 +414,8 @@ pub fn run() {
                     if let Some(window) = app_handle.get_webview_window("main") {
                         let _ = window.show();
                         let _ = window.set_focus();
+                        // 서버 준비 전 webview가 ERR_CONNECTION_REFUSED를 로드했을 수 있으므로 리로드
+                        let _ = window.reload();
                     }
                 });
             }
