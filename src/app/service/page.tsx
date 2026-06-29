@@ -11,6 +11,7 @@ import { PaymentSection } from "@/components/service/PaymentSection";
 import { FrameSection } from "@/components/service/FrameSection";
 import { BackgroundSection } from "@/components/service/BackgroundSection";
 import { CameraSection } from "@/components/service/CameraSection";
+import { CameraStreamer } from "@/components/service/CameraStreamer";
 import { SelectSection } from "@/components/service/SelectSection";
 import { CompleteSection } from "@/components/service/CompleteSection";
 
@@ -407,6 +408,10 @@ function ServiceContent() {
         </div>
       )}
       <FloatingElements />
+      {/* 카메라 스텝 외 구간에서 서브 화면으로 카메라 피드 송출 */}
+      {syncEnabled && currentStep !== "start" && currentStep !== "camera" && (
+        <CameraStreamer enabled />
+      )}
       {currentStep === "start" && (
         <StartSection
           onNext={handleStart}
