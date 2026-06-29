@@ -252,13 +252,21 @@ export function CameraSection({
     setSegmenterStatus("loading");
 
     async function initSegmenter() {
+      // MediaPipe WASM이 초기화 중 stdout/stderr로 찍는 내부 로그를 무시한다.
+      const noop = () => {};
+      const origLog = console.log;
+      const origInfo = console.info;
+      const origWarn = console.warn;
+      console.log = noop;
+      console.info = noop;
+      console.warn = noop;
       try {
         const { FilesetResolver, ImageSegmenter } = await import("@mediapipe/tasks-vision");
-        if (cancelled) return;
+        if (cancelled) { console.log = origLog; console.info = origInfo; console.warn = origWarn; return; }
         const vision = await FilesetResolver.forVisionTasks(
           "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.35/wasm"
         );
-        if (cancelled) return;
+        if (cancelled) { console.log = origLog; console.info = origInfo; console.warn = origWarn; return; }
         const segmenter = await ImageSegmenter.createFromOptions(vision, {
           baseOptions: {
             modelAssetPath:
@@ -268,12 +276,16 @@ export function CameraSection({
           outputCategoryMask: true,
           outputConfidenceMasks: true,
         });
-        if (cancelled) return;
+        if (cancelled) { segmenter.close(); console.log = origLog; console.info = origInfo; console.warn = origWarn; return; }
         segmenterRef.current = segmenter;
         setSegmenterStatus("ready");
       } catch (err) {
         console.error("MediaPipe initialization failed:", err);
         if (!cancelled) setSegmenterStatus("error");
+      } finally {
+        console.log = origLog;
+        console.info = origInfo;
+        console.warn = origWarn;
       }
     }
 
@@ -394,6 +406,16 @@ export function CameraSection({
         ctx.scale(-1, 1);
         ctx.drawImage(video, 0, 0, w, h);
         ctx.restore();
+
+        if (frameChannelRef.current) {
+          const now = performance.now();
+          if (now - lastFrameSentRef.current > 100) {
+            lastFrameSentRef.current = now;
+            const dataUrl = display.toDataURL("image/jpeg", 0.5);
+            frameChannelRef.current.postMessage({ type: "frame", dataUrl });
+          }
+        }
+
         animFrameRef.current = requestAnimationFrame(processFrame);
         return;
       }
@@ -412,27 +434,13 @@ export function CameraSection({
           const categoryMask = result.categoryMask as CategoryMask | undefined;
           const masks = result.confidenceMasks as ConfidenceMask[] | undefined;
           if (categoryMask || (masks && masks.length > 0)) {
-            const debugWindow = window as Window & { __MEDIA_PIPE_MASK_LOGGED__?: boolean };
             const imageData = offCtx.getImageData(0, 0, w, h);
             const data = imageData.data;
             if (categoryMask) {
               const labels = segmenterRef.current.getLabels?.() ?? [];
-              const foreground = applyCategoryMaskAlpha(data, categoryMask, w, h, labels);
-              if (process.env.NODE_ENV === "development" && !debugWindow.__MEDIA_PIPE_MASK_LOGGED__) {
-                debugWindow.__MEDIA_PIPE_MASK_LOGGED__ = true;
-                console.warn("[MediaPipe] using category mask", {
-                  width: categoryMask.width,
-                  height: categoryMask.height,
-                  labels,
-                  foreground,
-                });
-              }
+              applyCategoryMaskAlpha(data, categoryMask, w, h, labels);
             } else if (masks) {
-              const { mask: rawMask, inverted, index } = resolvePersonMask(masks, w, h);
-              if (process.env.NODE_ENV === "development" && !debugWindow.__MEDIA_PIPE_MASK_LOGGED__) {
-                debugWindow.__MEDIA_PIPE_MASK_LOGGED__ = true;
-                console.warn("[MediaPipe] using confidence mask fallback", { count: masks.length, index, inverted });
-              }
+              const { mask: rawMask, inverted } = resolvePersonMask(masks, w, h);
               for (let i = 0; i < rawMask.length; i++) {
                 const alpha = inverted ? 1 - rawMask[i] : rawMask[i];
                 data[i * 4 + 3] = Math.round(alpha * 255);
