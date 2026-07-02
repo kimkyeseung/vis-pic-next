@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import FullscreenToggle from "@/components/FullscreenToggle";
 
 export const metadata: Metadata = {
   title: "AR-pic",
@@ -22,6 +23,7 @@ export default function RootLayout({
         <meta name="theme-color" content="#2a2a2a" />
       </head>
       <body>
+        <FullscreenToggle />
         {children}
         <script
           dangerouslySetInnerHTML={{
