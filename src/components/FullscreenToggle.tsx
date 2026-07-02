@@ -5,7 +5,9 @@ import { useEffect } from "react";
 export default function FullscreenToggle() {
   useEffect(() => {
     const handleKeyDown = async (e: KeyboardEvent) => {
-      if (e.key !== "Escape") return;
+      if (e.key !== "F11") return;
+      e.preventDefault();
+      e.stopImmediatePropagation();
 
       try {
         const { getCurrentWindow } = await import("@tauri-apps/api/window");
@@ -17,8 +19,8 @@ export default function FullscreenToggle() {
       }
     };
 
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
+    window.addEventListener("keydown", handleKeyDown, { capture: true });
+    return () => window.removeEventListener("keydown", handleKeyDown, { capture: true });
   }, []);
 
   return null;

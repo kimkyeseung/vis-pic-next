@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import FullscreenToggle from "@/components/FullscreenToggle";
+import MediapipeLoader from "@/components/MediapipeLoader";
 
 export const metadata: Metadata = {
   title: "AR-pic",
@@ -20,7 +21,9 @@ export default function RootLayout({
       </head>
       <body>
         <FullscreenToggle />
-        {children}
+        <MediapipeLoader>
+          {children}
+        </MediapipeLoader>
         <script
           dangerouslySetInnerHTML={{
             __html: `if("serviceWorker"in navigator){if(location.hostname==="localhost"){navigator.serviceWorker.getRegistrations().then(function(r){r.forEach(function(s){s.unregister()})})}else{navigator.serviceWorker.register("/sw.js")}}`,

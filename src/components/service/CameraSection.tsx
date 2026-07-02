@@ -149,6 +149,8 @@ export function CameraSection({
   const [cameraError, setCameraError] = useState<string | null>(null);
   const [flash, setFlash] = useState(false);
   const [segmenterStatus, setSegmenterStatus] = useState<"idle" | "loading" | "ready" | "error">("idle");
+  const [segmenterError, setSegmenterError] = useState<string | null>(null);
+  const [cameraDeviceDiag, setCameraDeviceDiag] = useState<string | null>(null);
   const [autoTimer, setAutoTimer] = useState<number | null>(null);
   const autoTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [showStickerPicker, setShowStickerPicker] = useState(false);
@@ -221,6 +223,9 @@ export function CameraSection({
       console.info = noop;
       console.warn = noop;
       try {
+        // WASM 파일 접근 가능 여부 먼저 확인
+        const wasmCheck = await fetch("/static/mediapipe/wasm/vision_wasm_internal.wasm", { method: "HEAD" }).catch((e) => { throw new Error(`WASM fetch failed: ${e.message}`); });
+        if (!wasmCheck.ok) throw new Error(`WASM HTTP ${wasmCheck.status}: /static/mediapipe/wasm/vision_wasm_internal.wasm`);
         const { FilesetResolver, ImageSegmenter } = await import("@mediapipe/tasks-vision");
         if (cancelled) { console.log = origLog; console.info = origInfo; console.warn = origWarn; return; }
         const vision = await FilesetResolver.forVisionTasks(
@@ -241,7 +246,11 @@ export function CameraSection({
         setSegmenterStatus("ready");
       } catch (err) {
         console.error("MediaPipe initialization failed:", err);
-        if (!cancelled) setSegmenterStatus("error");
+        if (!cancelled) {
+          const msg = err instanceof Error ? `${err.name}: ${err.message}` : String(err);
+          setSegmenterError(msg);
+          setSegmenterStatus("error");
+        }
       } finally {
         console.log = origLog;
         console.info = origInfo;
@@ -297,6 +306,20 @@ export function CameraSection({
         setCameraError("카메라 권한이 거부되었습니다. 브라우저 설정에서 허용해 주세요.");
       } else if (e.name === "NotFoundError") {
         setCameraError("연결된 카메라가 없습니다.");
+        // 진단: 브라우저 레벨 장치 목록 + OS 레벨 장치 목록 수집
+        navigator.mediaDevices?.enumerateDevices().then(async (devices) => {
+          const videoInputs = devices.filter((d) => d.kind === "videoinput");
+          const isTauri = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
+          let osCameras: string[] = [];
+          if (isTauri) {
+            try {
+              const { invoke } = await import("@tauri-apps/api/core");
+              osCameras = await invoke<string[]>("get_cameras");
+            } catch { /* ignore */ }
+          }
+          const diag = `브라우저 장치: ${videoInputs.length}개 | OS 장치: ${osCameras.length > 0 ? osCameras.join(", ") : "없음"}`;
+          setCameraDeviceDiag(diag);
+        }).catch(() => {});
       } else if (e.name === "NotReadableError") {
         // 다른 컨텍스트가 아직 카메라를 점유 중 → 800ms 후 한 번 재시도
         if (!retryMs) {
@@ -775,7 +798,10 @@ export function CameraSection({
           {cameraError ? (
             <div className="absolute inset-0 flex flex-col items-center justify-center bg-gradient-to-br from-gray-700 to-gray-900">
               <span className="text-6xl mb-5 opacity-30">&#128247;</span>
-              <p className="text-white/60 mb-6">{cameraError}</p>
+              <p className="text-white/60 mb-2">{cameraError}</p>
+              <p className="text-white/40 text-xs mb-6 max-w-xs text-center min-h-[1em]">
+                {cameraDeviceDiag ?? "장치 확인 중..."}
+              </p>
               <div className="flex gap-3">
                 <button
                   className="px-6 py-3 bg-white/10 hover:bg-white/20 text-white rounded-xl transition-colors"
@@ -814,8 +840,9 @@ export function CameraSection({
             </div>
           )}
           {bgRemovalMode === "mediapipe" && segmenterStatus === "error" && (
-            <div className="absolute bottom-4 left-4 bg-red-900/80 text-white text-sm px-4 py-2 rounded-lg">
-              AI 모델 로드 실패
+            <div className="absolute bottom-4 left-4 bg-red-900/80 text-white text-sm px-4 py-2 rounded-lg max-w-xs">
+              <div>AI 모델 로드 실패</div>
+              {segmenterError && <div className="text-xs mt-1 opacity-80 break-all">{segmenterError}</div>}
             </div>
           )}
           {autoTimer !== null && countdown === null && photos.length < maxPhotos && (
