@@ -1,11 +1,14 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback, Suspense } from "react";
+import { useEffect, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
-import type { Step, BgRemovalMode, PaymentTerminalMode, DeviceConfig, BGImage, Sticker, MonitorInfo } from "@/types";
-import { FRAME_INFO } from "@/constants/frames";
 import { useSceneSyncSender } from "@/hooks/useSceneSync";
+import { useDeviceSetup } from "@/hooks/useDeviceSetup";
+import { usePhotoFlow } from "@/hooks/usePhotoFlow";
+import { useIdleTimer } from "@/hooks/useIdleTimer";
+import { useTauriMonitor } from "@/hooks/useTauriMonitor";
 import { FloatingElements } from "@/components/service/FloatingElements";
+import { CircularTimer } from "@/components/service/CircularTimer";
 import { StartSection } from "@/components/service/StartSection";
 import { PaymentSection } from "@/components/service/PaymentSection";
 import { FrameSection } from "@/components/service/FrameSection";
@@ -15,406 +18,56 @@ import { CameraStreamer } from "@/components/service/CameraStreamer";
 import { SelectSection } from "@/components/service/SelectSection";
 import { CompleteSection } from "@/components/service/CompleteSection";
 
-const DEFAULT_CONFIG: DeviceConfig = {
-  deviceId: "test",
-  deviceName: "테스트 장치",
-  paymentEnabled: false,
-  paymentAmount: 1000,
-  paymentTerminalMode: "payapp_lite",
-  captureSeconds: 3,
-  captureCount: 4,
-  chromakeyRgb: "0,255,0",
-  captureModes: ["1x1", "2x2"],
-  bgRemovalMode: "mediapipe",
-  idleTimeoutSeconds: 30,
-  cameraAutoTimerSeconds: 60,
-};
-
-const SESSION_KEY = "photobooth_session_v2";
-
 function ServiceContent() {
   const searchParams = useSearchParams();
   const deviceId = searchParams.get("device") || "test";
 
-  const [currentStep, setCurrentStep] = useState<Step>("start");
-  const [config, setConfig] = useState<DeviceConfig>(DEFAULT_CONFIG);
-  const [orderId, setOrderId] = useState<string | null>(null);
-  const [selectedFrame, setSelectedFrame] = useState<string | null>(null);
-  const [selectedBackground, setSelectedBackground] = useState<number | null>(null);
-  const [backgroundImages, setBackgroundImages] = useState<BGImage[]>([]);
-  const [photos, setPhotos] = useState<string[]>([]);
-  const [stickers, setStickers] = useState<Sticker[]>([]);
-  const [monitors, setMonitors] = useState<MonitorInfo[]>([]);
-  const [syncEnabled, setSyncEnabled] = useState(false);
-  const [selectedMonitorIndex, setSelectedMonitorIndex] = useState<number | null>(null);
+  const { config, backgroundImages, imageBaseUrl, printSettings } = useDeviceSetup(deviceId);
+  const flow = usePhotoFlow(deviceId, config);
+  const { monitors, syncEnabled, setSyncEnabled, selectedMonitorIndex, setSelectedMonitorIndex } = useTauriMonitor();
   const broadcastScene = useSceneSyncSender(syncEnabled);
-  const [intermediateFrames, setIntermediateFrames] = useState<string[][]>([]);
-  const [selectedPhotos, setSelectedPhotos] = useState<number[]>([]);
-  const [compositeImage, setCompositeImage] = useState<string | null>(null);
-  const [preparedPhotoUrl, setPreparedPhotoUrl] = useState<string | null>(null);
-  const [preparedGifUrl, setPreparedGifUrl] = useState<string | null>(null);
-  const [preparedExpiryDate, setPreparedExpiryDate] = useState<string | null>(null);
-  const [isPreparingComplete, setIsPreparingComplete] = useState(false);
-  const [imageBaseUrl, setImageBaseUrl] = useState<string>("/static/images");
-  const [printSettings, setPrintSettings] = useState<Record<string, string>>({});
-
-  useEffect(() => {
-    loadDeviceConfig(deviceId);
-    loadBackgrounds(deviceId);
-    loadPrintSettings();
-    restoreSession();
-  }, [deviceId]);
-
-  // Tauri 환경에서 모니터 목록 조회
-  useEffect(() => {
-    const isTauri = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
-    if (!isTauri) return;
-    import("@tauri-apps/api/core").then(({ invoke }) => {
-      invoke<MonitorInfo[]>("get_monitors").then(setMonitors).catch(console.error);
-    });
-  }, []);
-
-  // 서브 모니터 출력 창 열기/닫기
-  useEffect(() => {
-    const isTauri = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
-    if (!isTauri) return;
-    import("@tauri-apps/api/core").then(({ invoke }) => {
-      if (syncEnabled && selectedMonitorIndex !== null && monitors[selectedMonitorIndex]) {
-        const m = monitors[selectedMonitorIndex];
-        invoke("open_camera_window", { x: m.x, y: m.y, width: m.width, height: m.height }).catch(console.error);
-      } else if (!syncEnabled) {
-        invoke("close_camera_window").catch(console.error);
-      }
-    });
-  }, [syncEnabled, selectedMonitorIndex, monitors]);
+  const { idleRemaining, clearIdleTimer } = useIdleTimer(
+    flow.currentStep,
+    config.idleTimeoutSeconds,
+    flow.advanceFromCurrentStep,
+  );
 
   // 씬 상태 브로드캐스트
   useEffect(() => {
     if (!syncEnabled) return;
     broadcastScene({
-      selectedBackground,
+      selectedBackground: flow.selectedBackground,
       backgroundImages,
       imageBaseUrl,
       bgRemovalMode: config.bgRemovalMode,
       chromakeyRgb: config.chromakeyRgb,
-      stickers,
+      stickers: flow.stickers,
     });
-  }, [syncEnabled, selectedBackground, backgroundImages, imageBaseUrl, config.bgRemovalMode, config.chromakeyRgb, stickers, broadcastScene]);
+  }, [syncEnabled, flow.selectedBackground, backgroundImages, imageBaseUrl, config.bgRemovalMode, config.chromakeyRgb, flow.stickers, broadcastScene]);
 
-  const restoreSession = () => {
-    try {
-      const saved = sessionStorage.getItem(SESSION_KEY);
-      if (!saved) return;
-      const s = JSON.parse(saved);
-      if (s.deviceId !== deviceId) return;
-      if (s.step) setCurrentStep(s.step);
-      if (s.orderId) setOrderId(s.orderId);
-      if (s.selectedFrame) setSelectedFrame(s.selectedFrame);
-      if (s.selectedBackground !== undefined) setSelectedBackground(s.selectedBackground);
-      if (s.photos?.length > 0) setPhotos(s.photos);
-      if (s.intermediateFrames?.length > 0) setIntermediateFrames(s.intermediateFrames);
-      if (s.selectedPhotos?.length > 0) setSelectedPhotos(s.selectedPhotos);
-    } catch {
-      // ignore parse errors
-    }
-  };
-
-  useEffect(() => {
-    if (currentStep === "start") return;
-    try {
-      sessionStorage.setItem(SESSION_KEY, JSON.stringify({
-        deviceId,
-        step: currentStep,
-        orderId,
-        selectedFrame,
-        selectedBackground,
-        photos,
-        intermediateFrames,
-        selectedPhotos,
-      }));
-    } catch {
-      // sessionStorage full or unavailable
-    }
-  }, [currentStep, deviceId, orderId, selectedFrame, selectedBackground, photos, intermediateFrames, selectedPhotos]);
-
-  const loadDeviceConfig = async (id: string) => {
-    try {
-      const res = await fetch(`/api/device/${id}/settings`);
-      if (!res.ok) return;
-      const data = await res.json();
-      const s = data.settings || {};
-
-      const captureCount = parseInt(s.CAPTURE_COUNT_UNIFORM || "4", 10) || 4;
-      const modes = (s.CAPTURE_MODES || "1x1,2x2").split(",").map((m: string) => m.trim()).filter(Boolean);
-
-      const modeRaw = s.CHROMAKEY_MODE || "mediapipe";
-      let bgRemovalMode: BgRemovalMode = "mediapipe";
-      if (modeRaw === "0" || modeRaw === "off") bgRemovalMode = "off";
-      else if (modeRaw === "1" || modeRaw === "chromakey") bgRemovalMode = "chromakey";
-      else if (modeRaw === "mediapipe") bgRemovalMode = "mediapipe";
-
-      const terminalModeRaw = s.PAYMENT_TERMINAL_MODE || "payapp_lite";
-      const paymentTerminalMode: PaymentTerminalMode =
-        terminalModeRaw === "manual" ? "manual" : "payapp_lite";
-
-      setConfig({
-        deviceId: id,
-        deviceName: data.device?.name || id,
-        paymentEnabled: s.PAYMENT_ENABLED === "1",
-        paymentAmount: parseInt(s.PAYMENT_AMOUNT || "1000", 10),
-        paymentTerminalMode,
-        captureSeconds: parseInt(s.CAPTURE_SECONDS || "3", 10),
-        captureCount,
-        chromakeyRgb: s.CHROMAKEY_RGB || "0,255,0",
-        captureModes: modes,
-        bgRemovalMode,
-        idleTimeoutSeconds: parseInt(s.IDLE_TIMEOUT_SECONDS || "30", 10) || 30,
-        cameraAutoTimerSeconds: parseInt(s.CAMERA_AUTO_TIMER || "60", 10) || 60,
-      });
-    } catch {
-      // use defaults
-    }
-  };
-
-  const loadBackgrounds = async (id: string) => {
-    try {
-      const res = await fetch(`/api/image/list/1?device_id=${id}&check_files=1`);
-      if (!res.ok) return;
-      const data = await res.json();
-      if (data.images?.length > 0) {
-        setBackgroundImages(data.images);
-      }
-      if (data.baseUrl) {
-        setImageBaseUrl(data.baseUrl);
-      }
-    } catch {
-      // use fallback
-    }
-  };
-
-  const loadPrintSettings = async () => {
-    try {
-      const res = await fetch("/api/setting");
-      if (!res.ok) return;
-      const data = await res.json();
-      if (data.settings) setPrintSettings(data.settings);
-    } catch {
-      // use defaults
-    }
-  };
-
-  const goToStep = (step: Step) => setCurrentStep(step);
-
-  const handleStart = () => {
-    if (config.paymentEnabled) {
-      goToStep("payment");
-    } else {
-      goToStep("frame");
-    }
-  };
-
-  const addPhoto = (dataUrl: string, frames?: string[]) => {
-    setPhotos((prev) => [...prev, dataUrl]);
-    setIntermediateFrames((prev) => [...prev, frames || []]);
-  };
-
-  const toFullUrl = (url: string) =>
-    url.startsWith("http") ? url : window.location.origin + url;
-
-  const uploadPreparedPhoto = async (dataUrl: string, frames: string[]) => {
-    const res = await fetch("/api/print/upload-image/", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ image_data: dataUrl, image_type: "photo" }),
-    });
-    const data = await res.json();
-    if (!res.ok || !data.success || !data.image_url) {
-      throw new Error(data.error || "Failed to upload photo");
-    }
-    const fullUrl = toFullUrl(data.image_url);
-    setPreparedPhotoUrl(fullUrl);
-    setPreparedExpiryDate(data.expiry_date || null);
-
-    const gifSources = frames.length >= 2 ? frames : [];
-    if (gifSources.length < 2) {
-      setPreparedGifUrl(null);
-      return;
-    }
-
-    try {
-      const gifRes = await fetch("/api/gif/create/", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ images: gifSources, duration: 500 }),
-      });
-      const gifData = await gifRes.json();
-      if (gifRes.ok && gifData.success && gifData.gif_url) {
-        setPreparedGifUrl(toFullUrl(gifData.gif_url));
-        setPreparedExpiryDate(gifData.expiry_date || data.expiry_date || null);
-      } else {
-        setPreparedGifUrl(null);
-      }
-    } catch (error) {
-      console.error("Failed to create prepared GIF:", error);
-      setPreparedGifUrl(null);
-    }
-  };
-
-  const handleSelectNext = async () => {
-    const selected = selectedPhotos.length === slotsNeeded
-      ? selectedPhotos
-      : photos.map((_, i) => i).slice(0, slotsNeeded);
-    setSelectedPhotos(selected);
-    setPreparedPhotoUrl(null);
-    setPreparedGifUrl(null);
-    setPreparedExpiryDate(null);
-    setCompositeImage(null);
-
-    const selectedPhoto = slotsNeeded === 1 ? photos[selected[0]] : null;
-    if (!selectedPhoto) {
-      goToStep("complete");
-      return;
-    }
-
-    setIsPreparingComplete(true);
-    clearIdleTimer();
-    try {
-      setCompositeImage(selectedPhoto);
-      await uploadPreparedPhoto(selectedPhoto, intermediateFrames[selected[0]] || []);
-      goToStep("complete");
-    } catch (error) {
-      console.error("Failed to prepare selected photo:", error);
-      goToStep("complete");
-    } finally {
-      setIsPreparingComplete(false);
-    }
-  };
-
-  const resetAll = () => {
-    setCurrentStep("start");
-    setOrderId(null);
-    setSelectedFrame(null);
-    setSelectedBackground(null);
-    setPhotos([]);
-    setIntermediateFrames([]);
-    setSelectedPhotos([]);
-    setCompositeImage(null);
-    setPreparedPhotoUrl(null);
-    setPreparedGifUrl(null);
-    setPreparedExpiryDate(null);
-    setIsPreparingComplete(false);
-    setStickers([]);
-    try { sessionStorage.removeItem(SESSION_KEY); } catch {}
-  };
-
-  const slotsNeeded = selectedFrame ? FRAME_INFO[selectedFrame]?.count || 1 : 1;
+  const { currentStep, slotsNeeded } = flow;
   const maxCaptures = slotsNeeded * config.captureCount;
-
-  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const tickRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const [idleRemaining, setIdleRemaining] = useState<number | null>(null);
-
-  const clearIdleTimer = useCallback(() => {
-    if (timerRef.current) { clearTimeout(timerRef.current); timerRef.current = null; }
-    if (tickRef.current) { clearInterval(tickRef.current); tickRef.current = null; }
-    setIdleRemaining(null);
-  }, [setIdleRemaining]);
-
-  const advanceFromCurrentStep = useCallback(() => {
-    switch (currentStep) {
-      case "start":
-        handleStart();
-        break;
-      case "payment":
-        goToStep("frame");
-        break;
-      case "frame": {
-        if (!selectedFrame) {
-          const first = config.captureModes[0];
-          if (first) setSelectedFrame(first);
-        }
-        goToStep("background");
-        break;
-      }
-      case "background":
-        if (selectedBackground === null) setSelectedBackground(-1);
-        goToStep("camera");
-        break;
-      case "select": {
-        if (selectedPhotos.length < slotsNeeded) {
-          const auto = photos.map((_, i) => i).slice(0, slotsNeeded);
-          setSelectedPhotos(auto);
-        }
-        goToStep("complete");
-        break;
-      }
-      case "complete":
-        resetAll();
-        break;
-    }
-  }, [currentStep, selectedFrame, selectedBackground, selectedPhotos, slotsNeeded, photos, config.captureModes]);
-
-  const startIdleTimer = useCallback(() => {
-    clearIdleTimer();
-    const seconds = config.idleTimeoutSeconds;
-    if (seconds <= 0) return;
-
-    const deadline = Date.now() + seconds * 1000;
-    setIdleRemaining(seconds);
-
-    tickRef.current = setInterval(() => {
-      setIdleRemaining(Math.max(0, Math.ceil((deadline - Date.now()) / 1000)));
-    }, 1000);
-
-    timerRef.current = setTimeout(() => {
-      clearIdleTimer();
-      advanceFromCurrentStep();
-    }, seconds * 1000);
-  }, [config.idleTimeoutSeconds, clearIdleTimer, advanceFromCurrentStep]);
-
-  useEffect(() => {
-    if (currentStep === "camera") {
-      clearIdleTimer();
-      return;
-    }
-    startIdleTimer();
-    return clearIdleTimer;
-  }, [currentStep, startIdleTimer, clearIdleTimer]);
-
-  const handleInteraction = useCallback(() => {
-    if (currentStep !== "camera") startIdleTimer();
-  }, [currentStep, startIdleTimer]);
-
-  const showTimer = currentStep !== "start" && currentStep !== "camera" && idleRemaining !== null && config.idleTimeoutSeconds > 0;
+  const showTimer = currentStep !== "start" && currentStep !== "camera" && currentStep !== "payment" && idleRemaining !== null && config.idleTimeoutSeconds > 0;
 
   return (
-    <div
-      className="w-full h-screen overflow-hidden relative"
-      onClick={handleInteraction}
-      onTouchStart={handleInteraction}
-    >
+    <div className="w-full h-screen overflow-hidden relative">
       {showTimer && (
-        <div className="absolute top-0 left-0 right-0 z-50 h-1 bg-black/20">
-          <div
-            className="h-full bg-white/40 transition-all duration-1000 ease-linear"
-            style={{ width: `${(idleRemaining! / config.idleTimeoutSeconds) * 100}%` }}
-          />
-        </div>
+        <CircularTimer value={idleRemaining!} total={config.idleTimeoutSeconds} testId="page-idle-timer" />
       )}
-      {isPreparingComplete && (
+      {flow.isPreparingComplete && (
         <div className="absolute inset-0 z-[100] bg-black/70 backdrop-blur-sm flex flex-col items-center justify-center">
           <div className="w-16 h-16 border-4 border-white/20 border-t-white rounded-full animate-spin mb-6" />
           <p className="text-white text-2xl font-bold">사진 저장 중...</p>
         </div>
       )}
       <FloatingElements />
-      {/* 카메라 스텝 외 구간에서 서브 화면으로 카메라 피드 송출 */}
       {syncEnabled && currentStep !== "start" && currentStep !== "camera" && (
         <CameraStreamer enabled />
       )}
+
       {currentStep === "start" && (
         <StartSection
-          onNext={handleStart}
+          onNext={flow.handleStart}
           monitors={monitors}
           syncEnabled={syncEnabled}
           selectedMonitorIndex={selectedMonitorIndex}
@@ -425,90 +78,87 @@ function ServiceContent() {
       {currentStep === "payment" && (
         <PaymentSection
           config={config}
-          orderId={orderId}
-          setOrderId={setOrderId}
-          onNext={() => goToStep("frame")}
-          onPrev={resetAll}
+          orderId={flow.orderId}
+          setOrderId={flow.setOrderId}
+          onNext={() => flow.goToStep("frame")}
+          onPrev={flow.resetAll}
         />
       )}
       {currentStep === "frame" && (
         <FrameSection
           captureModes={config.captureModes}
-          selectedFrame={selectedFrame}
-          onSelect={setSelectedFrame}
-          onNext={() => goToStep("background")}
-          onPrev={() => (config.paymentEnabled ? goToStep("payment") : resetAll())}
+          selectedFrame={flow.selectedFrame}
+          onSelect={flow.setSelectedFrame}
+          onNext={() => flow.goToStep("background")}
+          onPrev={() => (config.paymentEnabled ? flow.goToStep("payment") : flow.resetAll())}
         />
       )}
       {currentStep === "background" && (
         <BackgroundSection
           backgroundImages={backgroundImages}
-          selectedBackground={selectedBackground}
+          selectedBackground={flow.selectedBackground}
           imageBaseUrl={imageBaseUrl}
-          onSelect={setSelectedBackground}
-          onNext={() => goToStep("camera")}
-          onPrev={() => goToStep("frame")}
+          onSelect={flow.setSelectedBackground}
+          onNext={() => flow.goToStep("camera")}
+          onPrev={() => flow.goToStep("frame")}
         />
       )}
       {currentStep === "camera" && (
         <CameraSection
           config={config}
-          photos={photos}
+          photos={flow.photos}
           maxPhotos={maxCaptures}
           minPhotos={slotsNeeded}
-          selectedBackground={selectedBackground}
+          selectedBackground={flow.selectedBackground}
           backgroundImages={backgroundImages}
           imageBaseUrl={imageBaseUrl}
-          stickers={stickers}
+          stickers={flow.stickers}
           syncEnabled={syncEnabled}
-          onStickersChange={setStickers}
-          onCapture={addPhoto}
+          onStickersChange={flow.setStickers}
+          onCapture={flow.addPhoto}
           onNext={() => {
-            if (photos.length <= slotsNeeded) {
-              setSelectedPhotos(photos.map((_, i) => i));
+            if (flow.photos.length <= slotsNeeded) {
+              flow.setSelectedPhotos(flow.photos.map((_, i) => i));
             }
-            goToStep("select");
+            flow.goToStep("select");
           }}
           onPrev={() => {
-            setPhotos([]);
-            goToStep("background");
+            flow.setPhotos([]);
+            flow.goToStep("background");
           }}
         />
       )}
       {currentStep === "select" && (
         <SelectSection
-          photos={photos}
+          photos={flow.photos}
           requiredCount={slotsNeeded}
-          selectedPhotos={selectedPhotos}
-          setSelectedPhotos={setSelectedPhotos}
-          onNext={handleSelectNext}
+          selectedPhotos={flow.selectedPhotos}
+          setSelectedPhotos={flow.setSelectedPhotos}
+          onNext={() => { clearIdleTimer(); flow.handleSelectNext(); }}
           onPrev={() => {
-            setPhotos([]);
-            setSelectedPhotos([]);
-            setCompositeImage(null);
-            setPreparedPhotoUrl(null);
-            setPreparedGifUrl(null);
-            setPreparedExpiryDate(null);
-            goToStep("camera");
+            flow.setPhotos([]);
+            flow.setSelectedPhotos([]);
+            flow.setCompositeImage(null);
+            flow.goToStep("camera");
           }}
         />
       )}
       {currentStep === "complete" && (
         <CompleteSection
-          photos={photos}
-          selectedPhotos={selectedPhotos}
-          selectedFrame={selectedFrame!}
-          selectedBackground={selectedBackground}
+          photos={flow.photos}
+          selectedPhotos={flow.selectedPhotos}
+          selectedFrame={flow.selectedFrame!}
+          selectedBackground={flow.selectedBackground}
           backgroundImages={backgroundImages}
           imageBaseUrl={imageBaseUrl}
-          compositeImage={compositeImage}
-          setCompositeImage={setCompositeImage}
-          intermediateFrames={intermediateFrames}
+          compositeImage={flow.compositeImage}
+          setCompositeImage={flow.setCompositeImage}
+          intermediateFrames={flow.intermediateFrames}
           printSettings={printSettings}
-          preparedPhotoUrl={preparedPhotoUrl}
-          preparedGifUrl={preparedGifUrl}
-          preparedExpiryDate={preparedExpiryDate}
-          onRestart={resetAll}
+          preparedPhotoUrl={flow.preparedPhotoUrl}
+          preparedGifUrl={flow.preparedGifUrl}
+          preparedExpiryDate={flow.preparedExpiryDate}
+          onRestart={flow.resetAll}
         />
       )}
     </div>
