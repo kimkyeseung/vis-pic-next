@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, Suspense } from "react";
+import { FALLBACK_BACKGROUNDS } from "@/constants/frames";
 import { useSearchParams } from "next/navigation";
 import { useSceneSyncSender } from "@/hooks/useSceneSync";
 import { useDeviceSetup } from "@/hooks/useDeviceSetup";
@@ -32,20 +33,34 @@ function ServiceContent() {
     flow.advanceFromCurrentStep,
   );
 
+  const { currentStep, slotsNeeded, selectedBackground, setSelectedBackground } = flow;
+
   // 씬 상태 브로드캐스트
   useEffect(() => {
     if (!syncEnabled) return;
     broadcastScene({
-      selectedBackground: flow.selectedBackground,
+      selectedBackground,
       backgroundImages,
       imageBaseUrl,
       bgRemovalMode: config.bgRemovalMode,
       chromakeyRgb: config.chromakeyRgb,
       stickers: flow.stickers,
     });
-  }, [syncEnabled, flow.selectedBackground, backgroundImages, imageBaseUrl, config.bgRemovalMode, config.chromakeyRgb, flow.stickers, broadcastScene]);
+  }, [syncEnabled, selectedBackground, backgroundImages, imageBaseUrl, config.bgRemovalMode, config.chromakeyRgb, flow.stickers, broadcastScene]);
 
-  const { currentStep, slotsNeeded } = flow;
+  // 배경 로드 시 랜덤 자동 선택: null이면 랜덤 선택, fallback 선택 중에 DB 이미지가 로드되면 DB 이미지로 교체
+  useEffect(() => {
+    const hasDbImages = backgroundImages.length > 0;
+    const isFallbackSelected = selectedBackground !== null && selectedBackground < 0;
+
+    if (selectedBackground === null) {
+      const pool = hasDbImages ? backgroundImages : FALLBACK_BACKGROUNDS;
+      setSelectedBackground(pool[Math.floor(Math.random() * pool.length)].id);
+    } else if (isFallbackSelected && hasDbImages) {
+      setSelectedBackground(backgroundImages[Math.floor(Math.random() * backgroundImages.length)].id);
+    }
+  }, [backgroundImages, selectedBackground, setSelectedBackground]);
+
   const maxCaptures = slotsNeeded * config.captureCount;
   const showTimer = currentStep !== "start" && currentStep !== "camera" && currentStep !== "payment" && idleRemaining !== null && config.idleTimeoutSeconds > 0;
 
@@ -62,7 +77,14 @@ function ServiceContent() {
       )}
       <FloatingElements />
       {syncEnabled && currentStep !== "start" && currentStep !== "camera" && (
-        <CameraStreamer enabled />
+        <CameraStreamer
+          enabled
+          selectedBackground={selectedBackground}
+          backgroundImages={backgroundImages}
+          imageBaseUrl={imageBaseUrl}
+          bgRemovalMode={config.bgRemovalMode}
+          chromakeyRgb={config.chromakeyRgb}
+        />
       )}
 
       {currentStep === "start" && (
@@ -96,9 +118,9 @@ function ServiceContent() {
       {currentStep === "background" && (
         <BackgroundSection
           backgroundImages={backgroundImages}
-          selectedBackground={flow.selectedBackground}
+          selectedBackground={selectedBackground}
           imageBaseUrl={imageBaseUrl}
-          onSelect={flow.setSelectedBackground}
+          onSelect={setSelectedBackground}
           onNext={() => flow.goToStep("camera")}
           onPrev={() => flow.goToStep("frame")}
         />
@@ -109,7 +131,7 @@ function ServiceContent() {
           photos={flow.photos}
           maxPhotos={maxCaptures}
           minPhotos={slotsNeeded}
-          selectedBackground={flow.selectedBackground}
+          selectedBackground={selectedBackground}
           backgroundImages={backgroundImages}
           imageBaseUrl={imageBaseUrl}
           stickers={flow.stickers}
@@ -148,7 +170,7 @@ function ServiceContent() {
           photos={flow.photos}
           selectedPhotos={flow.selectedPhotos}
           selectedFrame={flow.selectedFrame!}
-          selectedBackground={flow.selectedBackground}
+          selectedBackground={selectedBackground}
           backgroundImages={backgroundImages}
           imageBaseUrl={imageBaseUrl}
           compositeImage={flow.compositeImage}
