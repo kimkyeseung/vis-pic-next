@@ -1,8 +1,118 @@
 use std::process::Command;
+use std::sync::Mutex;
 use tauri::Manager;
 use serde::Serialize;
 #[cfg(target_os = "windows")]
 use std::os::windows::process::CommandExt;
+
+struct NodeProcess(Mutex<Option<std::process::Child>>);
+
+// ── mediapipe 헬퍼 ─────────────────────────────────────────────────────────
+
+fn ar_pic_dir() -> std::path::PathBuf {
+    dirs::data_local_dir()
+        .expect("LOCALAPPDATA를 찾을 수 없습니다")
+        .join("ar-pic")
+}
+
+fn mediapipe_cache_dir() -> std::path::PathBuf {
+    ar_pic_dir().join("mediapipe")
+}
+
+fn server_mediapipe_dir() -> std::path::PathBuf {
+    ar_pic_dir().join("server").join("public").join("static").join("mediapipe")
+}
+
+fn copy_dir_all(src: &std::path::Path, dst: &std::path::Path) -> std::io::Result<()> {
+    std::fs::create_dir_all(dst)?;
+    for entry in std::fs::read_dir(src)? {
+        let entry = entry?;
+        if entry.file_type()?.is_dir() {
+            copy_dir_all(&entry.path(), &dst.join(entry.file_name()))?;
+        } else {
+            std::fs::copy(entry.path(), dst.join(entry.file_name()))?;
+        }
+    }
+    Ok(())
+}
+
+const MEDIAPIPE_VERSION: &str = "0.10.35";
+
+const MEDIAPIPE_FILES: &[(&str, &str)] = &[
+    ("wasm/vision_wasm_internal.js",          "wasm/vision_wasm_internal.js"),
+    ("wasm/vision_wasm_internal.wasm",        "wasm/vision_wasm_internal.wasm"),
+    ("wasm/vision_wasm_module_internal.js",   "wasm/vision_wasm_module_internal.js"),
+    ("wasm/vision_wasm_module_internal.wasm", "wasm/vision_wasm_module_internal.wasm"),
+    ("wasm/vision_wasm_nosimd_internal.js",   "wasm/vision_wasm_nosimd_internal.js"),
+    ("wasm/vision_wasm_nosimd_internal.wasm", "wasm/vision_wasm_nosimd_internal.wasm"),
+    ("model/selfie_multiclass_256x256.tflite", ""),  // 두 번째 필드는 미사용 (아래에서 URL 직접 구성)
+];
+
+fn mediapipe_url(rel_path: &str) -> String {
+    if rel_path.starts_with("wasm/") {
+        let file = rel_path.strip_prefix("wasm/").unwrap_or(rel_path);
+        format!("https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@{}/wasm/{}", MEDIAPIPE_VERSION, file)
+    } else {
+        // model
+        "https://storage.googleapis.com/mediapipe-models/image_segmenter/selfie_multiclass_256x256/float32/latest/selfie_multiclass_256x256.tflite".to_string()
+    }
+}
+
+fn download_file(url: &str, dest: &std::path::Path) -> Result<(), String> {
+    if dest.exists() { return Ok(()); }
+    if let Some(parent) = dest.parent() {
+        std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+    }
+    #[cfg(target_os = "windows")]
+    {
+        let script = format!(
+            "(New-Object System.Net.WebClient).DownloadFile('{}', '{}')",
+            url,
+            dest.to_string_lossy().replace('\'', "''")
+        );
+        let status = Command::new("powershell")
+            .args(["-NoProfile", "-NonInteractive", "-Command", &script])
+            .creation_flags(0x08000000)
+            .status()
+            .map_err(|e| e.to_string())?;
+        if status.success() { Ok(()) } else { Err(format!("{url} 다운로드 실패")) }
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        let _ = url;
+        Err("Windows 전용 기능입니다".to_string())
+    }
+}
+
+/// mediapipe 파일이 서버 디렉터리에 설치되어 있는지 확인
+#[tauri::command]
+fn mediapipe_is_installed() -> bool {
+    if cfg!(debug_assertions) {
+        return true; // dev 모드: Next.js dev server가 public/에서 직접 서빙
+    }
+    server_mediapipe_dir()
+        .join("wasm")
+        .join("vision_wasm_internal.wasm")
+        .exists()
+}
+
+/// mediapipe를 CDN에서 다운로드 후 서버 디렉터리에 설치
+/// 진행 상황을 "mediapipe-progress" 이벤트로 전송 { done: n, total: N }
+#[tauri::command]
+fn download_mediapipe(app: tauri::AppHandle) -> Result<(), String> {
+    use tauri::Emitter;
+    let cache = mediapipe_cache_dir();
+    let rel_paths: Vec<&str> = MEDIAPIPE_FILES.iter().map(|(p, _)| *p).collect();
+    let total = rel_paths.len();
+
+    for (i, rel_path) in rel_paths.iter().enumerate() {
+        let url = mediapipe_url(rel_path);
+        download_file(&url, &cache.join(rel_path))?;
+        let _ = app.emit("mediapipe-progress", serde_json::json!({ "done": i + 1, "total": total }));
+    }
+
+    copy_dir_all(&cache, &server_mediapipe_dir()).map_err(|e| e.to_string())
+}
 
 // server.zip is created by prepare-tauri.mjs and embedded at compile time.
 // In debug builds this file may not exist, so the static is only declared for release.
@@ -37,6 +147,15 @@ fn prepare_server_dir() -> std::path::PathBuf {
         archive.extract(&server_dir).expect("서버 파일 압축 해제 실패");
 
         std::fs::write(&version_file, current_version).ok();
+    }
+
+    // 캐시된 mediapipe가 있으면 서버 디렉터리에 복사 (오프라인 재실행 지원)
+    let mp_cache = mediapipe_cache_dir();
+    if mp_cache.exists() {
+        let mp_dest = server_dir.join("public").join("static").join("mediapipe");
+        if !mp_dest.exists() {
+            let _ = copy_dir_all(&mp_cache, &mp_dest);
+        }
     }
 
     server_dir
@@ -334,6 +453,19 @@ fn load_settings() -> Result<std::collections::HashMap<String, String>, String> 
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
+        .plugin(
+            tauri_plugin_global_shortcut::Builder::new()
+                .with_handler(|app, _shortcut, event| {
+                    use tauri_plugin_global_shortcut::ShortcutState;
+                    if event.state() == ShortcutState::Pressed {
+                        if let Some(window) = app.get_webview_window("main") {
+                            let is_fs = window.is_fullscreen().unwrap_or(false);
+                            let _ = window.set_fullscreen(!is_fs);
+                        }
+                    }
+                })
+                .build(),
+        )
         .invoke_handler(tauri::generate_handler![
             get_printers,
             print_image,
@@ -342,7 +474,9 @@ pub fn run() {
             load_settings,
             get_monitors,
             open_camera_window,
-            close_camera_window
+            close_camera_window,
+            mediapipe_is_installed,
+            download_mediapipe
         ])
         .setup(|app| {
             if cfg!(debug_assertions) {
@@ -352,6 +486,12 @@ pub fn run() {
                         .build(),
                 )?;
             }
+
+            // ESC → 전체화면 토글 (OS 레벨, WebView2 키 소비 우회)
+            use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Shortcut};
+            app.handle().global_shortcut().register(
+                Shortcut::new(None, Code::F11)
+            )?;
 
             // WebView2는 PermissionRequested 핸들러가 없으면 기본으로 카메라를 거부한다.
             // 창이 숨겨진 상태에서 권한 프롬프트가 발생하면 자동 거부되어 NotFoundError가 발생하므로
@@ -395,9 +535,9 @@ pub fn run() {
             // 프로덕션 빌드에서만 임베디드 Next.js 서버 시작
             #[cfg(not(debug_assertions))]
             {
+                app.manage(NodeProcess(Mutex::new(None)));
                 let app_handle = app.handle().clone();
                 std::thread::spawn(move || {
-                    // 최초 실행(또는 버전 변경) 시 embedded zip을 LOCALAPPDATA에 압축 해제
                     let server_dir = prepare_server_dir();
                     let node_exe = server_dir.join("node.exe");
                     let server_js = server_dir.join("server.js");
@@ -408,6 +548,17 @@ pub fn run() {
                     let stdout_log = std::fs::File::create(log_base.join("server-stdout.log")).ok();
                     let stderr_log = std::fs::File::create(log_base.join("server-stderr.log")).ok();
 
+                    // 이전 인스턴스가 3001 포트를 점유하고 있으면 종료
+                    #[cfg(target_os = "windows")]
+                    {
+                        let _ = Command::new("powershell")
+                            .args(["-NoProfile", "-NonInteractive", "-Command",
+                                "$p=(Get-NetTCPConnection -LocalPort 3001 -ErrorAction SilentlyContinue).OwningProcess; if($p){Stop-Process -Id $p -Force -ErrorAction SilentlyContinue}"])
+                            .creation_flags(0x08000000)
+                            .status();
+                        std::thread::sleep(std::time::Duration::from_millis(300));
+                    }
+
                     let mut cmd = std::process::Command::new(&node_exe);
                     cmd.arg(&server_js)
                         .env("PORT", "3001")
@@ -417,7 +568,11 @@ pub fn run() {
                     if let Some(f) = stderr_log { cmd.stderr(f); }
                     #[cfg(target_os = "windows")]
                     cmd.creation_flags(0x08000000); // CREATE_NO_WINDOW
-                    let _ = cmd.spawn();
+                    if let Ok(child) = cmd.spawn() {
+                        if let Some(state) = app_handle.try_state::<NodeProcess>() {
+                            *state.0.lock().unwrap() = Some(child);
+                        }
+                    }
 
                     // 포트가 열릴 때까지 폴링 (최대 60초)
                     for _ in 0..120 {
@@ -436,6 +591,18 @@ pub fn run() {
             }
 
             Ok(())
+        })
+        .on_window_event(|window, event| {
+            if let tauri::WindowEvent::Destroyed = event {
+                #[cfg(not(debug_assertions))]
+                if let Some(state) = window.try_state::<NodeProcess>() {
+                    if let Ok(mut guard) = state.0.lock() {
+                        if let Some(mut child) = guard.take() {
+                            let _ = child.kill();
+                        }
+                    }
+                }
+            }
         })
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
