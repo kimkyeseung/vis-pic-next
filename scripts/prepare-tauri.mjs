@@ -1,10 +1,18 @@
 import { execSync } from "child_process";
-import { cpSync, mkdirSync, rmSync, existsSync, copyFileSync, writeFileSync } from "fs";
-import { join, dirname } from "path";
+import { cpSync, mkdirSync, rmSync, existsSync, copyFileSync, writeFileSync, readdirSync } from "fs";
+import { join, dirname, sep } from "path";
 import { fileURLToPath } from "url";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const SERVER_DIR = join(ROOT, "src-tauri", "server");
+
+// 0. 이전 추출 데이터 무효화 (재실행 시 새 server.zip 압축 해제 강제)
+const localAppData = process.env.LOCALAPPDATA || join(dirname(fileURLToPath(import.meta.url)), "..");
+const versionFile = join(localAppData, "ar-pic", ".version");
+if (existsSync(versionFile)) {
+  rmSync(versionFile);
+  console.log("[0] Cleared cached version → app will re-extract on next run");
+}
 
 // 1. Next.js build (prisma generate included in npm run build)
 console.log("[1/6] Building Next.js...");
@@ -27,12 +35,37 @@ cpSync(
   { recursive: true }
 );
 
-cpSync(join(ROOT, "public"), join(SERVER_DIR, "public"), { recursive: true });
+// prints: 로컬 폴백 코드가 mkdir으로 생성하므로 통째로 제외
+// mediapipe: 앱 최초 실행 시 온라인에서 다운로드하므로 제외 (~48MB 절감)
+const EXCLUDED = [
+  join("public", "static", "prints"),
+  join("public", "static", "mediapipe"),
+];
+cpSync(join(ROOT, "public"), join(SERVER_DIR, "public"), {
+  recursive: true,
+  filter: (src) => {
+    const rel = src.slice(ROOT.length + 1);
+    return !EXCLUDED.some((dir) => rel === dir || rel.startsWith(dir + sep));
+  },
+});
 
 // Remove build cache (unnecessary for production)
 const cacheDir = join(SERVER_DIR, ".next", "cache");
 if (existsSync(cacheDir)) {
   rmSync(cacheDir, { recursive: true, force: true });
+}
+
+// Prisma 정리: 임시 파일(.tmpXXXX)과 비Windows 플랫폼 바이너리 제거
+// (빌드 후 남은 쓰레기 파일 — 각 19MB × 여러 개로 zip 크기를 급증시킴)
+const prismaClientDir = join(SERVER_DIR, "node_modules", ".prisma", "client");
+if (existsSync(prismaClientDir)) {
+  for (const entry of readdirSync(prismaClientDir)) {
+    const isTemp = /\.tmp\d+$/.test(entry);
+    const isNonWindows = /\.(so|dylib)(\.\w+)?\.node$/.test(entry);
+    if (isTemp || isNonWindows) {
+      rmSync(join(prismaClientDir, entry));
+    }
+  }
 }
 
 // 3. Node.js runtime
