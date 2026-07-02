@@ -318,7 +318,7 @@ function ServiceContent() {
     if (timerRef.current) { clearTimeout(timerRef.current); timerRef.current = null; }
     if (tickRef.current) { clearInterval(tickRef.current); tickRef.current = null; }
     setIdleRemaining(null);
-  }, []);
+  }, [setIdleRemaining]);
 
   const advanceFromCurrentStep = useCallback(() => {
     switch (currentStep) {

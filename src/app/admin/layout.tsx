@@ -177,6 +177,12 @@ function AdminLayoutInner({ children }: AdminLayoutProps) {
           </div>
           <div className="flex items-center gap-4">
             <span className="text-gray-300">{adminName}</span>
+            <Link
+              href="/"
+              className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-500 transition-colors"
+            >
+              초기화면
+            </Link>
             <button
               onClick={handleLogout}
               className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"

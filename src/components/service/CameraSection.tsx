@@ -205,13 +205,12 @@ export function CameraSection({
 
   useEffect(() => {
     if (bgRemovalMode !== "mediapipe") {
-      setSegmenterStatus("idle");
       return;
     }
     let cancelled = false;
-    setSegmenterStatus("loading");
 
     async function initSegmenter() {
+      if (!cancelled) setSegmenterStatus("loading");
       // MediaPipe WASM이 초기화 중 stdout/stderr로 찍는 내부 로그를 무시한다.
       const noop = () => {};
       const origLog = console.log;
