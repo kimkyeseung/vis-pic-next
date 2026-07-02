@@ -9,6 +9,8 @@ import { useFrameSender } from "@/hooks/useSceneSync";
 
 type ConfidenceMask = {
   getAsFloat32Array: () => Float32Array;
+  width?: number;
+  height?: number;
 };
 
 type CategoryMask = {
@@ -106,48 +108,6 @@ function resolveForegroundCategory(
   return best;
 }
 
-function resolvePersonMask(masks: ConfidenceMask[], width: number, height: number) {
-  if (masks.length === 1) {
-    return { mask: masks[0].getAsFloat32Array(), inverted: false, index: 0 };
-  }
-
-  let best:
-    | { mask: Float32Array; inverted: boolean; index: number; score: number }
-    | null = null;
-
-  for (let index = 0; index < Math.min(masks.length, 2); index++) {
-    const mask = masks[index].getAsFloat32Array();
-    const centerVal = sampleMask(mask, width, height, 0.5, 0.5);
-    const upperVal = sampleMask(mask, width, height, 0.5, 0.35);
-    const cornerVal =
-      (sampleMask(mask, width, height, 0.05, 0.05) +
-        sampleMask(mask, width, height, 0.95, 0.05) +
-        sampleMask(mask, width, height, 0.05, 0.95) +
-        sampleMask(mask, width, height, 0.95, 0.95)) /
-      4;
-
-    for (const inverted of [false, true]) {
-      const fgCenter = inverted ? 1 - centerVal : centerVal;
-      const fgUpper = inverted ? 1 - upperVal : upperVal;
-      const fgCorner = inverted ? 1 - cornerVal : cornerVal;
-      const centerScore = (fgCenter + fgUpper) / 2;
-      const contrastScore = centerScore - fgCorner;
-      const score = contrastScore + centerScore * 0.15;
-
-      if (!best || score > best.score) {
-        best = { mask, inverted, index, score };
-      }
-    }
-  }
-
-  return best ?? { mask: masks[0].getAsFloat32Array(), inverted: false, index: 0 };
-}
-
-function sampleMask(mask: Float32Array, width: number, height: number, xRatio: number, yRatio: number) {
-  const x = Math.max(0, Math.min(width - 1, Math.round((width - 1) * xRatio)));
-  const y = Math.max(0, Math.min(height - 1, Math.round((height - 1) * yRatio)));
-  return mask[y * width + x] ?? 0;
-}
 
 export function CameraSection({
   config,
@@ -270,10 +230,10 @@ export function CameraSection({
         const segmenter = await ImageSegmenter.createFromOptions(vision, {
           baseOptions: {
             modelAssetPath:
-              "https://storage.googleapis.com/mediapipe-models/image_segmenter/selfie_segmenter_landscape/float16/latest/selfie_segmenter_landscape.tflite",
+              "https://storage.googleapis.com/mediapipe-models/image_segmenter/selfie_multiclass_256x256/float32/latest/selfie_multiclass_256x256.tflite",
           },
           runningMode: "VIDEO",
-          outputCategoryMask: true,
+          outputCategoryMask: false,
           outputConfidenceMasks: true,
         });
         if (cancelled) { segmenter.close(); console.log = origLog; console.info = origInfo; console.warn = origWarn; return; }
@@ -439,11 +399,30 @@ export function CameraSection({
             if (categoryMask) {
               const labels = segmenterRef.current.getLabels?.() ?? [];
               applyCategoryMaskAlpha(data, categoryMask, w, h, labels);
-            } else if (masks) {
-              const { mask: rawMask, inverted } = resolvePersonMask(masks, w, h);
-              for (let i = 0; i < rawMask.length; i++) {
-                const alpha = inverted ? 1 - rawMask[i] : rawMask[i];
-                data[i * 4 + 3] = Math.round(alpha * 255);
+            } else if (masks && masks.length > 0) {
+              // multiclass model: masks[0]=background, masks[1..N]=hair/skin/face/clothes/other
+              // foreground confidence = 1 - background confidence → preserves dark clothing
+              const bgMask = masks[0].getAsFloat32Array();
+              const maskW = masks[0].width ?? w;
+              const maskH = masks[0].height ?? h;
+              const THRESH = 0.15;
+              const FEATHER = 0.35;
+              if (bgMask.length === w * h) {
+                for (let i = 0; i < bgMask.length; i++) {
+                  const fgConf = 1 - bgMask[i];
+                  const softAlpha = Math.max(0, Math.min(1, (fgConf - THRESH) / FEATHER));
+                  data[i * 4 + 3] = Math.round(softAlpha * 255);
+                }
+              } else {
+                for (let y = 0; y < h; y++) {
+                  const maskY = Math.min(maskH - 1, Math.floor((y / h) * maskH));
+                  for (let x = 0; x < w; x++) {
+                    const maskX = Math.min(maskW - 1, Math.floor((x / w) * maskW));
+                    const fgConf = 1 - (bgMask[maskY * maskW + maskX] ?? 0);
+                    const softAlpha = Math.max(0, Math.min(1, (fgConf - THRESH) / FEATHER));
+                    data[(y * w + x) * 4 + 3] = Math.round(softAlpha * 255);
+                  }
+                }
               }
             }
             offCtx.putImageData(imageData, 0, 0);

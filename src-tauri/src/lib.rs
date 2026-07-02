@@ -214,9 +214,24 @@ fn print_file(printer_name: &str, file_path: &str) -> Result<bool, String> {
             $img = [System.Drawing.Image]::FromFile("{}")
             $pd = New-Object System.Drawing.Printing.PrintDocument
             {}
+            if ($img.Width -gt $img.Height) {{
+                $pd.DefaultPageSettings.Landscape = $true
+            }}
             $pd.add_PrintPage({{
                 param($sender, $e)
-                $e.Graphics.DrawImage($img, $e.MarginBounds)
+                $bounds = $e.MarginBounds
+                $imgRatio = $img.Width / $img.Height
+                $boundsRatio = $bounds.Width / $bounds.Height
+                if ($imgRatio -gt $boundsRatio) {{
+                    $drawH = [int]($bounds.Width / $imgRatio)
+                    $drawY = $bounds.Y + [int](($bounds.Height - $drawH) / 2)
+                    $rect = New-Object System.Drawing.Rectangle($bounds.X, $drawY, $bounds.Width, $drawH)
+                }} else {{
+                    $drawW = [int]($bounds.Height * $imgRatio)
+                    $drawX = $bounds.X + [int](($bounds.Width - $drawW) / 2)
+                    $rect = New-Object System.Drawing.Rectangle($drawX, $bounds.Y, $drawW, $bounds.Height)
+                }}
+                $e.Graphics.DrawImage($img, $rect)
             }})
             $pd.Print()
             $img.Dispose()
