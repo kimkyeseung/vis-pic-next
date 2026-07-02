@@ -224,13 +224,13 @@ export function CameraSection({
         const { FilesetResolver, ImageSegmenter } = await import("@mediapipe/tasks-vision");
         if (cancelled) { console.log = origLog; console.info = origInfo; console.warn = origWarn; return; }
         const vision = await FilesetResolver.forVisionTasks(
-          "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.35/wasm"
+          "/static/mediapipe/wasm"
         );
         if (cancelled) { console.log = origLog; console.info = origInfo; console.warn = origWarn; return; }
         const segmenter = await ImageSegmenter.createFromOptions(vision, {
           baseOptions: {
             modelAssetPath:
-              "https://storage.googleapis.com/mediapipe-models/image_segmenter/selfie_multiclass_256x256/float32/latest/selfie_multiclass_256x256.tflite",
+              "/static/mediapipe/model/selfie_multiclass_256x256.tflite",
           },
           runningMode: "VIDEO",
           outputCategoryMask: false,
