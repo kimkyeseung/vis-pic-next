@@ -6,6 +6,7 @@ import { FALLBACK_BACKGROUNDS } from "@/constants/frames";
 import { fillGradientFromCSS } from "@/lib/canvas";
 import { AVAILABLE_STICKERS } from "@/constants/stickers";
 import { useFrameSender } from "@/hooks/useSceneSync";
+import { CircularTimer } from "@/components/service/CircularTimer";
 
 type ConfidenceMask = {
   getAsFloat32Array: () => Float32Array;
@@ -817,6 +818,9 @@ export function CameraSection({
               AI 모델 로드 실패
             </div>
           )}
+          {autoTimer !== null && countdown === null && photos.length < maxPhotos && (
+            <CircularTimer value={autoTimer} total={config.cameraAutoTimerSeconds} size={72} />
+          )}
           {countdown !== null && (
             <div className="absolute inset-0 flex items-center justify-center bg-black/50">
               <span className="text-[200px] font-extrabold text-white animate-countdown" key={countdown} style={{ textShadow: "0 0 60px rgba(255,255,255,0.5)" }}>
@@ -929,11 +933,6 @@ export function CameraSection({
           )}
         </div>
 
-        {autoTimer !== null && countdown === null && photos.length < maxPhotos && (
-          <div className="text-center text-gray-400 text-sm mb-4">
-            자동 촬영까지 <span className="text-white font-semibold">{autoTimer}</span>초
-          </div>
-        )}
 
         <div className="mt-auto flex flex-col gap-3">
           <button className="service-button nav-button w-full" style={{ background: "rgba(255,255,255,0.1)", color: "#fff" }} onClick={onPrev}>
