@@ -59,3 +59,9 @@ next-env.d.ts
 # Tauri build artifacts
 /src-tauri/server/
 /src-tauri/server.zip
+
+# Tauri build artifacts
+/src-tauri/server/
+/src-tauri/server.zip
+
+/docs/*.json
