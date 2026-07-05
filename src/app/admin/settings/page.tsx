@@ -10,6 +10,14 @@ interface SettingGroup {
 
 const GROUPS: SettingGroup[] = [
   {
+    key: "basic",
+    label: "기본 설정",
+    prefix: ["IDLE_"],
+    fields: [
+      { name: "IDLE_TIMEOUT_SECONDS", label: "유휴 타임아웃 (초, 기본 30)", type: "number" },
+    ],
+  },
+  {
     key: "capture",
     label: "촬영 설정",
     prefix: ["CAPTURE_", "CAMERA_", "CHROMAKEY_"],
@@ -25,15 +33,6 @@ const GROUPS: SettingGroup[] = [
       { name: "CAPTURE_SMOOTHNESS", label: "캡처 부드러움", type: "number" },
     ],
   },
-  {
-    key: "admin",
-    label: "관리자",
-    prefix: ["ADMIN_"],
-    fields: [
-      { name: "ADMIN_ID", label: "관리자 ID" },
-      { name: "ADMIN_PASSWORD", label: "관리자 비밀번호" },
-    ],
-  },
 ];
 
 export default function SettingsPage() {
@@ -41,7 +40,7 @@ export default function SettingsPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
-  const [openGroups, setOpenGroups] = useState<Set<string>>(new Set(["basic", "capture", "payment"]));
+  const [openGroups, setOpenGroups] = useState<Set<string>>(new Set(["basic", "capture"]));
 
   useEffect(() => {
     fetch("/api/setting")
@@ -92,10 +91,13 @@ export default function SettingsPage() {
       });
   };
 
-  // Keys managed in dedicated pages (print-setting) — hide from this page
-  const PRINT_SETTING_KEYS = new Set([
+  // Keys managed in dedicated pages (print-setting, payment) — hide from this page.
+  // ADMIN_*: 로그인은 AdminAccount 테이블 기반이라 미사용 레거시 키 — 노출하지 않음 (평문 비밀번호 포함)
+  const HIDDEN_KEYS = new Set([
     "PICTURE_WIDTH", "PICTURE_HEIGHT", "PRINT_BACKGROUND", "CAPTURE_MODES",
-    ...Object.keys(settings).filter((k) => k.startsWith("MODE_") || k.startsWith("PAYMENT_") || k.startsWith("PAYAPP_")),
+    ...Object.keys(settings).filter(
+      (k) => k.startsWith("MODE_") || k.startsWith("PAYMENT_") || k.startsWith("PAYAPP_") || k.startsWith("ADMIN_"),
+    ),
   ]);
 
   const assignedKeys = new Set(GROUPS.flatMap((g) => {
@@ -103,8 +105,11 @@ export default function SettingsPage() {
     return Object.keys(settings).filter((k) => g.prefix.some((p) => k.startsWith(p)));
   }));
   const otherKeys = Object.keys(settings)
-    .filter((k) => !assignedKeys.has(k) && !PRINT_SETTING_KEYS.has(k))
+    .filter((k) => !assignedKeys.has(k) && !HIDDEN_KEYS.has(k))
     .sort();
+
+  const visibleCount =
+    GROUPS.reduce((n, g) => n + getGroupSettings(g).length, 0) + otherKeys.length;
 
   if (loading) return <div className="text-gray-400">로딩중...</div>;
 
@@ -112,7 +117,7 @@ export default function SettingsPage() {
     <div className="max-w-3xl space-y-4">
       <div className="flex items-center justify-between mb-6">
         <h2 className="text-2xl font-bold text-white">전역 설정</h2>
-        <span className="text-gray-500 text-sm">{Object.keys(settings).length}개 항목</span>
+        <span className="text-gray-500 text-sm">{visibleCount}개 항목</span>
       </div>
 
       {GROUPS.map((group) => {
@@ -157,7 +162,7 @@ export default function SettingsPage() {
                         value={settings[field.name] || ""}
                         onChange={(e) => updateSetting(field.name, e.target.value)}
                         className="px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white text-sm focus:outline-none focus:border-blue-500"
-                        placeholder={field.name}
+                        placeholder="미설정 (기본값 사용)"
                       />
                     )}
                   </div>

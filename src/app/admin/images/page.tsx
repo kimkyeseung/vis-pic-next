@@ -82,10 +82,20 @@ export default function ImagesPage() {
     }
   };
 
+  const TYPE_LABELS: Record<string, string> = {
+    background: "배경",
+    image: "프레임",
+    sticker: "스티커",
+  };
+
   const getTypeLabel = (typeId: number) => {
     const type = imageTypes.find((t) => t.id === typeId);
-    return type?.name || `타입 ${typeId}`;
+    if (!type) return `타입 ${typeId}`;
+    return TYPE_LABELS[type.name] || type.name;
   };
+
+  const isVideo = (filename: string) =>
+    filename.endsWith(".mp4") || filename.endsWith(".webm");
 
   return (
     <div className="space-y-6">
@@ -110,7 +120,7 @@ export default function ImagesPage() {
                 : "bg-gray-700 text-gray-300 hover:bg-gray-600"
             }`}
           >
-            {type.name}
+            {getTypeLabel(type.id)}
           </button>
         ))}
       </div>
@@ -137,15 +147,26 @@ export default function ImagesPage() {
               className="bg-gray-800 rounded-xl overflow-hidden"
             >
               <div className="aspect-video bg-gray-700 flex items-center justify-center">
-                <img
-                  src={`${imageBaseUrl}/${image.filename}`}
-                  alt={image.name}
-                  className="w-full h-full object-cover"
-                  onError={(e) => {
-                    (e.target as HTMLImageElement).src =
-                      "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='100' viewBox='0 0 100 100'%3E%3Crect fill='%23374151' width='100' height='100'/%3E%3Ctext fill='%239CA3AF' x='50' y='55' text-anchor='middle' font-size='12'%3ENo Image%3C/text%3E%3C/svg%3E";
-                  }}
-                />
+                {isVideo(image.filename) ? (
+                  <video
+                    src={`${imageBaseUrl}/${image.filename}`}
+                    className="w-full h-full object-cover"
+                    muted
+                    loop
+                    autoPlay
+                    playsInline
+                  />
+                ) : (
+                  <img
+                    src={`${imageBaseUrl}/${image.filename}`}
+                    alt={image.name}
+                    className="w-full h-full object-cover"
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).src =
+                        "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='100' viewBox='0 0 100 100'%3E%3Crect fill='%23374151' width='100' height='100'/%3E%3Ctext fill='%239CA3AF' x='50' y='55' text-anchor='middle' font-size='12'%3ENo Image%3C/text%3E%3C/svg%3E";
+                    }}
+                  />
+                )}
               </div>
               <div className="p-4">
                 <h4 className="text-white font-medium truncate">{image.name}</h4>

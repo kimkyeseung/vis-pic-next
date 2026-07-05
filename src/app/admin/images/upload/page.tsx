@@ -96,11 +96,22 @@ export default function ImageUploadPage() {
           >
             {preview ? (
               <div className="space-y-4">
-                <img
-                  src={preview}
-                  alt="Preview"
-                  className="max-h-48 mx-auto rounded-lg"
-                />
+                {file?.type.startsWith("video/") ? (
+                  <video
+                    src={preview}
+                    className="max-h-48 mx-auto rounded-lg"
+                    muted
+                    loop
+                    autoPlay
+                    playsInline
+                  />
+                ) : (
+                  <img
+                    src={preview}
+                    alt="Preview"
+                    className="max-h-48 mx-auto rounded-lg"
+                  />
+                )}
                 <p className="text-gray-400">{file?.name}</p>
               </div>
             ) : (
@@ -146,7 +157,7 @@ export default function ImageUploadPage() {
             className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-blue-500"
           >
             <option value="1">배경 (Background)</option>
-            <option value="2">이미지 (Image)</option>
+            <option value="2">프레임 (Frame)</option>
             <option value="3">스티커 (Sticker)</option>
           </select>
           {imageType === "3" && (

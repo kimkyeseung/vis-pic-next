@@ -68,10 +68,14 @@ function AdminLayoutInner({ children }: AdminLayoutProps) {
     { href: "/admin/settings", label: "설정", icon: "⚙️" },
   ];
 
+  const pathNoSlash = pathname.replace(/\/$/, "");
   const currentLabel =
-    selectedDevice
-      ? deviceMenuItems.find((item) => pathname.replace(/\/$/, "") === item.href)?.label || selectedDevice.name
-      : "장치 관리";
+    deviceMenuItems.find((item) => pathNoSlash === item.href)?.label ??
+    (pathNoSlash === "/admin"
+      ? "대시보드"
+      : pathNoSlash.startsWith("/admin/devices")
+        ? "장치 관리"
+        : "관리자");
 
   return (
     <div className="h-screen bg-gray-900 flex overflow-hidden">

@@ -59,7 +59,12 @@ export default function PaymentPage() {
 
   return (
     <div className="max-w-2xl space-y-6">
-      <h2 className="text-2xl font-bold text-white">결제 설정</h2>
+      <div>
+        <h2 className="text-2xl font-bold text-white">결제 설정</h2>
+        <p className="mt-1 text-sm text-gray-500">
+          모든 장치에 공통 적용되는 전역 설정입니다. 장치별로 같은 키의 설정이 있으면 해당 장치에서는 그 값이 우선합니다.
+        </p>
+      </div>
 
       {/* 기본 결제 설정 */}
       <div className="p-6 bg-gray-800 rounded-xl border border-gray-700 space-y-4">
@@ -103,7 +108,7 @@ export default function PaymentPage() {
                 type="text"
                 value={settings[field.name] || ""}
                 onChange={(e) => update(field.name, e.target.value)}
-                placeholder={field.name}
+                placeholder="미설정"
                 className="px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white text-sm focus:outline-none focus:border-blue-500"
               />
             </div>
