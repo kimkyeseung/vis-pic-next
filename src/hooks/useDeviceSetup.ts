@@ -34,12 +34,23 @@ export function useDeviceSetup(deviceId: string) {
   }, [deviceId]);
 
   // 설정 계층: 하드코딩 기본값 ← 전역 설정(Setting) ← 디바이스별 설정(DeviceSetting)
-  async function loadSettings(id: string, signal: AbortSignal) {
+  // 일시적 실패 시 기본값(결제 비활성 등)으로 남지 않도록 재시도한다
+  async function loadSettings(id: string, signal: AbortSignal, attempt = 0) {
+    const MAX_RETRIES = 5;
+    const retry = () => {
+      if (signal.aborted || attempt >= MAX_RETRIES) return;
+      setTimeout(() => loadSettings(id, signal, attempt + 1), 3000);
+    };
     try {
       const [globalRes, deviceRes] = await Promise.all([
         fetch("/api/setting", { signal }).catch(() => null),
         fetch(`/api/device/${id}/settings`, { signal }).catch(() => null),
       ]);
+
+      if ((!globalRes || !globalRes.ok) && (!deviceRes || !deviceRes.ok)) {
+        retry();
+        return;
+      }
 
       const globalData = globalRes?.ok ? await globalRes.json() : {};
       const deviceData = deviceRes?.ok ? await deviceRes.json() : {};
@@ -71,20 +82,29 @@ export function useDeviceSetup(deviceId: string) {
       });
     } catch (err) {
       if ((err as Error).name === "AbortError") return;
-      // use defaults
+      retry();
     }
   }
 
-  async function loadBackgrounds(id: string, signal: AbortSignal) {
+  // 서버 기동 직후 등 일시적 실패 시 폴백 그라디언트로 남지 않도록 재시도한다
+  async function loadBackgrounds(id: string, signal: AbortSignal, attempt = 0) {
+    const MAX_RETRIES = 5;
+    const retry = () => {
+      if (signal.aborted || attempt >= MAX_RETRIES) return;
+      setTimeout(() => loadBackgrounds(id, signal, attempt + 1), 3000);
+    };
     try {
       const res = await fetch(`/api/image/list/1?device_id=${id}&check_files=1`, { signal });
-      if (!res.ok) return;
+      if (!res.ok) {
+        retry();
+        return;
+      }
       const data = await res.json();
       if (data.images?.length > 0) setBackgroundImages(data.images);
       if (data.baseUrl) setImageBaseUrl(data.baseUrl);
     } catch (err) {
       if ((err as Error).name === "AbortError") return;
-      // use fallback
+      retry();
     }
   }
 
