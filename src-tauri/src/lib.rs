@@ -58,6 +58,14 @@ fn mediapipe_url(rel_path: &str) -> String {
     }
 }
 
+/// 다운로드 중단 시 완성본처럼 보이는 파일이 남지 않도록 사용하는 임시 경로.
+/// 확장자를 교체하지 않고 뒤에 붙여 `a.js`/`a.wasm`가 충돌하지 않게 한다.
+fn download_tmp_path(dest: &std::path::Path) -> std::path::PathBuf {
+    let mut name = dest.file_name().unwrap_or_default().to_os_string();
+    name.push(".download");
+    dest.with_file_name(name)
+}
+
 fn download_file(url: &str, dest: &std::path::Path) -> Result<(), String> {
     if dest.exists() { return Ok(()); }
     if let Some(parent) = dest.parent() {
@@ -65,17 +73,24 @@ fn download_file(url: &str, dest: &std::path::Path) -> Result<(), String> {
     }
     #[cfg(target_os = "windows")]
     {
+        // 임시 파일로 받은 뒤 rename: 중단된 다운로드가 dest에 부분 파일로 남아
+        // 다음 실행에서 "이미 존재"로 스킵되는 것을 방지한다.
+        let tmp = download_tmp_path(dest);
         let script = format!(
             "(New-Object System.Net.WebClient).DownloadFile('{}', '{}')",
             url,
-            dest.to_string_lossy().replace('\'', "''")
+            tmp.to_string_lossy().replace('\'', "''")
         );
         let status = Command::new("powershell")
             .args(["-NoProfile", "-NonInteractive", "-Command", &script])
             .creation_flags(0x08000000)
             .status()
             .map_err(|e| e.to_string())?;
-        if status.success() { Ok(()) } else { Err(format!("{url} 다운로드 실패")) }
+        if !status.success() {
+            let _ = std::fs::remove_file(&tmp);
+            return Err(format!("{url} 다운로드 실패"));
+        }
+        std::fs::rename(&tmp, dest).map_err(|e| e.to_string())
     }
     #[cfg(not(target_os = "windows"))]
     {
@@ -84,16 +99,19 @@ fn download_file(url: &str, dest: &std::path::Path) -> Result<(), String> {
     }
 }
 
+/// dir 아래에 mediapipe 필수 파일(wasm + 모델)이 모두 존재하는지 확인.
+/// 일부만 있으면(다운로드 중단 등) 미설치로 간주해 다운로드 UI가 다시 뜨게 한다.
+fn mediapipe_files_complete(dir: &std::path::Path) -> bool {
+    MEDIAPIPE_FILES.iter().all(|(rel, _)| dir.join(rel).exists())
+}
+
 /// mediapipe 파일이 서버 디렉터리에 설치되어 있는지 확인
 #[tauri::command]
 fn mediapipe_is_installed() -> bool {
     if cfg!(debug_assertions) {
         return true; // dev 모드: Next.js dev server가 public/에서 직접 서빙
     }
-    server_mediapipe_dir()
-        .join("wasm")
-        .join("vision_wasm_internal.wasm")
-        .exists()
+    mediapipe_files_complete(&server_mediapipe_dir())
 }
 
 /// mediapipe를 CDN에서 다운로드 후 서버 디렉터리에 설치
@@ -150,10 +168,11 @@ fn prepare_server_dir() -> std::path::PathBuf {
     }
 
     // 캐시된 mediapipe가 있으면 서버 디렉터리에 복사 (오프라인 재실행 지원)
+    // 대상이 불완전하면(과거 부분 다운로드 등) 캐시에서 다시 채운다.
     let mp_cache = mediapipe_cache_dir();
     if mp_cache.exists() {
         let mp_dest = server_dir.join("public").join("static").join("mediapipe");
-        if !mp_dest.exists() {
+        if !mediapipe_files_complete(&mp_dest) {
             let _ = copy_dir_all(&mp_cache, &mp_dest);
         }
     }
@@ -621,6 +640,54 @@ pub fn run() {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    // ── mediapipe 설치 완전성 검사 ────────────────────────────────────
+    // 회귀 방지: 과거에는 wasm 파일 하나만 검사해서, 모델(.tflite) 다운로드가
+    // 중단된 부분 설치 상태를 "설치됨"으로 오판해 다운로드 UI가 다시 뜨지 않았다.
+
+    #[test]
+    fn empty_dir_is_not_complete() {
+        let dir = std::env::temp_dir().join("arpic_mp_test_empty");
+        let _ = std::fs::remove_dir_all(&dir);
+        assert!(!mediapipe_files_complete(&dir));
+    }
+
+    #[test]
+    fn wasm_only_partial_install_is_not_complete() {
+        // 모델 파일 없이 wasm만 있는 상태 = 과거 버그 시나리오
+        let dir = std::env::temp_dir().join("arpic_mp_test_partial");
+        let _ = std::fs::remove_dir_all(&dir);
+        for (rel, _) in MEDIAPIPE_FILES.iter().filter(|(r, _)| r.starts_with("wasm/")) {
+            let p = dir.join(rel);
+            std::fs::create_dir_all(p.parent().unwrap()).unwrap();
+            std::fs::write(&p, b"x").unwrap();
+        }
+        assert!(!mediapipe_files_complete(&dir));
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn all_files_present_is_complete() {
+        let dir = std::env::temp_dir().join("arpic_mp_test_full");
+        let _ = std::fs::remove_dir_all(&dir);
+        for (rel, _) in MEDIAPIPE_FILES {
+            let p = dir.join(rel);
+            std::fs::create_dir_all(p.parent().unwrap()).unwrap();
+            std::fs::write(&p, b"x").unwrap();
+        }
+        assert!(mediapipe_files_complete(&dir));
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn download_tmp_path_appends_suffix_without_replacing_extension() {
+        let js = download_tmp_path(std::path::Path::new("wasm/vision_wasm_internal.js"));
+        let wasm = download_tmp_path(std::path::Path::new("wasm/vision_wasm_internal.wasm"));
+        assert!(js.to_string_lossy().ends_with("vision_wasm_internal.js.download"));
+        assert!(wasm.to_string_lossy().ends_with("vision_wasm_internal.wasm.download"));
+        // 확장자만 다른 두 파일의 임시 경로가 충돌하지 않아야 한다
+        assert_ne!(js, wasm);
+    }
 
     // ── Node 서버 종료 판단 (창 파괴 이벤트) ──────────────────────────
     // 회귀 방지: 과거에는 어떤 창이든 Destroyed 시 서버를 죽여서,
