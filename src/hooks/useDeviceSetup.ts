@@ -27,19 +27,28 @@ export function useDeviceSetup(deviceId: string) {
     const controller = new AbortController();
     const { signal } = controller;
 
-    loadDeviceConfig(deviceId, signal);
+    loadSettings(deviceId, signal);
     loadBackgrounds(deviceId, signal);
-    loadPrintSettings(signal);
 
     return () => controller.abort();
   }, [deviceId]);
 
-  async function loadDeviceConfig(id: string, signal: AbortSignal) {
+  // 설정 계층: 하드코딩 기본값 ← 전역 설정(Setting) ← 디바이스별 설정(DeviceSetting)
+  async function loadSettings(id: string, signal: AbortSignal) {
     try {
-      const res = await fetch(`/api/device/${id}/settings`, { signal });
-      if (!res.ok) return;
-      const data = await res.json();
-      const s = data.settings || {};
+      const [globalRes, deviceRes] = await Promise.all([
+        fetch("/api/setting", { signal }).catch(() => null),
+        fetch(`/api/device/${id}/settings`, { signal }).catch(() => null),
+      ]);
+
+      const globalData = globalRes?.ok ? await globalRes.json() : {};
+      const deviceData = deviceRes?.ok ? await deviceRes.json() : {};
+      const s: Record<string, string> = {
+        ...(globalData.settings || {}),
+        ...(deviceData.settings || {}),
+      };
+
+      setPrintSettings(s);
 
       const captureCount = parseIntSafe(s.CAPTURE_COUNT_UNIFORM || "", 4) || 4;
       const modes = parseCaptureModes(s.CAPTURE_MODES || "1x1,2x2");
@@ -48,7 +57,7 @@ export function useDeviceSetup(deviceId: string) {
 
       setConfig({
         deviceId: id,
-        deviceName: data.device?.name || id,
+        deviceName: deviceData.device?.name || id,
         paymentEnabled: s.PAYMENT_ENABLED === "1",
         paymentAmount: parseIntSafe(s.PAYMENT_AMOUNT || "", 1000),
         paymentTerminalMode,
@@ -76,18 +85,6 @@ export function useDeviceSetup(deviceId: string) {
     } catch (err) {
       if ((err as Error).name === "AbortError") return;
       // use fallback
-    }
-  }
-
-  async function loadPrintSettings(signal: AbortSignal) {
-    try {
-      const res = await fetch("/api/setting", { signal });
-      if (!res.ok) return;
-      const data = await res.json();
-      if (data.settings) setPrintSettings(data.settings);
-    } catch (err) {
-      if ((err as Error).name === "AbortError") return;
-      // use defaults
     }
   }
 
