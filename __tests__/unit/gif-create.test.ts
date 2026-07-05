@@ -1,5 +1,11 @@
+import "dotenv/config";
 import { describe, it, expect } from "vitest";
 import sharp from "sharp";
+
+// Supabase 설정 시 API가 절대 URL(https://...supabase.co/...)을 반환하고,
+// 로컬 폴백 시에는 상대 경로(/static/prints/...)를 반환한다. 둘 다 처리.
+const toAbsoluteUrl = (base: string, url: string) =>
+  url.startsWith("http") ? url : `${base}${url}`;
 
 async function makeTestJpegBase64(
   color: { r: number; g: number; b: number },
@@ -67,7 +73,7 @@ describe("POST /api/gif/create", () => {
     expect(data.image_count).toBe(4);
 
     // Verify the GIF file is actually animated
-    const gifRes = await fetch(`${BASE}${data.gif_url}`);
+    const gifRes = await fetch(toAbsoluteUrl(BASE, data.gif_url));
     const gifBuf = Buffer.from(await gifRes.arrayBuffer());
     expect(gifBuf[0]).toBe(0x47); // 'G'
     expect(gifBuf[1]).toBe(0x49); // 'I'
@@ -117,7 +123,7 @@ describe("POST /api/print/upload-image", () => {
     });
     const uploadData = await uploadRes.json();
 
-    const fileRes = await fetch(`${BASE}${uploadData.image_url}`);
+    const fileRes = await fetch(toAbsoluteUrl(BASE, uploadData.image_url));
     expect(fileRes.status).toBe(200);
     expect(fileRes.headers.get("content-type")).toMatch(/image\/jpeg/);
   });
@@ -127,7 +133,11 @@ describe("GET /api/print/cleanup", () => {
   const BASE = "http://localhost:3000";
 
   it("returns cleanup result", async () => {
-    const res = await fetch(`${BASE}/api/print/cleanup/`);
+    // 서버에 CRON_SECRET이 설정된 환경에서는 Bearer 인증이 필요하다
+    const cronSecret = process.env.CRON_SECRET;
+    const res = await fetch(`${BASE}/api/print/cleanup/`, {
+      headers: cronSecret ? { Authorization: `Bearer ${cronSecret}` } : {},
+    });
     const data = await res.json();
 
     expect(res.status).toBe(200);
