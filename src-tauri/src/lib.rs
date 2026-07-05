@@ -475,6 +475,23 @@ fn should_shutdown_server_on_destroy(window_label: &str) -> bool {
     window_label == "main"
 }
 
+/// F11 전체화면 ↔ 창 모드 토글.
+/// 창은 borderless 1920x1080 전체화면으로 시작하므로, 전체화면만 해제하면
+/// 여전히 모니터 전체를 덮어 아무 변화가 없어 보인다. 창 모드로 나올 때는
+/// 테두리를 복원하고 크기를 줄여 중앙에 배치해 토글이 눈에 보이게 한다.
+fn toggle_fullscreen(window: &tauri::WebviewWindow) {
+    let is_fs = window.is_fullscreen().unwrap_or(false);
+    if is_fs {
+        let _ = window.set_fullscreen(false);
+        let _ = window.set_decorations(true);
+        let _ = window.set_size(tauri::LogicalSize::new(1280.0, 800.0));
+        let _ = window.center();
+    } else {
+        let _ = window.set_decorations(false);
+        let _ = window.set_fullscreen(true);
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -485,8 +502,7 @@ pub fn run() {
                     use tauri_plugin_global_shortcut::ShortcutState;
                     if event.state() == ShortcutState::Pressed {
                         if let Some(window) = app.get_webview_window("main") {
-                            let is_fs = window.is_fullscreen().unwrap_or(false);
-                            let _ = window.set_fullscreen(!is_fs);
+                            toggle_fullscreen(&window);
                         }
                     }
                 })
@@ -513,11 +529,17 @@ pub fn run() {
                 )?;
             }
 
-            // ESC → 전체화면 토글 (OS 레벨, WebView2 키 소비 우회)
+            // F11 → 전체화면 토글 (OS 레벨, WebView2 키 소비 우회)
+            // 등록 실패(다른 앱이 F11 선점 등) 시 앱을 죽이지 않고
+            // 웹뷰 keydown 리스너(FullscreenToggle.tsx)가 폴백으로 동작한다.
             use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Shortcut};
-            app.handle().global_shortcut().register(
-                Shortcut::new(None, Code::F11)
-            )?;
+            if let Err(e) = app
+                .handle()
+                .global_shortcut()
+                .register(Shortcut::new(None, Code::F11))
+            {
+                eprintln!("F11 전역 단축키 등록 실패 (웹뷰 폴백 사용): {e}");
+            }
 
             // WebView2는 PermissionRequested 핸들러가 없으면 기본으로 카메라를 거부한다.
             // 창이 숨겨진 상태에서 권한 프롬프트가 발생하면 자동 거부되어 NotFoundError가 발생하므로
