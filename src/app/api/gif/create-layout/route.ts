@@ -6,6 +6,20 @@ import { EXPIRY_DAYS, decodeBase64Image, uploadPrintFile, formatExpiryDate } fro
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const GIFEncoder = require("gif-encoder-2");
 
+/**
+ * 단색 배경 버퍼 생성. sharp({create})는 출력 포맷을 지정하지 않으면
+ * 헤더 없는 raw 픽셀을 반환해 이후 sharp(bgBuffer) 재파싱이
+ * "unsupported image format"으로 실패하므로 png로 인코딩한다.
+ */
+function solidBackground(w: number, h: number, color: string): Promise<Buffer> {
+  return sharp({
+    create: { width: w, height: h, channels: 4, background: color },
+  })
+    .ensureAlpha()
+    .png()
+    .toBuffer();
+}
+
 interface LayoutGifRequest {
   intermediate_pictures: Record<string, string[]>;
   layout_cols: number;
@@ -93,18 +107,10 @@ export async function POST(request: NextRequest) {
         const rawBg = await readFile(bgPath);
         bgBuffer = await sharp(rawBg).resize(cw, ch, { fit: "cover" }).ensureAlpha().toBuffer();
       } catch {
-        bgBuffer = await sharp({
-          create: { width: cw, height: ch, channels: 4, background: background_color },
-        })
-          .ensureAlpha()
-          .toBuffer();
+        bgBuffer = await solidBackground(cw, ch, background_color);
       }
     } else {
-      bgBuffer = await sharp({
-        create: { width: cw, height: ch, channels: 4, background: background_color },
-      })
-        .ensureAlpha()
-        .toBuffer();
+      bgBuffer = await solidBackground(cw, ch, background_color);
     }
 
     // Encode GIF
