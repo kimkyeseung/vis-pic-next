@@ -53,6 +53,13 @@ export function CompleteSection({
   const toFullUrl = (url: string) =>
     url.startsWith("http") ? url : window.location.origin + url;
 
+  // QR 더블클릭 디버깅용. 브라우저에서만 새 창이 열린다 —
+  // Tauri(WebView2)는 window.open 새 창을 차단하며, 키오스크에서
+  // 브라우저가 열리면 안 되므로 의도된 동작이다.
+  const openDebugUrl = (url: string) => {
+    window.open(url, "_blank");
+  };
+
   const resolveImageUrl = (value: string, baseUrl: string) => {
     if (!value) return "";
     if (value.startsWith("http://") || value.startsWith("https://")) return value;
@@ -445,7 +452,7 @@ export function CompleteSection({
                         <p className="text-white font-semibold mb-3">{t("complete.photoDl")}</p>
                         <div
                           className="bg-white p-3 rounded-xl cursor-pointer"
-                          onDoubleClick={() => window.open(qrPhotoUrl, "_blank")}
+                          onDoubleClick={() => openDebugUrl(qrPhotoUrl)}
                         >
                           <QRCodeSVG value={qrPhotoUrl} size={120} />
                         </div>
@@ -458,7 +465,7 @@ export function CompleteSection({
                         <p className="text-white font-semibold mb-3">{t("complete.gifDl")}</p>
                         <div
                           className="bg-white p-3 rounded-xl cursor-pointer"
-                          onDoubleClick={() => window.open(qrGifUrl, "_blank")}
+                          onDoubleClick={() => openDebugUrl(qrGifUrl)}
                         >
                           <QRCodeSVG value={qrGifUrl} size={120} />
                         </div>
