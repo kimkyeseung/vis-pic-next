@@ -1,6 +1,6 @@
 # AR-pic 프로젝트 명세서 (Project Specification)
 
-> **버전:** 0.1.0 | **앱 식별자:** net.viswave.arpic | **최종 수정:** 2026-07-05
+> **버전:** 0.1.0 | **앱 식별자:** net.viswave.arpic | **최종 수정:** 2026-07-06
 
 ---
 
@@ -29,6 +29,7 @@
 21. [환경 변수](#21-환경-변수)
 22. [빌드 시스템](#22-빌드-시스템)
 23. [관리자 패널](#23-관리자-패널)
+24. [다국어 (i18n)](#24-다국어-i18n)
 
 ---
 
@@ -47,6 +48,7 @@
 - 인화지 출력 (Windows 프린터)
 - QR코드 기반 디지털 사진 공유 (3일 만료 URL)
 - 보조 모니터 실시간 카메라 미리보기
+- 다국어 지원 (한국어/영어/일본어/중국어 — §24)
 
 ### 사용자 유형
 
@@ -185,9 +187,12 @@
 ### Step 1: START
 
 - 스플래시 화면 ("Touch to start" 애니메이션)
+- **언어 선택 버튼**: 한국어/English/日本語/中文 (§24) — 대기 화면 복귀 시 한국어로 초기화
+- 우측 상단 빌드 시각 표시 (`NEXT_PUBLIC_BUILD_DATE`, §22)
 - 운영자 설정 패널: 서브 모니터 출력 ON/OFF, 모니터 선택
 - Tauri 환경 감지 (`__TAURI_INTERNALS__` in window)
 - `useTauriMonitor` 훅으로 연결된 모니터 목록 조회
+- 이 단계부터 `CameraStreamer`가 카메라를 상시 점유(웜업)한다 (§15)
 
 ### Step 2: PAYMENT (조건부)
 
@@ -203,6 +208,8 @@
 ### Step 3: FRAME SELECT
 
 - 6종 레이아웃 그리드 표시 (`CAPTURE_MODES` 설정에 따라 필터링)
+- 카드 미리보기는 실물 인화지 비율(10×15cm, 모드별 방향)의 흰 종이 위에
+  `computePrintLayout` 폴백 배치를 축소해 그린다 (`PaperPreview`, 여백 설정값 미반영)
 - 선택 시 `slotsNeeded` (슬롯 수) 결정
 
 ### Step 4: BACKGROUND SELECT
@@ -220,6 +227,10 @@
 ### Step 5: CAMERA CAPTURE (메인 루프)
 
 - WebRTC `getUserMedia`로 카메라 스트림 획득
+- 레이아웃: 좌측 프리뷰(화면 높이 기준 최대 크기) + 우측 고정폭(320px) 컨트롤 패널
+- **프리뷰 하단 배경 썸네일 스트립**: 촬영 중 배경 즉시 변경 가능
+  (`onBackgroundSelect` → flow의 `selectedBackground` 갱신 → 프리뷰·서브 모니터 실시간 반영,
+  배경제거 `off` 모드에서는 숨김)
 - 30fps 캔버스 렌더링 루프:
   1. 영상 프레임을 캔버스에 그리기
   2. 배경 제거 적용 (mediapipe / chromakey / off)
@@ -235,7 +246,7 @@
 
 ### Step 6: SELECT
 
-- 촬영된 사진 그리드 표시
+- 촬영된 사진 그리드 표시 (촬영 원본 비율 그대로, 크롭 없음)
 - 사용자가 정확히 `slotsNeeded`장 선택
 
 ### Step 7: COMPLETE
@@ -257,7 +268,7 @@
 
 | 파일 | 역할 |
 |------|------|
-| `StartSection.tsx` | 환영 화면 + 서브 모니터 설정 패널 |
+| `StartSection.tsx` | 환영 화면 + 언어 선택 버튼 + 서브 모니터 설정 패널 |
 | `PaymentSection.tsx` | 결제 UI (manual / PayApp Lite 폴링) |
 | `FrameSection.tsx` | 프레임 레이아웃 선택 그리드 |
 | `BackgroundSection.tsx` | 배경 이미지/영상 선택기 |
@@ -265,14 +276,14 @@
 | `SelectSection.tsx` | 사진 선택 UI |
 | `CompleteSection.tsx` | 결과 출력 + QR + 인쇄 |
 | `CircularTimer.tsx` | 원형 아이들 타임아웃 카운트다운 |
-| `CameraStreamer.tsx` | 서브 모니터로 프레임 전송 (배경 합성 포함) |
+| `CameraStreamer.tsx` | 카메라 상시 웜업 + 서브 모니터 프레임 전송 (배경 합성 포함, §15) |
 | `FloatingElements.tsx` | 배경 데코레이션 애니메이션 |
 
 ### 전역 컴포넌트 (`src/components/`)
 
 | 파일 | 역할 |
 |------|------|
-| `FullscreenToggle.tsx` | F11 전체화면 토글 리스너 |
+| `FullscreenToggle.tsx` | F11 전체화면 토글 웹뷰 리스너 (전역 단축키 등록 실패 시 폴백) |
 | `MediapipeLoader.tsx` | 앱 시작 시 MediaPipe WASM 설치 확인 + 다운로드 UI |
 
 ### CameraSection 상세
@@ -492,7 +503,7 @@ useSceneSyncReceiver → BroadcastChannel.onmessage(state)   ※ 레거시
 5. `node.exe server.js` 자식 프로세스 시작 (`HOSTNAME=127.0.0.1` 바인딩)
 6. 최대 60초 대기 후 서버 준비 확인
 7. WebView2 카메라 권한 자동 허용 (localhost URL)
-8. F11 전역 단축키 등록
+8. F11 전역 단축키 등록 (실패해도 앱 시작은 계속 — 웹뷰 리스너가 폴백)
 
 ### 종료 동작
 
@@ -504,9 +515,13 @@ useSceneSyncReceiver → BroadcastChannel.onmessage(state)   ※ 레거시
 
 | 단축키 | 동작 | 구현 위치 |
 |--------|------|---------|
-| `F11` | 전체화면 ↔ 창 모드 토글 | `src/components/FullscreenToggle.tsx` (전역 레이아웃에 마운트) |
+| `F11` | 전체화면 ↔ 창 모드 토글 | 1차: Rust 전역 단축키 (`toggle_fullscreen`, lib.rs) / 폴백: `src/components/FullscreenToggle.tsx` (전역 레이아웃에 마운트) |
 
-- Tauri 환경: `window.setFullscreen(!isFullscreen)` (WebviewWindow API)
+- 창은 borderless 1920×1080 전체화면으로 시작하므로, 창 모드 전환 시
+  **테두리 복원 + 1280×800 축소 + 화면 중앙 배치**로 토글이 시각적으로 구분되게 한다
+- 전체화면 복귀 시 테두리 제거 후 `setFullscreen(true)`
+- 두 구현(Rust/웹뷰)은 동일한 동작을 수행하며, 전역 단축키가 등록되면
+  OS가 키를 소비하므로 웹뷰 리스너는 실행되지 않는다 (이중 토글 없음)
 - 브라우저 직접 실행: 동작 없음 (Tauri API 미존재)
 
 ---
@@ -685,10 +700,12 @@ interface Sticker {
 ### 아키텍처
 
 ```
-[카메라 단계 외 스텝]
-CameraStreamer (헤드리스, 메인 윈도우)
-    ↓ useFrameSender
-    ↓ 배경 합성 후 JPEG (chromakey / mediapipe / raw)
+[카메라 단계 외 모든 스텝 (대기 화면 포함)]
+CameraStreamer (헤드리스, 메인 윈도우) — 항상 마운트
+    ↓ enabled=true: 앱 진입 즉시 getUserMedia로 카메라 상시 점유 (웜업)
+    ↓ sendFrames=syncEnabled: 서브 모니터 출력이 켜진 경우에만
+    ↓   배경 합성 후 JPEG (chromakey / mediapipe / raw)
+    ↓   (전송 대상 없으면 픽셀 합성 연산 생략, 카메라만 유지)
     POST /api/camera-frame
     ↓ SSE 브로드캐스트
 Output Page (서브 모니터 윈도우)
@@ -696,11 +713,13 @@ Output Page (서브 모니터 윈도우)
     <img src={frameUrl} />  (≈100-200ms 지연)
 
 [카메라 단계 (step="camera")]
-CameraSection (메인 윈도우)
+CameraSection (메인 윈도우) — CameraStreamer는 언마운트되고 카메라 소유권 이관
     ↓ 동일 파이프라인 (배경 합성 + 스티커 포함)
     POST /api/camera-frame
     → Output Page
 
+※ 카메라를 미리 켜두므로 서브 모니터 출력을 켜는 즉시 화면이 출력된다
+(getUserMedia 초기화 지연 없음).
 ※ 배경·스티커가 합성된 프레임이 전송되므로 output 페이지에 별도 상태
 동기화가 필요 없다. (BroadcastChannel 훅은 레거시 — §7 참고)
 ```
@@ -757,6 +776,8 @@ open_camera_window(x, y, width, height)
 - 로직:
   1. 각 프레임을 `photo_width × photo_height`로 리사이징
   2. 배경 컬러/이미지가 있는 베이스 캔버스 생성
+     (단색 배경은 반드시 png로 인코딩 — `sharp({create})`를 포맷 미지정으로
+     `toBuffer()`하면 raw 픽셀이 반환되어 이후 재파싱이 실패한다)
   3. 각 애니메이션 프레임마다 모든 포지션 버퍼를 계산된 오프셋에 합성
   4. GIF 인코딩
 
@@ -972,6 +993,13 @@ npm run dev          # Next.js dev server (localhost:3000)
 npm run tauri dev    # Tauri + Next.js dev (WebView2 → localhost:3000)
 ```
 
+### 빌드 시각 표시
+
+`next.config.ts`의 `env.NEXT_PUBLIC_BUILD_DATE`에 빌드 시점(KST,
+`YYYY-MM-DD HH:mm`)이 상수로 인라인된다. 루트 페이지(`/`)와 서비스 대기
+화면(StartSection) 우측 상단에 `빌드 {시각}` 형태로 표시된다.
+dev 모드에서는 dev 서버 시작 시각이 표시된다.
+
 ### 프로덕션 빌드 파이프라인
 
 ```
@@ -1054,6 +1082,42 @@ npm run tauri:build
 
 ---
 
+## 24. 다국어 (i18n)
+
+외부 라이브러리 없이 자체 사전 + React 컨텍스트로 구현 (`src/i18n/`).
+
+### 지원 언어
+
+| 코드 | 언어 | 버튼 라벨 |
+|------|------|----------|
+| `ko` | 한국어 (기본) | 한국어 |
+| `en` | 영어 | English |
+| `ja` | 일본어 | 日本語 |
+| `zh` | 중국어 (간체) | 中文 |
+
+### 구조
+
+| 파일 | 역할 |
+|------|------|
+| `src/i18n/translations.ts` | 4개 언어 사전 (`MessageKey` 타입으로 키 누락 시 컴파일 에러), `{param}` 치환 지원 |
+| `src/i18n/LanguageContext.tsx` | `LanguageProvider` + `useLanguage()` → `{ lang, setLang, t }` |
+
+### 동작
+
+- **언어 선택**: 대기 화면(StartSection) 터치 버튼 아래 4개 버튼.
+  버튼 클릭은 화면 터치(시작)로 전파되지 않는다.
+- **초기화**: 대기 화면(`currentStep === "start"`)으로 돌아오면 다음 손님을
+  위해 한국어로 자동 리셋 (service page의 effect).
+- **적용 범위**: 손님이 보는 서비스 플로우 전체 — 대기/결제/프레임/배경/
+  촬영/선택/완료 화면과 공통 버튼(이전/다음/처음으로/다시 시도), 카메라
+  오류 메시지 (에러는 `MessageKey`로 저장해 언어 변경 시에도 재번역).
+- **비적용(한국어 유지)**: 관리자 페이지, 운영자 UI(출력 설정 패널, 빌드
+  표시), 개발용 버튼, 장치 진단 문자열.
+- 프레임 라벨(`1컷` 등)은 `frame.cut` 키 + 슬롯 수 파라미터로 생성
+  (예: en `4-Cut`, ja `4カット`, zh `4格`).
+
+---
+
 ## 부록: 주요 파일 경로 참조
 
 | 역할 | 파일 경로 |
@@ -1066,6 +1130,7 @@ npm run tauri:build
 | 사진 흐름 훅 | `src/hooks/usePhotoFlow.ts` |
 | 장면 동기화 훅 | `src/hooks/useSceneSync.ts` |
 | 인화 레이아웃 계산 | `src/lib/printLayout.ts` |
+| 다국어 사전/컨텍스트 | `src/i18n/translations.ts`, `src/i18n/LanguageContext.tsx` |
 | Tauri 백엔드 | `src-tauri/src/lib.rs` |
 | Tauri 설정 | `src-tauri/tauri.conf.json` |
 | Prisma 스키마 | `prisma/schema.prisma` |
