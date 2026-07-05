@@ -166,6 +166,12 @@ export function CameraSection({
   const dragOffsetRef = useRef<{ ox: number; oy: number }>({ ox: 0, oy: 0 });
   const overlayRef = useRef<HTMLDivElement>(null);
   const stickerImgCacheRef = useRef<Map<string, HTMLImageElement>>(new Map());
+  // 스티커는 별도 캔버스 레이어에 60fps로 그린다 — 메인 합성 루프(배경제거)에
+  // 묶이면 드래그가 세그멘테이션 처리 속도로 끊기고, stickers가 루프 effect
+  // deps에 들어가면 mousemove마다 루프가 재생성되어 버벅인다.
+  const stickerCanvasRef = useRef<HTMLCanvasElement>(null);
+  const stickersRef = useRef(stickers);
+  useEffect(() => { stickersRef.current = stickers; }, [stickers]);
   const cameraStreamRef = useRef<MediaStream | null>(null);
   const frameChannelRef = useFrameSender(syncEnabled);
   const lastFrameSentRef = useRef(0);
@@ -363,6 +369,60 @@ export function CameraSection({
     });
   }, [stickers]);
 
+  const drawStickers = useCallback((ctx: CanvasRenderingContext2D, w: number, h: number) => {
+    stickersRef.current.forEach((s) => {
+      if (s.src) {
+        const img = stickerImgCacheRef.current.get(s.src);
+        if (img) {
+          const size = Math.round(s.scale * 120);
+          ctx.drawImage(img, s.x * w - size / 2, s.y * h - size / 2, size, size);
+        }
+      } else if (s.emoji) {
+        const fontSize = Math.round(s.scale * 72);
+        ctx.font = `${fontSize}px serif`;
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText(s.emoji, s.x * w, s.y * h);
+      }
+    });
+  }, []);
+
+  // 촬영·서브 모니터 송출용: 카메라 합성 캔버스 위에 스티커 레이어를 얹은 스냅샷
+  const composeCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const snapshotWithStickers = useCallback((quality: number): string | null => {
+    const display = displayCanvasRef.current;
+    if (!display || !display.width || !display.height) return null;
+    let c = composeCanvasRef.current;
+    if (!c) {
+      c = document.createElement("canvas");
+      composeCanvasRef.current = c;
+    }
+    if (c.width !== display.width) c.width = display.width;
+    if (c.height !== display.height) c.height = display.height;
+    const ctx = c.getContext("2d")!;
+    ctx.drawImage(display, 0, 0);
+    drawStickers(ctx, c.width, c.height);
+    return c.toDataURL("image/jpeg", quality);
+  }, [drawStickers]);
+
+  // 스티커 전용 오버레이 캔버스 루프 — 메인 합성 루프와 독립적으로 60fps 렌더
+  useEffect(() => {
+    let raf = 0;
+    const tick = () => {
+      raf = requestAnimationFrame(tick);
+      const display = displayCanvasRef.current;
+      const layer = stickerCanvasRef.current;
+      if (!display || !layer || !display.width || !display.height) return;
+      if (layer.width !== display.width) layer.width = display.width;
+      if (layer.height !== display.height) layer.height = display.height;
+      const ctx = layer.getContext("2d")!;
+      ctx.clearRect(0, 0, layer.width, layer.height);
+      drawStickers(ctx, layer.width, layer.height);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [drawStickers]);
+
   useEffect(() => {
     const offscreen = document.createElement("canvas");
     const HARD = 50 * 50;
@@ -399,8 +459,8 @@ export function CameraSection({
           const now = performance.now();
           if (now - lastFrameSentRef.current > 100) {
             lastFrameSentRef.current = now;
-            const dataUrl = display.toDataURL("image/jpeg", 0.5);
-            frameChannelRef.current.postMessage({ type: "frame", dataUrl });
+            const dataUrl = snapshotWithStickers(0.5);
+            if (dataUrl) frameChannelRef.current.postMessage({ type: "frame", dataUrl });
           }
         }
 
@@ -493,30 +553,15 @@ export function CameraSection({
         ctx.restore();
       }
 
-      // 스티커 렌더링
-      stickers.forEach((s) => {
-        if (s.src) {
-          const img = stickerImgCacheRef.current.get(s.src);
-          if (img) {
-            const size = Math.round(s.scale * 120);
-            ctx.drawImage(img, s.x * w - size / 2, s.y * h - size / 2, size, size);
-          }
-        } else if (s.emoji) {
-          const fontSize = Math.round(s.scale * 72);
-          ctx.font = `${fontSize}px serif`;
-          ctx.textAlign = "center";
-          ctx.textBaseline = "middle";
-          ctx.fillText(s.emoji, s.x * w, s.y * h);
-        }
-      });
+      // 스티커는 별도 캔버스 레이어에서 그린다 (송출 프레임에는 snapshotWithStickers로 합성)
 
       // syncEnabled 시 ~30fps로 합성 프레임을 output 창에 전송
       if (frameChannelRef.current) {
         const now = performance.now();
         if (now - lastFrameSentRef.current > 100) {
           lastFrameSentRef.current = now;
-          const dataUrl = display.toDataURL("image/jpeg", 0.5);
-          frameChannelRef.current?.postMessage({ type: "frame", dataUrl });
+          const dataUrl = snapshotWithStickers(0.5);
+          if (dataUrl) frameChannelRef.current?.postMessage({ type: "frame", dataUrl });
         }
       }
 
@@ -525,7 +570,7 @@ export function CameraSection({
 
     animFrameRef.current = requestAnimationFrame(processFrame);
     return () => cancelAnimationFrame(animFrameRef.current);
-  }, [selectedBackground, chromaKey, bgRemovalMode, drawBackground, stickers, frameChannelRef]);
+  }, [selectedBackground, chromaKey, bgRemovalMode, drawBackground, frameChannelRef, snapshotWithStickers]);
 
   const capturePhoto = useCallback(() => {
     if (countdown !== null || photos.length >= maxPhotos) return;
@@ -533,24 +578,23 @@ export function CameraSection({
     setCountdown(count);
     const frames: string[] = [];
 
-    if (displayCanvasRef.current) {
-      frames.push(displayCanvasRef.current.toDataURL("image/jpeg", 0.85));
-    }
+    const firstFrame = snapshotWithStickers(0.85);
+    if (firstFrame) frames.push(firstFrame);
 
     const interval = setInterval(() => {
       count--;
       if (count > 0) {
         setCountdown(count);
-        if (displayCanvasRef.current) {
-          frames.push(displayCanvasRef.current.toDataURL("image/jpeg", 0.85));
-        }
+        const midFrame = snapshotWithStickers(0.85);
+        if (midFrame) frames.push(midFrame);
       } else {
         clearInterval(interval);
         setCountdown(null);
 
-        if (displayCanvasRef.current) {
-          frames.push(displayCanvasRef.current.toDataURL("image/jpeg", 0.85));
-          const dataUrl = displayCanvasRef.current.toDataURL("image/jpeg", 0.92);
+        const lastFrame = snapshotWithStickers(0.85);
+        const dataUrl = snapshotWithStickers(0.92);
+        if (dataUrl) {
+          if (lastFrame) frames.push(lastFrame);
           onCapture(dataUrl, frames);
         }
 
@@ -558,7 +602,7 @@ export function CameraSection({
         setTimeout(() => setFlash(false), 200);
       }
     }, 1000);
-  }, [countdown, photos.length, maxPhotos, config.captureSeconds, onCapture]);
+  }, [countdown, photos.length, maxPhotos, config.captureSeconds, onCapture, snapshotWithStickers]);
 
   const startAutoTimer = useCallback(() => {
     if (autoTimerRef.current) clearInterval(autoTimerRef.current);
@@ -843,7 +887,11 @@ export function CameraSection({
               </div>
             </div>
           ) : (
-            <canvas ref={displayCanvasRef} className="camera-video" />
+            <>
+              <canvas ref={displayCanvasRef} className="camera-video" />
+              {/* 스티커 전용 레이어: 메인 합성 루프와 분리되어 60fps로 부드럽게 이동 */}
+              <canvas ref={stickerCanvasRef} className="camera-video absolute inset-0 pointer-events-none" />
+            </>
           )}
           {bgRemovalMode === "mediapipe" && segmenterStatus === "loading" && (
             <div className="absolute bottom-4 left-4 bg-black/70 text-white text-sm px-4 py-2 rounded-lg">
