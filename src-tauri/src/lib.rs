@@ -449,6 +449,13 @@ fn load_settings() -> Result<std::collections::HashMap<String, String>, String> 
     }
 }
 
+/// 창 파괴 시 Node 서버를 종료할지 판단한다.
+/// 메인 창이 닫힐 때(앱 종료)만 true. 서브 모니터 창(camera-output) 등
+/// 보조 창이 닫히거나 재생성될 때 서버가 죽으면 앱 전체가 먹통이 된다.
+fn should_shutdown_server_on_destroy(window_label: &str) -> bool {
+    window_label == "main"
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -594,6 +601,9 @@ pub fn run() {
         })
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::Destroyed = event {
+                if !should_shutdown_server_on_destroy(window.label()) {
+                    return;
+                }
                 #[cfg(not(debug_assertions))]
                 if let Some(state) = window.try_state::<NodeProcess>() {
                     if let Ok(mut guard) = state.0.lock() {
@@ -611,6 +621,27 @@ pub fn run() {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    // ── Node 서버 종료 판단 (창 파괴 이벤트) ──────────────────────────
+    // 회귀 방지: 과거에는 어떤 창이든 Destroyed 시 서버를 죽여서,
+    // 서브 모니터를 껐다 켜면 앱 전체가 먹통이 되는 버그가 있었다.
+
+    #[test]
+    fn main_window_destroy_shuts_down_server() {
+        assert!(should_shutdown_server_on_destroy("main"));
+    }
+
+    #[test]
+    fn camera_output_destroy_keeps_server_alive() {
+        // close_camera_window 및 open_camera_window의 기존 창 재생성 시 발생
+        assert!(!should_shutdown_server_on_destroy("camera-output"));
+    }
+
+    #[test]
+    fn unknown_window_destroy_keeps_server_alive() {
+        assert!(!should_shutdown_server_on_destroy("some-future-window"));
+        assert!(!should_shutdown_server_on_destroy(""));
+    }
 
     #[test]
     fn base64_decode_hello() {
