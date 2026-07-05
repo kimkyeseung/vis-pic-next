@@ -1,4 +1,36 @@
 import { FRAME_INFO } from "@/constants/frames";
+import { computePrintLayout } from "@/lib/printLayout";
+import type { FrameInfoEntry } from "@/types";
+
+// 미리보기 축척: 1cm → 12px (인화지 10×15cm 기준 120×180px)
+const PREVIEW_SCALE = 12;
+
+/** 실제 인화지 비율(10×15cm)과 공용 레이아웃 계산을 축소해 그리는 미리보기 */
+function PaperPreview({ mode, frame }: { mode: string; frame: FrameInfoEntry }) {
+  const paperW = frame.orientation === "landscape" ? 15 : 10;
+  const paperH = frame.orientation === "landscape" ? 10 : 15;
+  const { slots } = computePrintLayout({ frame, mode, paperW, paperH, settings: {} });
+
+  return (
+    <div
+      className="relative bg-white rounded-[3px] shadow-[0_6px_16px_rgba(0,0,0,0.45)]"
+      style={{ width: paperW * PREVIEW_SCALE, height: paperH * PREVIEW_SCALE }}
+    >
+      {slots.map((s, i) => (
+        <div
+          key={i}
+          className="absolute bg-gradient-to-br from-gray-400 to-gray-500 shadow-inner"
+          style={{
+            left: `${(s.x / paperW) * 100}%`,
+            top: `${(s.y / paperH) * 100}%`,
+            width: `${(s.w / paperW) * 100}%`,
+            height: `${(s.h / paperH) * 100}%`,
+          }}
+        />
+      ))}
+    </div>
+  );
+}
 
 export function FrameSection({
   captureModes,
@@ -31,18 +63,8 @@ export function FrameSection({
             onClick={() => onSelect(frame.id)}
           >
             {selectedFrame === frame.id && <span className="check-mark">&#10003;</span>}
-            <div className={`${frame.orientation === "landscape" ? "w-44 h-32" : "w-32 h-44"} mx-auto mb-5 bg-black/30 rounded-xl flex items-center justify-center`}>
-              <div
-                className="grid gap-1"
-                style={{
-                  gridTemplateColumns: `repeat(${frame.cols}, 1fr)`,
-                  gridTemplateRows: `repeat(${frame.rows}, 1fr)`,
-                }}
-              >
-                {Array.from({ length: frame.count }).map((_, i) => (
-                  <div key={i} className="w-10 h-8 bg-white/40 rounded" />
-                ))}
-              </div>
+            <div className="h-48 flex items-center justify-center mb-5">
+              <PaperPreview mode={frame.id} frame={frame} />
             </div>
             <span className="text-2xl font-bold text-white">{frame.label}</span>
           </div>
