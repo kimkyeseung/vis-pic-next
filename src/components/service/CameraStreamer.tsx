@@ -19,11 +19,14 @@ const SOFT = 100 * 100;
 /**
  * 헤드리스 카메라 송출 컴포넌트.
  * UI 없이 카메라를 열고 서브 화면으로 프레임을 보낸다.
- * CameraSection이 활성화되지 않은 스텝(결제·프레임 선택·배경 선택·완료 등)에서 사용.
+ * CameraSection이 활성화되지 않은 스텝(대기·결제·프레임 선택·배경 선택·완료 등)에서 사용.
  * selectedBackground가 설정된 경우 배경 합성(크로마키 또는 MediaPipe)을 적용한다.
+ * enabled는 카메라 장치 점유(웜업), sendFrames는 서브 화면 프레임 전송을 각각 제어한다 —
+ * 카메라를 미리 켜두면 서브모니터를 켜는 즉시 화면이 출력된다.
  */
 export function CameraStreamer({
   enabled,
+  sendFrames = true,
   selectedBackground = null,
   backgroundImages = [],
   imageBaseUrl = "",
@@ -31,13 +34,14 @@ export function CameraStreamer({
   chromakeyRgb = "0,255,0",
 }: {
   enabled: boolean;
+  sendFrames?: boolean;
   selectedBackground?: number | null;
   backgroundImages?: BGImage[];
   imageBaseUrl?: string;
   bgRemovalMode?: BgRemovalMode;
   chromakeyRgb?: string;
 }) {
-  const frameChannelRef = useFrameSender(enabled);
+  const frameChannelRef = useFrameSender(enabled && sendFrames);
   const lastSentRef = useRef(0);
   const bgSourceRef = useRef<HTMLImageElement | HTMLVideoElement | null>(null);
   const segmenterRef = useRef<Segmenter | null>(null);
@@ -159,6 +163,8 @@ export function CameraStreamer({
         const tick = () => {
           animFrame = requestAnimationFrame(tick);
           if (video.readyState < 2 || !video.videoWidth) return;
+          // 전송 대상이 없으면 합성 연산을 생략하고 카메라만 켜둔 채 대기
+          if (!frameChannelRef.current) return;
 
           const w = video.videoWidth;
           const h = video.videoHeight;

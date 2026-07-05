@@ -76,9 +76,10 @@ function ServiceContent() {
         </div>
       )}
       <FloatingElements />
-      {syncEnabled && currentStep !== "start" && currentStep !== "camera" && (
+      {currentStep !== "camera" && (
         <CameraStreamer
           enabled
+          sendFrames={syncEnabled}
           selectedBackground={selectedBackground}
           backgroundImages={backgroundImages}
           imageBaseUrl={imageBaseUrl}
