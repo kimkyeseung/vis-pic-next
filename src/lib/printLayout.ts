@@ -34,6 +34,12 @@ export function parseCm(value: string | undefined): number | null {
 
 const FALLBACK_PHOTO_RATIO = 4 / 3;
 
+// ── 사진 슬롯 프레임 스타일 (합성 사진과 레이아웃 GIF가 공유) ──────────
+// cm 단위로 정의하고 각 렌더러의 px/cm 배율을 곱해 사용한다.
+export const FRAME_CORNER_RADIUS_CM = 0.1;
+export const FRAME_BORDER_CM = 0.025;
+export const FRAME_BORDER_COLOR = "rgba(255,255,255,0.8)";
+
 /**
  * 인화지 크기와 MODE_* 설정으로 사진 슬롯 배치를 계산한다.
  * 미리보기(관리자)와 실제 합성/GIF(서비스)가 같은 결과를 쓰도록 하는 단일 소스.

@@ -146,7 +146,7 @@ export function usePhotoFlow(deviceId: string, config: DeviceConfig) {
       const gifRes = await fetch("/api/gif/create/", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ images: gifSources, duration: 500 }),
+        body: JSON.stringify({ images: gifSources, duration: 100 }),
       });
       const gifData = await gifRes.json();
       if (gifRes.ok && gifData.success && gifData.gif_url) {

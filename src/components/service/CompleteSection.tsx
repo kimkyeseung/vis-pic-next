@@ -5,7 +5,14 @@ import { QRCodeSVG } from "qrcode.react";
 import type { BGImage } from "@/types";
 import { FRAME_INFO, FALLBACK_BACKGROUNDS } from "@/constants/frames";
 import { roundRect, fillGradient, fillGradientFromCSS, loadImage, resizeForGif } from "@/lib/canvas";
-import { computePrintLayout, modeSettingPrefix, parseCm } from "@/lib/printLayout";
+import {
+  computePrintLayout,
+  modeSettingPrefix,
+  parseCm,
+  FRAME_CORNER_RADIUS_CM,
+  FRAME_BORDER_CM,
+  FRAME_BORDER_COLOR,
+} from "@/lib/printLayout";
 import { useLanguage } from "@/i18n/LanguageContext";
 
 export function CompleteSection({
@@ -69,7 +76,7 @@ export function CompleteSection({
     return `${baseUrl}/${filename}`;
   };
 
-  const uploadForQR = async (dataUrl: string) => {
+  const uploadForQR = async (dataUrl: string, bgImageData?: string | null) => {
     let photoUrl: string | null = null;
 
     try {
@@ -149,9 +156,15 @@ export function CompleteSection({
                 photo_height: photoHPx,
                 h_gap: hGapPx,
                 v_gap: vGapPx,
-                duration: 500,
+                duration: 100, // 10fps — 중간 프레임이 ~180ms 간격으로 캡처됨
                 background_color: "#ffffff",
                 background_image: printSettings.PRINT_BACKGROUND || null,
+                // 합성 사진과 동일한 배경(선택 배경/그라디언트 포함)과
+                // 프레임 스타일(둥근 모서리·테두리)을 GIF에도 적용
+                background_image_data: bgImageData || null,
+                corner_radius: Math.round(FRAME_CORNER_RADIUS_CM * gifScale),
+                border_width: Math.max(1, Math.round(FRAME_BORDER_CM * gifScale)),
+                border_color: FRAME_BORDER_COLOR,
                 canvas_width: gifCanvasW,
                 canvas_height: gifCanvasH,
                 start_x: startX,
@@ -181,7 +194,8 @@ export function CompleteSection({
       allFrames.length >= 2
         ? allFrames
         : selectedIndices.map((i) => photos[i]).filter(Boolean);
-    const gifDuration = allFrames.length >= 2 ? 500 : 800;
+    // 중간 프레임 GIF는 10fps, 완성 사진 나열 GIF는 0.8초 간격
+    const gifDuration = allFrames.length >= 2 ? 100 : 800;
 
     if (gifSources.length >= 2) {
       try {
@@ -271,6 +285,9 @@ export function CompleteSection({
       }
     }
 
+    // 배경만 그려진 상태 스냅샷 — 레이아웃 GIF가 같은 배경을 쓰도록 전달
+    const bgOnlyDataUrl = canvas.toDataURL("image/jpeg", 0.8);
+
     // Calculate photo slot positions — 관리자 미리보기와 동일한 공용 레이아웃 계산 사용
     const layout = computePrintLayout({
       frame,
@@ -311,7 +328,7 @@ export function CompleteSection({
         }
 
         ctx.save();
-        roundRect(ctx, x, y, w, h, 12);
+        roundRect(ctx, x, y, w, h, FRAME_CORNER_RADIUS_CM * cmToPx);
         ctx.clip();
 
         const imgAspect = img.width / img.height;
@@ -327,9 +344,9 @@ export function CompleteSection({
         ctx.drawImage(img, sx, sy, sw, sh, x, y, w, h);
         ctx.restore();
 
-        ctx.strokeStyle = "rgba(255,255,255,0.8)";
-        ctx.lineWidth = 3;
-        roundRect(ctx, x, y, w, h, 12);
+        ctx.strokeStyle = FRAME_BORDER_COLOR;
+        ctx.lineWidth = FRAME_BORDER_CM * cmToPx;
+        roundRect(ctx, x, y, w, h, FRAME_CORNER_RADIUS_CM * cmToPx);
         ctx.stroke();
       } catch (err) {
         console.error(`[createComposite] 사진 ${i} 로드 실패:`, err);
@@ -339,7 +356,7 @@ export function CompleteSection({
     const dataUrl = canvas.toDataURL("image/jpeg", 0.95);
     setCompositeImage(dataUrl);
 
-    await uploadForQR(dataUrl);
+    await uploadForQR(dataUrl, bgOnlyDataUrl);
     setPrintStatus("ready");
   };
 
@@ -371,7 +388,7 @@ export function CompleteSection({
         const res = await fetch("/api/gif/create/", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ images: resized, duration: 500 }),
+          body: JSON.stringify({ images: resized, duration: frames.length >= 2 ? 100 : 800 }),
         });
         const data = await res.json();
         if (data.success && data.gif_url) {

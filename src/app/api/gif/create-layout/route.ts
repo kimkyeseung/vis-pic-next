@@ -31,6 +31,12 @@ interface LayoutGifRequest {
   duration: number;
   background_color: string;
   background_image: string | null;
+  /** 배경 전체를 데이터 URL로 직접 전달 (합성 사진과 동일한 배경 사용) */
+  background_image_data?: string | null;
+  /** 사진 슬롯 프레임 스타일 (px) — 합성 사진의 둥근 모서리·테두리와 동일하게 */
+  corner_radius?: number;
+  border_width?: number;
+  border_color?: string;
   canvas_width: number;
   canvas_height: number;
   start_x: number;
@@ -52,6 +58,10 @@ export async function POST(request: NextRequest) {
       duration = 500,
       background_color = "#ffffff",
       background_image,
+      background_image_data,
+      corner_radius = 0,
+      border_width = 0,
+      border_color = "rgba(255,255,255,0.8)",
       canvas_width,
       canvas_height,
       start_x,
@@ -80,22 +90,55 @@ export async function POST(request: NextRequest) {
     const pw = Math.round(photo_width);
     const ph = Math.round(photo_height);
 
+    // 사진 슬롯 프레임 스타일: 둥근 모서리 마스크 + 테두리 (합성 사진과 동일)
+    const radius = Math.max(0, Math.round(corner_radius));
+    const bw = Math.max(0, Math.round(border_width));
+    const roundedMask =
+      radius > 0
+        ? Buffer.from(
+            `<svg width="${pw}" height="${ph}"><rect width="${pw}" height="${ph}" rx="${radius}" ry="${radius}" fill="#fff"/></svg>`,
+          )
+        : null;
+    const borderOverlay =
+      bw > 0
+        ? Buffer.from(
+            `<svg width="${pw}" height="${ph}"><rect x="${bw / 2}" y="${bw / 2}" width="${pw - bw}" height="${ph - bw}" rx="${radius}" ry="${radius}" fill="none" stroke="${border_color}" stroke-width="${bw}"/></svg>`,
+          )
+        : null;
+
+    async function styledPhoto(img: string): Promise<Buffer> {
+      const resized = await sharp(decodeBase64Image(img))
+        .resize(pw, ph, { fit: "cover" })
+        .ensureAlpha()
+        .png()
+        .toBuffer();
+      if (!roundedMask && !borderOverlay) return resized;
+      const overlays: sharp.OverlayOptions[] = [];
+      if (roundedMask) overlays.push({ input: roundedMask, blend: "dest-in" });
+      if (borderOverlay) overlays.push({ input: borderOverlay, blend: "over" });
+      return sharp(resized).composite(overlays).png().toBuffer();
+    }
+
     // Pre-decode and resize all position images
     const positionBuffers: Record<string, Buffer[]> = {};
     for (const [posKey, frames] of Object.entries(intermediate_pictures)) {
-      positionBuffers[posKey] = await Promise.all(
-        frames.map(async (img) => {
-          const buf = decodeBase64Image(img);
-          return sharp(buf)
-            .resize(pw, ph, { fit: "cover" })
-            .toBuffer();
-        }),
-      );
+      positionBuffers[posKey] = await Promise.all(frames.map(styledPhoto));
     }
 
     // Prepare background
     let bgBuffer: Buffer;
-    if (background_image) {
+    if (background_image_data) {
+      // 클라이언트가 합성 사진과 동일한 배경을 데이터 URL로 전달한 경우
+      try {
+        bgBuffer = await sharp(decodeBase64Image(background_image_data))
+          .resize(cw, ch, { fit: "cover" })
+          .ensureAlpha()
+          .png()
+          .toBuffer();
+      } catch {
+        bgBuffer = await solidBackground(cw, ch, background_color);
+      }
+    } else if (background_image) {
       try {
         const bgPath = path.join(
           process.cwd(),
@@ -105,7 +148,7 @@ export async function POST(request: NextRequest) {
           background_image,
         );
         const rawBg = await readFile(bgPath);
-        bgBuffer = await sharp(rawBg).resize(cw, ch, { fit: "cover" }).ensureAlpha().toBuffer();
+        bgBuffer = await sharp(rawBg).resize(cw, ch, { fit: "cover" }).ensureAlpha().png().toBuffer();
       } catch {
         bgBuffer = await solidBackground(cw, ch, background_color);
       }

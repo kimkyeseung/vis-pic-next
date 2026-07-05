@@ -60,6 +60,12 @@ function applyCategoryMaskAlpha(
   return foreground;
 }
 
+// GIF 중간 프레임 캡처: ~180ms 간격(재생 10fps와 매칭), 800px 다운스케일.
+// 최근 24장만 유지해 메모리·GIF 파일 크기(~2.5MB)를 제한한다.
+const GIF_FRAME_INTERVAL_MS = 180;
+const GIF_MAX_FRAMES = 24;
+const GIF_FRAME_WIDTH = 800;
+
 function resolveForegroundCategory(
   categories: Uint8Array,
   width: number,
@@ -369,16 +375,18 @@ export function CameraSection({
     });
   }, [stickers]);
 
-  const drawStickers = useCallback((ctx: CanvasRenderingContext2D, w: number, h: number) => {
+  // pxScale: 표시 캔버스(display) 대비 축소 배율 — 다운스케일 스냅샷에서 스티커
+  // 상대 크기가 유지되도록 픽셀 단위 크기에 곱한다.
+  const drawStickers = useCallback((ctx: CanvasRenderingContext2D, w: number, h: number, pxScale = 1) => {
     stickersRef.current.forEach((s) => {
       if (s.src) {
         const img = stickerImgCacheRef.current.get(s.src);
         if (img) {
-          const size = Math.round(s.scale * 120);
+          const size = Math.round(s.scale * 120 * pxScale);
           ctx.drawImage(img, s.x * w - size / 2, s.y * h - size / 2, size, size);
         }
       } else if (s.emoji) {
-        const fontSize = Math.round(s.scale * 72);
+        const fontSize = Math.round(s.scale * 72 * pxScale);
         ctx.font = `${fontSize}px serif`;
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
@@ -387,21 +395,25 @@ export function CameraSection({
     });
   }, []);
 
-  // 촬영·서브 모니터 송출용: 카메라 합성 캔버스 위에 스티커 레이어를 얹은 스냅샷
+  // 촬영·서브 모니터 송출용: 카메라 합성 캔버스 위에 스티커 레이어를 얹은 스냅샷.
+  // maxWidth 지정 시 다운스케일 (GIF 중간 프레임처럼 고해상도가 필요 없는 경우)
   const composeCanvasRef = useRef<HTMLCanvasElement | null>(null);
-  const snapshotWithStickers = useCallback((quality: number): string | null => {
+  const snapshotWithStickers = useCallback((quality: number, maxWidth?: number): string | null => {
     const display = displayCanvasRef.current;
     if (!display || !display.width || !display.height) return null;
+    const scale = maxWidth ? Math.min(1, maxWidth / display.width) : 1;
+    const w = Math.round(display.width * scale);
+    const h = Math.round(display.height * scale);
     let c = composeCanvasRef.current;
     if (!c) {
       c = document.createElement("canvas");
       composeCanvasRef.current = c;
     }
-    if (c.width !== display.width) c.width = display.width;
-    if (c.height !== display.height) c.height = display.height;
+    if (c.width !== w) c.width = w;
+    if (c.height !== h) c.height = h;
     const ctx = c.getContext("2d")!;
-    ctx.drawImage(display, 0, 0);
-    drawStickers(ctx, c.width, c.height);
+    ctx.drawImage(display, 0, 0, w, h);
+    drawStickers(ctx, w, h, scale);
     return c.toDataURL("image/jpeg", quality);
   }, [drawStickers]);
 
@@ -577,24 +589,29 @@ export function CameraSection({
     let count = config.captureSeconds;
     setCountdown(count);
     const frames: string[] = [];
+    const pushFrame = () => {
+      const snap = snapshotWithStickers(0.75, GIF_FRAME_WIDTH);
+      if (snap) {
+        frames.push(snap);
+        if (frames.length > GIF_MAX_FRAMES) frames.shift();
+      }
+    };
 
-    const firstFrame = snapshotWithStickers(0.85);
-    if (firstFrame) frames.push(firstFrame);
+    pushFrame();
+    const frameTimer = setInterval(pushFrame, GIF_FRAME_INTERVAL_MS);
 
     const interval = setInterval(() => {
       count--;
       if (count > 0) {
         setCountdown(count);
-        const midFrame = snapshotWithStickers(0.85);
-        if (midFrame) frames.push(midFrame);
       } else {
         clearInterval(interval);
+        clearInterval(frameTimer);
         setCountdown(null);
 
-        const lastFrame = snapshotWithStickers(0.85);
+        pushFrame();
         const dataUrl = snapshotWithStickers(0.92);
         if (dataUrl) {
-          if (lastFrame) frames.push(lastFrame);
           onCapture(dataUrl, frames);
         }
 
