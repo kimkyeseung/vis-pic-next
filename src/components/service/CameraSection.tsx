@@ -124,6 +124,7 @@ export function CameraSection({
   onNext,
   onPrev,
   onStickersChange,
+  onBackgroundSelect,
 }: {
   config: DeviceConfig;
   photos: string[];
@@ -138,6 +139,7 @@ export function CameraSection({
   onNext: () => void;
   onPrev: () => void;
   onStickersChange: (stickers: Sticker[]) => void;
+  onBackgroundSelect: (bg: number) => void;
 }) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const displayCanvasRef = useRef<HTMLCanvasElement>(null);
@@ -731,6 +733,8 @@ export function CameraSection({
   }, [stickers]);
 
   const canProceed = photos.length >= minPhotos;
+  const showBgStrip = bgRemovalMode !== "off";
+  const bgOptions = backgroundImages.length > 0 ? backgroundImages : FALLBACK_BACKGROUNDS;
 
   return (
     <section className="w-full h-full flex relative z-10">
@@ -738,8 +742,12 @@ export function CameraSection({
 
       {flash && <div className="fixed inset-0 bg-white z-50 pointer-events-none animate-flash" />}
 
-      <div className="flex-[7.5] flex items-center justify-center p-8">
-        <div className="camera-preview w-full max-w-5xl aspect-video relative">
+      {/* 좌측: 카메라 미리보기 + 배경 선택 스트립 */}
+      <div className="flex-1 min-w-0 flex flex-col items-center justify-center gap-4 px-6 py-4">
+        <div
+          className="camera-preview w-full aspect-video relative"
+          style={{ maxWidth: showBgStrip ? "calc((100vh - 180px) * 16 / 9)" : "calc((100vh - 64px) * 16 / 9)" }}
+        >
           {/* 스티커 드래그 오버레이 */}
           <div
             ref={overlayRef}
@@ -856,20 +864,66 @@ export function CameraSection({
             </div>
           )}
         </div>
+
+        {/* 배경 선택 스트립: 촬영 중 실시간 배경 변경 */}
+        {showBgStrip && (
+          <div className="w-full flex justify-center shrink-0">
+            <div className="flex gap-3 overflow-x-auto px-2 py-2 max-w-full">
+              {bgOptions.map((bg) => {
+                const isSelected = selectedBackground === bg.id;
+                const isDb = "filename" in bg;
+                const isVideo = isDb && (bg.filename.endsWith(".mp4") || bg.filename.endsWith(".webm"));
+                return (
+                  <button
+                    key={bg.id}
+                    className={`relative w-28 aspect-video shrink-0 rounded-xl overflow-hidden transition-all duration-200 ${
+                      isSelected
+                        ? "ring-[3px] ring-white shadow-lg scale-[1.06]"
+                        : "ring-1 ring-white/20 opacity-60 hover:opacity-100"
+                    }`}
+                    style={isDb ? undefined : { background: bg.gradient }}
+                    onClick={() => onBackgroundSelect(bg.id)}
+                  >
+                    {isDb && (isVideo ? (
+                      <video src={`${imageBaseUrl}/${bg.filename}`} className="w-full h-full object-cover" muted loop autoPlay playsInline />
+                    ) : (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={`${imageBaseUrl}/${bg.filename}`} alt={bg.name} className="w-full h-full object-cover" />
+                    ))}
+                    {isSelected && (
+                      <span className="absolute inset-0 flex items-center justify-center bg-black/25 text-white text-lg font-bold">
+                        &#10003;
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
       </div>
 
-      <div className="flex-[2.5] p-8 flex flex-col">
-        <h3 className="text-2xl font-bold text-white mb-8">
-          촬영 ({photos.length}/{maxPhotos})
-        </h3>
+      {/* 우측: 촬영 컨트롤 패널 */}
+      <div className="w-80 shrink-0 p-6 flex flex-col border-l border-white/10 bg-black/20">
+        <div className="flex items-baseline justify-between mb-5">
+          <h3 className="text-xl font-bold text-white">촬영</h3>
+          <span className="text-white/60 text-sm font-semibold tabular-nums">
+            {photos.length} / {maxPhotos}
+          </span>
+        </div>
 
-        <div className="grid grid-cols-2 gap-3 mb-8">
+        <div className="grid grid-cols-2 gap-2 mb-6">
           {Array.from({ length: maxPhotos }, (_, i) => (
-            <div key={i} className="aspect-[4/3] bg-black/30 rounded-xl flex items-center justify-center border-2 border-white/10 overflow-hidden">
+            <div
+              key={i}
+              className={`aspect-[4/3] bg-black/30 rounded-xl flex items-center justify-center border-2 overflow-hidden ${
+                i === photos.length ? "border-white/50" : "border-white/10"
+              }`}
+            >
               {photos[i] ? (
                 <img src={photos[i]} alt={`Photo ${i + 1}`} className="w-full h-full object-cover" />
               ) : (
-                <span className="text-white/30 text-2xl">{i + 1}</span>
+                <span className="text-white/30 text-xl">{i + 1}</span>
               )}
             </div>
           ))}

@@ -138,6 +138,7 @@ function ServiceContent() {
           stickers={flow.stickers}
           syncEnabled={syncEnabled}
           onStickersChange={flow.setStickers}
+          onBackgroundSelect={setSelectedBackground}
           onCapture={flow.addPhoto}
           onNext={() => {
             if (flow.photos.length <= slotsNeeded) {
