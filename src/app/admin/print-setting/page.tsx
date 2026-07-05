@@ -4,6 +4,7 @@ import { useEffect, useState, useRef, useCallback } from "react";
 import { useAdmin } from "../AdminContext";
 import { FRAME_INFO, ALL_MODES } from "@/constants/frames";
 import { roundRect } from "@/lib/canvas";
+import { computePrintLayout, modeSettingPrefix, parseCm, type PrintLayout } from "@/lib/printLayout";
 
 export default function PrintSettingPage() {
   const { selectedDevice } = useAdmin();
@@ -174,6 +175,19 @@ export default function PrintSettingPage() {
     return { pw: shorter, ph: longer };
   }, [paperWidth, paperHeight]);
 
+  // 현재 미리보기 모드의 슬롯 배치 (설정값 실시간 반영)
+  const getPreviewLayout = useCallback((): PrintLayout | null => {
+    if (!previewMode || !FRAME_INFO[previewMode]) return null;
+    const { pw, ph } = getPaperDimensions(previewMode);
+    return computePrintLayout({
+      frame: FRAME_INFO[previewMode],
+      mode: previewMode,
+      paperW: pw,
+      paperH: ph,
+      settings,
+    });
+  }, [previewMode, settings, getPaperDimensions]);
+
   const drawPreview = useCallback(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -224,7 +238,7 @@ export default function PrintSettingPage() {
 
     ctx.restore();
     finishDraw();
-  }, [paperWidth, paperHeight, previewMode, bgPreviewUrl, existingBgUrl, imageBaseUrl, getPaperDimensions]);
+  }, [paperWidth, paperHeight, previewMode, bgPreviewUrl, existingBgUrl, imageBaseUrl, getPaperDimensions, getPreviewLayout]);
 
   const drawSlots = (
     ctx: CanvasRenderingContext2D,
@@ -232,46 +246,42 @@ export default function PrintSettingPage() {
     drawW: number, drawH: number,
   ) => {
     if (!previewMode || !FRAME_INFO[previewMode]) return;
-    const frame = FRAME_INFO[previewMode];
+    const layout = getPreviewLayout();
+    if (!layout) return;
 
-    const padding = Math.min(drawW, drawH) * 0.04;
-    const allocW = (drawW - padding * (frame.cols + 1)) / frame.cols;
-    const allocH = (drawH - padding * (frame.rows + 1)) / frame.rows;
+    const { pw } = getPaperDimensions(previewMode);
+    const scale = drawW / pw; // cm → 캔버스 px
 
-    const photoRatio = 4 / 3;
-    let cellW: number, cellH: number;
-    if (allocW / allocH > photoRatio) {
-      cellH = allocH;
-      cellW = cellH * photoRatio;
-    } else {
-      cellW = allocW;
-      cellH = cellW / photoRatio;
-    }
-
-    for (let i = 0; i < frame.count; i++) {
-      const col = i % frame.cols;
-      const row = Math.floor(i / frame.cols);
-      const ax = ox + padding + col * (allocW + padding);
-      const ay = oy + padding + row * (allocH + padding);
-      const x = ax + (allocW - cellW) / 2;
-      const y = ay + (allocH - cellH) / 2;
+    layout.slots.forEach((slot, i) => {
+      const x = ox + slot.x * scale;
+      const y = oy + slot.y * scale;
+      const cellW = slot.w * scale;
+      const cellH = slot.h * scale;
 
       ctx.fillStyle = "rgba(200, 200, 200, 0.3)";
       roundRect(ctx, x, y, cellW, cellH, 4);
       ctx.fill();
 
-      ctx.strokeStyle = "rgba(150, 150, 150, 0.6)";
+      ctx.strokeStyle = layout.overflow ? "rgba(239, 68, 68, 0.9)" : "rgba(150, 150, 150, 0.6)";
       ctx.lineWidth = 1.5;
       ctx.setLineDash([4, 4]);
       roundRect(ctx, x, y, cellW, cellH, 4);
       ctx.stroke();
       ctx.setLineDash([]);
 
-      ctx.fillStyle = "rgba(120, 120, 120, 0.8)";
+      ctx.fillStyle = layout.overflow ? "rgba(239, 68, 68, 0.9)" : "rgba(120, 120, 120, 0.8)";
       ctx.font = `${Math.min(cellW, cellH) * 0.18}px sans-serif`;
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
       ctx.fillText(`${i + 1}`, x + cellW / 2, y + cellH / 2);
+    });
+
+    if (layout.overflow) {
+      ctx.fillStyle = "rgba(239, 68, 68, 0.95)";
+      ctx.font = "bold 12px sans-serif";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "top";
+      ctx.fillText("⚠ 인화지를 벗어납니다", ox + drawW / 2, oy + 6);
     }
   };
 
@@ -425,41 +435,77 @@ export default function PrintSettingPage() {
             )}
 
             {/* Layout settings for selected mode */}
-            {previewMode && (
-              <div className="mt-4 pt-4 border-t border-gray-700">
-                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">
-                  {previewMode} 레이아웃 설정 (cm)
-                </p>
-                <div className="grid grid-cols-2 gap-3">
-                  {[
-                    { suffix: "WIDTH", label: "사진 가로" },
-                    { suffix: "HEIGHT", label: "사진 세로" },
-                    { suffix: "HGAP", label: "가로 간격" },
-                    { suffix: "VGAP", label: "세로 간격" },
-                    { suffix: "MARGIN_TOP", label: "상단 여백" },
-                    { suffix: "MARGIN_LEFT", label: "좌측 여백" },
-                    { suffix: "MARGIN_BOTTOM", label: "하단 여백" },
-                    { suffix: "MARGIN_RIGHT", label: "우측 여백" },
-                  ].map(({ suffix, label }) => {
-                    const key = `MODE_${previewMode.replace("x", "_")}_${suffix}`;
-                    return (
-                      <div key={suffix}>
-                        <label className="block text-gray-500 text-xs mb-1">{label}</label>
-                        <input
-                          type="number"
-                          value={settings[key] || ""}
-                          onChange={(e) => setSettings((prev) => ({ ...prev, [key]: e.target.value }))}
-                          placeholder="0"
-                          step="0.1"
-                          min="0"
-                          className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white text-sm focus:outline-none focus:border-blue-500 transition-colors"
-                        />
-                      </div>
-                    );
-                  })}
+            {previewMode && (() => {
+              const prefix = modeSettingPrefix(previewMode);
+              const inputClass = "w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white text-sm focus:outline-none focus:border-blue-500 transition-colors disabled:opacity-40 disabled:cursor-not-allowed";
+              return (
+                <div className="mt-4 pt-4 border-t border-gray-700">
+                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">
+                    {previewMode} 레이아웃 설정 (cm)
+                  </p>
+                  <div className="grid grid-cols-2 gap-3">
+                    {[
+                      { suffix: "WIDTH", label: "사진 가로 크기" },
+                      { suffix: "HEIGHT", label: "사진 세로 크기" },
+                      { suffix: "HGAP", label: "사진 간 가로 간격" },
+                      { suffix: "VGAP", label: "사진 간 세로 간격" },
+                    ].map(({ suffix, label }) => {
+                      const key = prefix + suffix;
+                      return (
+                        <div key={suffix}>
+                          <label className="block text-gray-500 text-xs mb-1">{label}</label>
+                          <input
+                            type="number"
+                            value={settings[key] || ""}
+                            onChange={(e) => setSettings((prev) => ({ ...prev, [key]: e.target.value }))}
+                            placeholder="0"
+                            step="0.1"
+                            min="0"
+                            className={inputClass}
+                          />
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mt-5 mb-1">
+                    여백 설정
+                  </p>
+                  <p className="text-gray-500 text-xs mb-1">
+                    ※ 상단/하단 또는 좌측/우측 여백은 동시에 설정할 수 없습니다.
+                  </p>
+                  <p className="text-gray-500 text-xs mb-3">
+                    ※ 값을 비우면 자동 중앙 정렬됩니다.
+                  </p>
+                  <div className="grid grid-cols-2 gap-3">
+                    {[
+                      { suffix: "MARGIN_TOP", label: "상단 여백", opposite: "MARGIN_BOTTOM" },
+                      { suffix: "MARGIN_BOTTOM", label: "하단 여백", opposite: "MARGIN_TOP" },
+                      { suffix: "MARGIN_LEFT", label: "좌측 여백", opposite: "MARGIN_RIGHT" },
+                      { suffix: "MARGIN_RIGHT", label: "우측 여백", opposite: "MARGIN_LEFT" },
+                    ].map(({ suffix, label, opposite }) => {
+                      const key = prefix + suffix;
+                      const disabled = (settings[prefix + opposite] ?? "").trim() !== "";
+                      return (
+                        <div key={suffix}>
+                          <label className="block text-gray-500 text-xs mb-1">{label}</label>
+                          <input
+                            type="number"
+                            value={settings[key] || ""}
+                            onChange={(e) => setSettings((prev) => ({ ...prev, [key]: e.target.value }))}
+                            placeholder={disabled ? "반대쪽 여백 사용 중" : "자동 (중앙 정렬)"}
+                            step="0.1"
+                            min="0"
+                            disabled={disabled}
+                            className={inputClass}
+                          />
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
-              </div>
-            )}
+              );
+            })()}
           </div>
 
           {/* Background Image */}
@@ -502,6 +548,10 @@ export default function PrintSettingPage() {
                   </button>
                 </div>
               )}
+
+              <p className="text-gray-500 text-xs">
+                배경 이미지 업로드·제거는 하단의 &quot;설정 저장&quot;을 눌러야 반영됩니다.
+              </p>
             </div>
           </div>
 
@@ -568,7 +618,19 @@ export default function PrintSettingPage() {
               />
             </div>
 
+            {getPreviewLayout()?.overflow && (
+              <div className="mt-3 p-3 bg-red-900/40 border border-red-500/60 rounded-lg text-red-300 text-sm">
+                ⚠ 현재 설정으로는 사진이 인화지를 벗어납니다. 사진 크기·간격·여백을 확인하세요.
+              </div>
+            )}
+
             <div className="mt-4 space-y-2 text-sm">
+              <div className="flex justify-between text-gray-400">
+                <span>배치</span>
+                <span className="text-white">
+                  {getPreviewLayout()?.fromSettings ? "설정값 기반" : "자동 (설정 없음)"}
+                </span>
+              </div>
               <div className="flex justify-between text-gray-400">
                 <span>인화지</span>
                 <span className="text-white">
@@ -631,7 +693,7 @@ export default function PrintSettingPage() {
         </div>
       )}
 
-      <div className="sticky bottom-0 py-4 bg-gray-900/80 backdrop-blur-sm">
+      <div className="sticky bottom-0 py-4 bg-gray-900 border-t border-gray-700">
         <button
           onClick={handleSave}
           disabled={saving}

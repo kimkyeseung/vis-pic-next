@@ -5,6 +5,7 @@ import { QRCodeSVG } from "qrcode.react";
 import type { BGImage } from "@/types";
 import { FRAME_INFO, FALLBACK_BACKGROUNDS } from "@/constants/frames";
 import { roundRect, fillGradient, fillGradientFromCSS, loadImage, resizeForGif } from "@/lib/canvas";
+import { computePrintLayout, modeSettingPrefix, parseCm } from "@/lib/printLayout";
 
 export function CompleteSection({
   photos,
@@ -83,11 +84,11 @@ export function CompleteSection({
 
     // Try layout GIF for multi-slot frames with admin settings
     if (frame && frame.count > 1) {
-      const modePrefix = `MODE_${selectedFrame.replace("x", "_")}_`;
-      const photoWCm = parseFloat(printSettings[modePrefix + "WIDTH"] || "0");
-      const photoHCm = parseFloat(printSettings[modePrefix + "HEIGHT"] || "0");
+      const modePrefix = modeSettingPrefix(selectedFrame);
+      const photoWCm = parseCm(printSettings[modePrefix + "WIDTH"]);
+      const photoHCm = parseCm(printSettings[modePrefix + "HEIGHT"]);
 
-      if (photoWCm > 0 && photoHCm > 0) {
+      if (photoWCm && photoHCm) {
         const intermediatePictures: Record<string, string[]> = {};
         selectedIndices.forEach((photoIdx, slotIdx) => {
           const frames = intermediateFrames[photoIdx];
@@ -110,23 +111,23 @@ export function CompleteSection({
             const gifCanvasW = Math.round(pw * gifScale);
             const gifCanvasH = Math.round(ph * gifScale);
 
-            const hGapCm = parseFloat(printSettings[modePrefix + "HGAP"] || "0");
-            const vGapCm = parseFloat(printSettings[modePrefix + "VGAP"] || "0");
+            const hGapCm = parseCm(printSettings[modePrefix + "HGAP"]) ?? 0;
+            const vGapCm = parseCm(printSettings[modePrefix + "VGAP"]) ?? 0;
             const photoWPx = Math.round(photoWCm * gifScale);
             const photoHPx = Math.round(photoHCm * gifScale);
             const hGapPx = Math.round(hGapCm * gifScale);
             const vGapPx = Math.round(vGapCm * gifScale);
 
-            const totalW = frame.cols * photoWPx + (frame.cols - 1) * hGapPx;
-            const totalH = frame.rows * photoHPx + (frame.rows - 1) * vGapPx;
-            const marginTopStr = printSettings[modePrefix + "MARGIN_TOP"];
-            const marginLeftStr = printSettings[modePrefix + "MARGIN_LEFT"];
-            const startX = marginLeftStr
-              ? Math.round(parseFloat(marginLeftStr) * gifScale)
-              : Math.round((gifCanvasW - totalW) / 2);
-            const startY = marginTopStr
-              ? Math.round(parseFloat(marginTopStr) * gifScale)
-              : Math.round((gifCanvasH - totalH) / 2);
+            // 4방향 여백·중앙 정렬을 포함한 시작 좌표는 공용 레이아웃 계산과 동일하게
+            const layout = computePrintLayout({
+              frame,
+              mode: selectedFrame,
+              paperW: pw,
+              paperH: ph,
+              settings: printSettings,
+            });
+            const startX = Math.round(layout.slots[0].x * gifScale);
+            const startY = Math.round(layout.slots[0].y * gifScale);
 
             const gifRes = await fetch("/api/gif/create-layout/", {
               method: "POST",
@@ -261,69 +262,21 @@ export function CompleteSection({
       }
     }
 
-    // Calculate photo slot positions
-    const slots: { x: number; y: number; w: number; h: number }[] = [];
-    const modePrefix = `MODE_${selectedFrame.replace("x", "_")}_`;
-    const photoWCm = parseFloat(printSettings[modePrefix + "WIDTH"] || "0");
-    const photoHCm = parseFloat(printSettings[modePrefix + "HEIGHT"] || "0");
-
-    if (photoWCm > 0 && photoHCm > 0) {
-      const cmToPx = canvasWidth / pw;
-      const cellW = photoWCm * cmToPx;
-      const cellH = photoHCm * cmToPx;
-      const hGapPx = parseFloat(printSettings[modePrefix + "HGAP"] || "0") * cmToPx;
-      const vGapPx = parseFloat(printSettings[modePrefix + "VGAP"] || "0") * cmToPx;
-
-      const totalW = frame.cols * cellW + (frame.cols - 1) * hGapPx;
-      const totalH = frame.rows * cellH + (frame.rows - 1) * vGapPx;
-
-      const marginTopStr = printSettings[modePrefix + "MARGIN_TOP"];
-      const marginLeftStr = printSettings[modePrefix + "MARGIN_LEFT"];
-      const startX = marginLeftStr !== undefined
-        ? parseFloat(marginLeftStr) * cmToPx
-        : (canvasWidth - totalW) / 2;
-      const startY = marginTopStr !== undefined
-        ? parseFloat(marginTopStr) * cmToPx
-        : (canvasHeight - totalH) / 2;
-
-      for (let i = 0; i < frame.count; i++) {
-        const col = i % frame.cols;
-        const row = Math.floor(i / frame.cols);
-        slots.push({
-          x: startX + col * (cellW + hGapPx),
-          y: startY + row * (cellH + vGapPx),
-          w: cellW,
-          h: cellH,
-        });
-      }
-    } else {
-      // Fallback: padding-based layout
-      const padding = 20;
-      const allocW = (canvasWidth - padding * (frame.cols + 1)) / frame.cols;
-      const allocH = (canvasHeight - padding * (frame.rows + 1)) / frame.rows;
-      const photoRatio = 4 / 3;
-      let cellW: number, cellH: number;
-      if (allocW / allocH > photoRatio) {
-        cellH = allocH;
-        cellW = cellH * photoRatio;
-      } else {
-        cellW = allocW;
-        cellH = cellW / photoRatio;
-      }
-
-      for (let i = 0; i < frame.count; i++) {
-        const col = i % frame.cols;
-        const row = Math.floor(i / frame.cols);
-        const ax = padding + col * (allocW + padding);
-        const ay = padding + row * (allocH + padding);
-        slots.push({
-          x: ax + (allocW - cellW) / 2,
-          y: ay + (allocH - cellH) / 2,
-          w: cellW,
-          h: cellH,
-        });
-      }
-    }
+    // Calculate photo slot positions — 관리자 미리보기와 동일한 공용 레이아웃 계산 사용
+    const layout = computePrintLayout({
+      frame,
+      mode: selectedFrame,
+      paperW: pw,
+      paperH: ph,
+      settings: printSettings,
+    });
+    const cmToPx = canvasWidth / pw;
+    const slots = layout.slots.map((s) => ({
+      x: s.x * cmToPx,
+      y: s.y * cmToPx,
+      w: s.w * cmToPx,
+      h: s.h * cmToPx,
+    }));
 
     // Draw photos in slots
     for (let i = 0; i < selectedPhotos.length && i < slots.length; i++) {
