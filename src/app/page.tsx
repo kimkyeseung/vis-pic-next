@@ -33,6 +33,9 @@ export default function Home() {
 
   return (
     <main className="w-full h-screen flex flex-col items-center justify-center relative overflow-hidden">
+      <div className="absolute top-4 right-5 z-10 text-gray-500 text-xs select-none">
+        빌드 {process.env.NEXT_PUBLIC_BUILD_DATE}
+      </div>
       <div className="pattern-overlay" />
       <div className="floating-elements">
         <div className="floating-element" />

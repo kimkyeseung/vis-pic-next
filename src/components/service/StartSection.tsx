@@ -20,6 +20,9 @@ export function StartSection({
 
   return (
     <section className="w-full h-full flex flex-col items-center justify-center cursor-pointer relative z-10" onClick={onNext}>
+      <div className="absolute top-4 right-5 text-gray-500 text-xs select-none">
+        빌드 {process.env.NEXT_PUBLIC_BUILD_DATE}
+      </div>
       <div className="main-container flex flex-col items-center">
         <div className="logo-section text-center mb-24 animate-fadeInDown">
           <h1 className="text-7xl font-extrabold mb-5 tracking-widest text-white" style={{ textShadow: "0 2px 15px rgba(0,0,0,0.5)" }}>
