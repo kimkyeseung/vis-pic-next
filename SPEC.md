@@ -1,6 +1,6 @@
 # AR-pic 프로젝트 명세서 (Project Specification)
 
-> **버전:** 0.1.0 | **앱 식별자:** net.viswave.arpic | **최종 수정:** 2026-07-03
+> **버전:** 0.1.0 | **앱 식별자:** net.viswave.arpic | **최종 수정:** 2026-07-05
 
 ---
 
@@ -240,13 +240,14 @@
 
 ### Step 7: COMPLETE
 
-1. 선택 사진 합성 이미지 생성
+1. 선택 사진 합성 이미지 생성 (`src/lib/printLayout.ts` 공용 레이아웃 계산 사용)
 2. `POST /api/print/upload-image` → 3일 만료 URL
 3. `POST /api/gif/create-layout` → 애니메이션 GIF URL
 4. QR 코드 표시 (사진 URL + GIF URL)
-5. 프린터 목록 조회 (`get_printers` Tauri 명령어)
-6. 인쇄 버튼 → `print_image` Tauri 명령어 호출
-7. 재시작 버튼 → Step 1으로 리셋
+5. 인쇄 버튼 → `print_image` Tauri 명령어 호출 (전역 설정 `PRINTER_NAME` 사용, 비어 있으면 기본 프린터)
+6. 재시작 버튼 → Step 1으로 리셋
+
+※ 프린터 목록 조회(`get_printers`)는 관리자 인화 설정 페이지에서 사용된다.
 
 ---
 
@@ -314,9 +315,13 @@
 ```
 useFrameSender     → POST /api/camera-frame (throttled)
 useFrameReceiver   → EventSource GET /api/camera-frame
-useSceneSyncSender → BroadcastChannel.postMessage(state)
-useSceneSyncReceiver → BroadcastChannel.onmessage(state)
+useSceneSyncSender → BroadcastChannel.postMessage(state)   ※ 레거시
+useSceneSyncReceiver → BroadcastChannel.onmessage(state)   ※ 레거시
 ```
+
+※ 프레임에 배경·스티커가 **합성된 상태로 전송**되므로 output 페이지는
+`useFrameReceiver`만 사용한다. BroadcastChannel 기반 상태 동기화 훅은
+코드에 남아 있으나 현재 수신처가 없다 (제거 후보).
 
 ---
 
@@ -473,8 +478,8 @@ useSceneSyncReceiver → BroadcastChannel.onmessage(state)
 | `get_printers` | `Vec<String>` | Windows 프린터 목록 (PowerShell) |
 | `get_cameras` | `Vec<String>` | 연결된 카메라 목록 (PnP) |
 | `print_image(printer_name, image_data)` | `Result<bool, String>` | base64 JPEG 출력 (.NET PrintDocument) |
-| `mediapipe_is_installed` | `bool` | WASM 파일 로컬 캐시 여부 (디버그 모드: 항상 true) |
-| `download_mediapipe` | `Result<(), String>` | CDN에서 MediaPipe 다운로드 + `mediapipe-progress` 이벤트 발행 |
+| `mediapipe_is_installed` | `bool` | 필수 파일 **전체**(wasm 6개 + 모델)의 완전성 검사 (디버그 모드: 항상 true) |
+| `download_mediapipe` | `Result<(), String>` | CDN에서 MediaPipe 다운로드 + `mediapipe-progress` 이벤트 발행. 임시 파일(`.download`)로 받은 뒤 rename하여 부분 다운로드 잔존 방지 |
 | `save_settings` | `Result<bool, String>` | `%APPDATA%\ar-pic\settings.json` 저장 |
 | `load_settings` | `Result<HashMap<String,String>, String>` | 설정 JSON 로드 |
 
@@ -482,12 +487,18 @@ useSceneSyncReceiver → BroadcastChannel.onmessage(state)
 
 1. `%LOCALAPPDATA%\ar-pic\.version` 파일로 버전 비교
 2. 버전 불일치 시 `server.zip` 압축 해제 (`%LOCALAPPDATA%\ar-pic\server\`)
-3. MediaPipe 캐시가 있으면 서버 디렉토리에 자동 복사
+3. MediaPipe 캐시가 있고 서버 디렉토리가 **불완전하면** 캐시에서 다시 복사
 4. 포트 3001 선점 프로세스 종료
-5. `node.exe server.js` 자식 프로세스 시작
+5. `node.exe server.js` 자식 프로세스 시작 (`HOSTNAME=127.0.0.1` 바인딩)
 6. 최대 60초 대기 후 서버 준비 확인
 7. WebView2 카메라 권한 자동 허용 (localhost URL)
 8. F11 전역 단축키 등록
+
+### 종료 동작
+
+- **메인 창**(`main`)이 파괴될 때만 Node 자식 프로세스를 종료한다.
+  서브 모니터 창(`camera-output`)을 닫거나 재생성해도 서버는 유지된다
+  (`should_shutdown_server_on_destroy`, 단위 테스트 포함).
 
 ### 키보드 단축키
 
@@ -581,17 +592,42 @@ sticker 오버레이 (canvas.drawImage / fillText)
 
 ### 인쇄 레이아웃 설정 키 패턴
 
+키의 `{ID}`는 모드 문자열의 `x`를 `_`로 치환한 형태다 (예: `2x2` → `MODE_2_2_*`).
+
 ```
-MODE_{ID}_WIDTH       # 인화지 너비 (cm)
-MODE_{ID}_HEIGHT      # 인화지 높이 (cm)
-MODE_{ID}_HGAP        # 가로 간격 (cm)
-MODE_{ID}_VGAP        # 세로 간격 (cm)
-MODE_{ID}_MARGIN_TOP  # 상단 여백 (cm, 선택)
-MODE_{ID}_MARGIN_LEFT # 좌측 여백 (cm, 선택)
-PRINT_BACKGROUND      # 인쇄 배경 이미지 (선택)
+MODE_{ID}_WIDTH          # 사진 슬롯 너비 (cm)
+MODE_{ID}_HEIGHT         # 사진 슬롯 높이 (cm)
+MODE_{ID}_HGAP           # 사진 간 가로 간격 (cm)
+MODE_{ID}_VGAP           # 사진 간 세로 간격 (cm)
+MODE_{ID}_MARGIN_TOP     # 상단 여백 (cm, 선택)
+MODE_{ID}_MARGIN_BOTTOM  # 하단 여백 (cm, 선택)
+MODE_{ID}_MARGIN_LEFT    # 좌측 여백 (cm, 선택)
+MODE_{ID}_MARGIN_RIGHT   # 우측 여백 (cm, 선택)
+PICTURE_WIDTH            # 인화지 너비 (cm)
+PICTURE_HEIGHT           # 인화지 높이 (cm)
+PRINT_BACKGROUND         # 인쇄 배경 이미지 (선택)
+PRINTER_NAME             # 출력 프린터 이름 (비우면 기본 프린터)
 ```
 
-예: `MODE_2X2_WIDTH=10`, `MODE_2X2_HEIGHT=15`, `MODE_2X2_HGAP=0.3`, `MODE_2X2_VGAP=0.3`
+예: `MODE_2_2_WIDTH=6.5`, `MODE_2_2_HEIGHT=4.7`, `MODE_2_2_HGAP=0.2`, `MODE_2_2_VGAP=0.2`
+
+### 슬롯 배치 계산 (`src/lib/printLayout.ts`)
+
+관리자 인화 설정의 **실시간 미리보기**와 서비스의 **합성/레이아웃 GIF**가
+동일한 `computePrintLayout()` 함수를 사용한다 (보이는 대로 인쇄 보장).
+
+**여백 규칙** (가로/세로 축 각각 독립):
+
+| 입력 상태 | 배치 기준 |
+|-----------|----------|
+| 상단(좌측) 여백 지정 | 위(왼쪽) 기준 |
+| 하단(우측) 여백만 지정 | 아래(오른쪽) 기준 |
+| 둘 다 비움 | 중앙 정렬 |
+| 둘 다 지정 | 상단/좌측 우선 (관리자 UI에서 동시 입력을 비활성화로 차단) |
+
+- 빈 문자열·NaN·음수 값은 "미설정"으로 취급 (`parseCm`)
+- `WIDTH`/`HEIGHT` 미설정 시 4:3 비율 자동 배치 폴백
+- 슬롯이 인화지를 벗어나면 `overflow` 플래그 → 미리보기에 빨간 슬롯 + 경고 배너 표시
 
 ### 중간 프레임 (Intermediate Frames)
 
@@ -665,9 +701,8 @@ CameraSection (메인 윈도우)
     POST /api/camera-frame
     → Output Page
 
-상태 동기화 (BroadcastChannel):
-service/page.tsx → useSceneSyncSender → postMessage
-동기화 항목: selectedBackground, backgroundImages, chromakeyRgb, stickers[]
+※ 배경·스티커가 합성된 프레임이 전송되므로 output 페이지에 별도 상태
+동기화가 필요 없다. (BroadcastChannel 훅은 레거시 — §7 참고)
 ```
 
 ### CameraStreamer 배경 합성 모드
@@ -781,13 +816,13 @@ PAYAPP_RETURN_URL      # 결제 완료 후 리다이렉트 URL
 
 | 파일 | 출처 | 크기(약) |
 |------|------|---------|
-| `vision_wasm_internal.js` | jsDelivr | ~800KB |
-| `vision_wasm_internal.wasm` | jsDelivr | ~7MB |
-| `vision_wasm_internal_simd.js` | jsDelivr | ~800KB |
-| `vision_wasm_internal_simd.wasm` | jsDelivr | ~7MB |
-| `vision_wasm_nosimd.js` | jsDelivr | ~800KB |
-| `vision_wasm_nosimd.wasm` | jsDelivr | ~7MB |
-| `selfie_multiclass_256x256.tflite` | Google Storage | ~20MB |
+| `wasm/vision_wasm_internal.js` | jsDelivr | ~800KB |
+| `wasm/vision_wasm_internal.wasm` | jsDelivr | ~7MB |
+| `wasm/vision_wasm_module_internal.js` | jsDelivr | ~800KB |
+| `wasm/vision_wasm_module_internal.wasm` | jsDelivr | ~7MB |
+| `wasm/vision_wasm_nosimd_internal.js` | jsDelivr | ~800KB |
+| `wasm/vision_wasm_nosimd_internal.wasm` | jsDelivr | ~7MB |
+| `model/selfie_multiclass_256x256.tflite` | Google Storage | ~20MB |
 
 ### 캐시 전략
 
@@ -796,15 +831,20 @@ PAYAPP_RETURN_URL      # 결제 완료 후 리다이렉트 URL
     ↓ mediapipe_is_installed() → false
     ↓ MediapipeLoader.tsx: 다운로드 UI 표시
     ↓ download_mediapipe() Rust 명령어
-    ↓ 7개 파일 순차 다운로드
+    ↓ 7개 파일 순차 다운로드 (파일별 {이름}.download 임시 파일 → 성공 시 rename)
     ↓ %LOCALAPPDATA%\ar-pic\mediapipe\ 에 저장
     ↓ server\ 디렉토리에 복사
 
 이후 실행
-    ↓ prepare_server_dir()에서 캐시 → server\ 자동 복사
-    ↓ mediapipe_is_installed() → true
+    ↓ prepare_server_dir(): server\ 쪽 파일이 불완전하면 캐시에서 재복사
+    ↓ mediapipe_is_installed() → 필수 7개 파일 전체 존재 시에만 true
     ↓ 다운로드 UI 스킵
 ```
+
+**부분 다운로드 복구**: 다운로드가 중간에 중단되어도 (1) 임시 파일 rename
+방식이라 불완전한 파일이 최종 경로에 남지 않고, (2) 설치 검사가 전체 파일
+기준이라 다음 실행 시 다운로드 UI가 다시 표시되어 이어받는다
+(`download_file`은 이미 존재하는 파일을 스킵).
 
 **디버그 모드**: `mediapipe_is_installed()` 항상 `true` 반환 (다운로드 스킵)
 
@@ -820,9 +860,10 @@ PAYAPP_RETURN_URL      # 결제 완료 후 리다이렉트 URL
 | API 응답 | 네트워크-first → 캐시 폴백 | `arpic-dynamic-v2` |
 | `/api/payments/*` | 네트워크 전용 (실패 시 오류) | — |
 
-### 사전 캐시 항목 (17개)
+### 사전 캐시 항목 (10개)
 
-주요 페이지 (`/`, `/service`, `/admin`), MediaPipe WASM 파일, 핵심 정적 자산
+페이지 4종 (`/`, `/service`, `/admin`, `/output`), `manifest.json`,
+MediaPipe WASM 4종 + 모델 1종
 
 ### PWA 매니페스트 (`public/manifest.json`)
 
@@ -861,6 +902,10 @@ PAYAPP_RETURN_URL      # 결제 완료 후 리다이렉트 URL
 3. 디바이스별 설정 (DeviceSetting 테이블, /api/device/[id]/settings)
 ```
 
+병합은 클라이언트의 `useDeviceSetup.loadSettings()`에서 수행한다:
+전역과 디바이스 설정을 병렬 조회 후 `{...global, ...device}`로 합쳐
+`config`(파싱된 값)와 `printSettings`(원시 키-값)를 구성한다.
+
 ### 주요 설정 키
 
 | 키 | 기본값 | 설명 |
@@ -875,8 +920,10 @@ PAYAPP_RETURN_URL      # 결제 완료 후 리다이렉트 URL
 | `PAYMENT_TERMINAL_MODE` | "manual" | 결제 모드 |
 | `IDLE_TIMEOUT_SECONDS` | "30" | 자동 진행 타임아웃 |
 | `CAMERA_AUTO_TIMER` | "60" | 자동 촬영 타이머 (초) |
-| `MODE_2X2_WIDTH` | — | 2×2 모드 인화지 너비 (cm) |
-| `MODE_2X2_HEIGHT` | — | 2×2 모드 인화지 높이 (cm) |
+| `PICTURE_WIDTH` / `PICTURE_HEIGHT` | "10" / "15" | 인화지 크기 (cm) |
+| `PRINTER_NAME` | "" | 출력 프린터 (비우면 기본 프린터) |
+| `MODE_2_2_WIDTH` | — | 2×2 모드 사진 슬롯 너비 (cm) |
+| `MODE_2_2_HEIGHT` | — | 2×2 모드 사진 슬롯 높이 (cm) |
 
 ---
 
@@ -950,7 +997,7 @@ npm run tauri:build
          └─ NSIS 인스톨러 생성
 
 출력물:
-  src-tauri/target/release/bundle/nsis/비즈웨이브 AR-pic_0.1.0_x64-setup.exe
+  src-tauri/target/release/bundle/nsis/AR-pic_0.1.0_x64-setup.exe
 ```
 
 ### server.zip 크기 최적화
@@ -969,7 +1016,8 @@ npm run tauri:build
 
 | 항목 | 값 |
 |------|---|
-| 앱 이름 | 비즈웨이브 AR-pic |
+| 제품명 (productName) | AR-pic |
+| 창 제목 | 비즈웨이브 AR-pic |
 | 버전 | 0.1.0 |
 | 식별자 | net.viswave.arpic |
 | 초기 창 크기 | 1920×1080 |
@@ -987,11 +1035,16 @@ npm run tauri:build
 | 메뉴 | 경로 | 주요 기능 |
 |------|------|---------|
 | 디바이스 관리 | `/admin/devices` | 생성, 편집, 복제 |
-| 이미지 관리 | `/admin/images` | 배경/프레임 이미지 조회, 삭제, 업로드 |
-| 인쇄 설정 | `/admin/print-setting` | 모드별 인화지 치수/간격 설정 |
-| 시스템 설정 | `/admin/settings` | 촬영 횟수, 크로마키, 타임아웃 등 전역 설정 |
-| 결제 설정 | `/admin/payment` | PayApp 활성화, 금액, 단말 모드 설정 |
+| 이미지 관리 | `/admin/images` | 배경/프레임/스티커 탭별 조회·삭제·업로드, MP4/WebM 영상 미리보기 |
+| 인화 설정 | `/admin/print-setting` | 인화지 크기, 모드별 사진 크기·간격·4방향 여백, 배경 이미지, 프린터 선택. 설정값 실시간 미리보기 + 용지 초과 경고 |
+| 시스템 설정 | `/admin/settings` | 유휴 타임아웃, 촬영 횟수, 크로마키 등 전역 설정 (그룹: 기본/촬영/기타) |
+| 결제 설정 | `/admin/payment` | PayApp 활성화, 금액, 단말 모드 설정 (전역 적용, 디바이스 설정이 우선) |
 | 결제 내역 | `/admin/payment-history` | 거래 이력 조회 |
+
+- 이미지 타입(배경=1, 프레임=2, 스티커=3)은 `/api/admin/image-types` 조회 시
+  기본 3종이 upsert로 보장된다 (시드 이전 DB에서도 스티커 업로드 가능).
+- 인화 설정의 여백 입력은 상/하 또는 좌/우를 동시에 설정할 수 없다
+  (한쪽 입력 시 반대쪽 비활성화, 비우면 자동 중앙 정렬 — §13 참고).
 
 ### 인증
 
@@ -1012,6 +1065,7 @@ npm run tauri:build
 | MediaPipe 로더 | `src/components/MediapipeLoader.tsx` |
 | 사진 흐름 훅 | `src/hooks/usePhotoFlow.ts` |
 | 장면 동기화 훅 | `src/hooks/useSceneSync.ts` |
+| 인화 레이아웃 계산 | `src/lib/printLayout.ts` |
 | Tauri 백엔드 | `src-tauri/src/lib.rs` |
 | Tauri 설정 | `src-tauri/tauri.conf.json` |
 | Prisma 스키마 | `prisma/schema.prisma` |
