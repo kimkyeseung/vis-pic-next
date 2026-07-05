@@ -646,9 +646,10 @@ PRINTER_NAME             # 출력 프린터 이름 (비우면 기본 프린터)
 
 ### 중간 프레임 (Intermediate Frames)
 
-- 촬영 카운트다운 중 3~4장의 중간 프레임을 `intermediateFrames[photoIndex][]`에 저장
+- 촬영 카운트다운 중 **~180ms 간격**으로 중간 프레임을 `intermediateFrames[photoIndex][]`에 저장
+  (GIF 재생 10fps와 매칭, 800px 다운스케일 JPEG, 최근 24장만 유지 — 메모리·파일 크기 제한)
 - `CompleteSection`에서 `/api/gif/create-layout` 호출 시 사용
-- GIF 애니메이션: 촬영 과정이 자연스럽게 보임
+- GIF 애니메이션: 촬영 과정이 자연스럽게 보임 (10fps, 24프레임 시 ~2.4초 루프)
 
 ---
 
@@ -769,17 +770,26 @@ open_camera_window(x, y, width, height)
 - 최대 너비 800px (비율 유지 리사이징)
 - `gif-encoder-2` + `sharp` 사용
 - Neuquant 팔레트 (quality=10)
+- 프레임 지속시간: 중간 프레임 GIF는 100ms(10fps), 완성 사진 나열 GIF는 800ms
+  ※ GIF 딜레이를 20ms 미만으로 낮추면 브라우저가 100ms로 강제하므로 50fps가 포맷 실질 한계
 
 ### 레이아웃 GIF (`/api/gif/create-layout`)
 
-- 입력: `intermediate_pictures` (위치별 프레임 배열), 레이아웃 파라미터
+- 입력: `intermediate_pictures` (위치별 프레임 배열), 레이아웃 파라미터,
+  프레임 스타일 파라미터(`corner_radius`/`border_width`/`border_color`),
+  배경 데이터 URL(`background_image_data`)
+- **합성 사진과 동일한 프레임 스타일 적용**: 클라이언트가 배경만 그려진
+  합성 캔버스 스냅샷과 스타일 값(공용 상수 `FRAME_CORNER_RADIUS_CM` 등,
+  `src/lib/printLayout.ts`)을 GIF 축척으로 환산해 전달 → 서버가 SVG 마스크로
+  둥근 모서리, SVG 스트로크로 테두리를 각 사진에 적용
 - 로직:
-  1. 각 프레임을 `photo_width × photo_height`로 리사이징
-  2. 배경 컬러/이미지가 있는 베이스 캔버스 생성
+  1. 각 프레임을 `photo_width × photo_height`로 리사이징 + 둥근 모서리·테두리 적용
+  2. 배경 베이스 캔버스 생성 — `background_image_data`(합성과 동일 배경) >
+     `background_image`(PRINT_BACKGROUND 파일) > `background_color` 순
      (단색 배경은 반드시 png로 인코딩 — `sharp({create})`를 포맷 미지정으로
      `toBuffer()`하면 raw 픽셀이 반환되어 이후 재파싱이 실패한다)
   3. 각 애니메이션 프레임마다 모든 포지션 버퍼를 계산된 오프셋에 합성
-  4. GIF 인코딩
+  4. GIF 인코딩 (duration 100ms = 10fps)
 
 ### 물리적 인쇄 (`print_image` Tauri 명령어)
 
