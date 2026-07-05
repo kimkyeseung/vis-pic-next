@@ -34,15 +34,16 @@ export function SelectSection({
         {requiredCount}장을 선택해 주세요 ({selectedPhotos.length}/{requiredCount})
       </p>
 
-      <div className="flex gap-8 mb-20 animate-fadeInUp">
+      <div className="flex flex-wrap justify-center gap-8 mb-20 max-w-6xl animate-fadeInUp">
         {photos.map((photo, i) => (
           <div
             key={i}
-            className={`photo-thumbnail w-56 bg-black/30 flex items-center justify-center relative overflow-hidden ${selectedPhotos.includes(i) ? "selected" : ""}`}
+            className={`photo-thumbnail w-80 bg-black/30 relative overflow-hidden ${selectedPhotos.includes(i) ? "selected" : ""}`}
+            style={{ aspectRatio: "auto" }}
             onClick={() => togglePhoto(i)}
           >
             {selectedPhotos.includes(i) && <span className="check-mark">&#10003;</span>}
-            <img src={photo} alt={`Photo ${i + 1}`} className="w-full h-full object-cover" />
+            <img src={photo} alt={`Photo ${i + 1}`} className="w-full h-auto block" />
           </div>
         ))}
       </div>
