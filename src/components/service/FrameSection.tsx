@@ -1,5 +1,6 @@
 import { FRAME_INFO } from "@/constants/frames";
 import { computePrintLayout } from "@/lib/printLayout";
+import { useLanguage } from "@/i18n/LanguageContext";
 import type { FrameInfoEntry } from "@/types";
 
 // 미리보기 축척: 1cm → 12px (인화지 10×15cm 기준 120×180px)
@@ -45,6 +46,7 @@ export function FrameSection({
   onNext: () => void;
   onPrev: () => void;
 }) {
+  const { t } = useLanguage();
   const frames = captureModes
     .map((mode) => ({ id: mode, ...FRAME_INFO[mode] }))
     .filter((f) => f.label);
@@ -52,7 +54,7 @@ export function FrameSection({
   return (
     <section className="w-full h-full flex flex-col items-center justify-center relative z-10">
       <h2 className="text-4xl font-extrabold text-white mb-16 animate-fadeInDown" style={{ textShadow: "0 2px 15px rgba(0,0,0,0.5)" }}>
-        프레임을 선택해 주세요
+        {t("frame.title")}
       </h2>
 
       <div className="flex gap-10 mb-20 animate-fadeInUp">
@@ -66,21 +68,21 @@ export function FrameSection({
             <div className="h-48 flex items-center justify-center mb-5">
               <PaperPreview mode={frame.id} frame={frame} />
             </div>
-            <span className="text-2xl font-bold text-white">{frame.label}</span>
+            <span className="text-2xl font-bold text-white">{t("frame.cut", { n: frame.count })}</span>
           </div>
         ))}
       </div>
 
       <div className="flex gap-6 animate-fadeInUp" style={{ animationDelay: "0.3s" }}>
         <button className="service-button nav-button" style={{ background: "rgba(255,255,255,0.1)", color: "#fff" }} onClick={onPrev}>
-          &#9664; 이전으로
+          &#9664; {t("common.prev")}
         </button>
         <button
           className={`service-button nav-button ${!selectedFrame ? "disabled" : ""}`}
           onClick={onNext}
           style={!selectedFrame ? { opacity: 0.5, pointerEvents: "none" } : {}}
         >
-          다음으로 &#9654;
+          {t("common.next")} &#9654;
         </button>
       </div>
     </section>

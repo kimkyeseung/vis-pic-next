@@ -1,5 +1,6 @@
 import type { BGImage } from "@/types";
 import { FALLBACK_BACKGROUNDS } from "@/constants/frames";
+import { useLanguage } from "@/i18n/LanguageContext";
 
 export function BackgroundSection({
   backgroundImages,
@@ -16,12 +17,13 @@ export function BackgroundSection({
   onNext: () => void;
   onPrev: () => void;
 }) {
+  const { t } = useLanguage();
   const hasDbImages = backgroundImages.length > 0;
 
   return (
     <section className="w-full h-full flex flex-col items-center justify-center relative z-10">
       <h2 className="text-4xl font-extrabold text-white mb-16 animate-fadeInDown" style={{ textShadow: "0 2px 15px rgba(0,0,0,0.5)" }}>
-        배경을 선택해 주세요
+        {t("bg.title")}
       </h2>
 
       <div className="grid grid-cols-3 gap-8 mb-20 animate-fadeInUp">
@@ -69,14 +71,14 @@ export function BackgroundSection({
 
       <div className="flex gap-6 animate-fadeInUp" style={{ animationDelay: "0.3s" }}>
         <button className="service-button nav-button" style={{ background: "rgba(255,255,255,0.1)", color: "#fff" }} onClick={onPrev}>
-          &#9664; 이전으로
+          &#9664; {t("common.prev")}
         </button>
         <button
           className="service-button nav-button"
           onClick={onNext}
           style={selectedBackground === null ? { opacity: 0.5, pointerEvents: "none" } : {}}
         >
-          다음으로 &#9654;
+          {t("common.next")} &#9654;
         </button>
       </div>
     </section>

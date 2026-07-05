@@ -7,6 +7,8 @@ import { fillGradientFromCSS } from "@/lib/canvas";
 import { AVAILABLE_STICKERS } from "@/constants/stickers";
 import { useFrameSender } from "@/hooks/useSceneSync";
 import { CircularTimer } from "@/components/service/CircularTimer";
+import { useLanguage } from "@/i18n/LanguageContext";
+import type { MessageKey } from "@/i18n/translations";
 
 type ConfidenceMask = {
   getAsFloat32Array: () => Float32Array;
@@ -141,6 +143,7 @@ export function CameraSection({
   onStickersChange: (stickers: Sticker[]) => void;
   onBackgroundSelect: (bg: number) => void;
 }) {
+  const { t } = useLanguage();
   const videoRef = useRef<HTMLVideoElement>(null);
   const displayCanvasRef = useRef<HTMLCanvasElement>(null);
   const bgSourceRef = useRef<HTMLImageElement | HTMLVideoElement | null>(null);
@@ -148,7 +151,7 @@ export function CameraSection({
   const segmenterRef = useRef<any>(null);
   const animFrameRef = useRef<number>(0);
   const [countdown, setCountdown] = useState<number | null>(null);
-  const [cameraError, setCameraError] = useState<string | null>(null);
+  const [cameraError, setCameraError] = useState<{ key: MessageKey; reason?: string } | null>(null);
   const [flash, setFlash] = useState(false);
   const [segmenterStatus, setSegmenterStatus] = useState<"idle" | "loading" | "ready" | "error">("idle");
   const [segmenterError, setSegmenterError] = useState<string | null>(null);
@@ -305,9 +308,9 @@ export function CameraSection({
     } catch (err) {
       const e = err as DOMException;
       if (e.name === "NotAllowedError") {
-        setCameraError("카메라 권한이 거부되었습니다. 브라우저 설정에서 허용해 주세요.");
+        setCameraError({ key: "camera.errPermission" });
       } else if (e.name === "NotFoundError") {
-        setCameraError("연결된 카메라가 없습니다.");
+        setCameraError({ key: "camera.errNotFound" });
         // 진단: 브라우저 레벨 장치 목록 + OS 레벨 장치 목록 수집
         navigator.mediaDevices?.enumerateDevices().then(async (devices) => {
           const videoInputs = devices.filter((d) => d.kind === "videoinput");
@@ -327,10 +330,10 @@ export function CameraSection({
         if (!retryMs) {
           startCamera(800);
         } else {
-          setCameraError("카메라가 다른 프로그램에서 사용 중입니다. 잠시 후 다시 시도하세요.");
+          setCameraError({ key: "camera.errBusy" });
         }
       } else {
-        setCameraError(`카메라를 사용할 수 없습니다 (${e.name || e.message})`);
+        setCameraError({ key: "camera.errGeneric", reason: e.name || e.message });
       }
     }
   }, [stopCamera]);
@@ -806,7 +809,7 @@ export function CameraSection({
           {cameraError ? (
             <div className="absolute inset-0 flex flex-col items-center justify-center bg-gradient-to-br from-gray-700 to-gray-900">
               <span className="text-6xl mb-5 opacity-30">&#128247;</span>
-              <p className="text-white/60 mb-2">{cameraError}</p>
+              <p className="text-white/60 mb-2">{t(cameraError.key, { reason: cameraError.reason ?? "" })}</p>
               <p className="text-white/40 text-xs mb-6 max-w-xs text-center min-h-[1em]">
                 {cameraDeviceDiag ?? "장치 확인 중..."}
               </p>
@@ -815,7 +818,7 @@ export function CameraSection({
                   className="px-6 py-3 bg-white/10 hover:bg-white/20 text-white rounded-xl transition-colors"
                   onClick={() => startCamera()}
                 >
-                  다시 시도
+                  {t("common.retry")}
                 </button>
                 <button
                   className="px-6 py-3 bg-blue-600/80 hover:bg-blue-500 text-white rounded-xl transition-colors"
@@ -844,12 +847,12 @@ export function CameraSection({
           )}
           {bgRemovalMode === "mediapipe" && segmenterStatus === "loading" && (
             <div className="absolute bottom-4 left-4 bg-black/70 text-white text-sm px-4 py-2 rounded-lg">
-              AI 모델 로딩 중...
+              {t("camera.aiLoading")}
             </div>
           )}
           {bgRemovalMode === "mediapipe" && segmenterStatus === "error" && (
             <div className="absolute bottom-4 left-4 bg-red-900/80 text-white text-sm px-4 py-2 rounded-lg max-w-xs">
-              <div>AI 모델 로드 실패</div>
+              <div>{t("camera.aiError")}</div>
               {segmenterError && <div className="text-xs mt-1 opacity-80 break-all">{segmenterError}</div>}
             </div>
           )}
@@ -906,7 +909,7 @@ export function CameraSection({
       {/* 우측: 촬영 컨트롤 패널 */}
       <div className="w-80 shrink-0 p-6 flex flex-col border-l border-white/10 bg-black/20">
         <div className="flex items-baseline justify-between mb-5">
-          <h3 className="text-xl font-bold text-white">촬영</h3>
+          <h3 className="text-xl font-bold text-white">{t("camera.title")}</h3>
           <span className="text-white/60 text-sm font-semibold tabular-nums">
             {photos.length} / {maxPhotos}
           </span>
@@ -934,7 +937,7 @@ export function CameraSection({
           onClick={handleManualCapture}
           style={countdown !== null || photos.length >= maxPhotos ? { opacity: 0.5, pointerEvents: "none" } : {}}
         >
-          &#128248; 촬영하기
+          &#128248; {t("camera.shoot")}
         </button>
 
         {/* 스티커 버튼 */}
@@ -944,7 +947,7 @@ export function CameraSection({
             style={{ background: showStickerPicker ? "rgba(99,102,241,0.6)" : "rgba(255,255,255,0.1)", color: "#fff" }}
             onClick={() => setShowStickerPicker((v) => !v)}
           >
-            ✨ 스티커 추가
+            ✨ {t("camera.sticker")}
           </button>
           {showStickerPicker && (
             <div className="absolute bottom-full mb-2 left-0 right-0 bg-black/80 border border-white/20 rounded-2xl p-3 backdrop-blur-sm">
@@ -956,7 +959,7 @@ export function CameraSection({
                     className={`flex-1 py-1 rounded-lg text-xs font-medium transition-colors ${stickerTab === tab ? "bg-white/20 text-white" : "text-white/50 hover:text-white/70"}`}
                     onClick={() => setStickerTab(tab)}
                   >
-                    {tab === "emoji" ? "이모지" : "이미지"}
+                    {tab === "emoji" ? t("camera.stickerEmoji") : t("camera.stickerImage")}
                   </button>
                 ))}
               </div>
@@ -979,7 +982,7 @@ export function CameraSection({
               {stickerTab === "image" && (
                 dbStickerImages.length === 0 ? (
                   <p className="text-center text-white/40 text-xs py-4">
-                    업로드된 스티커가 없습니다
+                    {t("camera.noStickers")}
                   </p>
                 ) : (
                   <div className="grid grid-cols-4 gap-2 max-h-40 overflow-y-auto">
@@ -1007,7 +1010,7 @@ export function CameraSection({
                   className="mt-2 w-full text-xs text-white/40 hover:text-white/70 transition-colors py-1"
                   onClick={() => { onStickersChange([]); setShowStickerPicker(false); }}
                 >
-                  전체 삭제
+                  {t("camera.clearStickers")}
                 </button>
               )}
             </div>
@@ -1017,14 +1020,14 @@ export function CameraSection({
 
         <div className="mt-auto flex flex-col gap-3">
           <button className="service-button nav-button w-full" style={{ background: "rgba(255,255,255,0.1)", color: "#fff" }} onClick={onPrev}>
-            &#9664; 이전으로
+            &#9664; {t("common.prev")}
           </button>
           <button
             className="service-button nav-button w-full"
             onClick={onNext}
             style={!canProceed ? { opacity: 0.5, pointerEvents: "none" } : {}}
           >
-            다음으로 &#9654;
+            {t("common.next")} &#9654;
           </button>
         </div>
       </div>

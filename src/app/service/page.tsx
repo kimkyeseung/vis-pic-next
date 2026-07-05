@@ -3,6 +3,7 @@
 import { useEffect, Suspense } from "react";
 import { FALLBACK_BACKGROUNDS } from "@/constants/frames";
 import { useSearchParams } from "next/navigation";
+import { LanguageProvider, useLanguage } from "@/i18n/LanguageContext";
 import { useSceneSyncSender } from "@/hooks/useSceneSync";
 import { useDeviceSetup } from "@/hooks/useDeviceSetup";
 import { usePhotoFlow } from "@/hooks/usePhotoFlow";
@@ -34,6 +35,12 @@ function ServiceContent() {
   );
 
   const { currentStep, slotsNeeded, selectedBackground, setSelectedBackground } = flow;
+  const { setLang, t } = useLanguage();
+
+  // 대기 화면으로 돌아오면 다음 손님을 위해 언어를 한국어로 초기화
+  useEffect(() => {
+    if (currentStep === "start") setLang("ko");
+  }, [currentStep, setLang]);
 
   // 씬 상태 브로드캐스트
   useEffect(() => {
@@ -72,7 +79,7 @@ function ServiceContent() {
       {flow.isPreparingComplete && (
         <div className="absolute inset-0 z-[100] bg-black/70 backdrop-blur-sm flex flex-col items-center justify-center">
           <div className="w-16 h-16 border-4 border-white/20 border-t-white rounded-full animate-spin mb-6" />
-          <p className="text-white text-2xl font-bold">사진 저장 중...</p>
+          <p className="text-white text-2xl font-bold">{t("page.saving")}</p>
         </div>
       )}
       <FloatingElements />
@@ -192,7 +199,9 @@ function ServiceContent() {
 export default function ServicePage() {
   return (
     <Suspense fallback={<div className="w-full h-screen bg-[#2a2a2a]" />}>
-      <ServiceContent />
+      <LanguageProvider>
+        <ServiceContent />
+      </LanguageProvider>
     </Suspense>
   );
 }

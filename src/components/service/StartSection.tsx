@@ -1,5 +1,7 @@
 import { useState } from "react";
 import type { MonitorInfo } from "@/types";
+import { useLanguage } from "@/i18n/LanguageContext";
+import { LOCALES } from "@/i18n/translations";
 
 export function StartSection({
   onNext,
@@ -17,6 +19,7 @@ export function StartSection({
   onMonitorIndexChange: (i: number) => void;
 }) {
   const [showSettings, setShowSettings] = useState(false);
+  const { lang, setLang, t } = useLanguage();
 
   return (
     <section className="w-full h-full flex flex-col items-center justify-center cursor-pointer relative z-10" onClick={onNext}>
@@ -35,14 +38,31 @@ export function StartSection({
           onClick={(e) => { e.stopPropagation(); onNext(); }}
         >
           <span className="animate-touchBounce inline-block mr-5 text-3xl">&#128070;</span>
-          화면을 터치해주세요
+          {t("start.touch")}
         </button>
+
+        {/* 언어 선택 */}
+        <div className="flex gap-3 mt-12" onClick={(e) => e.stopPropagation()}>
+          {LOCALES.map(({ code, label }) => (
+            <button
+              key={code}
+              className={`px-6 py-3 rounded-full text-base font-semibold transition-all ${
+                lang === code
+                  ? "bg-white text-gray-900 shadow-lg"
+                  : "bg-white/10 text-white/60 hover:bg-white/20 hover:text-white"
+              }`}
+              onClick={() => setLang(code)}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
         <img src="/static/images/viswave_logo.png" className="mt-24 opacity-80" style={{ width: "200px" }} alt="Viswave" onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
       </div>
 
       <div className="absolute bottom-16 text-center text-gray-500 animate-fadeInUp" style={{ animationDelay: "1s" }}>
-        <p className="mb-2">화면 아무 곳이나 터치하여 시작하세요</p>
-        <p className="animate-blink">● 대기중 ●</p>
+        <p className="mb-2">{t("start.hint")}</p>
+        <p className="animate-blink">{t("start.waiting")}</p>
       </div>
 
       {/* 운영자 설정 버튼 */}

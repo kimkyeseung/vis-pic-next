@@ -6,6 +6,7 @@ import type { BGImage } from "@/types";
 import { FRAME_INFO, FALLBACK_BACKGROUNDS } from "@/constants/frames";
 import { roundRect, fillGradient, fillGradientFromCSS, loadImage, resizeForGif } from "@/lib/canvas";
 import { computePrintLayout, modeSettingPrefix, parseCm } from "@/lib/printLayout";
+import { useLanguage } from "@/i18n/LanguageContext";
 
 export function CompleteSection({
   photos,
@@ -38,6 +39,7 @@ export function CompleteSection({
   preparedExpiryDate?: string | null;
   onRestart: () => void;
 }) {
+  const { t } = useLanguage();
   const hasPreparedImage = Boolean(compositeImage && preparedPhotoUrl);
   const [printStatus, setPrintStatus] = useState<"compositing" | "ready" | "printing" | "done" | "error">(
     hasPreparedImage ? "ready" : "compositing",
@@ -419,14 +421,14 @@ export function CompleteSection({
         {printStatus === "compositing" && (
           <>
             <div className="w-20 h-20 border-4 border-white/20 border-t-blue-500 rounded-full animate-spin mx-auto mb-8" />
-            <p className="text-white text-2xl">사진 합성 중...</p>
+            <p className="text-white text-2xl">{t("complete.compositing")}</p>
           </>
         )}
 
         {(printStatus === "ready" || printStatus === "done") && compositeImage && (
           <>
             <h2 className="text-5xl font-extrabold text-white mb-6" style={{ textShadow: "0 2px 15px rgba(0,0,0,0.5)" }}>
-              {printStatus === "done" ? "완료!" : "사진이 완성되었습니다!"}
+              {printStatus === "done" ? t("complete.done") : t("complete.ready")}
             </h2>
 
             <div className="flex items-start justify-center gap-12 mb-10">
@@ -440,27 +442,27 @@ export function CompleteSection({
                     {qrPhotoUrl && (
                       <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-5 border border-white/20 text-center">
                         <div className="text-2xl mb-1">📷</div>
-                        <p className="text-white font-semibold mb-3">사진 다운로드</p>
+                        <p className="text-white font-semibold mb-3">{t("complete.photoDl")}</p>
                         <div
                           className="bg-white p-3 rounded-xl cursor-pointer"
                           onDoubleClick={() => window.open(qrPhotoUrl, "_blank")}
                         >
                           <QRCodeSVG value={qrPhotoUrl} size={120} />
                         </div>
-                        <p className="text-gray-400 text-xs mt-2">QR 스캔</p>
+                        <p className="text-gray-400 text-xs mt-2">{t("complete.qrScan")}</p>
                       </div>
                     )}
                     {qrGifUrl && (
                       <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-5 border border-white/20 text-center">
                         <div className="text-2xl mb-1">🎬</div>
-                        <p className="text-white font-semibold mb-3">GIF 다운로드</p>
+                        <p className="text-white font-semibold mb-3">{t("complete.gifDl")}</p>
                         <div
                           className="bg-white p-3 rounded-xl cursor-pointer"
                           onDoubleClick={() => window.open(qrGifUrl, "_blank")}
                         >
                           <QRCodeSVG value={qrGifUrl} size={120} />
                         </div>
-                        <p className="text-gray-400 text-xs mt-2">QR 스캔</p>
+                        <p className="text-gray-400 text-xs mt-2">{t("complete.qrScan")}</p>
                       </div>
                     )}
                   </div>
@@ -469,7 +471,7 @@ export function CompleteSection({
                     <div className="flex items-center gap-2 bg-black/40 px-4 py-2 rounded-full text-sm">
                       <span>⏰</span>
                       <span className="text-gray-300">
-                        <strong className="text-white">{qrExpiryDate}</strong> 까지 다운로드 가능
+                        {t("complete.expiry", { date: qrExpiryDate })}
                       </span>
                     </div>
                   )}
@@ -480,13 +482,13 @@ export function CompleteSection({
             {printStatus === "ready" && (
               <div className="flex gap-6 justify-center mb-8">
                 <button className="service-button nav-button" onClick={handlePrint}>
-                  &#128424; 인쇄하기
+                  &#128424; {t("complete.print")}
                 </button>
               </div>
             )}
 
             {printStatus === "done" && (
-              <p className="text-gray-400 text-lg mb-8">인쇄가 완료되었습니다</p>
+              <p className="text-gray-400 text-lg mb-8">{t("complete.printDone")}</p>
             )}
 
             <button
@@ -494,7 +496,7 @@ export function CompleteSection({
               style={{ width: "auto", minHeight: "auto", padding: "25px 60px", fontSize: "1.5em" }}
               onClick={onRestart}
             >
-              처음으로 돌아가기
+              {t("complete.restart")}
             </button>
           </>
         )}
@@ -502,21 +504,21 @@ export function CompleteSection({
         {printStatus === "printing" && (
           <>
             <div className="w-20 h-20 border-4 border-white/20 border-t-green-500 rounded-full animate-spin mx-auto mb-8" />
-            <p className="text-white text-2xl">인쇄 중...</p>
+            <p className="text-white text-2xl">{t("complete.printing")}</p>
           </>
         )}
 
         {printStatus === "error" && (
           <>
-            <p className="text-red-400 text-xl mb-4">인쇄 중 오류가 발생했습니다</p>
+            <p className="text-red-400 text-xl mb-4">{t("complete.printError")}</p>
             {printError && (
               <p className="text-red-300 text-sm mb-8 font-mono bg-black/40 px-4 py-2 rounded max-w-lg break-all">{printError}</p>
             )}
             <button className="service-button nav-button" onClick={handlePrint}>
-              다시 시도
+              {t("common.retry")}
             </button>
             <button className="service-button touch-button mt-6" style={{ width: "auto", minHeight: "auto", padding: "25px 60px", fontSize: "1.5em" }} onClick={onRestart}>
-              처음으로 돌아가기
+              {t("complete.restart")}
             </button>
           </>
         )}
