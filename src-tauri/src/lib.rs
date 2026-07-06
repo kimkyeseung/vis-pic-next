@@ -146,7 +146,10 @@ fn prepare_server_dir() -> std::path::PathBuf {
         .join("ar-pic");
     let server_dir = base.join("server");
     let version_file = base.join(".version");
-    let current_version = env!("CARGO_PKG_VERSION");
+    // 앱 버전 + server.zip 내용 해시(build.rs에서 계산) — 같은 앱 버전이라도
+    // 번들이 바뀌면 재추출된다. 버전만 비교하던 시절에는 이전 빌드를 설치했던
+    // PC에서 새로 설치해도 옛 server 디렉터리가 재사용되는 버그가 있었다.
+    let current_version = concat!(env!("CARGO_PKG_VERSION"), "-", env!("SERVER_BUILD_ID"));
 
     let up_to_date = version_file.exists()
         && std::fs::read_to_string(&version_file)
