@@ -496,8 +496,11 @@ useSceneSyncReceiver → BroadcastChannel.onmessage(state)   ※ 레거시
 
 ### 자동 초기화 동작 (앱 시작 시)
 
-1. `%LOCALAPPDATA%\ar-pic\.version` 파일로 버전 비교
-2. 버전 불일치 시 `server.zip` 압축 해제 (`%LOCALAPPDATA%\ar-pic\server\`)
+1. `%LOCALAPPDATA%\ar-pic\.version` 파일로 **앱 버전 + server.zip 내용 해시**
+   (build.rs가 FNV-1a로 계산, `SERVER_BUILD_ID`) 비교 — 같은 앱 버전(0.1.0)이라도
+   번들이 바뀌면 재추출된다 (버전만 비교하면 이전 빌드를 설치했던 PC에서
+   새 설치 후에도 구버전 server 디렉터리가 재사용되는 버그)
+2. 불일치 시 `server.zip` 압축 해제 (`%LOCALAPPDATA%\ar-pic\server\`)
 3. MediaPipe 캐시가 있고 서버 디렉토리가 **불완전하면** 캐시에서 다시 복사
 4. 포트 3001 선점 프로세스 종료
 5. `node.exe server.js` 자식 프로세스 시작 (`HOSTNAME=127.0.0.1` 바인딩)
