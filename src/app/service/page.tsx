@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, Suspense } from "react";
+import { useEffect, useState, Suspense } from "react";
 import { FALLBACK_BACKGROUNDS } from "@/constants/frames";
 import { useSearchParams } from "next/navigation";
 import { LanguageProvider, useLanguage } from "@/i18n/LanguageContext";
@@ -10,6 +10,7 @@ import { usePhotoFlow } from "@/hooks/usePhotoFlow";
 import { useIdleTimer } from "@/hooks/useIdleTimer";
 import { useTauriMonitor } from "@/hooks/useTauriMonitor";
 import { FloatingElements } from "@/components/service/FloatingElements";
+import { PreflightSection } from "@/components/service/PreflightSection";
 import { CircularTimer } from "@/components/service/CircularTimer";
 import { StartSection } from "@/components/service/StartSection";
 import { PaymentSection } from "@/components/service/PaymentSection";
@@ -23,6 +24,7 @@ import { CompleteSection } from "@/components/service/CompleteSection";
 function ServiceContent() {
   const searchParams = useSearchParams();
   const deviceId = searchParams.get("device") || "test";
+  const [preflightDone, setPreflightDone] = useState(false);
 
   const { config, backgroundImages, imageBaseUrl, printSettings } = useDeviceSetup(deviceId);
   const flow = usePhotoFlow(deviceId, config);
@@ -95,7 +97,11 @@ function ServiceContent() {
         />
       )}
 
-      {currentStep === "start" && (
+      {/* 대기 화면 진입 전 시스템 점검 (서버/번들/설정/애셋/AI/카메라) */}
+      {!preflightDone && currentStep === "start" && (
+        <PreflightSection deviceId={deviceId} config={config} onReady={() => setPreflightDone(true)} />
+      )}
+      {preflightDone && currentStep === "start" && (
         <StartSection
           onNext={flow.handleStart}
           monitors={monitors}
