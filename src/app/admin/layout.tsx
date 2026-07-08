@@ -17,18 +17,24 @@ function AdminLayoutInner({ children }: AdminLayoutProps) {
   const { devices, selectedDevice, selectDevice, loading: devicesLoading } = useAdmin();
 
   useEffect(() => {
-    const session = localStorage.getItem("admin_session");
-    if (session) {
-      try {
-        const data = JSON.parse(session);
-        setIsLoggedIn(true);
-        setAdminName(data.name || data.username);
-      } catch {
+    let cancelled = false;
+    // localStorage는 외부 시스템 — 마이크로태스크 콜백에서 읽어 effect 본문 동기 setState를 피한다
+    Promise.resolve().then(() => {
+      if (cancelled) return;
+      const session = localStorage.getItem("admin_session");
+      if (session) {
+        try {
+          const data = JSON.parse(session);
+          setIsLoggedIn(true);
+          setAdminName(data.name || data.username);
+        } catch {
+          setIsLoggedIn(false);
+        }
+      } else {
         setIsLoggedIn(false);
       }
-    } else {
-      setIsLoggedIn(false);
-    }
+    });
+    return () => { cancelled = true; };
   }, [pathname]);
 
   const isLoginPage = pathname.replace(/\/$/, "") === "/admin/login";
@@ -39,7 +45,9 @@ function AdminLayoutInner({ children }: AdminLayoutProps) {
     }
   }, [isLoggedIn, isLoginPage, router]);
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    // httpOnly 세션 쿠키는 서버에서만 지울 수 있다
+    await fetch("/api/admin/logout", { method: "POST" }).catch(() => {});
     localStorage.removeItem("admin_session");
     router.push("/admin/login");
   };

@@ -13,12 +13,48 @@ export async function POST(request: NextRequest) {
       return new Response("FAIL", { status: 400 });
     }
 
+    // ── 위조 방지 검증 ─────────────────────────────────────────
+    // PayApp은 피드백에 판매자 연동 KEY/VALUE(linkkey/linkval)를 담아 보낸다.
+    // 환경변수가 설정돼 있으면 반드시 일치해야 한다 — orderId만 알아도
+    // 임의 요청으로 결제완료 처리되는 것을 막는다.
+    const expectedLinkKey = process.env.PAYAPP_LINKKEY;
+    const expectedLinkVal = process.env.PAYAPP_LINKVAL;
+    if (expectedLinkKey && formData.get("linkkey") !== expectedLinkKey) {
+      console.warn("PayApp feedback rejected: linkkey mismatch", { orderId });
+      return new Response("FAIL", { status: 403 });
+    }
+    if (expectedLinkVal && formData.get("linkval") !== expectedLinkVal) {
+      console.warn("PayApp feedback rejected: linkval mismatch", { orderId });
+      return new Response("FAIL", { status: 403 });
+    }
+    if (!expectedLinkKey && !expectedLinkVal) {
+      console.warn(
+        "PayApp feedback received without PAYAPP_LINKKEY/PAYAPP_LINKVAL configured — feedback authenticity cannot be verified"
+      );
+    }
+    const expectedUserId = process.env.PAYAPP_USERID;
+    if (expectedUserId && formData.get("userid") !== expectedUserId) {
+      console.warn("PayApp feedback rejected: userid mismatch", { orderId });
+      return new Response("FAIL", { status: 403 });
+    }
+
     const payment = await prisma.payappPayment.findUnique({
       where: { orderId },
     });
 
     if (!payment) {
       return new Response("FAIL", { status: 404 });
+    }
+
+    // 결제요청 시 저장해 둔 PayApp 결제번호·금액과 교차 검증
+    if (payment.mulNo && mulNo && payment.mulNo !== mulNo) {
+      console.warn("PayApp feedback rejected: mul_no mismatch", { orderId });
+      return new Response("FAIL", { status: 403 });
+    }
+    const price = formData.get("price") as string | null;
+    if (price && Number(price) !== payment.amount) {
+      console.warn("PayApp feedback rejected: price mismatch", { orderId });
+      return new Response("FAIL", { status: 403 });
     }
 
     const payStateNum = Number(payState);

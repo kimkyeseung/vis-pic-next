@@ -62,8 +62,9 @@ export default function ImagesPage() {
   };
 
   useEffect(() => {
-    fetchImageTypes();
-    fetchImages(selectedType);
+    (async () => {
+      await Promise.all([fetchImageTypes(), fetchImages(selectedType)]);
+    })();
   }, [selectedType]);
 
   const handleDelete = async (id: number) => {

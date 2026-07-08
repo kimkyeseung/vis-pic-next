@@ -1,28 +1,32 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import type { Device } from "@/types";
+
+interface DeviceOption {
+  deviceId: string;
+  name: string;
+}
 
 export default function Home() {
   const router = useRouter();
   const [showDeviceInput, setShowDeviceInput] = useState(false);
-  const [devices, setDevices] = useState<Device[]>([]);
+  const [devices, setDevices] = useState<DeviceOption[]>([]);
   const [deviceId, setDeviceId] = useState("");
   const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
-    if (showDeviceInput) {
-      const saved = localStorage.getItem("last_device_id");
-      if (saved) setDeviceId(saved);
+  const openDevicePicker = () => {
+    setShowDeviceInput(true);
+    const saved = localStorage.getItem("last_device_id");
+    if (saved) setDeviceId(saved);
 
-      fetch("/api/admin/devices")
-        .then((r) => r.json())
-        .then((d) => setDevices((d.devices || []).filter((dev: Device) => dev.isActive)))
-        .catch(() => {});
-    }
-  }, [showDeviceInput]);
+    // 관리자 인증이 없는 키오스크에서도 목록이 보이도록 공개 엔드포인트 사용
+    fetch("/api/devices")
+      .then((r) => r.json())
+      .then((d) => setDevices(d.devices || []))
+      .catch(() => {});
+  };
 
   const handleStart = () => {
     if (!deviceId.trim()) return;
@@ -58,7 +62,7 @@ export default function Home() {
 
         <div className="flex gap-16 animate-fadeInUp" style={{ animationDelay: "0.3s" }}>
           <button
-            onClick={() => setShowDeviceInput(true)}
+            onClick={openDevicePicker}
             className="service-button flex-col gap-3 w-52 min-h-44 p-6 text-xl rounded-2xl"
           >
             <span className="text-3xl opacity-80">📸</span>

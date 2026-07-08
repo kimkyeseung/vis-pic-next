@@ -16,107 +16,11 @@ type ConfidenceMask = {
   height?: number;
 };
 
-type CategoryMask = {
-  width: number;
-  height: number;
-  getAsUint8Array: () => Uint8Array;
-};
-
-type CategoryMaskSelection = {
-  category: number;
-  score: number;
-  source: "labels" | "distribution";
-};
-
-function applyCategoryMaskAlpha(
-  data: Uint8ClampedArray,
-  categoryMask: CategoryMask,
-  width: number,
-  height: number,
-  labels: string[],
-) {
-  const categories = categoryMask.getAsUint8Array();
-  const maskWidth = categoryMask.width || width;
-  const maskHeight = categoryMask.height || height;
-  const foreground = resolveForegroundCategory(categories, maskWidth, maskHeight, labels);
-
-  if (categories.length === width * height) {
-    for (let i = 0; i < categories.length; i++) {
-      data[i * 4 + 3] = categories[i] === foreground.category ? 255 : 0;
-    }
-    return foreground;
-  }
-
-  for (let y = 0; y < height; y++) {
-    const maskY = Math.min(maskHeight - 1, Math.floor((y / height) * maskHeight));
-    for (let x = 0; x < width; x++) {
-      const maskX = Math.min(maskWidth - 1, Math.floor((x / width) * maskWidth));
-      const pixelIdx = y * width + x;
-      data[pixelIdx * 4 + 3] =
-        categories[maskY * maskWidth + maskX] === foreground.category ? 255 : 0;
-    }
-  }
-
-  return foreground;
-}
-
 // GIF 중간 프레임 캡처: ~180ms 간격(재생 10fps와 매칭), 800px 다운스케일.
 // 최근 24장만 유지해 메모리·GIF 파일 크기(~2.5MB)를 제한한다.
 const GIF_FRAME_INTERVAL_MS = 180;
 const GIF_MAX_FRAMES = 24;
 const GIF_FRAME_WIDTH = 800;
-
-function resolveForegroundCategory(
-  categories: Uint8Array,
-  width: number,
-  height: number,
-  labels: string[],
-): CategoryMaskSelection {
-  const personLabelIndex = labels.findIndex((label) =>
-    /person|human|foreground|selfie/i.test(label),
-  );
-  if (personLabelIndex >= 0) {
-    return { category: personLabelIndex, score: 1, source: "labels" };
-  }
-
-  const centerCounts = new Map<number, number>();
-  const borderCounts = new Map<number, number>();
-  let centerTotal = 0;
-  let borderTotal = 0;
-
-  for (let y = 0; y < height; y++) {
-    const yr = height <= 1 ? 0 : y / (height - 1);
-    for (let x = 0; x < width; x++) {
-      const xr = width <= 1 ? 0 : x / (width - 1);
-      const category = categories[y * width + x] ?? 0;
-      const inPersonZone = xr >= 0.25 && xr <= 0.75 && yr >= 0.15 && yr <= 0.9;
-      const inBorderZone = xr <= 0.1 || xr >= 0.9 || yr <= 0.1 || yr >= 0.9;
-
-      if (inPersonZone) {
-        centerCounts.set(category, (centerCounts.get(category) ?? 0) + 1);
-        centerTotal++;
-      }
-      if (inBorderZone) {
-        borderCounts.set(category, (borderCounts.get(category) ?? 0) + 1);
-        borderTotal++;
-      }
-    }
-  }
-
-  let best = { category: 1, score: -Infinity, source: "distribution" as const };
-  const observedCategories = new Set([...centerCounts.keys(), ...borderCounts.keys()]);
-  for (const category of observedCategories) {
-    const centerRatio = (centerCounts.get(category) ?? 0) / Math.max(centerTotal, 1);
-    const borderRatio = (borderCounts.get(category) ?? 0) / Math.max(borderTotal, 1);
-    const score = centerRatio - borderRatio;
-    if (score > best.score) {
-      best = { category, score, source: "distribution" };
-    }
-  }
-
-  return best;
-}
-
 
 export function CameraSection({
   config,
@@ -302,56 +206,58 @@ export function CameraSection({
     if (videoRef.current) videoRef.current.srcObject = null;
   }, []);
 
-  const startCamera = useCallback(async (retryMs?: number) => {
-    // 기존 스트림 먼저 정리
-    stopCamera();
+  const startCamera = useCallback(async () => {
+    for (let attempt = 0; ; attempt++) {
+      // 기존 스트림 먼저 정리
+      stopCamera();
 
-    if (retryMs) {
-      await new Promise((r) => setTimeout(r, retryMs));
-    }
-
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { width: { ideal: 1920 }, height: { ideal: 1080 } },
-      });
-      cameraStreamRef.current = stream;
-      if (videoRef.current) videoRef.current.srcObject = stream;
-      setCameraError(null);
-    } catch (err) {
-      const e = err as DOMException;
-      if (e.name === "NotAllowedError") {
-        setCameraError({ key: "camera.errPermission" });
-      } else if (e.name === "NotFoundError") {
-        setCameraError({ key: "camera.errNotFound" });
-        // 진단: 브라우저 레벨 장치 목록 + OS 레벨 장치 목록 수집
-        navigator.mediaDevices?.enumerateDevices().then(async (devices) => {
-          const videoInputs = devices.filter((d) => d.kind === "videoinput");
-          const isTauri = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
-          let osCameras: string[] = [];
-          if (isTauri) {
-            try {
-              const { invoke } = await import("@tauri-apps/api/core");
-              osCameras = await invoke<string[]>("get_cameras");
-            } catch { /* ignore */ }
-          }
-          const diag = `브라우저 장치: ${videoInputs.length}개 | OS 장치: ${osCameras.length > 0 ? osCameras.join(", ") : "없음"}`;
-          setCameraDeviceDiag(diag);
-        }).catch(() => {});
-      } else if (e.name === "NotReadableError") {
-        // 다른 컨텍스트가 아직 카메라를 점유 중 → 800ms 후 한 번 재시도
-        if (!retryMs) {
-          startCamera(800);
-        } else {
-          setCameraError({ key: "camera.errBusy" });
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { width: { ideal: 1920 }, height: { ideal: 1080 } },
+        });
+        cameraStreamRef.current = stream;
+        if (videoRef.current) videoRef.current.srcObject = stream;
+        setCameraError(null);
+        return;
+      } catch (err) {
+        const e = err as DOMException;
+        if (e.name === "NotReadableError" && attempt === 0) {
+          // 다른 컨텍스트가 아직 카메라를 점유 중 → 800ms 후 한 번 재시도
+          await new Promise((r) => setTimeout(r, 800));
+          continue;
         }
-      } else {
-        setCameraError({ key: "camera.errGeneric", reason: e.name || e.message });
+        if (e.name === "NotAllowedError") {
+          setCameraError({ key: "camera.errPermission" });
+        } else if (e.name === "NotFoundError") {
+          setCameraError({ key: "camera.errNotFound" });
+          // 진단: 브라우저 레벨 장치 목록 + OS 레벨 장치 목록 수집
+          navigator.mediaDevices?.enumerateDevices().then(async (devices) => {
+            const videoInputs = devices.filter((d) => d.kind === "videoinput");
+            const isTauri = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
+            let osCameras: string[] = [];
+            if (isTauri) {
+              try {
+                const { invoke } = await import("@tauri-apps/api/core");
+                osCameras = await invoke<string[]>("get_cameras");
+              } catch { /* ignore */ }
+            }
+            const diag = `브라우저 장치: ${videoInputs.length}개 | OS 장치: ${osCameras.length > 0 ? osCameras.join(", ") : "없음"}`;
+            setCameraDeviceDiag(diag);
+          }).catch(() => {});
+        } else if (e.name === "NotReadableError") {
+          setCameraError({ key: "camera.errBusy" });
+        } else {
+          setCameraError({ key: "camera.errGeneric", reason: e.name || e.message });
+        }
+        return;
       }
     }
   }, [stopCamera]);
 
   useEffect(() => {
-    startCamera();
+    (async () => {
+      await startCamera();
+    })();
     return stopCamera;
   }, [startCamera, stopCamera]);
 
@@ -491,37 +397,31 @@ export function CameraSection({
       if (bgRemovalMode === "mediapipe" && segmenterRef.current) {
         try {
           const result = segmenterRef.current.segmentForVideo(video, performance.now());
-          const categoryMask = result.categoryMask as CategoryMask | undefined;
           const masks = result.confidenceMasks as ConfidenceMask[] | undefined;
-          if (categoryMask || (masks && masks.length > 0)) {
+          if (masks && masks.length > 0) {
             const imageData = offCtx.getImageData(0, 0, w, h);
             const data = imageData.data;
-            if (categoryMask) {
-              const labels = segmenterRef.current.getLabels?.() ?? [];
-              applyCategoryMaskAlpha(data, categoryMask, w, h, labels);
-            } else if (masks && masks.length > 0) {
-              // multiclass model: masks[0]=background, masks[1..N]=hair/skin/face/clothes/other
-              // foreground confidence = 1 - background confidence → preserves dark clothing
-              const bgMask = masks[0].getAsFloat32Array();
-              const maskW = masks[0].width ?? w;
-              const maskH = masks[0].height ?? h;
-              const THRESH = 0.15;
-              const FEATHER = 0.35;
-              if (bgMask.length === w * h) {
-                for (let i = 0; i < bgMask.length; i++) {
-                  const fgConf = 1 - bgMask[i];
+            // multiclass model: masks[0]=background, masks[1..N]=hair/skin/face/clothes/other
+            // foreground confidence = 1 - background confidence → preserves dark clothing
+            const bgMask = masks[0].getAsFloat32Array();
+            const maskW = masks[0].width ?? w;
+            const maskH = masks[0].height ?? h;
+            const THRESH = 0.15;
+            const FEATHER = 0.35;
+            if (bgMask.length === w * h) {
+              for (let i = 0; i < bgMask.length; i++) {
+                const fgConf = 1 - bgMask[i];
+                const softAlpha = Math.max(0, Math.min(1, (fgConf - THRESH) / FEATHER));
+                data[i * 4 + 3] = Math.round(softAlpha * 255);
+              }
+            } else {
+              for (let y = 0; y < h; y++) {
+                const maskY = Math.min(maskH - 1, Math.floor((y / h) * maskH));
+                for (let x = 0; x < w; x++) {
+                  const maskX = Math.min(maskW - 1, Math.floor((x / w) * maskW));
+                  const fgConf = 1 - (bgMask[maskY * maskW + maskX] ?? 0);
                   const softAlpha = Math.max(0, Math.min(1, (fgConf - THRESH) / FEATHER));
-                  data[i * 4 + 3] = Math.round(softAlpha * 255);
-                }
-              } else {
-                for (let y = 0; y < h; y++) {
-                  const maskY = Math.min(maskH - 1, Math.floor((y / h) * maskH));
-                  for (let x = 0; x < w; x++) {
-                    const maskX = Math.min(maskW - 1, Math.floor((x / w) * maskW));
-                    const fgConf = 1 - (bgMask[maskY * maskW + maskX] ?? 0);
-                    const softAlpha = Math.max(0, Math.min(1, (fgConf - THRESH) / FEATHER));
-                    data[(y * w + x) * 4 + 3] = Math.round(softAlpha * 255);
-                  }
+                  data[(y * w + x) * 4 + 3] = Math.round(softAlpha * 255);
                 }
               }
             }
@@ -584,6 +484,14 @@ export function CameraSection({
     return () => cancelAnimationFrame(animFrameRef.current);
   }, [selectedBackground, chromaKey, bgRemovalMode, drawBackground, frameChannelRef, snapshotWithStickers]);
 
+  // 카운트다운 도중 언마운트(이전/다음 이동 등) 시 타이머가 살아남아
+  // onCapture가 화면 전환 후에 실행되는 것을 막는다.
+  const captureTimersRef = useRef<ReturnType<typeof setInterval>[]>([]);
+  useEffect(() => () => {
+    captureTimersRef.current.forEach((t) => clearInterval(t));
+    captureTimersRef.current = [];
+  }, []);
+
   const capturePhoto = useCallback(() => {
     if (countdown !== null || photos.length >= maxPhotos) return;
     let count = config.captureSeconds;
@@ -607,6 +515,7 @@ export function CameraSection({
       } else {
         clearInterval(interval);
         clearInterval(frameTimer);
+        captureTimersRef.current = captureTimersRef.current.filter((t) => t !== interval && t !== frameTimer);
         setCountdown(null);
 
         pushFrame();
@@ -619,14 +528,18 @@ export function CameraSection({
         setTimeout(() => setFlash(false), 200);
       }
     }, 1000);
+
+    captureTimersRef.current.push(frameTimer, interval);
   }, [countdown, photos.length, maxPhotos, config.captureSeconds, onCapture, snapshotWithStickers]);
 
-  const startAutoTimer = useCallback(() => {
-    if (autoTimerRef.current) clearInterval(autoTimerRef.current);
+  // 자동 촬영 타이머 — setState는 전부 타이머 콜백에서 수행
+  useEffect(() => {
+    if (photos.length >= maxPhotos || countdown !== null) return;
     const seconds = config.cameraAutoTimerSeconds;
     if (seconds <= 0) return;
-    setAutoTimer(seconds);
+
     const deadline = Date.now() + seconds * 1000;
+    const init = setTimeout(() => setAutoTimer(seconds), 0);
     autoTimerRef.current = setInterval(() => {
       const remaining = Math.ceil((deadline - Date.now()) / 1000);
       if (remaining <= 0) {
@@ -638,15 +551,12 @@ export function CameraSection({
         setAutoTimer(remaining);
       }
     }, 1000);
-  }, [config.cameraAutoTimerSeconds, capturePhoto]);
 
-  useEffect(() => {
-    if (photos.length >= maxPhotos || countdown !== null) return;
-    startAutoTimer();
     return () => {
+      clearTimeout(init);
       if (autoTimerRef.current) { clearInterval(autoTimerRef.current); autoTimerRef.current = null; }
     };
-  }, [photos.length, maxPhotos, countdown, startAutoTimer]);
+  }, [photos.length, maxPhotos, countdown, config.cameraAutoTimerSeconds, capturePhoto]);
 
   const handleManualCapture = useCallback(() => {
     if (autoTimerRef.current) { clearInterval(autoTimerRef.current); autoTimerRef.current = null; }
@@ -829,7 +739,7 @@ export function CameraSection({
               return (
                 <div
                   key={s.id}
-                  className="absolute"
+                  className="absolute group"
                   style={{
                     left: `${s.x * 100}%`,
                     top: `${s.y * 100}%`,

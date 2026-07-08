@@ -51,8 +51,11 @@ export async function GET(request: NextRequest) {
     for (const file of files) {
       const m = file.match(/^(\d{8})_/);
       if (m && m[1] < cutoffStr) {
-        await unlink(path.join(printsDir, file)).catch(() => {});
-        deletedLocal++;
+        const ok = await unlink(path.join(printsDir, file)).then(
+          () => true,
+          () => false,
+        );
+        if (ok) deletedLocal++;
       }
     }
   } catch {

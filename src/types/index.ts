@@ -9,15 +9,6 @@ export interface Sticker {
   scale: number;
 }
 
-export interface SceneState {
-  selectedBackground: number | null;
-  backgroundImages: BGImage[];
-  imageBaseUrl: string;
-  bgRemovalMode: BgRemovalMode;
-  chromakeyRgb: string;
-  stickers: Sticker[];
-}
-
 export interface MonitorInfo {
   index: number;
   name: string;

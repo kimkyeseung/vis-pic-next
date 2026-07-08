@@ -11,7 +11,8 @@ export default function MediapipeLoader({ children }: { children: React.ReactNod
   useEffect(() => {
     const isTauri = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
     if (!isTauri) {
-      setStatus("ready");
+      // 브라우저 환경은 다운로드 불필요 — 콜백에서 상태 전환 (effect 본문 동기 setState 회피)
+      Promise.resolve().then(() => setStatus("ready"));
       return;
     }
 

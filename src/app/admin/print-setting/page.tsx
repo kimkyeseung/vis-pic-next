@@ -4,7 +4,7 @@ import { useEffect, useState, useRef, useCallback } from "react";
 import { useAdmin } from "../AdminContext";
 import { FRAME_INFO, ALL_MODES } from "@/constants/frames";
 import { roundRect } from "@/lib/canvas";
-import { computePrintLayout, modeSettingPrefix, parseCm, type PrintLayout } from "@/lib/printLayout";
+import { computePrintLayout, modeSettingPrefix, type PrintLayout } from "@/lib/printLayout";
 
 export default function PrintSettingPage() {
   const { selectedDevice } = useAdmin();
@@ -22,15 +22,11 @@ export default function PrintSettingPage() {
 
   const [bgFile, setBgFile] = useState<File | null>(null);
   const [bgPreviewUrl, setBgPreviewUrl] = useState<string | null>(null);
+  const [bgRemoved, setBgRemoved] = useState(false);
   const [existingBgUrl, setExistingBgUrl] = useState<string | null>(null);
   const [imageBaseUrl, setImageBaseUrl] = useState("/static/images");
   const [printerName, setPrinterName] = useState("");
   const [printerList, setPrinterList] = useState<string[]>([]);
-
-  useEffect(() => {
-    loadSettings();
-    loadImageBaseUrl();
-  }, [selectedDevice]);
 
   const loadImageBaseUrl = async () => {
     try {
@@ -73,6 +69,12 @@ export default function PrintSettingPage() {
     }
   };
 
+  useEffect(() => {
+    (async () => {
+      await Promise.all([loadSettings(), loadImageBaseUrl()]);
+    })();
+  }, [selectedDevice]);
+
   const handleSave = async () => {
     setSaving(true);
     setMessage("");
@@ -84,6 +86,9 @@ export default function PrintSettingPage() {
         CAPTURE_MODES: modes.join(","),
         PRINTER_NAME: printerName,
       };
+      // 배경 제거는 서버에서 키를 삭제해야 반영된다 (upsert만으로는 리로드 시 부활)
+      const payload: Record<string, string | null> = { ...updatedSettings };
+      if (bgRemoved && !bgFile) payload.PRINT_BACKGROUND = null;
 
       if (bgFile) {
         const formData = new FormData();
@@ -100,8 +105,10 @@ export default function PrintSettingPage() {
         if (uploadRes.ok) {
           const uploadData = await uploadRes.json();
           updatedSettings.PRINT_BACKGROUND = uploadData.image.filename;
+          payload.PRINT_BACKGROUND = uploadData.image.filename;
           setExistingBgUrl(uploadData.image.filename);
           setBgFile(null);
+          if (bgPreviewUrl) URL.revokeObjectURL(bgPreviewUrl);
           setBgPreviewUrl(uploadData.image.url || null);
         }
       }
@@ -109,11 +116,12 @@ export default function PrintSettingPage() {
       const res = await fetch("/api/setting", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(updatedSettings),
+        body: JSON.stringify(payload),
       });
 
       if (res.ok) {
         setSettings(updatedSettings);
+        setBgRemoved(false);
         setMessage("설정이 저장되었습니다.");
         setTimeout(() => setMessage(""), 3000);
       } else {
@@ -144,14 +152,18 @@ export default function PrintSettingPage() {
     const file = e.target.files?.[0];
     if (!file) return;
     setBgFile(file);
+    setBgRemoved(false);
+    if (bgPreviewUrl) URL.revokeObjectURL(bgPreviewUrl);
     const url = URL.createObjectURL(file);
     setBgPreviewUrl(url);
   };
 
   const removeBg = () => {
     setBgFile(null);
+    if (bgPreviewUrl) URL.revokeObjectURL(bgPreviewUrl);
     setBgPreviewUrl(null);
     setExistingBgUrl(null);
+    setBgRemoved(true);
     setSettings((prev) => {
       const next = { ...prev };
       delete next.PRINT_BACKGROUND;
@@ -159,11 +171,11 @@ export default function PrintSettingPage() {
     });
   };
 
-  const resolveUrl = (value: string) => {
+  const resolveUrl = useCallback((value: string) => {
     if (value.startsWith("http://") || value.startsWith("https://")) return value;
     if (value.startsWith("/")) return value;
     return `${imageBaseUrl}/${value.split("/").pop()}`;
-  };
+  }, [imageBaseUrl]);
 
   const getPaperDimensions = useCallback((mode: string | null) => {
     const w = parseFloat(paperWidth) || 10;
@@ -188,62 +200,10 @@ export default function PrintSettingPage() {
     });
   }, [previewMode, settings, getPaperDimensions]);
 
-  const drawPreview = useCallback(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-
-    const { pw, ph } = getPaperDimensions(previewMode);
-
-    const maxW = canvas.width;
-    const maxH = canvas.height;
-    const scale = Math.min(maxW / pw, maxH / ph) * 0.85;
-    const drawW = pw * scale;
-    const drawH = ph * scale;
-    const ox = (maxW - drawW) / 2;
-    const oy = (maxH - drawH) / 2;
-
-    ctx.clearRect(0, 0, maxW, maxH);
-    ctx.fillStyle = "#1a1a2e";
-    ctx.fillRect(0, 0, maxW, maxH);
-
-    ctx.save();
-    ctx.shadowColor = "rgba(0,0,0,0.3)";
-    ctx.shadowBlur = 20;
-    ctx.shadowOffsetY = 4;
-    ctx.fillStyle = "#ffffff";
-    roundRect(ctx, ox, oy, drawW, drawH, 6);
-    ctx.fill();
-    ctx.restore();
-
-    const finishDraw = () => {
-      drawSlots(ctx, ox, oy, drawW, drawH);
-      drawLabels(ctx, ox, oy, drawW, drawH, pw, ph);
-    };
-
-    ctx.save();
-    roundRect(ctx, ox, oy, drawW, drawH, 6);
-    ctx.clip();
-
-    const bgUrl = bgPreviewUrl || (existingBgUrl ? resolveUrl(existingBgUrl) : null);
-    if (bgUrl) {
-      const img = new Image();
-      img.crossOrigin = "anonymous";
-      img.onload = () => { ctx.drawImage(img, ox, oy, drawW, drawH); ctx.restore(); finishDraw(); };
-      img.onerror = () => { ctx.restore(); finishDraw(); };
-      img.src = bgUrl;
-      return;
-    }
-
-    ctx.restore();
-    finishDraw();
-  }, [paperWidth, paperHeight, previewMode, bgPreviewUrl, existingBgUrl, imageBaseUrl, getPaperDimensions, getPreviewLayout]);
-
-  const drawSlots = (
+  const drawSlots = useCallback((
     ctx: CanvasRenderingContext2D,
     ox: number, oy: number,
-    drawW: number, drawH: number,
+    drawW: number,
   ) => {
     if (!previewMode || !FRAME_INFO[previewMode]) return;
     const layout = getPreviewLayout();
@@ -283,9 +243,9 @@ export default function PrintSettingPage() {
       ctx.textBaseline = "top";
       ctx.fillText("⚠ 인화지를 벗어납니다", ox + drawW / 2, oy + 6);
     }
-  };
+  }, [previewMode, getPreviewLayout, getPaperDimensions]);
 
-  const drawLabels = (
+  const drawLabels = useCallback((
     ctx: CanvasRenderingContext2D,
     ox: number, oy: number,
     drawW: number, drawH: number,
@@ -305,7 +265,59 @@ export default function PrintSettingPage() {
     ctx.textBaseline = "bottom";
     ctx.fillText(`${ph}cm`, 0, 0);
     ctx.restore();
-  };
+  }, []);
+
+  const drawPreview = useCallback(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    const { pw, ph } = getPaperDimensions(previewMode);
+
+    const maxW = canvas.width;
+    const maxH = canvas.height;
+    const scale = Math.min(maxW / pw, maxH / ph) * 0.85;
+    const drawW = pw * scale;
+    const drawH = ph * scale;
+    const ox = (maxW - drawW) / 2;
+    const oy = (maxH - drawH) / 2;
+
+    ctx.clearRect(0, 0, maxW, maxH);
+    ctx.fillStyle = "#1a1a2e";
+    ctx.fillRect(0, 0, maxW, maxH);
+
+    ctx.save();
+    ctx.shadowColor = "rgba(0,0,0,0.3)";
+    ctx.shadowBlur = 20;
+    ctx.shadowOffsetY = 4;
+    ctx.fillStyle = "#ffffff";
+    roundRect(ctx, ox, oy, drawW, drawH, 6);
+    ctx.fill();
+    ctx.restore();
+
+    const finishDraw = () => {
+      drawSlots(ctx, ox, oy, drawW);
+      drawLabels(ctx, ox, oy, drawW, drawH, pw, ph);
+    };
+
+    ctx.save();
+    roundRect(ctx, ox, oy, drawW, drawH, 6);
+    ctx.clip();
+
+    const bgUrl = bgPreviewUrl || (existingBgUrl ? resolveUrl(existingBgUrl) : null);
+    if (bgUrl) {
+      const img = new Image();
+      img.crossOrigin = "anonymous";
+      img.onload = () => { ctx.drawImage(img, ox, oy, drawW, drawH); ctx.restore(); finishDraw(); };
+      img.onerror = () => { ctx.restore(); finishDraw(); };
+      img.src = bgUrl;
+      return;
+    }
+
+    ctx.restore();
+    finishDraw();
+  }, [previewMode, bgPreviewUrl, existingBgUrl, getPaperDimensions, resolveUrl, drawSlots, drawLabels]);
 
   useEffect(() => {
     drawPreview();

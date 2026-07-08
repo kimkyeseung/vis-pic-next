@@ -79,7 +79,10 @@ export function PreflightSection({
   const [attempt, setAttempt] = useState(0);
   const doneRef = useRef(false);
   const bgRemovalModeRef = useRef(config.bgRemovalMode);
-  bgRemovalModeRef.current = config.bgRemovalMode;
+  // 점검 재실행 없이 최신 설정값만 참조 — ref 갱신은 렌더 중이 아닌 effect에서
+  useEffect(() => {
+    bgRemovalModeRef.current = config.bgRemovalMode;
+  }, [config.bgRemovalMode]);
 
   const setCheck = useCallback((id: string, status: CheckStatus, detail?: string) => {
     setChecks((prev) => prev.map((c) => (c.id === id ? { ...c, status, detail } : c)));

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { useFrameReceiver } from "@/hooks/useSceneSync";
 
 export default function OutputPage() {

@@ -21,23 +21,29 @@ export function usePhotoFlow(deviceId: string, config: DeviceConfig) {
 
   const slotsNeeded = selectedFrame ? FRAME_INFO[selectedFrame]?.count || 1 : 1;
 
-  // 세션 복원
+  // 세션 복원 — sessionStorage는 SSR에 없으므로 하이드레이션 직후
+  // 마이크로태스크 콜백에서 복원한다 (첫 렌더는 SSR 마크업과 일치 유지)
   useEffect(() => {
-    try {
-      const saved = sessionStorage.getItem(SESSION_KEY);
-      if (!saved) return;
-      const s = JSON.parse(saved);
-      if (s.deviceId !== deviceId) return;
-      if (s.step) setCurrentStep(s.step);
-      if (s.orderId) setOrderId(s.orderId);
-      if (s.selectedFrame) setSelectedFrame(s.selectedFrame);
-      if (s.selectedBackground !== undefined) setSelectedBackground(s.selectedBackground);
-      if (s.photos?.length > 0) setPhotos(s.photos);
-      if (s.intermediateFrames?.length > 0) setIntermediateFrames(s.intermediateFrames);
-      if (s.selectedPhotos?.length > 0) setSelectedPhotos(s.selectedPhotos);
-    } catch {
-      // ignore parse errors
-    }
+    let cancelled = false;
+    Promise.resolve().then(() => {
+      if (cancelled) return;
+      try {
+        const saved = sessionStorage.getItem(SESSION_KEY);
+        if (!saved) return;
+        const s = JSON.parse(saved);
+        if (s.deviceId !== deviceId) return;
+        if (s.step) setCurrentStep(s.step);
+        if (s.orderId) setOrderId(s.orderId);
+        if (s.selectedFrame) setSelectedFrame(s.selectedFrame);
+        if (s.selectedBackground !== undefined) setSelectedBackground(s.selectedBackground);
+        if (s.photos?.length > 0) setPhotos(s.photos);
+        if (s.intermediateFrames?.length > 0) setIntermediateFrames(s.intermediateFrames);
+        if (s.selectedPhotos?.length > 0) setSelectedPhotos(s.selectedPhotos);
+      } catch {
+        // ignore parse errors
+      }
+    });
+    return () => { cancelled = true; };
   }, [deviceId]);
 
   // 세션 저장

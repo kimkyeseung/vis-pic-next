@@ -4,7 +4,6 @@ import { useEffect, useState, Suspense } from "react";
 import { FALLBACK_BACKGROUNDS } from "@/constants/frames";
 import { useSearchParams } from "next/navigation";
 import { LanguageProvider, useLanguage } from "@/i18n/LanguageContext";
-import { useSceneSyncSender } from "@/hooks/useSceneSync";
 import { useDeviceSetup } from "@/hooks/useDeviceSetup";
 import { usePhotoFlow } from "@/hooks/usePhotoFlow";
 import { useIdleTimer } from "@/hooks/useIdleTimer";
@@ -29,7 +28,6 @@ function ServiceContent() {
   const { config, backgroundImages, imageBaseUrl, printSettings } = useDeviceSetup(deviceId);
   const flow = usePhotoFlow(deviceId, config);
   const { monitors, syncEnabled, setSyncEnabled, selectedMonitorIndex, setSelectedMonitorIndex } = useTauriMonitor();
-  const broadcastScene = useSceneSyncSender(syncEnabled);
   const { idleRemaining, clearIdleTimer } = useIdleTimer(
     flow.currentStep,
     config.idleTimeoutSeconds,
@@ -43,19 +41,6 @@ function ServiceContent() {
   useEffect(() => {
     if (currentStep === "start") setLang("ko");
   }, [currentStep, setLang]);
-
-  // 씬 상태 브로드캐스트
-  useEffect(() => {
-    if (!syncEnabled) return;
-    broadcastScene({
-      selectedBackground,
-      backgroundImages,
-      imageBaseUrl,
-      bgRemovalMode: config.bgRemovalMode,
-      chromakeyRgb: config.chromakeyRgb,
-      stickers: flow.stickers,
-    });
-  }, [syncEnabled, selectedBackground, backgroundImages, imageBaseUrl, config.bgRemovalMode, config.chromakeyRgb, flow.stickers, broadcastScene]);
 
   // 배경 로드 시 랜덤 자동 선택: null이면 랜덤 선택, fallback 선택 중에 DB 이미지가 로드되면 DB 이미지로 교체
   useEffect(() => {

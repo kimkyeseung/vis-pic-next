@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/db";
+import { requireAdmin } from "@/lib/adminAuth";
 
 export async function GET() {
   try {
@@ -21,6 +22,9 @@ export async function GET() {
 }
 
 export async function POST(request: NextRequest) {
+  const unauthorized = await requireAdmin();
+  if (unauthorized) return unauthorized;
+
   try {
     const body = await request.json();
 
@@ -31,6 +35,9 @@ export async function POST(request: NextRequest) {
           update: { value },
           create: { name, value },
         });
+      } else if (value === null) {
+        // null 값은 해당 설정 삭제를 의미 (예: 인쇄 배경 제거)
+        await prisma.setting.deleteMany({ where: { name } });
       }
     }
 

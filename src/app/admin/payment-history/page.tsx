@@ -63,7 +63,9 @@ export default function PaymentHistoryPage() {
   };
 
   useEffect(() => {
-    fetchPayments(1);
+    (async () => {
+      await fetchPayments(1);
+    })();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [statusFilter, deviceFilter]);
 

@@ -25,7 +25,9 @@ export default function DevicesPage() {
   };
 
   useEffect(() => {
-    fetchDevices();
+    (async () => {
+      await fetchDevices();
+    })();
   }, []);
 
   const handleDelete = async (id: number) => {

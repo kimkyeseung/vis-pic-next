@@ -44,7 +44,9 @@ export function AdminProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
-    fetchDevices();
+    (async () => {
+      await fetchDevices();
+    })();
   }, [fetchDevices]);
 
   const selectDevice = (device: Device | null) => {

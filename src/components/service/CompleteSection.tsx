@@ -174,8 +174,8 @@ export function CompleteSection({
             const gifData = await gifRes.json();
             if (gifData.success && gifData.gif_url) {
               setQrGifUrl(toFullUrl(gifData.gif_url));
-              if (!qrExpiryDate && gifData.expiry_date) {
-                setQrExpiryDate(gifData.expiry_date);
+              if (gifData.expiry_date) {
+                setQrExpiryDate((prev) => prev ?? gifData.expiry_date);
               }
               return;
             }
@@ -210,8 +210,8 @@ export function CompleteSection({
         const gifData = await gifRes.json();
         if (gifData.success && gifData.gif_url) {
           setQrGifUrl(toFullUrl(gifData.gif_url));
-          if (!qrExpiryDate && gifData.expiry_date) {
-            setQrExpiryDate(gifData.expiry_date);
+          if (gifData.expiry_date) {
+            setQrExpiryDate((prev) => prev ?? gifData.expiry_date);
           }
         } else if (photoUrl) {
           setQrGifUrl(photoUrl);
@@ -361,14 +361,14 @@ export function CompleteSection({
   };
 
   useEffect(() => {
-    if (hasPreparedImage) {
-      setPrintStatus("ready");
-      return;
-    }
+    // hasPreparedImage인 경우 초기 상태가 이미 "ready"이므로 setState 불필요
+    if (hasPreparedImage) return;
     if (!compositeRef.current) {
       compositeRef.current = true;
       createComposite();
     }
+    // 마운트 시 1회만 합성 (compositeRef로 중복 방지)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // hasPreparedImage 경로에서 GIF 생성이 실패한 경우 fallback 시도
@@ -393,7 +393,7 @@ export function CompleteSection({
         const data = await res.json();
         if (data.success && data.gif_url) {
           setQrGifUrl(toFullUrl(data.gif_url));
-          if (!qrExpiryDate && data.expiry_date) setQrExpiryDate(data.expiry_date);
+          if (data.expiry_date) setQrExpiryDate((prev) => prev ?? data.expiry_date);
         }
       } catch { /* silent */ }
     })();

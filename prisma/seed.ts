@@ -68,7 +68,8 @@ async function main() {
     { name: "PAYMENT_ENABLED", value: "1", description: "결제 사용 여부" },
     { name: "PAYMENT_AMOUNT", value: "1000", description: "결제 금액" },
     { name: "CAPTURE_SECONDS", value: "3", description: "촬영 카운트다운" },
-    { name: "CAPTURE_COUNT_MODE", value: "4", description: "촬영 횟수" },
+    { name: "CAPTURE_COUNT_MODE", value: "uniform", description: "촬영 횟수 모드 (uniform/custom)" },
+    { name: "CAPTURE_COUNT_UNIFORM", value: "4", description: "슬롯당 촬영 횟수" },
     { name: "CHROMAKEY_MODE", value: "mediapipe", description: "배경 제거 모드 (mediapipe/chromakey/off)" },
     { name: "CHROMAKEY_RGB", value: "0,255,0", description: "크로마키 색상" },
   ];
@@ -122,7 +123,7 @@ async function main() {
   const globalSettings = [
     { name: "PICTURE_WIDTH", value: "10", description: "인화 가로 크기(cm)" },
     { name: "PICTURE_HEIGHT", value: "15", description: "인화 세로 크기(cm)" },
-    { name: "CAPTURE_MODES", value: "1x1,1x2,2x2", description: "지원 프레임" },
+    { name: "CAPTURE_MODES", value: "1x1,2x1,2x2", description: "지원 프레임" },
   ];
 
   for (const setting of globalSettings) {
