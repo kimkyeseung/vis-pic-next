@@ -1,4 +1,4 @@
-import type { FrameInfoEntry } from "@/types";
+import type { FrameInfoEntry, Orientation } from "@/types";
 
 export interface SlotRect {
   x: number;
@@ -30,6 +30,21 @@ export function parseCm(value: string | undefined): number | null {
   if (value === undefined || value.trim() === "") return null;
   const n = parseFloat(value);
   return Number.isFinite(n) && n >= 0 ? n : null;
+}
+
+/**
+ * 인화지 실측 가로/세로(cm)를 촬영 모드의 인쇄 방향에 맞춰 배정한다.
+ * 관리자 미리보기(print-setting)와 실제 합성(CompleteSection)이 같은 결과를
+ * 쓰도록 하는 단일 소스 — 두 곳에서 각자 구현해 어긋나는 것을 방지한다.
+ */
+export function getPaperDimensions(
+  paperW: number,
+  paperH: number,
+  orientation: Orientation,
+): { pw: number; ph: number } {
+  const longer = Math.max(paperW, paperH);
+  const shorter = Math.min(paperW, paperH);
+  return orientation === "landscape" ? { pw: longer, ph: shorter } : { pw: shorter, ph: longer };
 }
 
 const FALLBACK_PHOTO_RATIO = 4 / 3;

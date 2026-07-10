@@ -1,89 +1,75 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi, afterEach } from "vitest";
+import { stripDataUriPrefix } from "@/lib/canvas";
+import { decodeBase64Image, formatExpiryDate, EXPIRY_DAYS } from "@/lib/prints";
 
-// Mirrors the regex used in handlePrint to strip the data: URI prefix before
-// passing image data to Tauri's print_image command.
-const stripDataUri = (dataUrl: string) =>
-  dataUrl.replace(/^data:image\/\w+;base64,/, "");
+afterEach(() => {
+  vi.useRealTimers();
+});
 
-// Mirrors the Rust fix: replace backslashes with forward slashes so the path
-// is valid in PowerShell (which doesn't use \ as an escape character).
-const toForwardSlash = (p: string) => p.replace(/\\/g, "/");
-
-describe("base64 data-URI stripping", () => {
+describe("stripDataUriPrefix", () => {
   it("strips jpeg prefix", () => {
-    const result = stripDataUri("data:image/jpeg;base64,/9j/4AAQ==");
-    expect(result).toBe("/9j/4AAQ==");
+    expect(stripDataUriPrefix("data:image/jpeg;base64,/9j/4AAQ==")).toBe("/9j/4AAQ==");
   });
 
   it("strips png prefix", () => {
-    const result = stripDataUri("data:image/png;base64,iVBORw0KGg==");
-    expect(result).toBe("iVBORw0KGg==");
+    expect(stripDataUriPrefix("data:image/png;base64,iVBORw0KGg==")).toBe("iVBORw0KGg==");
   });
 
   it("strips webp prefix", () => {
-    const result = stripDataUri("data:image/webp;base64,UklGRg==");
-    expect(result).toBe("UklGRg==");
+    expect(stripDataUriPrefix("data:image/webp;base64,UklGRg==")).toBe("UklGRg==");
   });
 
-  it("leaves plain base64 unchanged", () => {
+  it("leaves plain base64 unchanged (no prefix to strip)", () => {
     const plain = "/9j/4AAQ==";
-    expect(stripDataUri(plain)).toBe(plain);
+    expect(stripDataUriPrefix(plain)).toBe(plain);
   });
 
   it("leaves empty string unchanged", () => {
-    expect(stripDataUri("")).toBe("");
+    expect(stripDataUriPrefix("")).toBe("");
   });
 });
 
-describe("Windows path forward-slash conversion (mirrors Rust fix)", () => {
-  it("converts backslashes to forward slashes", () => {
-    const win = "C:\\Users\\test\\AppData\\Local\\Temp\\arpic_print_1234.jpg";
-    expect(toForwardSlash(win)).toBe(
-      "C:/Users/test/AppData/Local/Temp/arpic_print_1234.jpg"
-    );
+describe("decodeBase64Image", () => {
+  it("decodes a data: URI back to the original bytes", () => {
+    const original = Buffer.from("hello world");
+    const dataUrl = `data:image/jpeg;base64,${original.toString("base64")}`;
+    expect(decodeBase64Image(dataUrl)).toEqual(original);
   });
 
-  it("path with no backslashes is unchanged", () => {
-    const fwd = "C:/Users/test/file.jpg";
-    expect(toForwardSlash(fwd)).toBe(fwd);
+  it("decodes a raw base64 string without a data: prefix", () => {
+    const original = Buffer.from([1, 2, 3, 4, 255]);
+    expect(decodeBase64Image(original.toString("base64"))).toEqual(original);
   });
 
-  it("converted path contains no backslashes", () => {
-    const win = "C:\\some\\deep\\path\\file.jpg";
-    expect(toForwardSlash(win)).not.toContain("\\");
-  });
-
-  it("double-backslash (old bug) would produce invalid path", () => {
-    const win = "C:\\Users\\file.jpg";
-    // Old code did replace('\\', '\\\\') → double backslashes in shell string
-    const buggy = win.replace(/\\/g, "\\\\");
-    expect(buggy).toBe("C:\\\\Users\\\\file.jpg");
-    // Fixed code produces valid forward-slash path
-    const fixed = toForwardSlash(win);
-    expect(fixed).toBe("C:/Users/file.jpg");
+  it("supports png/webp mime types, not just jpeg", () => {
+    const original = Buffer.from("png-bytes");
+    const dataUrl = `data:image/png;base64,${original.toString("base64")}`;
+    expect(decodeBase64Image(dataUrl)).toEqual(original);
   });
 });
 
-describe("Tauri invoke args — camelCase required by Tauri v2", () => {
-  // Tauri v2 maps JS camelCase → Rust snake_case automatically.
-  // Sending snake_case from JS causes "missing required key" error.
-  it("invoke args use camelCase keys", () => {
-    const printerName = "Canon";
-    const imageData = "base64data";
-    const args = { printerName, imageData };
-    expect(Object.keys(args)).toContain("printerName");
-    expect(Object.keys(args)).toContain("imageData");
-    expect(Object.keys(args)).not.toContain("printer_name");
-    expect(Object.keys(args)).not.toContain("image_data");
+describe("formatExpiryDate", () => {
+  it("returns today + N days in 'YYYY년 MM월 DD일' format", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 0, 10)); // 2026-01-10
+    expect(formatExpiryDate(5)).toBe("2026년 01월 15일");
   });
 
-  it("empty printerName falls back to default printer (not rejected)", () => {
-    // When PRINTER_NAME setting is unset, printerName is "".
-    // Rust side skips setting PrinterName so .NET uses system default.
-    const printerName = "";
-    expect(printerName).toBe("");
-    // Non-empty value is passed through unchanged
-    const named = "Canon SELPHY";
-    expect(named).toBe("Canon SELPHY");
+  it("defaults to EXPIRY_DAYS when no argument is given", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 0, 10));
+    expect(formatExpiryDate()).toBe(formatExpiryDate(EXPIRY_DAYS));
+  });
+
+  it("rolls over into the next month correctly", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 0, 30)); // 2026-01-30
+    expect(formatExpiryDate(3)).toBe("2026년 02월 02일");
+  });
+
+  it("rolls over into the next year correctly", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 11, 30)); // 2026-12-30
+    expect(formatExpiryDate(3)).toBe("2027년 01월 02일");
   });
 });

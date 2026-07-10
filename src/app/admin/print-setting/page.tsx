@@ -4,7 +4,12 @@ import { useEffect, useState, useRef, useCallback } from "react";
 import { useAdmin } from "../AdminContext";
 import { FRAME_INFO, ALL_MODES } from "@/constants/frames";
 import { roundRect } from "@/lib/canvas";
-import { computePrintLayout, modeSettingPrefix, type PrintLayout } from "@/lib/printLayout";
+import {
+  computePrintLayout,
+  modeSettingPrefix,
+  getPaperDimensions as paperDimensionsFor,
+  type PrintLayout,
+} from "@/lib/printLayout";
 
 export default function PrintSettingPage() {
   const { selectedDevice } = useAdmin();
@@ -180,11 +185,8 @@ export default function PrintSettingPage() {
   const getPaperDimensions = useCallback((mode: string | null) => {
     const w = parseFloat(paperWidth) || 10;
     const h = parseFloat(paperHeight) || 15;
-    const longer = Math.max(w, h);
-    const shorter = Math.min(w, h);
     const orient = mode && FRAME_INFO[mode] ? FRAME_INFO[mode].orientation : "portrait";
-    if (orient === "landscape") return { pw: longer, ph: shorter };
-    return { pw: shorter, ph: longer };
+    return paperDimensionsFor(w, h, orient);
   }, [paperWidth, paperHeight]);
 
   // 현재 미리보기 모드의 슬롯 배치 (설정값 실시간 반영)

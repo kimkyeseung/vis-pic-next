@@ -4,11 +4,12 @@ import { useState, useEffect, useRef } from "react";
 import { QRCodeSVG } from "qrcode.react";
 import type { BGImage } from "@/types";
 import { FRAME_INFO, FALLBACK_BACKGROUNDS } from "@/constants/frames";
-import { roundRect, fillGradient, fillGradientFromCSS, loadImage, resizeForGif } from "@/lib/canvas";
+import { roundRect, fillGradient, fillGradientFromCSS, loadImage, resizeForGif, stripDataUriPrefix } from "@/lib/canvas";
 import {
   computePrintLayout,
   modeSettingPrefix,
   parseCm,
+  getPaperDimensions,
   FRAME_CORNER_RADIUS_CM,
   FRAME_BORDER_CM,
   FRAME_BORDER_COLOR,
@@ -117,10 +118,7 @@ export function CompleteSection({
           try {
             const paperWCm = parseFloat(printSettings.PICTURE_WIDTH || "10");
             const paperHCm = parseFloat(printSettings.PICTURE_HEIGHT || "15");
-            const longer = Math.max(paperWCm, paperHCm);
-            const shorter = Math.min(paperWCm, paperHCm);
-            const pw = frame.orientation === "landscape" ? longer : shorter;
-            const ph = frame.orientation === "landscape" ? shorter : longer;
+            const { pw, ph } = getPaperDimensions(paperWCm, paperHCm, frame.orientation);
 
             const maxGifDim = 800;
             const gifScale = Math.min(maxGifDim / pw, maxGifDim / ph);
@@ -232,10 +230,7 @@ export function CompleteSection({
 
     const paperWCm = parseFloat(printSettings.PICTURE_WIDTH || "10");
     const paperHCm = parseFloat(printSettings.PICTURE_HEIGHT || "15");
-    const longer = Math.max(paperWCm, paperHCm);
-    const shorter = Math.min(paperWCm, paperHCm);
-    const pw = frame.orientation === "landscape" ? longer : shorter;
-    const ph = frame.orientation === "landscape" ? shorter : longer;
+    const { pw, ph } = getPaperDimensions(paperWCm, paperHCm, frame.orientation);
 
     let canvasWidth: number, canvasHeight: number;
     if (pw >= ph) {
@@ -409,7 +404,7 @@ export function CompleteSection({
     if (isTauri) {
       try {
         const { invoke } = await import("@tauri-apps/api/core");
-        const base64 = compositeImage.replace(/^data:image\/\w+;base64,/, "");
+        const base64 = stripDataUriPrefix(compositeImage);
         const printerName = printSettings.PRINTER_NAME || "";
         await invoke("print_image", { printerName, imageData: base64 });
         setPrintStatus("done");

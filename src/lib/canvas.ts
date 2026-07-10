@@ -1,3 +1,8 @@
+/** Tauri print_image invoke 전, data: URI 접두사를 제거해 순수 base64로 만든다. */
+export function stripDataUriPrefix(dataUrl: string): string {
+  return dataUrl.replace(/^data:image\/\w+;base64,/, "");
+}
+
 export function roundRect(
   ctx: CanvasRenderingContext2D,
   x: number, y: number,
