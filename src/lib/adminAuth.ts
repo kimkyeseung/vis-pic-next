@@ -2,6 +2,14 @@ import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import prisma from "@/lib/db";
 
+export async function getAdminId(): Promise<number | null> {
+  const cookieStore = await cookies();
+  const sessionVal = cookieStore.get("admin_session")?.value;
+  if (!sessionVal) return null;
+  const id = parseInt(sessionVal, 10);
+  return isNaN(id) ? null : id;
+}
+
 export async function requireAdmin(): Promise<NextResponse | null> {
   const cookieStore = await cookies();
   const sessionVal = cookieStore.get("admin_session")?.value;

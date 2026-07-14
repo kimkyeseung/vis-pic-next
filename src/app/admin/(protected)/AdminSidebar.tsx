@@ -29,13 +29,15 @@ export function AdminSidebar({ adminName, children }: AdminSidebarProps) {
   ];
 
   const pathNoSlash = pathname.replace(/\/$/, "");
-  const currentLabel =
-    deviceMenuItems.find((item) => pathNoSlash === item.href)?.label ??
-    (pathNoSlash === "/admin"
-      ? "대시보드"
-      : pathNoSlash.startsWith("/admin/devices")
-        ? "장치 관리"
-        : "관리자");
+  const isAccountsSection = pathNoSlash.startsWith("/admin/accounts");
+  const currentLabel = isAccountsSection
+    ? "계정 관리"
+    : deviceMenuItems.find((item) => pathNoSlash === item.href)?.label ??
+      (pathNoSlash === "/admin"
+        ? "대시보드"
+        : pathNoSlash.startsWith("/admin/devices")
+          ? "장치 관리"
+          : "관리자");
 
   return (
     <div className="h-screen bg-gray-900 flex overflow-hidden">
@@ -44,86 +46,114 @@ export function AdminSidebar({ adminName, children }: AdminSidebarProps) {
           <h1 className="text-xl font-bold text-white">AR-pic 관리자</h1>
         </div>
 
-        <nav className="flex-1 overflow-y-auto p-4">
-          <div className="mb-3">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">장치 목록</span>
-              <Link
-                href="/admin/devices/new"
-                className="text-xs text-blue-400 hover:text-blue-300"
-              >
-                + 추가
-              </Link>
-            </div>
-            <ul className="space-y-1">
-              {devicesLoading ? (
-                <li className="px-3 py-2 text-gray-500 text-sm">로딩중...</li>
-              ) : devices.length === 0 ? (
-                <li className="px-3 py-2 text-gray-500 text-sm">
-                  등록된 장치가 없습니다
-                </li>
-              ) : (
-                devices.map((device) => (
-                  <li key={device.id}>
-                    <button
-                      onClick={() => {
-                        selectDevice(
-                          selectedDevice?.id === device.id ? null : device
-                        );
-                        if (selectedDevice?.id !== device.id) {
-                          router.push("/admin");
-                        }
-                      }}
-                      className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-left text-sm transition-colors ${
-                        selectedDevice?.id === device.id
-                          ? "bg-blue-600 text-white"
-                          : "text-gray-300 hover:bg-gray-700"
-                      }`}
-                    >
-                      <span
-                        className={`w-2 h-2 rounded-full flex-shrink-0 ${
-                          device.isActive ? "bg-green-400" : "bg-red-400"
-                        }`}
-                      />
-                      <span className="truncate">{device.name}</span>
-                    </button>
-                  </li>
-                ))
-              )}
-            </ul>
-          </div>
+        {/* 최상위 탭: 장치 관리 / 계정 관리 */}
+        <div className="flex border-b border-gray-700">
+          <button
+            onClick={() => { if (isAccountsSection) router.push("/admin"); }}
+            className={`flex-1 py-2.5 text-sm font-medium transition-colors ${
+              !isAccountsSection
+                ? "text-white border-b-2 border-blue-500"
+                : "text-gray-400 hover:text-gray-200"
+            }`}
+          >
+            장치 관리
+          </button>
+          <button
+            onClick={() => router.push("/admin/accounts")}
+            className={`flex-1 py-2.5 text-sm font-medium transition-colors ${
+              isAccountsSection
+                ? "text-white border-b-2 border-blue-500"
+                : "text-gray-400 hover:text-gray-200"
+            }`}
+          >
+            계정 관리
+          </button>
+        </div>
 
-          {selectedDevice && (
-            <div className="mt-4 pt-4 border-t border-gray-700">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                  관리
-                </span>
-                <Link
-                  href={`/admin/devices/${selectedDevice.id}`}
-                  className="text-xs text-gray-400 hover:text-gray-300"
-                >
-                  장치 편집
-                </Link>
+        <nav className="flex-1 overflow-y-auto p-4">
+          {isAccountsSection ? null : (
+            <>
+              <div className="mb-3">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">장치 목록</span>
+                  <Link
+                    href="/admin/devices/new"
+                    className="text-xs text-blue-400 hover:text-blue-300"
+                  >
+                    + 추가
+                  </Link>
+                </div>
+                <ul className="space-y-1">
+                  {devicesLoading ? (
+                    <li className="px-3 py-2 text-gray-500 text-sm">로딩중...</li>
+                  ) : devices.length === 0 ? (
+                    <li className="px-3 py-2 text-gray-500 text-sm">
+                      등록된 장치가 없습니다
+                    </li>
+                  ) : (
+                    devices.map((device) => (
+                      <li key={device.id}>
+                        <button
+                          onClick={() => {
+                            selectDevice(
+                              selectedDevice?.id === device.id ? null : device
+                            );
+                            if (selectedDevice?.id !== device.id) {
+                              router.push("/admin");
+                            }
+                          }}
+                          className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-left text-sm transition-colors ${
+                            selectedDevice?.id === device.id
+                              ? "bg-blue-600 text-white"
+                              : "text-gray-300 hover:bg-gray-700"
+                          }`}
+                        >
+                          <span
+                            className={`w-2 h-2 rounded-full flex-shrink-0 ${
+                              device.isActive ? "bg-green-400" : "bg-red-400"
+                            }`}
+                          />
+                          <span className="truncate">{device.name}</span>
+                        </button>
+                      </li>
+                    ))
+                  )}
+                </ul>
               </div>
-              <ul className="space-y-1">
-                {deviceMenuItems.map((item) => (
-                  <li key={item.href}>
+
+              {selectedDevice && (
+                <div className="mt-4 pt-4 border-t border-gray-700">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                      관리
+                    </span>
                     <Link
-                      href={item.href}
-                      className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${
-                        pathname.replace(/\/$/, "") === item.href
-                          ? "bg-gray-600 text-white"
-                          : "text-gray-300 hover:bg-gray-700"
-                      }`}
+                      href={`/admin/devices/${selectedDevice.id}`}
+                      className="text-xs text-gray-400 hover:text-gray-300"
                     >
-                      <span>{item.icon}</span>
-                      <span>{item.label}</span>
+                      장치 편집
                     </Link>
-                  </li>
-                ))}
-              </ul>
-            </div>
+                  </div>
+                  <ul className="space-y-1">
+                    {deviceMenuItems.map((item) => (
+                      <li key={item.href}>
+                        <Link
+                          href={item.href}
+                          className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${
+                            pathname.replace(/\/$/, "") === item.href
+                              ? "bg-gray-600 text-white"
+                              : "text-gray-300 hover:bg-gray-700"
+                          }`}
+                        >
+                          <span>{item.icon}</span>
+                          <span>{item.label}</span>
+                        </Link>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </>
           )}
         </nav>
       </aside>
