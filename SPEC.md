@@ -293,7 +293,7 @@
 | `CameraSection.tsx` | 카메라 + AI 합성 + 스티커 + 촬영 로직 |
 | `SelectSection.tsx` | 사진 선택 UI |
 | `CompleteSection.tsx` | 결과 출력 + QR + 인쇄 |
-| `CircularTimer.tsx` | 원형 아이들 타임아웃 카운트다운 |
+| `CircularTimer.tsx` | 원형 아이들 타임아웃 카운트다운 — frame·background·select·complete 단계에서만 표시 (start·payment·camera 제외) |
 | `CameraStreamer.tsx` | 카메라 상시 웜업 + 서브 모니터 프레임 전송 (배경 합성 포함, §15) |
 | `FloatingElements.tsx` | 배경 데코레이션 애니메이션 |
 
@@ -328,7 +328,7 @@
 |----|------|------|
 | `useDeviceSetup` | `src/hooks/useDeviceSetup.ts` | 디바이스 설정 + 이미지 목록 + 인쇄 설정 로드 |
 | `usePhotoFlow` | `src/hooks/usePhotoFlow.ts` | 7단계 상태 머신, sessionStorage 영속성 |
-| `useIdleTimer` | `src/hooks/useIdleTimer.ts` | 비활동 타임아웃 카운트다운 |
+| `useIdleTimer` | `src/hooks/useIdleTimer.ts` | 비활동 타임아웃 카운트다운 (frame·background·select·complete 단계에서만 동작) |
 | `useTauriMonitor` | `src/hooks/useTauriMonitor.ts` | Tauri 모니터 목록 + 서브 윈도우 열기/닫기 |
 | `useSceneSync` | `src/hooks/useSceneSync.ts` | SSE 프레임 스트림 + BroadcastChannel 상태 동기화 |
 
