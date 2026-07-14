@@ -22,7 +22,7 @@ export default function Home() {
     if (saved) setDeviceId(saved);
 
     // 관리자 인증이 없는 키오스크에서도 목록이 보이도록 공개 엔드포인트 사용
-    fetch("/api/devices")
+    fetch("/api/devices/")
       .then((r) => r.json())
       .then((d) => setDevices(d.devices || []))
       .catch(() => {});

@@ -27,7 +27,7 @@ export default function ImagesPage() {
   useEffect(() => {
     const loadImageBaseUrl = async () => {
       try {
-        const res = await fetch("/api/images/url");
+        const res = await fetch("/api/images/url/");
         if (!res.ok) return;
         const data = await res.json();
         if (data.baseUrl) setImageBaseUrl(data.baseUrl);
@@ -41,7 +41,7 @@ export default function ImagesPage() {
   const fetchImages = async (typeId: number) => {
     setLoading(true);
     try {
-      const res = await fetch(`/api/image/list/${typeId}`);
+      const res = await fetch(`/api/image/list/${typeId}/`);
       const data = await res.json();
       setImages(data.images || []);
     } catch (error) {
@@ -53,7 +53,7 @@ export default function ImagesPage() {
 
   const fetchImageTypes = async () => {
     try {
-      const res = await fetch("/api/admin/image-types");
+      const res = await fetch("/api/admin/image-types/");
       const data = await res.json();
       setImageTypes(data.imageTypes || []);
     } catch (error) {
@@ -71,7 +71,7 @@ export default function ImagesPage() {
     if (!confirm("정말 삭제하시겠습니까?")) return;
 
     try {
-      const res = await fetch(`/api/admin/images/${id}`, {
+      const res = await fetch(`/api/admin/images/${id}/`, {
         method: "DELETE",
       });
 

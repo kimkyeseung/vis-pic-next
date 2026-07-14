@@ -263,7 +263,7 @@ export function CameraSection({
 
   // DB 스티커 이미지 목록 로드
   useEffect(() => {
-    fetch(`/api/image/list/3?device_id=${config.deviceId}`)
+    fetch(`/api/image/list/3/?device_id=${config.deviceId}`)
       .then((r) => r.json())
       .then((data) => setDbStickerImages(data.images || []))
       .catch(() => {});

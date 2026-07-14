@@ -41,25 +41,59 @@ export default function ImageUploadPage() {
     setLoading(true);
 
     try {
-      const formData = new FormData();
-      formData.append("file", file);
-      formData.append("name", name);
-      formData.append("imageType", imageType);
-      formData.append("priority", priority);
-      if (deviceId) {
-        formData.append("deviceId", deviceId);
+      const ext = file.name.split(".").pop() || "";
+
+      // Step 1: 서버에서 presigned URL 요청
+      const presignRes = await fetch("/api/admin/images/presign/", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ext, name }),
+      });
+      const presignData = await presignRes.json();
+
+      if (!presignRes.ok) {
+        setError(presignData.error || "업로드 준비에 실패했습니다.");
+        return;
       }
 
-      const res = await fetch("/api/admin/images/upload", {
-        method: "POST",
-        body: formData,
-      });
+      if (presignData.mode === "local") {
+        // Supabase 미설정: 기존 방식으로 fallback
+        const formData = new FormData();
+        formData.append("file", file);
+        formData.append("name", name);
+        formData.append("imageType", imageType);
+        formData.append("priority", priority);
+        if (deviceId) formData.append("deviceId", deviceId);
 
-      const data = await res.json();
+        const res = await fetch("/api/admin/images/upload/", { method: "POST", body: formData });
+        const data = await res.json();
+        if (!res.ok) { setError(data.error || "업로드에 실패했습니다."); return; }
+      } else {
+        // Step 2: 브라우저에서 Supabase로 직접 업로드 (Vercel 무경유)
+        const uploadRes = await fetch(presignData.signedUrl, {
+          method: "PUT",
+          headers: { "Content-Type": file.type || "application/octet-stream" },
+          body: file,
+        });
+        if (!uploadRes.ok) {
+          setError("파일 업로드에 실패했습니다.");
+          return;
+        }
 
-      if (!res.ok) {
-        setError(data.error || "업로드에 실패했습니다.");
-        return;
+        // Step 3: DB에 메타데이터 등록
+        const regRes = await fetch("/api/admin/images/register/", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            filename: presignData.filename,
+            name,
+            imageType,
+            deviceId: deviceId || null,
+            priority,
+          }),
+        });
+        const regData = await regRes.json();
+        if (!regRes.ok) { setError(regData.error || "등록에 실패했습니다."); return; }
       }
 
       router.push("/admin/images");

@@ -18,7 +18,7 @@ export default function NewDevicePage() {
     setLoading(true);
 
     try {
-      const res = await fetch("/api/admin/devices", {
+      const res = await fetch("/api/admin/devices/", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ deviceId, name, description }),

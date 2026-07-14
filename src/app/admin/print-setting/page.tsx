@@ -35,7 +35,7 @@ export default function PrintSettingPage() {
 
   const loadImageBaseUrl = async () => {
     try {
-      const res = await fetch("/api/images/url");
+      const res = await fetch("/api/images/url/");
       if (!res.ok) return;
       const data = await res.json();
       if (data.baseUrl) setImageBaseUrl(data.baseUrl);
@@ -47,7 +47,7 @@ export default function PrintSettingPage() {
   const loadSettings = async () => {
     setLoading(true);
     try {
-      const res = await fetch("/api/setting");
+      const res = await fetch("/api/setting/");
       if (!res.ok) return;
       const data = await res.json();
       const s: Record<string, string> = data.settings || {};
@@ -102,7 +102,7 @@ export default function PrintSettingPage() {
         formData.append("imageType", "2");
         formData.append("priority", "0");
 
-        const uploadRes = await fetch("/api/admin/images/upload", {
+        const uploadRes = await fetch("/api/admin/images/upload/", {
           method: "POST",
           body: formData,
         });
@@ -118,7 +118,7 @@ export default function PrintSettingPage() {
         }
       }
 
-      const res = await fetch("/api/setting", {
+      const res = await fetch("/api/setting/", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),

@@ -39,7 +39,7 @@ export function PaymentSection({
         return;
       }
       try {
-        const res = await fetch(`/api/payments/status/${oid}`);
+        const res = await fetch(`/api/payments/status/${oid}/`);
         const data = await res.json();
         if (data.paymentStatus === "paid") {
           if (pollRef.current) clearInterval(pollRef.current);

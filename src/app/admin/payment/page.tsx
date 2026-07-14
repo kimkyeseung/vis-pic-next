@@ -25,7 +25,7 @@ export default function PaymentPage() {
   const [message, setMessage] = useState("");
 
   useEffect(() => {
-    fetch("/api/setting")
+    fetch("/api/setting/")
       .then((r) => r.json())
       .then((d) => setSettings(d.settings || {}))
       .catch(console.error)
@@ -39,7 +39,7 @@ export default function PaymentPage() {
     setSaving(true);
     setMessage("");
     try {
-      const res = await fetch("/api/setting", {
+      const res = await fetch("/api/setting/", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(settings),

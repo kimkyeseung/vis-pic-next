@@ -38,8 +38,8 @@ export function useDeviceSetup(deviceId: string) {
       };
       try {
         const [globalRes, deviceRes] = await Promise.all([
-          fetch("/api/setting", { signal }).catch(() => null),
-          fetch(`/api/device/${id}/settings`, { signal }).catch(() => null),
+          fetch("/api/setting/", { signal }).catch(() => null),
+          fetch(`/api/device/${id}/settings/`, { signal }).catch(() => null),
         ]);
 
         if ((!globalRes || !globalRes.ok) && (!deviceRes || !deviceRes.ok)) {
@@ -90,7 +90,7 @@ export function useDeviceSetup(deviceId: string) {
         signal.addEventListener("abort", () => clearTimeout(timer), { once: true });
       };
       try {
-        const res = await fetch(`/api/image/list/1?device_id=${id}&check_files=1`, { signal });
+        const res = await fetch(`/api/image/list/1/?device_id=${id}&check_files=1`, { signal });
         if (!res.ok) {
           retry();
           return;

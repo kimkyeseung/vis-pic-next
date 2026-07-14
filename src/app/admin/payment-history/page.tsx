@@ -50,7 +50,7 @@ export default function PaymentHistoryPage() {
       if (statusFilter) params.set("status", statusFilter);
       if (deviceFilter) params.set("deviceId", deviceFilter);
 
-      const res = await fetch(`/api/admin/payments?${params}`);
+      const res = await fetch(`/api/admin/payments/?${params}`);
       if (!res.ok) return;
       const data = await res.json();
       setPayments(data.payments || []);

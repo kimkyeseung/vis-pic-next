@@ -28,7 +28,7 @@ export function useIdleTimer(
   // timeoutSeconds가 비동기 설정 로드로 바뀌면 새 값으로 타이머를 재시작한다.
   // 초기값 표시를 포함한 모든 setState는 타이머 콜백에서 수행 (effect 본문 동기 setState 회피).
   useEffect(() => {
-    if (currentStep === "camera" || timeoutSeconds <= 0) return;
+    if (currentStep === "start" || currentStep === "camera" || currentStep === "payment" || timeoutSeconds <= 0) return;
 
     const deadline = Date.now() + timeoutSeconds * 1000;
     initRef.current = setTimeout(() => setIdleRemaining(timeoutSeconds), 0);

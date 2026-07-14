@@ -23,7 +23,7 @@ export default function DeviceEditPage({
   useEffect(() => {
     async function fetchDevice() {
       try {
-        const res = await fetch(`/api/admin/devices/${id}`);
+        const res = await fetch(`/api/admin/devices/${id}/`);
         const data = await res.json();
 
         if (res.ok && data.device) {
@@ -54,7 +54,7 @@ export default function DeviceEditPage({
 
     try {
       // Update device info
-      const res = await fetch(`/api/admin/devices/${id}`, {
+      const res = await fetch(`/api/admin/devices/${id}/`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name, description }),
@@ -68,7 +68,7 @@ export default function DeviceEditPage({
 
       // Update device settings
       if (device) {
-        await fetch(`/api/device/${device.deviceId}/settings`, {
+        await fetch(`/api/device/${device.deviceId}/settings/`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(settings),

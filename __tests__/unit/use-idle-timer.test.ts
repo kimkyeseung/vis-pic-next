@@ -84,6 +84,24 @@ describe("useIdleTimer", () => {
     expect(onTimeout).not.toHaveBeenCalled();
   });
 
+  it("currentStep이 start면 타이머를 돌리지 않는다", () => {
+    const onTimeout = vi.fn();
+    const { result } = renderHook(() => useIdleTimer("start", 3, onTimeout));
+
+    act(() => { vi.advanceTimersByTime(10000); });
+    expect(result.current.idleRemaining).toBeNull();
+    expect(onTimeout).not.toHaveBeenCalled();
+  });
+
+  it("currentStep이 payment면 타이머를 돌리지 않는다", () => {
+    const onTimeout = vi.fn();
+    const { result } = renderHook(() => useIdleTimer("payment", 3, onTimeout));
+
+    act(() => { vi.advanceTimersByTime(10000); });
+    expect(result.current.idleRemaining).toBeNull();
+    expect(onTimeout).not.toHaveBeenCalled();
+  });
+
   it("timeoutSeconds가 0 이하면 타이머를 돌리지 않는다", () => {
     const onTimeout = vi.fn();
     const { result } = renderHook(() => useIdleTimer("frame", 0, onTimeout));

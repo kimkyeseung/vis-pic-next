@@ -56,10 +56,10 @@ export async function POST(request: NextRequest) {
     // Upload to storage (local + Supabase if configured)
     const { supabaseOk } = await uploadImage(file, filename);
 
-    // Save to database
+    // Save to database (name is VarChar(32))
     const image = await prisma.image.create({
       data: {
-        name,
+        name: name.slice(0, 32),
         filename,
         imageType,
         deviceId: deviceId || null,

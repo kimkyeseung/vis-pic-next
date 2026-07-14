@@ -14,7 +14,7 @@ export default function DevicesPage() {
 
   const fetchDevices = async () => {
     try {
-      const res = await fetch("/api/admin/devices");
+      const res = await fetch("/api/admin/devices/");
       const data = await res.json();
       setDevices(data.devices || []);
     } catch (error) {
@@ -34,7 +34,7 @@ export default function DevicesPage() {
     if (!confirm("정말 삭제하시겠습니까?")) return;
 
     try {
-      const res = await fetch(`/api/admin/devices/${id}`, {
+      const res = await fetch(`/api/admin/devices/${id}/`, {
         method: "DELETE",
       });
 
@@ -50,7 +50,7 @@ export default function DevicesPage() {
   const handleClone = async () => {
     if (!cloneTarget || !cloneForm.deviceId || !cloneForm.name) return;
     try {
-      const res = await fetch("/api/admin/devices/clone", {
+      const res = await fetch("/api/admin/devices/clone/", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -76,7 +76,7 @@ export default function DevicesPage() {
 
   const handleToggleActive = async (device: Device) => {
     try {
-      const res = await fetch(`/api/admin/devices/${device.id}`, {
+      const res = await fetch(`/api/admin/devices/${device.id}/`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ isActive: !device.isActive }),

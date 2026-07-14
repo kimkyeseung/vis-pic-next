@@ -26,7 +26,7 @@ export function AdminProvider({ children }: { children: React.ReactNode }) {
 
   const fetchDevices = useCallback(async () => {
     try {
-      const res = await fetch("/api/admin/devices");
+      const res = await fetch("/api/admin/devices/");
       const data = await res.json();
       const list: Device[] = data.devices || [];
       setDevices(list);

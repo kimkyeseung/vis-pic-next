@@ -6,7 +6,7 @@ const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-const BUCKET_NAME = "pic-images";
+export const BUCKET_NAME = "pic-images";
 
 function getSupabaseClient() {
   if (!supabaseUrl) return null;
@@ -14,6 +14,12 @@ function getSupabaseClient() {
   const key = supabaseServiceKey || supabaseKey;
   if (!key) return null;
   return createClient(supabaseUrl, key);
+}
+
+/** 서비스 롤 키를 사용하는 관리자 클라이언트 (presign URL 생성 등 서버 전용) */
+export function getSupabaseAdminClient() {
+  if (!supabaseUrl || !supabaseServiceKey) return null;
+  return createClient(supabaseUrl, supabaseServiceKey);
 }
 
 function getLocalDir() {

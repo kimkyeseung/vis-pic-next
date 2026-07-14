@@ -14,7 +14,7 @@ function AdminLayoutInner({ children }: AdminLayoutProps) {
   const pathname = usePathname();
   const [isLoggedIn, setIsLoggedIn] = useState<boolean | null>(null);
   const [adminName, setAdminName] = useState("");
-  const { devices, selectedDevice, selectDevice, loading: devicesLoading } = useAdmin();
+  const { devices, selectedDevice, selectDevice, refreshDevices, loading: devicesLoading } = useAdmin();
 
   useEffect(() => {
     let cancelled = false;
@@ -43,11 +43,14 @@ function AdminLayoutInner({ children }: AdminLayoutProps) {
     if (isLoggedIn === false && !isLoginPage) {
       router.push("/admin/login");
     }
-  }, [isLoggedIn, isLoginPage, router]);
+    if (isLoggedIn === true) {
+      refreshDevices();
+    }
+  }, [isLoggedIn, isLoginPage, router, refreshDevices]);
 
   const handleLogout = async () => {
     // httpOnly 세션 쿠키는 서버에서만 지울 수 있다
-    await fetch("/api/admin/logout", { method: "POST" }).catch(() => {});
+    await fetch("/api/admin/logout/", { method: "POST" }).catch(() => {});
     localStorage.removeItem("admin_session");
     router.push("/admin/login");
   };
