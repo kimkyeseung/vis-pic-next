@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useAdmin } from "./AdminContext";
+import { useAdmin } from "../AdminContext";
 
 export default function AdminPage() {
   const { selectedDevice, devices, loading } = useAdmin();

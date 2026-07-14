@@ -1,75 +1,24 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
-import { AdminProvider, useAdmin } from "./AdminContext";
+import { useAdmin } from "../AdminContext";
 
-interface AdminLayoutProps {
+interface AdminSidebarProps {
+  adminName: string;
   children: React.ReactNode;
 }
 
-function AdminLayoutInner({ children }: AdminLayoutProps) {
+export function AdminSidebar({ adminName, children }: AdminSidebarProps) {
   const router = useRouter();
   const pathname = usePathname();
-  const [isLoggedIn, setIsLoggedIn] = useState<boolean | null>(null);
-  const [adminName, setAdminName] = useState("");
-  const { devices, selectedDevice, selectDevice, refreshDevices, loading: devicesLoading } = useAdmin();
-
-  useEffect(() => {
-    let cancelled = false;
-    // localStorage는 외부 시스템 — 마이크로태스크 콜백에서 읽어 effect 본문 동기 setState를 피한다
-    Promise.resolve().then(() => {
-      if (cancelled) return;
-      const session = localStorage.getItem("admin_session");
-      if (session) {
-        try {
-          const data = JSON.parse(session);
-          setIsLoggedIn(true);
-          setAdminName(data.name || data.username);
-        } catch {
-          setIsLoggedIn(false);
-        }
-      } else {
-        setIsLoggedIn(false);
-      }
-    });
-    return () => { cancelled = true; };
-  }, [pathname]);
-
-  const isLoginPage = pathname.replace(/\/$/, "") === "/admin/login";
-
-  useEffect(() => {
-    if (isLoggedIn === false && !isLoginPage) {
-      router.push("/admin/login");
-    }
-    if (isLoggedIn === true) {
-      refreshDevices();
-    }
-  }, [isLoggedIn, isLoginPage, router, refreshDevices]);
+  const { devices, selectedDevice, selectDevice, loading: devicesLoading } = useAdmin();
 
   const handleLogout = async () => {
-    // httpOnly 세션 쿠키는 서버에서만 지울 수 있다
     await fetch("/api/admin/logout/", { method: "POST" }).catch(() => {});
     localStorage.removeItem("admin_session");
     router.push("/admin/login");
   };
-
-  if (isLoggedIn === null) {
-    return (
-      <div className="min-h-screen bg-gray-900 flex items-center justify-center">
-        <div className="text-white">로딩중...</div>
-      </div>
-    );
-  }
-
-  if (isLoginPage) {
-    return <>{children}</>;
-  }
-
-  if (!isLoggedIn) {
-    return null;
-  }
 
   const deviceMenuItems = [
     { href: "/admin/images", label: "이미지 관리", icon: "🖼️" },
@@ -210,13 +159,5 @@ function AdminLayoutInner({ children }: AdminLayoutProps) {
         <main className="flex-1 p-6 overflow-y-auto">{children}</main>
       </div>
     </div>
-  );
-}
-
-export default function AdminLayout({ children }: AdminLayoutProps) {
-  return (
-    <AdminProvider>
-      <AdminLayoutInner>{children}</AdminLayoutInner>
-    </AdminProvider>
   );
 }
