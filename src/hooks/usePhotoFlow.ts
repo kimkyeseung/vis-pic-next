@@ -13,6 +13,7 @@ export function usePhotoFlow(deviceId: string, config: DeviceConfig) {
   const [stickers, setStickers] = useState<Sticker[]>([]);
   const [intermediateFrames, setIntermediateFrames] = useState<string[][]>([]);
   const [selectedPhotos, setSelectedPhotos] = useState<number[]>([]);
+  const [selectedPrintBg, setSelectedPrintBg] = useState<number | null>(null);
   const [compositeImage, setCompositeImage] = useState<string | null>(null);
   const [preparedPhotoUrl, setPreparedPhotoUrl] = useState<string | null>(null);
   const [preparedGifUrl, setPreparedGifUrl] = useState<string | null>(null);
@@ -36,6 +37,7 @@ export function usePhotoFlow(deviceId: string, config: DeviceConfig) {
         if (s.orderId) setOrderId(s.orderId);
         if (s.selectedFrame) setSelectedFrame(s.selectedFrame);
         if (s.selectedBackground !== undefined) setSelectedBackground(s.selectedBackground);
+        if (s.selectedPrintBg !== undefined) setSelectedPrintBg(s.selectedPrintBg);
         if (s.photos?.length > 0) setPhotos(s.photos);
         if (s.intermediateFrames?.length > 0) setIntermediateFrames(s.intermediateFrames);
         if (s.selectedPhotos?.length > 0) setSelectedPhotos(s.selectedPhotos);
@@ -56,6 +58,7 @@ export function usePhotoFlow(deviceId: string, config: DeviceConfig) {
         orderId,
         selectedFrame,
         selectedBackground,
+        selectedPrintBg,
         photos,
         intermediateFrames,
         selectedPhotos,
@@ -63,7 +66,7 @@ export function usePhotoFlow(deviceId: string, config: DeviceConfig) {
     } catch {
       // sessionStorage full or unavailable
     }
-  }, [currentStep, deviceId, orderId, selectedFrame, selectedBackground, photos, intermediateFrames, selectedPhotos]);
+  }, [currentStep, deviceId, orderId, selectedFrame, selectedBackground, selectedPrintBg, photos, intermediateFrames, selectedPhotos]);
 
   const goToStep = (step: Step) => setCurrentStep(step);
 
@@ -84,6 +87,7 @@ export function usePhotoFlow(deviceId: string, config: DeviceConfig) {
     setPhotos([]);
     setIntermediateFrames([]);
     setSelectedPhotos([]);
+    setSelectedPrintBg(null);
     setCompositeImage(null);
     setPreparedPhotoUrl(null);
     setPreparedGifUrl(null);
@@ -116,9 +120,12 @@ export function usePhotoFlow(deviceId: string, config: DeviceConfig) {
         if (selectedPhotos.length < slotsNeeded) {
           setSelectedPhotos(photos.map((_, i) => i).slice(0, slotsNeeded));
         }
-        goToStep("complete");
+        goToStep("printbg");
         break;
       }
+      case "printbg":
+        goToStep("complete");
+        break;
       case "complete":
         resetAll();
         break;
@@ -166,7 +173,7 @@ export function usePhotoFlow(deviceId: string, config: DeviceConfig) {
     }
   };
 
-  const handleSelectNext = async () => {
+  const handleSelectNext = async (hasPrintBgImages = false) => {
     const selected = selectedPhotos.length === slotsNeeded
       ? selectedPhotos
       : photos.map((_, i) => i).slice(0, slotsNeeded);
@@ -176,17 +183,18 @@ export function usePhotoFlow(deviceId: string, config: DeviceConfig) {
     setPreparedExpiryDate(null);
     setCompositeImage(null);
 
+    const nextStep: Step = hasPrintBgImages ? "printbg" : "complete";
     const selectedPhoto = slotsNeeded === 1 ? photos[selected[0]] : null;
-    if (!selectedPhoto) { goToStep("complete"); return; }
+    if (!selectedPhoto) { goToStep(nextStep); return; }
 
     setIsPreparingComplete(true);
     try {
       setCompositeImage(selectedPhoto);
       await uploadPreparedPhoto(selectedPhoto, intermediateFrames[selected[0]] || []);
-      goToStep("complete");
+      goToStep(nextStep);
     } catch (error) {
       console.error("Failed to prepare selected photo:", error);
-      goToStep("complete");
+      goToStep(nextStep);
     } finally {
       setIsPreparingComplete(false);
     }
@@ -197,6 +205,7 @@ export function usePhotoFlow(deviceId: string, config: DeviceConfig) {
     orderId, setOrderId,
     selectedFrame, setSelectedFrame,
     selectedBackground, setSelectedBackground,
+    selectedPrintBg, setSelectedPrintBg,
     photos, setPhotos,
     stickers, setStickers,
     intermediateFrames,

@@ -18,7 +18,7 @@ export interface MonitorInfo {
   y: number;
 }
 
-export type Step = "start" | "payment" | "frame" | "background" | "camera" | "select" | "complete";
+export type Step = "start" | "payment" | "frame" | "background" | "camera" | "select" | "printbg" | "complete";
 
 export type BgRemovalMode = "mediapipe" | "chromakey" | "off";
 

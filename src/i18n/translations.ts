@@ -31,6 +31,8 @@ const ko = {
 
   "bg.title": "배경을 선택해 주세요",
 
+  "printbg.title": "인쇄 배경을 선택해 주세요",
+
   "camera.title": "촬영",
   "camera.shoot": "촬영하기",
   "camera.sticker": "스티커 추가",
@@ -96,6 +98,8 @@ const en: Record<MessageKey, string> = {
 
   "bg.title": "Please select a background",
 
+  "printbg.title": "Select a print background",
+
   "camera.title": "Capture",
   "camera.shoot": "Take Photo",
   "camera.sticker": "Add Sticker",
@@ -159,6 +163,8 @@ const ja: Record<MessageKey, string> = {
 
   "bg.title": "背景を選択してください",
 
+  "printbg.title": "印刷背景を選択してください",
+
   "camera.title": "撮影",
   "camera.shoot": "撮影する",
   "camera.sticker": "ステッカー追加",
@@ -221,6 +227,8 @@ const zh: Record<MessageKey, string> = {
   "frame.cut": "{n}格",
 
   "bg.title": "请选择背景",
+
+  "printbg.title": "请选择打印背景",
 
   "camera.title": "拍摄",
   "camera.shoot": "拍照",

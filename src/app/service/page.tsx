@@ -18,6 +18,7 @@ import { BackgroundSection } from "@/components/service/BackgroundSection";
 import { CameraSection } from "@/components/service/CameraSection";
 import { CameraStreamer } from "@/components/service/CameraStreamer";
 import { SelectSection } from "@/components/service/SelectSection";
+import { PrintBgSection } from "@/components/service/PrintBgSection";
 import { CompleteSection } from "@/components/service/CompleteSection";
 
 function ServiceContent() {
@@ -25,7 +26,7 @@ function ServiceContent() {
   const deviceId = searchParams.get("device") || "test";
   const [preflightDone, setPreflightDone] = useState(false);
 
-  const { config, backgroundImages, imageBaseUrl, printSettings } = useDeviceSetup(deviceId);
+  const { config, backgroundImages, printBgImages, imageBaseUrl, printSettings } = useDeviceSetup(deviceId);
   const flow = usePhotoFlow(deviceId, config);
   const { monitors, syncEnabled, setSyncEnabled, selectedMonitorIndex, setSelectedMonitorIndex } = useTauriMonitor();
   const { idleRemaining, clearIdleTimer } = useIdleTimer(
@@ -34,7 +35,7 @@ function ServiceContent() {
     flow.advanceFromCurrentStep,
   );
 
-  const { currentStep, slotsNeeded, selectedBackground, setSelectedBackground } = flow;
+  const { currentStep, slotsNeeded, selectedBackground, setSelectedBackground, selectedPrintBg, setSelectedPrintBg } = flow;
   const { setLang, t } = useLanguage();
 
   // 대기 화면으로 돌아오면 다음 손님을 위해 언어를 한국어로 초기화
@@ -156,12 +157,25 @@ function ServiceContent() {
           requiredCount={slotsNeeded}
           selectedPhotos={flow.selectedPhotos}
           setSelectedPhotos={flow.setSelectedPhotos}
-          onNext={() => { clearIdleTimer(); flow.handleSelectNext(); }}
+          onNext={() => { clearIdleTimer(); flow.handleSelectNext(printBgImages.length > 0); }}
           onPrev={() => {
             flow.setPhotos([]);
             flow.setSelectedPhotos([]);
             flow.setCompositeImage(null);
             flow.goToStep("camera");
+          }}
+        />
+      )}
+      {currentStep === "printbg" && (
+        <PrintBgSection
+          printBgImages={printBgImages}
+          selectedPrintBg={selectedPrintBg}
+          imageBaseUrl={imageBaseUrl}
+          onSelect={setSelectedPrintBg}
+          onNext={() => flow.goToStep("complete")}
+          onPrev={() => {
+            flow.setCompositeImage(null);
+            flow.goToStep("select");
           }}
         />
       )}
@@ -177,6 +191,8 @@ function ServiceContent() {
           setCompositeImage={flow.setCompositeImage}
           intermediateFrames={flow.intermediateFrames}
           printSettings={printSettings}
+          selectedPrintBg={selectedPrintBg}
+          printBgImages={printBgImages}
           preparedPhotoUrl={flow.preparedPhotoUrl}
           preparedGifUrl={flow.preparedGifUrl}
           preparedExpiryDate={flow.preparedExpiryDate}

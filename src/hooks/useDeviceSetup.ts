@@ -20,6 +20,7 @@ const DEFAULT_CONFIG: DeviceConfig = {
 export function useDeviceSetup(deviceId: string) {
   const [config, setConfig] = useState<DeviceConfig>(DEFAULT_CONFIG);
   const [backgroundImages, setBackgroundImages] = useState<BGImage[]>([]);
+  const [printBgImages, setPrintBgImages] = useState<BGImage[]>([]);
   const [imageBaseUrl, setImageBaseUrl] = useState<string>("/static/images");
   const [printSettings, setPrintSettings] = useState<Record<string, string>>({});
 
@@ -104,11 +105,30 @@ export function useDeviceSetup(deviceId: string) {
       }
     }
 
+    async function loadPrintBackgrounds(id: string, attempt = 0) {
+      const MAX_RETRIES = 5;
+      const retry = () => {
+        if (signal.aborted || attempt >= MAX_RETRIES) return;
+        const timer = setTimeout(() => loadPrintBackgrounds(id, attempt + 1), 3000);
+        signal.addEventListener("abort", () => clearTimeout(timer), { once: true });
+      };
+      try {
+        const res = await fetch(`/api/image/list/4/?device_id=${id}&check_files=1`, { signal });
+        if (!res.ok) { retry(); return; }
+        const data = await res.json();
+        if (data.images) setPrintBgImages(data.images);
+      } catch (err) {
+        if ((err as Error).name === "AbortError") return;
+        retry();
+      }
+    }
+
     loadSettings(deviceId);
     loadBackgrounds(deviceId);
+    loadPrintBackgrounds(deviceId);
 
     return () => controller.abort();
   }, [deviceId]);
 
-  return { config, backgroundImages, imageBaseUrl, printSettings };
+  return { config, backgroundImages, printBgImages, imageBaseUrl, printSettings };
 }

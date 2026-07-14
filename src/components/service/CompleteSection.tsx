@@ -27,6 +27,8 @@ export function CompleteSection({
   setCompositeImage,
   intermediateFrames,
   printSettings,
+  selectedPrintBg,
+  printBgImages,
   preparedPhotoUrl,
   preparedGifUrl,
   preparedExpiryDate,
@@ -42,6 +44,8 @@ export function CompleteSection({
   setCompositeImage: (img: string | null) => void;
   intermediateFrames: string[][];
   printSettings: Record<string, string>;
+  selectedPrintBg?: number | null;
+  printBgImages?: BGImage[];
   preparedPhotoUrl?: string | null;
   preparedGifUrl?: string | null;
   preparedExpiryDate?: string | null;
@@ -77,7 +81,7 @@ export function CompleteSection({
     return `${baseUrl}/${filename}`;
   };
 
-  const uploadForQR = async (dataUrl: string, bgImageData?: string | null) => {
+  const uploadForQR = async (dataUrl: string, bgImageData?: string | null, printBgFilename?: string | null) => {
     let photoUrl: string | null = null;
 
     try {
@@ -156,7 +160,7 @@ export function CompleteSection({
                 v_gap: vGapPx,
                 duration: 100, // 10fps — 중간 프레임이 ~180ms 간격으로 캡처됨
                 background_color: "#ffffff",
-                background_image: printSettings.PRINT_BACKGROUND || null,
+                background_image: printBgFilename || printSettings.PRINT_BACKGROUND || null,
                 // 합성 사진과 동일한 배경(선택 배경/그라디언트 포함)과
                 // 프레임 스타일(둥근 모서리·테두리)을 GIF에도 적용
                 background_image_data: bgImageData || null,
@@ -246,9 +250,25 @@ export function CompleteSection({
     canvas.height = canvasHeight;
     const ctx = canvas.getContext("2d")!;
 
-    // Background: PRINT_BACKGROUND > user-selected > fallback gradient
+    // Background priority: user-selected print bg > PRINT_BACKGROUND setting > user AR bg > fallback gradient
     let bgDrawn = false;
-    if (printSettings.PRINT_BACKGROUND) {
+
+    // 1. User-selected print background (imageType=4)
+    const printBgInfo = selectedPrintBg != null
+      ? (printBgImages || []).find((b) => b.id === selectedPrintBg)
+      : null;
+    if (printBgInfo) {
+      try {
+        const bgImg = await loadImage(`${imageBaseUrl}/${printBgInfo.filename}`);
+        ctx.drawImage(bgImg, 0, 0, canvasWidth, canvasHeight);
+        bgDrawn = true;
+      } catch {
+        // fall through
+      }
+    }
+
+    // 2. Legacy single PRINT_BACKGROUND setting (fallback when no print bg images)
+    if (!bgDrawn && printSettings.PRINT_BACKGROUND) {
       try {
         const bgImg = await loadImage(resolveImageUrl(printSettings.PRINT_BACKGROUND, imageBaseUrl));
         ctx.drawImage(bgImg, 0, 0, canvasWidth, canvasHeight);
@@ -351,7 +371,7 @@ export function CompleteSection({
     const dataUrl = canvas.toDataURL("image/jpeg", 0.95);
     setCompositeImage(dataUrl);
 
-    await uploadForQR(dataUrl, bgOnlyDataUrl);
+    await uploadForQR(dataUrl, bgOnlyDataUrl, printBgInfo?.filename ?? null);
     setPrintStatus("ready");
   };
 

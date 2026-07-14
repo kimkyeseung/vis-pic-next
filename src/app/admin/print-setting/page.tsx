@@ -11,6 +11,12 @@ import {
   type PrintLayout,
 } from "@/lib/printLayout";
 
+interface PrintBgImage {
+  id: number;
+  name: string;
+  filename: string;
+}
+
 export default function PrintSettingPage() {
   const { selectedDevice } = useAdmin();
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -25,13 +31,14 @@ export default function PrintSettingPage() {
   const [modes, setModes] = useState<string[]>([]);
   const [previewMode, setPreviewMode] = useState<string | null>(null);
 
-  const [bgFile, setBgFile] = useState<File | null>(null);
-  const [bgPreviewUrl, setBgPreviewUrl] = useState<string | null>(null);
-  const [bgRemoved, setBgRemoved] = useState(false);
-  const [existingBgUrl, setExistingBgUrl] = useState<string | null>(null);
   const [imageBaseUrl, setImageBaseUrl] = useState("/static/images");
   const [printerName, setPrinterName] = useState("");
   const [printerList, setPrinterList] = useState<string[]>([]);
+
+  // Print background images (imageType=4)
+  const [printBgImages, setPrintBgImages] = useState<PrintBgImage[]>([]);
+  const [bgUploading, setBgUploading] = useState(false);
+  const [bgUploadError, setBgUploadError] = useState("");
 
   const loadImageBaseUrl = async () => {
     try {
@@ -41,6 +48,17 @@ export default function PrintSettingPage() {
       if (data.baseUrl) setImageBaseUrl(data.baseUrl);
     } catch {
       // use default
+    }
+  };
+
+  const loadPrintBgImages = async () => {
+    try {
+      const res = await fetch("/api/image/list/4/");
+      if (!res.ok) return;
+      const data = await res.json();
+      setPrintBgImages(data.images || []);
+    } catch {
+      // ignore
     }
   };
 
@@ -63,10 +81,6 @@ export default function PrintSettingPage() {
         .filter((m: string) => FRAME_INFO[m]);
       setModes(modeList);
       if (modeList.length > 0) setPreviewMode(modeList[0]);
-
-      if (s.PRINT_BACKGROUND) {
-        setExistingBgUrl(s.PRINT_BACKGROUND);
-      }
     } catch {
       // fallback
     } finally {
@@ -76,8 +90,9 @@ export default function PrintSettingPage() {
 
   useEffect(() => {
     (async () => {
-      await Promise.all([loadSettings(), loadImageBaseUrl()]);
+      await Promise.all([loadSettings(), loadImageBaseUrl(), loadPrintBgImages()]);
     })();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedDevice]);
 
   const handleSave = async () => {
@@ -91,42 +106,15 @@ export default function PrintSettingPage() {
         CAPTURE_MODES: modes.join(","),
         PRINTER_NAME: printerName,
       };
-      // 배경 제거는 서버에서 키를 삭제해야 반영된다 (upsert만으로는 리로드 시 부활)
-      const payload: Record<string, string | null> = { ...updatedSettings };
-      if (bgRemoved && !bgFile) payload.PRINT_BACKGROUND = null;
-
-      if (bgFile) {
-        const formData = new FormData();
-        formData.append("file", bgFile);
-        formData.append("name", "인화 배경");
-        formData.append("imageType", "2");
-        formData.append("priority", "0");
-
-        const uploadRes = await fetch("/api/admin/images/upload/", {
-          method: "POST",
-          body: formData,
-        });
-
-        if (uploadRes.ok) {
-          const uploadData = await uploadRes.json();
-          updatedSettings.PRINT_BACKGROUND = uploadData.image.filename;
-          payload.PRINT_BACKGROUND = uploadData.image.filename;
-          setExistingBgUrl(uploadData.image.filename);
-          setBgFile(null);
-          if (bgPreviewUrl) URL.revokeObjectURL(bgPreviewUrl);
-          setBgPreviewUrl(uploadData.image.url || null);
-        }
-      }
 
       const res = await fetch("/api/setting/", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
+        body: JSON.stringify(updatedSettings),
       });
 
       if (res.ok) {
         setSettings(updatedSettings);
-        setBgRemoved(false);
         setMessage("설정이 저장되었습니다.");
         setTimeout(() => setMessage(""), 3000);
       } else {
@@ -153,33 +141,71 @@ export default function PrintSettingPage() {
     if (previewMode === mode) setPreviewMode(next[0] || null);
   };
 
-  const handleBgFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleBgUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
+    e.target.value = "";
     if (!file) return;
-    setBgFile(file);
-    setBgRemoved(false);
-    if (bgPreviewUrl) URL.revokeObjectURL(bgPreviewUrl);
-    const url = URL.createObjectURL(file);
-    setBgPreviewUrl(url);
+
+    setBgUploading(true);
+    setBgUploadError("");
+
+    try {
+      // Try presigned upload first (Vercel / large files)
+      const presignRes = await fetch("/api/admin/images/presign/", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ filename: file.name, contentType: file.type }),
+      });
+
+      if (presignRes.ok) {
+        const { signedUrl, filename: storedFilename } = await presignRes.json();
+        await fetch(signedUrl, { method: "PUT", body: file, headers: { "Content-Type": file.type } });
+        const regRes = await fetch("/api/admin/images/register/", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ filename: storedFilename, name: file.name, imageType: 4, priority: 0 }),
+        });
+        if (regRes.ok) {
+          await loadPrintBgImages();
+          return;
+        }
+      }
+
+      // Fallback: direct upload
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("name", file.name);
+      formData.append("imageType", "4");
+      formData.append("priority", "0");
+      const uploadRes = await fetch("/api/admin/images/upload/", { method: "POST", body: formData });
+      if (uploadRes.ok) {
+        await loadPrintBgImages();
+      } else {
+        setBgUploadError("업로드에 실패했습니다.");
+      }
+    } catch {
+      setBgUploadError("업로드 중 오류가 발생했습니다.");
+    } finally {
+      setBgUploading(false);
+    }
   };
 
-  const removeBg = () => {
-    setBgFile(null);
-    if (bgPreviewUrl) URL.revokeObjectURL(bgPreviewUrl);
-    setBgPreviewUrl(null);
-    setExistingBgUrl(null);
-    setBgRemoved(true);
-    setSettings((prev) => {
-      const next = { ...prev };
-      delete next.PRINT_BACKGROUND;
-      return next;
-    });
+  const handleBgDelete = async (id: number) => {
+    if (!confirm("이 배경 이미지를 삭제하시겠습니까?")) return;
+    try {
+      const res = await fetch(`/api/admin/images/${id}/`, { method: "DELETE" });
+      if (res.ok) {
+        setPrintBgImages((prev) => prev.filter((img) => img.id !== id));
+      } else {
+        alert("삭제에 실패했습니다.");
+      }
+    } catch {
+      alert("삭제 중 오류가 발생했습니다.");
+    }
   };
 
-  const resolveUrl = useCallback((value: string) => {
-    if (value.startsWith("http://") || value.startsWith("https://")) return value;
-    if (value.startsWith("/")) return value;
-    return `${imageBaseUrl}/${value.split("/").pop()}`;
+  const resolveUrl = useCallback((filename: string) => {
+    return `${imageBaseUrl}/${filename.split("/").pop()}`;
   }, [imageBaseUrl]);
 
   const getPaperDimensions = useCallback((mode: string | null) => {
@@ -189,7 +215,6 @@ export default function PrintSettingPage() {
     return paperDimensionsFor(w, h, orient);
   }, [paperWidth, paperHeight]);
 
-  // 현재 미리보기 모드의 슬롯 배치 (설정값 실시간 반영)
   const getPreviewLayout = useCallback((): PrintLayout | null => {
     if (!previewMode || !FRAME_INFO[previewMode]) return null;
     const { pw, ph } = getPaperDimensions(previewMode);
@@ -212,7 +237,7 @@ export default function PrintSettingPage() {
     if (!layout) return;
 
     const { pw } = getPaperDimensions(previewMode);
-    const scale = drawW / pw; // cm → 캔버스 px
+    const scale = drawW / pw;
 
     layout.slots.forEach((slot, i) => {
       const x = ox + slot.x * scale;
@@ -307,19 +332,20 @@ export default function PrintSettingPage() {
     roundRect(ctx, ox, oy, drawW, drawH, 6);
     ctx.clip();
 
-    const bgUrl = bgPreviewUrl || (existingBgUrl ? resolveUrl(existingBgUrl) : null);
-    if (bgUrl) {
+    // Show first print bg image in preview if available
+    const firstBg = printBgImages[0];
+    if (firstBg) {
       const img = new Image();
       img.crossOrigin = "anonymous";
       img.onload = () => { ctx.drawImage(img, ox, oy, drawW, drawH); ctx.restore(); finishDraw(); };
       img.onerror = () => { ctx.restore(); finishDraw(); };
-      img.src = bgUrl;
+      img.src = resolveUrl(firstBg.filename);
       return;
     }
 
     ctx.restore();
     finishDraw();
-  }, [previewMode, bgPreviewUrl, existingBgUrl, getPaperDimensions, resolveUrl, drawSlots, drawLabels]);
+  }, [previewMode, printBgImages, getPaperDimensions, resolveUrl, drawSlots, drawLabels]);
 
   useEffect(() => {
     drawPreview();
@@ -397,7 +423,6 @@ export default function PrintSettingPage() {
                       }`}
                       onClick={() => setPreviewMode(mode)}
                     >
-                      {/* Mini grid preview */}
                       <div
                         className="w-10 h-10 grid gap-0.5 p-1 bg-gray-800 rounded flex-shrink-0"
                         style={{
@@ -448,7 +473,6 @@ export default function PrintSettingPage() {
               </div>
             )}
 
-            {/* Layout settings for selected mode */}
             {previewMode && (() => {
               const prefix = modeSettingPrefix(previewMode);
               const inputClass = "w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white text-sm focus:outline-none focus:border-blue-500 transition-colors disabled:opacity-40 disabled:cursor-not-allowed";
@@ -522,51 +546,62 @@ export default function PrintSettingPage() {
             })()}
           </div>
 
-          {/* Background Image */}
+          {/* Print Background Images */}
           <div className="p-6 bg-gray-800 rounded-xl border border-gray-700">
             <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
               <span className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center text-sm">3</span>
               인쇄 배경 이미지
             </h3>
+            <p className="text-gray-500 text-xs mb-4">
+              사용자가 인화 직전에 선택할 배경 이미지 목록입니다. 여러 장 등록 가능하며, 이미지가 없으면 선택 단계를 건너뜁니다.
+            </p>
 
-            <div className="space-y-4">
-              <label className="flex items-center gap-3 px-4 py-3 bg-gray-700 border border-gray-600 border-dashed rounded-lg cursor-pointer hover:border-blue-500 transition-colors">
-                <svg className="w-5 h-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                </svg>
-                <span className="text-gray-400 text-sm">
-                  {bgFile ? bgFile.name : "이미지 파일 선택..."}
-                </span>
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={handleBgFileChange}
-                  className="hidden"
-                />
-              </label>
+            {/* Upload button */}
+            <label className={`inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm rounded-lg cursor-pointer hover:bg-blue-700 transition-colors mb-4 ${bgUploading ? "opacity-50 pointer-events-none" : ""}`}>
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+              </svg>
+              {bgUploading ? "업로드 중..." : "이미지 추가"}
+              <input
+                type="file"
+                accept="image/*"
+                onChange={handleBgUpload}
+                disabled={bgUploading}
+                className="hidden"
+              />
+            </label>
 
-              {(bgPreviewUrl || existingBgUrl) && (
-                <div className="relative group">
-                  <img
-                    src={bgPreviewUrl || (existingBgUrl ? resolveUrl(existingBgUrl) : "")}
-                    alt="배경 미리보기"
-                    className="w-full max-h-48 object-cover rounded-lg border border-gray-600"
-                  />
-                  <button
-                    onClick={removeBg}
-                    className="absolute top-2 right-2 p-1.5 bg-red-600 text-white rounded-lg opacity-0 group-hover:opacity-100 transition-opacity"
-                  >
-                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                  </button>
-                </div>
-              )}
+            {bgUploadError && (
+              <p className="text-red-400 text-sm mb-3">{bgUploadError}</p>
+            )}
 
-              <p className="text-gray-500 text-xs">
-                배경 이미지 업로드·제거는 하단의 &quot;설정 저장&quot;을 눌러야 반영됩니다.
-              </p>
-            </div>
+            {printBgImages.length === 0 ? (
+              <div className="py-8 text-center text-gray-500 text-sm border border-dashed border-gray-600 rounded-lg">
+                등록된 인쇄 배경 이미지가 없습니다
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                {printBgImages.map((img) => (
+                  <div key={img.id} className="relative group rounded-lg overflow-hidden border border-gray-600">
+                    <img
+                      src={resolveUrl(img.filename)}
+                      alt={img.name}
+                      className="w-full h-28 object-cover"
+                      onError={(e) => { (e.target as HTMLImageElement).style.opacity = "0.3"; }}
+                    />
+                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                      <button
+                        onClick={() => handleBgDelete(img.id)}
+                        className="px-3 py-1.5 bg-red-600 text-white text-xs rounded-lg hover:bg-red-500 transition-colors"
+                      >
+                        삭제
+                      </button>
+                    </div>
+                    <p className="text-gray-400 text-xs truncate px-2 py-1 bg-gray-900/80">{img.name}</p>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Printer */}
@@ -669,9 +704,9 @@ export default function PrintSettingPage() {
                 </span>
               </div>
               <div className="flex justify-between text-gray-400">
-                <span>배경</span>
+                <span>인쇄 배경</span>
                 <span className="text-white">
-                  {bgPreviewUrl || existingBgUrl ? "설정됨" : "없음"}
+                  {printBgImages.length > 0 ? `${printBgImages.length}장 등록됨` : "없음"}
                 </span>
               </div>
             </div>
@@ -719,4 +754,3 @@ export default function PrintSettingPage() {
     </div>
   );
 }
-
