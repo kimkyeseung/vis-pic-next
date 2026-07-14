@@ -2,7 +2,7 @@ import { test, expect, type Page } from "@playwright/test";
 
 // ─── 헬퍼 ─────────────────────────────────────────────────────────────────────
 
-/** 세션 초기화 후 /service 로 이동 */
+/** 세션 초기화 후 /service 로 이동. PreflightSection 완료까지 대기. */
 async function gotoFresh(page: Page) {
   await page.goto("/service/?device=test");
   await page.evaluate(() => {
@@ -10,6 +10,8 @@ async function gotoFresh(page: Page) {
     localStorage.clear();
   });
   await page.reload();
+  // PreflightSection(서버/카메라 점검)이 끝나고 StartSection이 표시될 때까지 대기
+  await expect(page.getByText("화면을 터치해주세요")).toBeVisible({ timeout: 30000 });
 }
 
 /** 페이지 레벨 CircularTimer SVG 원형 테두리 */
@@ -20,9 +22,14 @@ const timerCircle = (page: Page) =>
 const timerNumber = (page: Page) =>
   page.locator('[data-testid="page-idle-timer"] span');
 
-/** 시작 화면 → 프레임 선택 단계로 진입 */
+/** 시작 화면 → 프레임 선택 단계로 진입 (결제 단계가 있으면 dev 버튼으로 건너뜀) */
 async function goToFrame(page: Page) {
   await page.locator("section").first().click();
+  // 결제가 활성화된 디바이스는 결제 단계가 먼저 표시됨 → 개발용 버튼으로 건너뜀
+  const paymentVisible = await page.getByRole("heading", { name: "결제" }).isVisible({ timeout: 2000 }).catch(() => false);
+  if (paymentVisible) {
+    await page.getByText("결제완료(개발)").click();
+  }
   await expect(page.getByText("프레임을 선택해 주세요")).toBeVisible({ timeout: 5000 });
 }
 
@@ -42,8 +49,9 @@ async function goToCamera(page: Page) {
 
 /** 카메라에서 테스트 사진 추가 후 선택 단계로 */
 async function goToSelect(page: Page) {
-  const shootingText = await page.getByText(/촬영 \(0\//).textContent();
-  const match = shootingText?.match(/촬영 \(0\/(\d+)\)/);
+  // 카운터 "0 / N" 형식에서 최대 촬영 수 파악
+  const counterText = await page.locator(".tabular-nums").first().textContent();
+  const match = counterText?.match(/\d+\s*\/\s*(\d+)/);
   const count = match ? Math.min(parseInt(match[1]), 4) : 1;
   for (let i = 0; i < count; i++) {
     await page.getByText("테스트 사진 추가").click({ force: true });
@@ -172,6 +180,12 @@ test.describe("전체 서비스 플로우", () => {
     await expect(page.getByText("화면을 터치해주세요")).toBeVisible({ timeout: 5000 });
     await page.locator("section").first().click();
 
+    // 결제 단계가 있으면 개발용 버튼으로 건너뜀
+    const paymentVisible = await page.getByRole("heading", { name: "결제" }).isVisible({ timeout: 2000 }).catch(() => false);
+    if (paymentVisible) {
+      await page.getByText("결제완료(개발)").click();
+    }
+
     // Frame
     await expect(page.getByText("프레임을 선택해 주세요")).toBeVisible({ timeout: 5000 });
     await page.locator(".frame-option").first().click();
@@ -184,8 +198,8 @@ test.describe("전체 서비스 플로우", () => {
 
     // Camera
     await expect(page.getByText("테스트 사진 추가")).toBeVisible({ timeout: 5000 });
-    const shootingText = await page.getByText(/촬영 \(0\//).textContent();
-    const match = shootingText?.match(/촬영 \(0\/(\d+)\)/);
+    const counterText = await page.locator(".tabular-nums").first().textContent();
+    const match = counterText?.match(/\d+\s*\/\s*(\d+)/);
     const count = match ? Math.min(parseInt(match[1]), 4) : 1;
     for (let i = 0; i < count; i++) {
       await page.getByText("테스트 사진 추가").click({ force: true });
@@ -199,16 +213,22 @@ test.describe("전체 서비스 플로우", () => {
 
     // Select
     await expect(page.getByText("인화할 사진을 선택해 주세요")).toBeVisible({ timeout: 5000 });
+    // 썸네일 클릭(선택) 후 다음으로 — React onClick은 evaluate로 직접 트리거
     const thumbnails = page.locator(".photo-thumbnail");
     const thumbCount = await thumbnails.count();
     for (let i = 0; i < Math.min(thumbCount, count); i++) {
       await thumbnails.nth(i).click({ force: true });
+      await page.waitForTimeout(100);
     }
-    await page.getByText("다음으로").last().click({ force: true });
+    await page.evaluate(() => {
+      const buttons = document.querySelectorAll("button.nav-button");
+      const last = buttons[buttons.length - 1] as HTMLButtonElement;
+      last?.click();
+    });
 
     // Complete — 인화할 사진을 선택 화면이 사라지면 complete 단계 진입 확인
     await expect(page.getByText("인화할 사진을 선택해 주세요")).not.toBeVisible({ timeout: 20000 });
-    await expect(page.getByText(/사진이 완성되었습니다|완료|처음으로/)).toBeVisible({ timeout: 30000 });
+    await expect(page.getByText(/사진이 완성되었습니다|완료|처음으로/).first()).toBeVisible({ timeout: 30000 });
   });
 
   test("이전으로 버튼이 이전 단계로 돌아간다", async ({ page }) => {
