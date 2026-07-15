@@ -70,5 +70,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: AR-pic-Windows-portable-${{ github.run_number }}
-          path: src-tauri/target/release/AR-pic.exe
+          path: src-tauri/target/release/app.exe
           if-no-files-found: error
