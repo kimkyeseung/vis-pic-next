@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { useAdmin } from "../AdminContext";
+import { useAdmin } from "../../AdminContext";
 import type { Device } from "@/types";
 
 export default function DevicesPage() {

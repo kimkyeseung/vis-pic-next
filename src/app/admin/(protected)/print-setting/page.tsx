@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useRef, useCallback } from "react";
-import { useAdmin } from "../AdminContext";
+import { useAdmin } from "../../AdminContext";
 import { FRAME_INFO, ALL_MODES } from "@/constants/frames";
 import { roundRect } from "@/lib/canvas";
 import {
