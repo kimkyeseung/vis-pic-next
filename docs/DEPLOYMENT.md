@@ -145,7 +145,6 @@ npm run tauri:dev
 | `/admin/timer-setting` | 타이머 설정 (유휴·촬영·인화 타이머) |
 | `/admin/payment` | 결제 설정 |
 | `/admin/payment-history` | 결제 내역 |
-| `/admin/settings` | 기타 전역 설정 |
 
 ---
 

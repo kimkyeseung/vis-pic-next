@@ -92,13 +92,6 @@ export default function AdminPage() {
       color: "from-yellow-500 to-yellow-600",
     },
     {
-      title: "설정",
-      description: "촬영, 크로마키 등 시스템 설정을 관리합니다",
-      href: "/admin/settings",
-      icon: "⚙️",
-      color: "from-green-500 to-green-600",
-    },
-    {
       title: "장치 편집",
       description: "장치 정보와 장치별 설정을 수정합니다",
       href: `/admin/devices/${selectedDevice.id}`,
