@@ -111,6 +111,8 @@ model Image {
   right     Int?
   bottom    Int?
   priority  Int       @default(0)
+  focalX    Float?    @default(0.5) @map("focal_x")
+  focalY    Float?    @default(0.5) @map("focal_y")
   createdAt DateTime  @default(now()) @map("created_at") @db.Timestamp(6)
   type      ImageType @relation(fields: [imageType], references: [id], onDelete: NoAction, onUpdate: NoAction)
 

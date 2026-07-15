@@ -40,6 +40,8 @@ export async function GET(
       right: img.right,
       bottom: img.bottom,
       priority: img.priority,
+      focalX: img.focalX ?? 0.5,
+      focalY: img.focalY ?? 0.5,
     }));
 
     const publicDir = join(process.cwd(), "public", "static", "images");

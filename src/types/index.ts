@@ -52,6 +52,8 @@ export interface BGImage {
   id: number;
   name: string;
   filename: string;
+  focalX?: number;
+  focalY?: number;
 }
 
 export interface FallbackBackground {

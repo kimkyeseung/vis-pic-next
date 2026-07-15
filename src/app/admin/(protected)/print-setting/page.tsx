@@ -4,7 +4,7 @@ import { useEffect, useState, useRef, useCallback, useMemo } from "react";
 import { useAdmin } from "../../AdminContext";
 import { FRAME_INFO } from "@/constants/frames";
 import type { FrameInfoEntry } from "@/types";
-import { roundRect } from "@/lib/canvas";
+import { roundRect, drawImageCover } from "@/lib/canvas";
 import {
   computePrintLayout,
   modeSettingPrefix,
@@ -16,6 +16,8 @@ interface PrintBgImage {
   id: number;
   name: string;
   filename: string;
+  focalX: number;
+  focalY: number;
 }
 
 export default function PrintSettingPage() {
@@ -68,9 +70,26 @@ export default function PrintSettingPage() {
       const res = await fetch("/api/image/list/4/");
       if (!res.ok) return;
       const data = await res.json();
-      setPrintBgImages(data.images || []);
+      const imgs = (data.images || []).map((img: PrintBgImage & Record<string, unknown>) => ({
+        ...img,
+        focalX: typeof img.focalX === "number" ? img.focalX : 0.5,
+        focalY: typeof img.focalY === "number" ? img.focalY : 0.5,
+      }));
+      setPrintBgImages(imgs);
     } catch {
       // ignore
+    }
+  };
+
+  const saveFocal = async (id: number, focalX: number, focalY: number) => {
+    try {
+      await fetch(`/api/admin/images/${id}/`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ focalX, focalY }),
+      });
+    } catch {
+      // silent
     }
   };
 
@@ -414,7 +433,7 @@ export default function PrintSettingPage() {
     if (firstBg) {
       const img = new Image();
       img.crossOrigin = "anonymous";
-      img.onload = () => { ctx.drawImage(img, ox, oy, drawW, drawH); ctx.restore(); finishDraw(); };
+      img.onload = () => { drawImageCover(ctx, img, ox, oy, drawW, drawH, firstBg.focalX, firstBg.focalY); ctx.restore(); finishDraw(); };
       img.onerror = () => { ctx.restore(); finishDraw(); };
       img.src = resolveUrl(firstBg.filename);
       return;
@@ -470,7 +489,7 @@ export default function PrintSettingPage() {
     if (firstBg) {
       const img = new Image();
       img.crossOrigin = "anonymous";
-      img.onload = () => { ctx.drawImage(img, ox, oy, drawW, drawH); ctx.restore(); finishDraw(); };
+      img.onload = () => { drawImageCover(ctx, img, ox, oy, drawW, drawH, firstBg.focalX, firstBg.focalY); ctx.restore(); finishDraw(); };
       img.onerror = () => { ctx.restore(); finishDraw(); };
       img.src = resolveUrl(firstBg.filename);
       return;
@@ -731,24 +750,59 @@ export default function PrintSettingPage() {
                 등록된 인쇄 배경 이미지가 없습니다
               </div>
             ) : (
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+              <div className="space-y-4">
                 {printBgImages.map((img) => (
-                  <div key={img.id} className="relative group rounded-lg overflow-hidden border border-gray-600">
-                    <img
-                      src={resolveUrl(img.filename)}
-                      alt={img.name}
-                      className="w-full h-28 object-cover"
-                      onError={(e) => { (e.target as HTMLImageElement).style.opacity = "0.3"; }}
-                    />
-                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                      <button
-                        onClick={() => handleBgDelete(img.id)}
-                        className="px-3 py-1.5 bg-red-600 text-white text-xs rounded-lg hover:bg-red-500 transition-colors"
-                      >
-                        삭제
-                      </button>
+                  <div key={img.id} className="rounded-lg border border-gray-600 overflow-hidden">
+                    {/* 썸네일 + 삭제 */}
+                    <div className="relative group">
+                      <img
+                        src={resolveUrl(img.filename)}
+                        alt={img.name}
+                        className="w-full h-36 object-cover"
+                        style={{ objectPosition: `${img.focalX * 100}% ${img.focalY * 100}%` }}
+                        onError={(e) => { (e.target as HTMLImageElement).style.opacity = "0.3"; }}
+                      />
+                      <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <button
+                          onClick={() => handleBgDelete(img.id)}
+                          className="px-3 py-1.5 bg-red-600 text-white text-xs rounded-lg hover:bg-red-500 transition-colors"
+                        >
+                          삭제
+                        </button>
+                      </div>
+                      <p className="absolute bottom-0 left-0 right-0 text-gray-300 text-xs truncate px-2 py-1 bg-gray-900/70">{img.name}</p>
                     </div>
-                    <p className="text-gray-400 text-xs truncate px-2 py-1 bg-gray-900/80">{img.name}</p>
+                    {/* focal 슬라이더 */}
+                    <div className="px-3 py-3 bg-gray-900/60 space-y-2">
+                      <div className="flex items-center gap-3">
+                        <label className="text-gray-500 text-xs w-16 flex-shrink-0">가로 위치</label>
+                        <input
+                          type="range" min="0" max="100" step="1"
+                          value={Math.round(img.focalX * 100)}
+                          onChange={(e) => {
+                            const fx = parseInt(e.target.value) / 100;
+                            setPrintBgImages((prev) => prev.map((p) => p.id === img.id ? { ...p, focalX: fx } : p));
+                            saveFocal(img.id, fx, img.focalY);
+                          }}
+                          className="flex-1 accent-blue-500"
+                        />
+                        <span className="text-gray-400 text-xs w-8 text-right">{Math.round(img.focalX * 100)}%</span>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <label className="text-gray-500 text-xs w-16 flex-shrink-0">세로 위치</label>
+                        <input
+                          type="range" min="0" max="100" step="1"
+                          value={Math.round(img.focalY * 100)}
+                          onChange={(e) => {
+                            const fy = parseInt(e.target.value) / 100;
+                            setPrintBgImages((prev) => prev.map((p) => p.id === img.id ? { ...p, focalY: fy } : p));
+                            saveFocal(img.id, img.focalX, fy);
+                          }}
+                          className="flex-1 accent-blue-500"
+                        />
+                        <span className="text-gray-400 text-xs w-8 text-right">{Math.round(img.focalY * 100)}%</span>
+                      </div>
+                    </div>
                   </div>
                 ))}
               </div>

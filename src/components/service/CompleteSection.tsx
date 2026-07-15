@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import { QRCodeSVG } from "qrcode.react";
 import type { BGImage } from "@/types";
 import { FRAME_INFO, FALLBACK_BACKGROUNDS } from "@/constants/frames";
-import { roundRect, fillGradient, fillGradientFromCSS, loadImage, resizeForGif, stripDataUriPrefix } from "@/lib/canvas";
+import { roundRect, fillGradient, fillGradientFromCSS, loadImage, resizeForGif, stripDataUriPrefix, drawImageCover } from "@/lib/canvas";
 import {
   computePrintLayout,
   modeSettingPrefix,
@@ -260,7 +260,7 @@ export function CompleteSection({
     if (printBgInfo) {
       try {
         const bgImg = await loadImage(`${imageBaseUrl}/${printBgInfo.filename}`);
-        ctx.drawImage(bgImg, 0, 0, canvasWidth, canvasHeight);
+        drawImageCover(ctx, bgImg, 0, 0, canvasWidth, canvasHeight, printBgInfo.focalX ?? 0.5, printBgInfo.focalY ?? 0.5);
         bgDrawn = true;
       } catch {
         // fall through
@@ -271,7 +271,7 @@ export function CompleteSection({
     if (!bgDrawn && printSettings.PRINT_BACKGROUND) {
       try {
         const bgImg = await loadImage(resolveImageUrl(printSettings.PRINT_BACKGROUND, imageBaseUrl));
-        ctx.drawImage(bgImg, 0, 0, canvasWidth, canvasHeight);
+        drawImageCover(ctx, bgImg, 0, 0, canvasWidth, canvasHeight);
         bgDrawn = true;
       } catch {
         // fall through
@@ -286,7 +286,7 @@ export function CompleteSection({
       if (bgInfo) {
         try {
           const bgImg = await loadImage(`${imageBaseUrl}/${bgInfo.filename}`);
-          ctx.drawImage(bgImg, 0, 0, canvasWidth, canvasHeight);
+          drawImageCover(ctx, bgImg, 0, 0, canvasWidth, canvasHeight);
         } catch {
           fillGradient(ctx, canvasWidth, canvasHeight);
         }

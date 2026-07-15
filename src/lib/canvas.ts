@@ -47,6 +47,38 @@ export function fillGradientFromCSS(
   }
 }
 
+/**
+ * 이미지를 object-fit: cover 방식으로 캔버스에 그립니다.
+ * focalX/focalY (0.0~1.0): 이미지의 초점 위치. 기본값 0.5 (중앙).
+ */
+export function drawImageCover(
+  ctx: CanvasRenderingContext2D,
+  img: HTMLImageElement,
+  dx: number, dy: number, dw: number, dh: number,
+  focalX = 0.5, focalY = 0.5,
+) {
+  const iw = img.naturalWidth;
+  const ih = img.naturalHeight;
+  const destRatio = dw / dh;
+  const imgRatio = iw / ih;
+
+  let sx: number, sy: number, sw: number, sh: number;
+  if (imgRatio > destRatio) {
+    // 이미지가 더 넓음 → 좌우를 잘라냄
+    sh = ih;
+    sw = ih * destRatio;
+    sx = (iw - sw) * focalX;
+    sy = 0;
+  } else {
+    // 이미지가 더 높음 → 상하를 잘라냄
+    sw = iw;
+    sh = iw / destRatio;
+    sx = 0;
+    sy = (ih - sh) * focalY;
+  }
+  ctx.drawImage(img, sx, sy, sw, sh, dx, dy, dw, dh);
+}
+
 export function loadImage(src: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
     const img = new Image();
