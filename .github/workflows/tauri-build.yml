@@ -51,8 +51,8 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Build Next.js
-        run: npm run build
+      - name: Prepare server bundle (Next.js build + server.zip)
+        run: node scripts/prepare-tauri.mjs
 
       - name: Build Tauri
         run: npm run tauri:build
