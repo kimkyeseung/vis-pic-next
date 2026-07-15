@@ -9,7 +9,7 @@ interface CircularTimerProps {
 
 const strokeWidth = 4;
 
-export function CircularTimer({ value, total, size = 72, testId }: CircularTimerProps) {
+export function CircularTimer({ value, total, size = 108, testId }: CircularTimerProps) {
   const radius = (size - strokeWidth * 2) / 2;
   const circumference = 2 * Math.PI * radius;
   const progress = Math.max(0, Math.min(1, value / total));
@@ -17,7 +17,7 @@ export function CircularTimer({ value, total, size = 72, testId }: CircularTimer
 
   return (
     <div
-      className="absolute top-4 left-4 z-50 flex items-center justify-center"
+      className="absolute top-6 left-6 z-50 flex items-center justify-center"
       style={{ width: size, height: size }}
       data-testid={testId}
     >
