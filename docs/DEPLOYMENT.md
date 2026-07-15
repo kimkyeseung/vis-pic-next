@@ -140,7 +140,7 @@ npm run tauri:dev
 | `/admin/devices/[id]` | 장치 편집 |
 | `/admin/images` | 이미지 관리 |
 | `/admin/images/upload` | 이미지 업로드 |
-| `/admin/print-setting` | 인화 설정 (용지 크기·촬영 모드·배경) |
+| `/admin/print-setting` | 인화 설정 (용지 크기·촬영 모드·배경·focal point 조절) |
 | `/admin/capture-setting` | 촬영 설정 (카운트다운·크로마키 등) |
 | `/admin/timer-setting` | 타이머 설정 (유휴·촬영·인화 타이머) |
 | `/admin/payment` | 결제 설정 |
@@ -169,7 +169,7 @@ npm run tauri:dev
 | `CAMERA_AUTO_TIMER` | 60 | 촬영 단계 자동 촬영 타이머 (0이면 비활성) |
 | `PRINT_AUTO_TIMER` | 30 | 완료 화면 자동 복귀 타이머 (0이면 비활성) |
 | `CAPTURE_SECONDS` | 3 | 촬영 카운트다운 (초) |
-| `CAPTURE_MODES` | `1x1,2x2` | 사용 가능한 촬영 모드 |
+| `CAPTURE_MODES` | `1x1,2x2` | 사용 가능한 촬영 모드. 관리자 인화 설정에서 NxM 형식으로 커스텀 모드 추가 가능 (예: `3x2`, `4x1`) |
 | `CAPTURE_COUNT_UNIFORM` | 4 | 슬롯당 촬영 횟수 |
 | `CHROMAKEY_MODE` | `mediapipe` | 배경 제거 모드 (mediapipe/chromakey/off) |
 | `PAYMENT_ENABLED` | `0` | 결제 활성화 여부 |
