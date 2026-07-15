@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, Suspense } from "react";
+import { useEffect, useState, useRef, Suspense } from "react";
 import { FALLBACK_BACKGROUNDS } from "@/constants/frames";
 import { useSearchParams } from "next/navigation";
 import { LanguageProvider, useLanguage } from "@/i18n/LanguageContext";
@@ -35,6 +35,36 @@ function ServiceContent() {
     flow.advanceFromCurrentStep,
   );
 
+  // 인화 단계 전용 타이머 (complete step)
+  const [printRemaining, setPrintRemaining] = useState<number | null>(null);
+  const printTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const resetAllRef = useRef(flow.resetAll);
+  useEffect(() => { resetAllRef.current = flow.resetAll; }, [flow.resetAll]);
+
+  useEffect(() => {
+    if (flow.currentStep !== "complete" || config.printAutoTimerSeconds <= 0) {
+      if (printTimerRef.current) { clearInterval(printTimerRef.current); printTimerRef.current = null; }
+      setPrintRemaining(null);
+      return;
+    }
+    const deadline = Date.now() + config.printAutoTimerSeconds * 1000;
+    const init = setTimeout(() => setPrintRemaining(config.printAutoTimerSeconds), 0);
+    printTimerRef.current = setInterval(() => {
+      const remaining = Math.ceil((deadline - Date.now()) / 1000);
+      if (remaining <= 0) {
+        if (printTimerRef.current) { clearInterval(printTimerRef.current); printTimerRef.current = null; }
+        setPrintRemaining(null);
+        resetAllRef.current();
+      } else {
+        setPrintRemaining(remaining);
+      }
+    }, 1000);
+    return () => {
+      clearTimeout(init);
+      if (printTimerRef.current) { clearInterval(printTimerRef.current); printTimerRef.current = null; }
+    };
+  }, [flow.currentStep, config.printAutoTimerSeconds]);
+
   const { currentStep, slotsNeeded, selectedBackground, setSelectedBackground, selectedPrintBg, setSelectedPrintBg } = flow;
   const { setLang, t } = useLanguage();
 
@@ -57,12 +87,15 @@ function ServiceContent() {
   }, [backgroundImages, selectedBackground, setSelectedBackground]);
 
   const maxCaptures = slotsNeeded * config.captureCount;
-  const showTimer = currentStep !== "start" && currentStep !== "camera" && currentStep !== "payment" && idleRemaining !== null && config.idleTimeoutSeconds > 0;
+  const showTimer = currentStep !== "start" && currentStep !== "camera" && currentStep !== "payment" && currentStep !== "complete" && idleRemaining !== null && config.idleTimeoutSeconds > 0;
 
   return (
     <div className="w-full h-screen overflow-hidden relative">
       {showTimer && (
         <CircularTimer value={idleRemaining!} total={config.idleTimeoutSeconds} testId="page-idle-timer" />
+      )}
+      {currentStep === "complete" && printRemaining !== null && config.printAutoTimerSeconds > 0 && (
+        <CircularTimer value={printRemaining} total={config.printAutoTimerSeconds} testId="page-print-timer" />
       )}
       {flow.isPreparingComplete && (
         <div className="absolute inset-0 z-[100] bg-black/70 backdrop-blur-sm flex flex-col items-center justify-center">

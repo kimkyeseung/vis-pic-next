@@ -8,16 +8,7 @@ interface SettingGroup {
   fields?: { name: string; label: string; type?: "text" | "number" | "select"; options?: { value: string; label: string }[] }[];
 }
 
-const GROUPS: SettingGroup[] = [
-  {
-    key: "basic",
-    label: "기본 설정",
-    prefix: ["IDLE_"],
-    fields: [
-      { name: "IDLE_TIMEOUT_SECONDS", label: "유휴 타임아웃 (초, 기본 30)", type: "number" },
-    ],
-  },
-];
+const GROUPS: SettingGroup[] = [];
 
 export default function SettingsPage() {
   const [settings, setSettings] = useState<Record<string, string>>({});
@@ -86,7 +77,8 @@ export default function SettingsPage() {
     ...Object.keys(settings).filter(
       (k) =>
         k.startsWith("MODE_") || k.startsWith("PAYMENT_") || k.startsWith("PAYAPP_") || k.startsWith("ADMIN_") ||
-        k.startsWith("CAPTURE_") || k.startsWith("CAMERA_") || k.startsWith("CHROMAKEY_"),
+        k.startsWith("CAPTURE_") || k.startsWith("CAMERA_") || k.startsWith("CHROMAKEY_") ||
+        k.startsWith("IDLE_") || k === "PRINT_AUTO_TIMER",
     ),
   ]);
 

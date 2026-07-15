@@ -134,23 +134,46 @@ npm run tauri:dev
 | `/service?device=DEVICE_ID` | 서비스 화면 (키오스크) |
 | `/admin` | 관리자 대시보드 |
 | `/admin/login` | 관리자 로그인 |
-| `/admin/devices` | 장치 관리 |
+| `/admin/accounts` | 계정 관리 (계정 추가·삭제·비밀번호 변경) |
+| `/admin/devices` | 장치 목록 |
+| `/admin/devices/new` | 장치 추가 |
+| `/admin/devices/[id]` | 장치 편집 |
 | `/admin/images` | 이미지 관리 |
-| `/admin/settings` | 전역 설정 |
-| `/admin/printer` | 프린터/카메라 (Tauri) |
+| `/admin/images/upload` | 이미지 업로드 |
+| `/admin/print-setting` | 인화 설정 (용지 크기·촬영 모드·배경) |
+| `/admin/capture-setting` | 촬영 설정 (카운트다운·크로마키 등) |
+| `/admin/timer-setting` | 타이머 설정 (유휴·촬영·인화 타이머) |
+| `/admin/payment` | 결제 설정 |
+| `/admin/payment-history` | 결제 내역 |
+| `/admin/settings` | 기타 전역 설정 |
 
 ---
 
 ## 7. 서비스 촬영 플로우
 
 ```
-시작 → [결제] → 프레임 선택 → 배경 선택 → 촬영 → 사진 선택 → 합성/인쇄 → 완료
+시작 → [결제] → 프레임 선택 → 배경 선택 → 촬영 → 사진 선택 → [인화 배경 선택] → 합성/인쇄 → 완료
 ```
 
 - **결제**: `PAYMENT_ENABLED=1`이면 PayApp 결제 진행 (개발 모드에서는 건너뛰기 가능)
 - **프레임**: `CAPTURE_MODES` 설정에 따라 1x1, 2x1, 2x2 등 선택
-- **촬영**: 슬롯당 `CAPTURE_COUNT_UNIFORM`장 촬영, 필요한 수만 선택
+- **촬영**: 슬롯당 `CAPTURE_COUNT_UNIFORM`장 촬영, 필요한 수만 선택. `CAMERA_AUTO_TIMER`(초) 경과 시 자동 촬영
+- **인화 배경 선택**: 인화 배경 이미지가 등록된 경우에만 노출
 - **인쇄**: Tauri → 선택된 프린터로 인쇄 / 브라우저 → 새 창 인쇄 또는 다운로드
+- **완료 화면**: `PRINT_AUTO_TIMER`(초) 경과 시 자동으로 시작 화면으로 복귀 (기본 30초, 0이면 비활성)
+
+### 주요 설정 키 (DB `pic_Setting` 테이블)
+
+| 키 | 기본값 | 설명 |
+|----|--------|------|
+| `IDLE_TIMEOUT_SECONDS` | 30 | 유휴 타임아웃 (프레임·배경·선택·인화배경 단계) |
+| `CAMERA_AUTO_TIMER` | 60 | 촬영 단계 자동 촬영 타이머 (0이면 비활성) |
+| `PRINT_AUTO_TIMER` | 30 | 완료 화면 자동 복귀 타이머 (0이면 비활성) |
+| `CAPTURE_SECONDS` | 3 | 촬영 카운트다운 (초) |
+| `CAPTURE_MODES` | `1x1,2x2` | 사용 가능한 촬영 모드 |
+| `CAPTURE_COUNT_UNIFORM` | 4 | 슬롯당 촬영 횟수 |
+| `CHROMAKEY_MODE` | `mediapipe` | 배경 제거 모드 (mediapipe/chromakey/off) |
+| `PAYMENT_ENABLED` | `0` | 결제 활성화 여부 |
 
 ---
 
@@ -162,6 +185,7 @@ npm run tauri:dev
 | viswave | viswave1214 |
 
 운영 환경에서는 반드시 비밀번호를 변경하세요.
+계정 추가·삭제·비밀번호 변경은 `/admin/accounts` 페이지에서 관리합니다.
 
 ---
 

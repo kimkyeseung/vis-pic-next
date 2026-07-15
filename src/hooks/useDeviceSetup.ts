@@ -15,6 +15,7 @@ const DEFAULT_CONFIG: DeviceConfig = {
   bgRemovalMode: "mediapipe",
   idleTimeoutSeconds: 30,
   cameraAutoTimerSeconds: 60,
+  printAutoTimerSeconds: 30,
 };
 
 export function useDeviceSetup(deviceId: string) {
@@ -75,6 +76,7 @@ export function useDeviceSetup(deviceId: string) {
           bgRemovalMode,
           idleTimeoutSeconds: parseIntSafe(s.IDLE_TIMEOUT_SECONDS || "", 30),
           cameraAutoTimerSeconds: parseIntSafe(s.CAMERA_AUTO_TIMER || "", 60),
+          printAutoTimerSeconds: parseIntSafe(s.PRINT_AUTO_TIMER || "", 30),
         });
       } catch (err) {
         if ((err as Error).name === "AbortError") return;
