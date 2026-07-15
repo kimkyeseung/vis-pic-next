@@ -23,6 +23,7 @@ export function AdminSidebar({ adminName, children }: AdminSidebarProps) {
   const deviceMenuItems = [
     { href: "/admin/images", label: "이미지 관리", icon: "🖼️" },
     { href: "/admin/print-setting", label: "인화 설정", icon: "🖨️" },
+    { href: "/admin/capture-setting", label: "촬영 설정", icon: "📷" },
     { href: "/admin/payment", label: "결제 설정", icon: "💳" },
     { href: "/admin/payment-history", label: "결제 내역", icon: "📋" },
     { href: "/admin/settings", label: "설정", icon: "⚙️" },
@@ -30,6 +31,7 @@ export function AdminSidebar({ adminName, children }: AdminSidebarProps) {
 
   const pathNoSlash = pathname.replace(/\/$/, "");
   const isAccountsSection = pathNoSlash.startsWith("/admin/accounts");
+
   const currentLabel = isAccountsSection
     ? "계정 관리"
     : deviceMenuItems.find((item) => pathNoSlash === item.href)?.label ??

@@ -17,22 +17,6 @@ const GROUPS: SettingGroup[] = [
       { name: "IDLE_TIMEOUT_SECONDS", label: "유휴 타임아웃 (초, 기본 30)", type: "number" },
     ],
   },
-  {
-    key: "capture",
-    label: "촬영 설정",
-    prefix: ["CAPTURE_", "CAMERA_", "CHROMAKEY_"],
-    fields: [
-      { name: "CAPTURE_SECONDS", label: "카운트다운 (초)", type: "number" },
-      { name: "CAPTURE_COUNT_MODE", label: "촬영 횟수 모드", type: "select", options: [{ value: "uniform", label: "균일" }, { value: "custom", label: "커스텀" }] },
-      { name: "CAPTURE_COUNT_UNIFORM", label: "슬롯당 촬영 횟수", type: "number" },
-      { name: "CAPTURE_COUNT_CUSTOM", label: "커스텀 촬영 횟수 (JSON)" },
-      { name: "CAMERA_AUTO_TIMER", label: "자동 촬영 타이머 (초, 기본 60)", type: "number" },
-      { name: "CHROMAKEY_MODE", label: "배경 제거 모드", type: "select", options: [{ value: "mediapipe", label: "AI 배경 제거 (기본)" }, { value: "chromakey", label: "크로마키 (그린스크린)" }, { value: "off", label: "비활성" }] },
-      { name: "CHROMAKEY_RGB", label: "크로마키 색상 (R,G,B)" },
-      { name: "CAPTURE_THRESHOLD", label: "캡처 임계값", type: "number" },
-      { name: "CAPTURE_SMOOTHNESS", label: "캡처 부드러움", type: "number" },
-    ],
-  },
 ];
 
 export default function SettingsPage() {
@@ -100,7 +84,9 @@ export default function SettingsPage() {
   const HIDDEN_KEYS = new Set([
     "PICTURE_WIDTH", "PICTURE_HEIGHT", "PRINT_BACKGROUND", "CAPTURE_MODES",
     ...Object.keys(settings).filter(
-      (k) => k.startsWith("MODE_") || k.startsWith("PAYMENT_") || k.startsWith("PAYAPP_") || k.startsWith("ADMIN_"),
+      (k) =>
+        k.startsWith("MODE_") || k.startsWith("PAYMENT_") || k.startsWith("PAYAPP_") || k.startsWith("ADMIN_") ||
+        k.startsWith("CAPTURE_") || k.startsWith("CAMERA_") || k.startsWith("CHROMAKEY_"),
     ),
   ]);
 
