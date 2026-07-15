@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useState, useRef, useCallback } from "react";
+import { useEffect, useState, useRef, useCallback, useMemo } from "react";
 import { useAdmin } from "../../AdminContext";
-import { FRAME_INFO, ALL_MODES } from "@/constants/frames";
+import { FRAME_INFO } from "@/constants/frames";
+import type { FrameInfoEntry } from "@/types";
 import { roundRect } from "@/lib/canvas";
 import {
   computePrintLayout,
@@ -20,6 +21,8 @@ interface PrintBgImage {
 export default function PrintSettingPage() {
   const { selectedDevice } = useAdmin();
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const bigCanvasRef = useRef<HTMLCanvasElement>(null);
+  const [showBigPreview, setShowBigPreview] = useState(false);
 
   const [settings, setSettings] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
@@ -30,6 +33,15 @@ export default function PrintSettingPage() {
   const [paperHeight, setPaperHeight] = useState("15");
   const [modes, setModes] = useState<string[]>([]);
   const [previewMode, setPreviewMode] = useState<string | null>(null);
+
+  const [customModeInfo, setCustomModeInfo] = useState<Record<string, FrameInfoEntry>>({});
+  const [customModeInput, setCustomModeInput] = useState("");
+  const [customModeError, setCustomModeError] = useState("");
+
+  const effectiveModeInfo = useMemo(
+    () => ({ ...FRAME_INFO, ...customModeInfo }),
+    [customModeInfo]
+  );
 
   const [imageBaseUrl, setImageBaseUrl] = useState("/static/images");
   const [printerName, setPrinterName] = useState("");
@@ -75,10 +87,24 @@ export default function PrintSettingPage() {
       setPaperHeight(s.PICTURE_HEIGHT || "15");
       setPrinterName(s.PRINTER_NAME || "");
 
-      const modeList = (s.CAPTURE_MODES || "1x1,2x2")
+      const rawModes = (s.CAPTURE_MODES || "1x1,2x2")
         .split(",")
         .map((m: string) => m.trim())
-        .filter((m: string) => FRAME_INFO[m]);
+        .filter(Boolean);
+
+      const custom: Record<string, FrameInfoEntry> = {};
+      const modeList = rawModes.filter((m: string) => {
+        if (FRAME_INFO[m]) return true;
+        const match = /^(\d+)x(\d+)$/i.exec(m);
+        if (!match) return false;
+        const rows = parseInt(match[1], 10);
+        const cols = parseInt(match[2], 10);
+        if (rows < 1 || cols < 1 || rows > 10 || cols > 10) return false;
+        const count = rows * cols;
+        custom[m] = { label: `${count}컷`, cols, rows, count, orientation: cols >= rows ? "landscape" : "portrait" };
+        return true;
+      });
+      if (Object.keys(custom).length > 0) setCustomModeInfo(custom);
       setModes(modeList);
       if (modeList.length > 0) setPreviewMode(modeList[0]);
     } catch {
@@ -127,18 +153,52 @@ export default function PrintSettingPage() {
     }
   };
 
-  const addMode = (mode: string) => {
-    if (!modes.includes(mode)) {
-      const next = [...modes, mode];
-      setModes(next);
-      if (!previewMode) setPreviewMode(mode);
+  const handleAddCustomMode = () => {
+    const raw = customModeInput.trim().toLowerCase();
+    if (!raw) return;
+
+    const match = /^(\d+)x(\d+)$/.exec(raw);
+    if (!match) {
+      setCustomModeError("NxM 형식으로 입력하세요. 예: 2x3, 4x1");
+      return;
     }
+    const rows = parseInt(match[1], 10);
+    const cols = parseInt(match[2], 10);
+    if (rows < 1 || cols < 1 || rows > 10 || cols > 10) {
+      setCustomModeError("행/열은 1~10 사이여야 합니다.");
+      return;
+    }
+    if (modes.includes(raw)) {
+      setCustomModeError("이미 추가된 모드입니다.");
+      return;
+    }
+
+    if (!FRAME_INFO[raw]) {
+      const count = rows * cols;
+      setCustomModeInfo((prev) => ({
+        ...prev,
+        [raw]: { label: `${count}컷`, cols, rows, count, orientation: cols >= rows ? "landscape" : "portrait" },
+      }));
+    }
+
+    const next = [...modes, raw];
+    setModes(next);
+    if (!previewMode) setPreviewMode(raw);
+    setCustomModeInput("");
+    setCustomModeError("");
   };
 
   const removeMode = (mode: string) => {
     const next = modes.filter((m) => m !== mode);
     setModes(next);
     if (previewMode === mode) setPreviewMode(next[0] || null);
+    if (!FRAME_INFO[mode]) {
+      setCustomModeInfo((prev) => {
+        const updated = { ...prev };
+        delete updated[mode];
+        return updated;
+      });
+    }
   };
 
   const handleBgUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -211,28 +271,45 @@ export default function PrintSettingPage() {
   const getPaperDimensions = useCallback((mode: string | null) => {
     const w = parseFloat(paperWidth) || 10;
     const h = parseFloat(paperHeight) || 15;
-    const orient = mode && FRAME_INFO[mode] ? FRAME_INFO[mode].orientation : "portrait";
+    const orient = mode && effectiveModeInfo[mode] ? effectiveModeInfo[mode].orientation : "portrait";
     return paperDimensionsFor(w, h, orient);
-  }, [paperWidth, paperHeight]);
+  }, [paperWidth, paperHeight, effectiveModeInfo]);
 
   const getPreviewLayout = useCallback((): PrintLayout | null => {
-    if (!previewMode || !FRAME_INFO[previewMode]) return null;
+    if (!previewMode || !effectiveModeInfo[previewMode]) return null;
     const { pw, ph } = getPaperDimensions(previewMode);
     return computePrintLayout({
-      frame: FRAME_INFO[previewMode],
+      frame: effectiveModeInfo[previewMode],
       mode: previewMode,
       paperW: pw,
       paperH: ph,
       settings,
     });
-  }, [previewMode, settings, getPaperDimensions]);
+  }, [previewMode, settings, getPaperDimensions, effectiveModeInfo]);
+
+  const overflowModes = useMemo(() => {
+    const set = new Set<string>();
+    for (const mode of modes) {
+      if (!effectiveModeInfo[mode]) continue;
+      const { pw, ph } = getPaperDimensions(mode);
+      const layout = computePrintLayout({
+        frame: effectiveModeInfo[mode],
+        mode,
+        paperW: pw,
+        paperH: ph,
+        settings,
+      });
+      if (layout.overflow) set.add(mode);
+    }
+    return set;
+  }, [modes, effectiveModeInfo, settings, getPaperDimensions]);
 
   const drawSlots = useCallback((
     ctx: CanvasRenderingContext2D,
     ox: number, oy: number,
     drawW: number,
   ) => {
-    if (!previewMode || !FRAME_INFO[previewMode]) return;
+    if (!previewMode || !effectiveModeInfo[previewMode]) return;
     const layout = getPreviewLayout();
     if (!layout) return;
 
@@ -270,7 +347,7 @@ export default function PrintSettingPage() {
       ctx.textBaseline = "top";
       ctx.fillText("⚠ 인화지를 벗어납니다", ox + drawW / 2, oy + 6);
     }
-  }, [previewMode, getPreviewLayout, getPaperDimensions]);
+  }, [previewMode, getPreviewLayout, getPaperDimensions, effectiveModeInfo]);
 
   const drawLabels = useCallback((
     ctx: CanvasRenderingContext2D,
@@ -351,7 +428,62 @@ export default function PrintSettingPage() {
     drawPreview();
   }, [drawPreview]);
 
-  const availableModes = ALL_MODES.filter((m) => !modes.includes(m));
+  const drawBigPreview = useCallback(() => {
+    const canvas = bigCanvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    const { pw, ph } = getPaperDimensions(previewMode);
+
+    const maxW = canvas.width;
+    const maxH = canvas.height;
+    const scale = Math.min(maxW / pw, maxH / ph) * 0.88;
+    const drawW = pw * scale;
+    const drawH = ph * scale;
+    const ox = (maxW - drawW) / 2;
+    const oy = (maxH - drawH) / 2;
+
+    ctx.clearRect(0, 0, maxW, maxH);
+    ctx.fillStyle = "#1a1a2e";
+    ctx.fillRect(0, 0, maxW, maxH);
+
+    ctx.save();
+    ctx.shadowColor = "rgba(0,0,0,0.3)";
+    ctx.shadowBlur = 20;
+    ctx.shadowOffsetY = 4;
+    ctx.fillStyle = "#ffffff";
+    roundRect(ctx, ox, oy, drawW, drawH, 6);
+    ctx.fill();
+    ctx.restore();
+
+    const finishDraw = () => {
+      drawSlots(ctx, ox, oy, drawW);
+      drawLabels(ctx, ox, oy, drawW, drawH, pw, ph);
+    };
+
+    ctx.save();
+    roundRect(ctx, ox, oy, drawW, drawH, 6);
+    ctx.clip();
+
+    const firstBg = printBgImages[0];
+    if (firstBg) {
+      const img = new Image();
+      img.crossOrigin = "anonymous";
+      img.onload = () => { ctx.drawImage(img, ox, oy, drawW, drawH); ctx.restore(); finishDraw(); };
+      img.onerror = () => { ctx.restore(); finishDraw(); };
+      img.src = resolveUrl(firstBg.filename);
+      return;
+    }
+
+    ctx.restore();
+    finishDraw();
+  }, [previewMode, printBgImages, getPaperDimensions, resolveUrl, drawSlots, drawLabels]);
+
+  useEffect(() => {
+    if (showBigPreview) drawBigPreview();
+  }, [showBigPreview, drawBigPreview]);
+
 
   if (loading) return <div className="text-gray-400">로딩중...</div>;
 
@@ -411,7 +543,7 @@ export default function PrintSettingPage() {
             ) : (
               <div className="space-y-2 mb-4">
                 {modes.map((mode) => {
-                  const info = FRAME_INFO[mode];
+                  const info = effectiveModeInfo[mode];
                   const isSelected = previewMode === mode;
                   return (
                     <div
@@ -435,16 +567,21 @@ export default function PrintSettingPage() {
                         ))}
                       </div>
 
-                      <div className="flex-1 min-w-0">
+                      <div className="flex-1 min-w-0 flex items-center gap-2 flex-wrap">
                         <span className="text-white font-medium">{mode}</span>
-                        <span className="text-gray-400 text-sm ml-2">{info.label}</span>
-                        <span className={`ml-2 px-1.5 py-0.5 text-xs rounded ${
+                        <span className="text-gray-400 text-sm">{info.label}</span>
+                        <span className={`px-1.5 py-0.5 text-xs rounded ${
                           info.orientation === "landscape"
                             ? "bg-amber-600/30 text-amber-300"
                             : "bg-indigo-600/30 text-indigo-300"
                         }`}>
                           {info.orientation === "landscape" ? "가로 인쇄" : "세로 인쇄"}
                         </span>
+                        {overflowModes.has(mode) && (
+                          <span className="px-1.5 py-0.5 text-xs rounded bg-red-600/30 text-red-300 font-semibold">
+                            ⚠ 범위 초과
+                          </span>
+                        )}
                       </div>
 
                       <button
@@ -459,19 +596,33 @@ export default function PrintSettingPage() {
               </div>
             )}
 
-            {availableModes.length > 0 && (
-              <div className="flex flex-wrap gap-2">
-                {availableModes.map((mode) => (
-                  <button
-                    key={mode}
-                    onClick={() => addMode(mode)}
-                    className="px-3 py-2 bg-gray-700 text-gray-300 text-sm rounded-lg hover:bg-gray-600 hover:text-white transition-colors border border-gray-600 border-dashed"
-                  >
-                    + {mode} ({FRAME_INFO[mode].label})
-                  </button>
-                ))}
+            <div className="mt-4 pt-4 border-t border-gray-700">
+              <p className="text-xs text-gray-500 mb-2">
+                행×열 형식으로 입력 (예: <code className="text-gray-400">2x3</code> = 2행 3열, 6컷)
+              </p>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={customModeInput}
+                  onChange={(e) => {
+                    setCustomModeInput(e.target.value.toLowerCase());
+                    setCustomModeError("");
+                  }}
+                  onKeyDown={(e) => { if (e.key === "Enter") handleAddCustomMode(); }}
+                  placeholder="예: 2x3, 4x1, 3x2"
+                  className="flex-1 px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white text-sm focus:outline-none focus:border-blue-500 placeholder-gray-500"
+                />
+                <button
+                  onClick={handleAddCustomMode}
+                  className="px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition-colors whitespace-nowrap"
+                >
+                  + 추가
+                </button>
               </div>
-            )}
+              {customModeError && (
+                <p className="text-red-400 text-xs mt-1">{customModeError}</p>
+              )}
+            </div>
 
             {previewMode && (() => {
               const prefix = modeSettingPrefix(previewMode);
@@ -657,7 +808,21 @@ export default function PrintSettingPage() {
         {/* Right: Preview */}
         <div className="space-y-4">
           <div className="p-6 bg-gray-800 rounded-xl border border-gray-700 sticky top-6">
-            <h3 className="text-lg font-semibold text-white mb-4">인화 미리보기</h3>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-white">인화 미리보기</h3>
+              <button
+                onClick={() => setShowBigPreview(true)}
+                title="크게 보기"
+                className="w-8 h-8 flex items-center justify-center bg-gray-700 hover:bg-gray-600 text-gray-300 hover:text-white rounded-full transition-colors"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <circle cx="11" cy="11" r="8" />
+                  <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                  <line x1="11" y1="8" x2="11" y2="14" />
+                  <line x1="8" y1="11" x2="14" y2="11" />
+                </svg>
+              </button>
+            </div>
             <div className="bg-gray-900 rounded-lg p-4">
               <canvas
                 ref={canvasRef}
@@ -692,15 +857,15 @@ export default function PrintSettingPage() {
               <div className="flex justify-between text-gray-400">
                 <span>인쇄 방향</span>
                 <span className="text-white">
-                  {previewMode && FRAME_INFO[previewMode]
-                    ? FRAME_INFO[previewMode].orientation === "landscape" ? "가로" : "세로"
+                  {previewMode && effectiveModeInfo[previewMode]
+                    ? effectiveModeInfo[previewMode].orientation === "landscape" ? "가로" : "세로"
                     : "-"}
                 </span>
               </div>
               <div className="flex justify-between text-gray-400">
                 <span>선택 모드</span>
                 <span className="text-white">
-                  {previewMode ? `${previewMode} (${FRAME_INFO[previewMode]?.label})` : "없음"}
+                  {previewMode ? `${previewMode} (${effectiveModeInfo[previewMode]?.label})` : "없음"}
                 </span>
               </div>
               <div className="flex justify-between text-gray-400">
@@ -742,15 +907,60 @@ export default function PrintSettingPage() {
         </div>
       )}
 
-      <div className="sticky bottom-0 py-4 bg-gray-900 border-t border-gray-700">
+      <div className="sticky bottom-0 py-4 bg-gray-900 border-t border-gray-700 flex items-center gap-4">
         <button
           onClick={handleSave}
-          disabled={saving}
-          className="px-8 py-3 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition-colors disabled:opacity-50"
+          disabled={saving || overflowModes.size > 0}
+          className="px-8 py-3 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {saving ? "저장 중..." : "설정 저장"}
         </button>
+        {overflowModes.size > 0 && (
+          <p className="text-red-400 text-sm">
+            ⚠ {[...overflowModes].join(", ")} 모드가 인화지를 벗어납니다. 크기·간격·여백을 수정 후 저장하세요.
+          </p>
+        )}
       </div>
+
+      {/* Big Preview Modal */}
+      {showBigPreview && (
+        <div
+          className="fixed inset-0 z-50 bg-black/85 backdrop-blur-sm flex items-center justify-center p-4"
+          onClick={() => setShowBigPreview(false)}
+        >
+          <div
+            className="relative bg-gray-900 rounded-2xl border border-gray-700 shadow-2xl w-full max-w-5xl max-h-[95vh] flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-700 flex-shrink-0">
+              <h3 className="text-lg font-semibold text-white">
+                인화 미리보기 — {previewMode ?? "모드 없음"}
+              </h3>
+              <button
+                onClick={() => setShowBigPreview(false)}
+                className="w-8 h-8 flex items-center justify-center bg-gray-700 hover:bg-gray-600 text-gray-300 hover:text-white rounded-lg transition-colors text-sm"
+              >
+                ✕
+              </button>
+            </div>
+            <div className="p-6 overflow-auto flex-1">
+              <div className="bg-[#1a1a2e] rounded-xl overflow-hidden">
+                <canvas
+                  ref={bigCanvasRef}
+                  width={1080}
+                  height={1080}
+                  className="w-full rounded-xl"
+                />
+              </div>
+              {getPreviewLayout()?.overflow && (
+                <div className="mt-4 p-3 bg-red-900/40 border border-red-500/60 rounded-lg text-red-300 text-sm">
+                  ⚠ 현재 설정으로는 사진이 인화지를 벗어납니다. 사진 크기·간격·여백을 확인하세요.
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
