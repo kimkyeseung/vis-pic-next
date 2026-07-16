@@ -74,27 +74,6 @@ export default function DevicesPage() {
     }
   };
 
-  const handleToggleActive = async (device: Device) => {
-    try {
-      const res = await fetch(`/api/admin/devices/${device.id}/`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ isActive: !device.isActive }),
-      });
-
-      if (res.ok) {
-        setDevices(
-          devices.map((d) =>
-            d.id === device.id ? { ...d, isActive: !d.isActive } : d
-          )
-        );
-        refreshDevices();
-      }
-    } catch (error) {
-      console.error("Failed to toggle device:", error);
-    }
-  };
-
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -134,9 +113,6 @@ export default function DevicesPage() {
                   설명
                 </th>
                 <th className="px-6 py-4 text-left text-gray-300 font-medium">
-                  상태
-                </th>
-                <th className="px-6 py-4 text-left text-gray-300 font-medium">
                   생성일
                 </th>
                 <th className="px-6 py-4 text-right text-gray-300 font-medium">
@@ -155,18 +131,6 @@ export default function DevicesPage() {
                   <td className="px-6 py-4 text-white">{device.name}</td>
                   <td className="px-6 py-4 text-gray-400">
                     {device.description || "-"}
-                  </td>
-                  <td className="px-6 py-4">
-                    <button
-                      onClick={() => handleToggleActive(device)}
-                      className={`px-3 py-1 rounded-full text-sm font-medium ${
-                        device.isActive
-                          ? "bg-green-900/50 text-green-400"
-                          : "bg-red-900/50 text-red-400"
-                      }`}
-                    >
-                      {device.isActive ? "활성" : "비활성"}
-                    </button>
                   </td>
                   <td className="px-6 py-4 text-gray-400">
                     {new Date(device.createdAt).toLocaleDateString("ko-KR")}
