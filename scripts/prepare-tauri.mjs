@@ -100,9 +100,12 @@ for (const f of [".env", ".env.local", ".env.production"]) {
 console.log("[6/6] Zipping server bundle...");
 const zipPath = join(ROOT, "src-tauri", "server.zip");
 if (existsSync(zipPath)) rmSync(zipPath);
-// Write a temp PS1 to avoid shell quoting issues with long paths
+// Write a temp PS1 to avoid shell quoting issues with long paths.
+// Must include a UTF-8 BOM: Windows PowerShell 5.1 reads BOM-less .ps1 files using the
+// system ANSI codepage, which mangles non-ASCII characters in ROOT (e.g. Korean usernames)
+// and makes Compress-Archive resolve a garbled/nonexistent path (fails with a null Join-Path arg).
 const tmpPs1 = join(ROOT, "src-tauri", "_zip_tmp.ps1");
-writeFileSync(tmpPs1, `Compress-Archive -Path "${SERVER_DIR}\\*" -DestinationPath "${zipPath}" -Force\n`);
+writeFileSync(tmpPs1, `﻿Compress-Archive -Path "${SERVER_DIR}\\*" -DestinationPath "${zipPath}" -Force\n`);
 execSync(`powershell -NoProfile -ExecutionPolicy Bypass -File "${tmpPs1}"`, { stdio: "inherit" });
 rmSync(tmpPs1);
 console.log(`  Created server.zip`);

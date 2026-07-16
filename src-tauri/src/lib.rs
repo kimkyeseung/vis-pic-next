@@ -19,8 +19,47 @@ fn mediapipe_cache_dir() -> std::path::PathBuf {
     ar_pic_dir().join("mediapipe")
 }
 
+fn app_server_dir() -> std::path::PathBuf {
+    ar_pic_dir().join("server")
+}
+
 fn server_mediapipe_dir() -> std::path::PathBuf {
-    ar_pic_dir().join("server").join("public").join("static").join("mediapipe")
+    app_server_dir().join("public").join("static").join("mediapipe")
+}
+
+/// node.exe/server.js를 지정한 서버 디렉터리에서 구동한다.
+/// setup()의 최초 기동과 download_mediapipe()의 재시작이 동일한 절차를 공유한다.
+fn spawn_node_server(server_dir: &std::path::Path) -> std::io::Result<std::process::Child> {
+    let node_exe = server_dir.join("node.exe");
+    let server_js = server_dir.join("server.js");
+
+    let log_base = dirs::data_local_dir()
+        .unwrap_or_else(|| std::path::PathBuf::from("."))
+        .join("ar-pic");
+    let stdout_log = std::fs::File::create(log_base.join("server-stdout.log")).ok();
+    let stderr_log = std::fs::File::create(log_base.join("server-stderr.log")).ok();
+
+    let mut cmd = std::process::Command::new(&node_exe);
+    cmd.arg(&server_js)
+        .env("PORT", "3001")
+        .env("HOSTNAME", "127.0.0.1")
+        .current_dir(server_dir);
+    if let Some(f) = stdout_log { cmd.stdout(f); }
+    if let Some(f) = stderr_log { cmd.stderr(f); }
+    #[cfg(target_os = "windows")]
+    cmd.creation_flags(0x08000000); // CREATE_NO_WINDOW
+    cmd.spawn()
+}
+
+/// 3001 포트가 응답할 때까지 폴링. 성공 시 true.
+fn wait_for_server_port(max_iters: u32) -> bool {
+    for _ in 0..max_iters {
+        std::thread::sleep(std::time::Duration::from_millis(500));
+        if std::net::TcpStream::connect("127.0.0.1:3001").is_ok() {
+            return true;
+        }
+    }
+    false
 }
 
 fn copy_dir_all(src: &std::path::Path, dst: &std::path::Path) -> std::io::Result<()> {
@@ -129,7 +168,28 @@ fn download_mediapipe(app: tauri::AppHandle) -> Result<(), String> {
         let _ = app.emit("mediapipe-progress", serde_json::json!({ "done": i + 1, "total": total }));
     }
 
-    copy_dir_all(&cache, &server_mediapipe_dir()).map_err(|e| e.to_string())
+    copy_dir_all(&cache, &server_mediapipe_dir()).map_err(|e| e.to_string())?;
+
+    // Next.js는 서버 기동 시점의 public/ 디렉터리 스냅샷을 메모리에 캐시해두고
+    // 이후 요청을 그 목록으로만 판별한다. 방금 디스크에 추가한 mediapipe 파일은
+    // 이미 떠 있는 서버 프로세스가 인식하지 못해 계속 404를 반환하므로
+    // (재시작 없이는 앱을 껐다 켜기 전까지 "AI 배경제거 모델" 점검이 영구히
+    //  노란 경고로 남는 버그의 원인이었다) 서버를 재시작해 새로 스캔하게 한다.
+    if let Some(state) = app.try_state::<NodeProcess>() {
+        let mut guard = state.0.lock().map_err(|e| e.to_string())?;
+        if let Some(mut child) = guard.take() {
+            let _ = child.kill();
+            let _ = child.wait();
+        }
+        let child = spawn_node_server(&app_server_dir()).map_err(|e| format!("서버 재시작 실패: {e}"))?;
+        *guard = Some(child);
+        drop(guard);
+        if !wait_for_server_port(40) {
+            return Err("서버 재시작 후 응답 없음".to_string());
+        }
+    }
+
+    Ok(())
 }
 
 // server.zip is created by prepare-tauri.mjs and embedded at compile time.
@@ -590,14 +650,6 @@ pub fn run() {
                 let app_handle = app.handle().clone();
                 std::thread::spawn(move || {
                     let server_dir = prepare_server_dir();
-                    let node_exe = server_dir.join("node.exe");
-                    let server_js = server_dir.join("server.js");
-
-                    let log_base = dirs::data_local_dir()
-                        .unwrap_or_else(|| std::path::PathBuf::from("."))
-                        .join("ar-pic");
-                    let stdout_log = std::fs::File::create(log_base.join("server-stdout.log")).ok();
-                    let stderr_log = std::fs::File::create(log_base.join("server-stderr.log")).ok();
 
                     // 이전 인스턴스가 3001 포트를 점유하고 있으면 종료
                     #[cfg(target_os = "windows")]
@@ -610,28 +662,14 @@ pub fn run() {
                         std::thread::sleep(std::time::Duration::from_millis(300));
                     }
 
-                    let mut cmd = std::process::Command::new(&node_exe);
-                    cmd.arg(&server_js)
-                        .env("PORT", "3001")
-                        .env("HOSTNAME", "127.0.0.1")
-                        .current_dir(&server_dir);
-                    if let Some(f) = stdout_log { cmd.stdout(f); }
-                    if let Some(f) = stderr_log { cmd.stderr(f); }
-                    #[cfg(target_os = "windows")]
-                    cmd.creation_flags(0x08000000); // CREATE_NO_WINDOW
-                    if let Ok(child) = cmd.spawn() {
+                    if let Ok(child) = spawn_node_server(&server_dir) {
                         if let Some(state) = app_handle.try_state::<NodeProcess>() {
                             *state.0.lock().unwrap() = Some(child);
                         }
                     }
 
                     // 포트가 열릴 때까지 폴링 (최대 60초)
-                    for _ in 0..120 {
-                        std::thread::sleep(std::time::Duration::from_millis(500));
-                        if std::net::TcpStream::connect("127.0.0.1:3001").is_ok() {
-                            break;
-                        }
-                    }
+                    wait_for_server_port(120);
                     if let Some(window) = app_handle.get_webview_window("main") {
                         let _ = window.show();
                         let _ = window.set_focus();
