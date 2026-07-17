@@ -3,7 +3,6 @@ import type { FrameInfoEntry, FallbackBackground } from "@/types";
 export const FRAME_INFO: Record<string, FrameInfoEntry> = {
   "1x1": { label: "1컷", cols: 1, rows: 1, count: 1, orientation: "landscape" },
   "2x1": { label: "2컷", cols: 1, rows: 2, count: 2, orientation: "portrait" },
-  "1x2": { label: "2컷", cols: 2, rows: 1, count: 2, orientation: "landscape" },
   "2x2": { label: "4컷", cols: 2, rows: 2, count: 4, orientation: "landscape" },
   "2x3": { label: "6컷", cols: 3, rows: 2, count: 6, orientation: "landscape" },
   "2x4": { label: "8컷", cols: 2, rows: 4, count: 8, orientation: "portrait" },
