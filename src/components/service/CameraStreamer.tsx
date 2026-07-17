@@ -7,7 +7,7 @@ import { FALLBACK_BACKGROUNDS } from "@/constants/frames";
 import type { BGImage, BgRemovalMode } from "@/types";
 
 type Segmenter = {
-  segmentForVideo: (video: HTMLVideoElement, ts: number) => {
+  segmentForVideo: (source: HTMLVideoElement | HTMLCanvasElement, ts: number) => {
     confidenceMasks?: Array<{ getAsFloat32Array: () => Float32Array; width?: number; height?: number }>;
   };
   close: () => void;
@@ -15,6 +15,10 @@ type Segmenter = {
 
 const HARD = 50 * 50;
 const SOFT = 100 * 100;
+// 배경제거 처리 해상도를 낮춰 서브 화면 송출 루프의 부하를 줄인다 (CameraSection.tsx와 동일한 이유).
+const PROCESS_SCALE = 0.5;
+// mediapipe 추론은 화면 갱신보다 훨씬 무거우므로 이 간격으로만 실행하고 재사용한다.
+const INFERENCE_INTERVAL_MS = 200;
 
 /**
  * 헤드리스 카메라 송출 컴포넌트.
@@ -45,6 +49,9 @@ export function CameraStreamer({
   const lastSentRef = useRef(0);
   const bgSourceRef = useRef<HTMLImageElement | HTMLVideoElement | null>(null);
   const segmenterRef = useRef<Segmenter | null>(null);
+  // mediapipe 추론은 무거우므로 스로틀링해서 재사용한다 (CameraSection.tsx와 동일한 이유)
+  const lastMaskRef = useRef<{ data: Float32Array; w: number; h: number } | null>(null);
+  const lastInferenceTimeRef = useRef(0);
 
   // 애니메이션 루프에서 최신 값을 읽기 위한 ref
   const selectedBgRef = useRef(selectedBackground);
@@ -87,6 +94,8 @@ export function CameraStreamer({
     if (bgRemovalMode !== "mediapipe") {
       segmenterRef.current?.close();
       segmenterRef.current = null;
+      lastMaskRef.current = null;
+      lastInferenceTimeRef.current = 0;
       return;
     }
     let cancelled = false;
@@ -114,6 +123,8 @@ export function CameraStreamer({
       cancelled = true;
       segmenterRef.current?.close();
       segmenterRef.current = null;
+      lastMaskRef.current = null;
+      lastInferenceTimeRef.current = 0;
     };
   }, [bgRemovalMode]);
 
@@ -170,8 +181,10 @@ export function CameraStreamer({
           const h = video.videoHeight;
           if (canvas.width !== w) canvas.width = w;
           if (canvas.height !== h) canvas.height = h;
-          if (offscreen.width !== w) offscreen.width = w;
-          if (offscreen.height !== h) offscreen.height = h;
+          const pw = Math.max(1, Math.round(w * PROCESS_SCALE));
+          const ph = Math.max(1, Math.round(h * PROCESS_SCALE));
+          if (offscreen.width !== pw) offscreen.width = pw;
+          if (offscreen.height !== ph) offscreen.height = ph;
 
           const mode = bgRemovalModeRef.current;
           const sbg = selectedBgRef.current;
@@ -180,8 +193,8 @@ export function CameraStreamer({
           if (!hasBg || mode === "off") {
             drawRaw(w, h);
           } else if (mode === "chromakey") {
-            offCtx.drawImage(video, 0, 0, w, h);
-            const imgData = offCtx.getImageData(0, 0, w, h);
+            offCtx.drawImage(video, 0, 0, pw, ph);
+            const imgData = offCtx.getImageData(0, 0, pw, ph);
             const d = imgData.data;
             const [kr, kg, kb] = chromakeyRgbRef.current.split(",").map(Number);
             for (let i = 0; i < d.length; i += 4) {
@@ -201,29 +214,44 @@ export function CameraStreamer({
             ctx.restore();
           } else if (mode === "mediapipe" && segmenterRef.current) {
             try {
-              const result = segmenterRef.current.segmentForVideo(video, performance.now());
-              const masks = result.confidenceMasks;
-              if (masks && masks.length > 0) {
-                offCtx.drawImage(video, 0, 0, w, h);
-                const imgData = offCtx.getImageData(0, 0, w, h);
+              offCtx.drawImage(video, 0, 0, pw, ph);
+
+              const now = performance.now();
+              if (now - lastInferenceTimeRef.current >= INFERENCE_INTERVAL_MS || !lastMaskRef.current) {
+                // 다운스케일된 offscreen을 입력으로 넘겨 마스크 자체를 더 작게 받는다
+                const result = segmenterRef.current.segmentForVideo(offscreen, now);
+                const masks = result.confidenceMasks;
+                if (masks && masks.length > 0) {
+                  lastMaskRef.current = {
+                    data: masks[0].getAsFloat32Array().slice(),
+                    w: masks[0].width ?? pw,
+                    h: masks[0].height ?? ph,
+                  };
+                  lastInferenceTimeRef.current = now;
+                }
+              }
+
+              const cached = lastMaskRef.current;
+              if (cached) {
+                const imgData = offCtx.getImageData(0, 0, pw, ph);
                 const d = imgData.data;
-                const bgMask = masks[0].getAsFloat32Array();
-                const maskW = masks[0].width ?? w;
-                const maskH = masks[0].height ?? h;
+                const bgMask = cached.data;
+                const maskW = cached.w;
+                const maskH = cached.h;
                 const THRESH = 0.15;
                 const FEATHER = 0.35;
-                if (bgMask.length === w * h) {
+                if (bgMask.length === pw * ph) {
                   for (let i = 0; i < bgMask.length; i++) {
                     const alpha = Math.max(0, Math.min(1, (1 - bgMask[i] - THRESH) / FEATHER));
                     d[i * 4 + 3] = Math.round(alpha * 255);
                   }
                 } else {
-                  for (let y = 0; y < h; y++) {
-                    const my = Math.min(maskH - 1, Math.floor((y / h) * maskH));
-                    for (let x = 0; x < w; x++) {
-                      const mx = Math.min(maskW - 1, Math.floor((x / w) * maskW));
+                  for (let y = 0; y < ph; y++) {
+                    const my = Math.min(maskH - 1, Math.floor((y / ph) * maskH));
+                    for (let x = 0; x < pw; x++) {
+                      const mx = Math.min(maskW - 1, Math.floor((x / pw) * maskW));
                       const alpha = Math.max(0, Math.min(1, (1 - (bgMask[my * maskW + mx] ?? 0) - THRESH) / FEATHER));
-                      d[(y * w + x) * 4 + 3] = Math.round(alpha * 255);
+                      d[(y * pw + x) * 4 + 3] = Math.round(alpha * 255);
                     }
                   }
                 }

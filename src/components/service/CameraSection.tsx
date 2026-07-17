@@ -60,6 +60,10 @@ export function CameraSection({
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const segmenterRef = useRef<any>(null);
   const animFrameRef = useRef<number>(0);
+  // mediapipe 추론(segmentForVideo)은 무거우므로 매 프레임 돌리지 않고 스로틀링해서
+  // 재사용한다 — 화면 갱신(최대 60fps)과 AI 추론(간격은 INFERENCE_INTERVAL_MS)을 분리해 끊김을 줄인다.
+  const lastMaskRef = useRef<{ data: Float32Array; w: number; h: number } | null>(null);
+  const lastInferenceTimeRef = useRef(0);
   const [countdown, setCountdown] = useState<number | null>(null);
   const [cameraError, setCameraError] = useState<{ key: MessageKey; reason?: string } | null>(null);
   const [flash, setFlash] = useState(false);
@@ -187,6 +191,8 @@ export function CameraSection({
       cancelled = true;
       segmenterRef.current?.close();
       segmenterRef.current = null;
+      lastMaskRef.current = null;
+      lastInferenceTimeRef.current = 0;
     };
   }, [bgRemovalMode]);
 
@@ -348,6 +354,13 @@ export function CameraSection({
     const offscreen = document.createElement("canvas");
     const HARD = 50 * 50;
     const SOFT = 100 * 100;
+    // 배경제거(마스크 계산 + getImageData/putImageData) 처리 해상도를 낮춰 프레임 드롭을 줄인다.
+    // 최종 표시/캡처는 여전히 네이티브 해상도(display 캔버스)로 업스케일되므로 화질 손실은
+    // 가장자리 마스크 정밀도 정도로 미미하고, 기존 FEATHER 블렌딩이 이를 더 가려준다.
+    const PROCESS_SCALE = 0.5;
+    // mediapipe 추론(segmentForVideo)은 화면 갱신보다 훨씬 무거우므로 초당 최대 이 간격으로만
+    // 실행하고, 그 사이 프레임은 직전 마스크를 재사용한다 (사람 실루엣은 프레임 간 급변하지 않음).
+    const INFERENCE_INTERVAL_MS = 200;
 
     const processFrame = () => {
       const video = videoRef.current;
@@ -389,42 +402,61 @@ export function CameraSection({
         return;
       }
 
-      if (offscreen.width !== w) offscreen.width = w;
-      if (offscreen.height !== h) offscreen.height = h;
+      const pw = Math.max(1, Math.round(w * PROCESS_SCALE));
+      const ph = Math.max(1, Math.round(h * PROCESS_SCALE));
+      if (offscreen.width !== pw) offscreen.width = pw;
+      if (offscreen.height !== ph) offscreen.height = ph;
       const offCtx = offscreen.getContext("2d")!;
 
-      offCtx.drawImage(video, 0, 0, w, h);
+      offCtx.drawImage(video, 0, 0, pw, ph);
 
       let processed = false;
 
       if (bgRemovalMode === "mediapipe" && segmenterRef.current) {
         try {
-          const result = segmenterRef.current.segmentForVideo(video, performance.now());
-          const masks = result.confidenceMasks as ConfidenceMask[] | undefined;
-          if (masks && masks.length > 0) {
-            const imageData = offCtx.getImageData(0, 0, w, h);
+          const now = performance.now();
+          if (now - lastInferenceTimeRef.current >= INFERENCE_INTERVAL_MS || !lastMaskRef.current) {
+            // 다운스케일된 offscreen을 입력으로 넘겨 마스크 자체를 더 작게 받는다
+            // (video를 그대로 넘기면 마스크가 네이티브 해상도로 나와 다운스케일 효과가 없어짐)
+            const result = segmenterRef.current.segmentForVideo(offscreen, now);
+            const masks = result.confidenceMasks as ConfidenceMask[] | undefined;
+            if (masks && masks.length > 0) {
+              // WASM 힙 위의 뷰일 수 있으므로 다음 segmentForVideo 호출 전까지만
+              // 안전하다고 가정하지 않고 복사해서 다음 추론 전까지 여러 프레임에서 재사용한다.
+              lastMaskRef.current = {
+                data: masks[0].getAsFloat32Array().slice(),
+                w: masks[0].width ?? pw,
+                h: masks[0].height ?? ph,
+              };
+              lastInferenceTimeRef.current = now;
+            }
+          }
+
+          const cached = lastMaskRef.current;
+          if (cached) {
+            const imageData = offCtx.getImageData(0, 0, pw, ph);
             const data = imageData.data;
             // multiclass model: masks[0]=background, masks[1..N]=hair/skin/face/clothes/other
             // foreground confidence = 1 - background confidence → preserves dark clothing
-            const bgMask = masks[0].getAsFloat32Array();
-            const maskW = masks[0].width ?? w;
-            const maskH = masks[0].height ?? h;
+            const bgMask = cached.data;
+            const maskW = cached.w;
+            const maskH = cached.h;
             const THRESH = segmentThresh;
             const FEATHER = segmentFeather;
-            if (bgMask.length === w * h) {
+            if (bgMask.length === pw * ph) {
               for (let i = 0; i < bgMask.length; i++) {
                 const fgConf = 1 - bgMask[i];
                 const softAlpha = Math.max(0, Math.min(1, (fgConf - THRESH) / FEATHER));
                 data[i * 4 + 3] = Math.round(softAlpha * 255);
               }
             } else {
-              for (let y = 0; y < h; y++) {
-                const maskY = Math.min(maskH - 1, Math.floor((y / h) * maskH));
-                for (let x = 0; x < w; x++) {
-                  const maskX = Math.min(maskW - 1, Math.floor((x / w) * maskW));
+              for (let y = 0; y < ph; y++) {
+                const maskY = Math.min(maskH - 1, Math.floor((y / ph) * maskH));
+                for (let x = 0; x < pw; x++) {
+                  const maskX = Math.min(maskW - 1, Math.floor((x / pw) * maskW));
                   const fgConf = 1 - (bgMask[maskY * maskW + maskX] ?? 0);
                   const softAlpha = Math.max(0, Math.min(1, (fgConf - THRESH) / FEATHER));
-                  data[(y * w + x) * 4 + 3] = Math.round(softAlpha * 255);
+                  data[(y * pw + x) * 4 + 3] = Math.round(softAlpha * 255);
                 }
               }
             }
@@ -435,7 +467,7 @@ export function CameraSection({
           console.error("Segmentation error:", err);
         }
       } else if (bgRemovalMode === "chromakey") {
-        const imageData = offCtx.getImageData(0, 0, w, h);
+        const imageData = offCtx.getImageData(0, 0, pw, ph);
         const data = imageData.data;
         const { r: kr, g: kg, b: kb } = chromaKey;
         for (let i = 0; i < data.length; i += 4) {

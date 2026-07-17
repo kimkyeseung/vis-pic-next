@@ -6,6 +6,10 @@ import { HexColorPicker } from "react-colorful";
 // CameraSection.tsx의 크로마키 제거 로직과 동일한 거리 임계값
 const HARD = 50 * 50;
 const SOFT = 100 * 100;
+// 배경제거 처리 해상도를 낮춰 프레임 드롭을 줄인다 (CameraSection.tsx와 동일한 이유).
+const PROCESS_SCALE = 0.5;
+// mediapipe 추론은 화면 갱신보다 훨씬 무거우므로 이 간격으로만 실행하고 재사용한다.
+const INFERENCE_INTERVAL_MS = 200;
 
 // 제거된 영역이 잘 보이도록 체커보드 패턴을 배경으로 그린다
 const CHECKER_SIZE = 20;
@@ -60,6 +64,9 @@ export function BackgroundRemovalPreviewDialog({
   const streamRef = useRef<MediaStream | null>(null);
   const animFrameRef = useRef<number>(0);
   const segmenterRef = useRef<Segmenter>(null);
+  // mediapipe 추론은 무거우므로 스로틀링해서 재사용한다 (CameraSection.tsx와 동일한 이유)
+  const lastMaskRef = useRef<{ data: Float32Array; w: number; h: number } | null>(null);
+  const lastInferenceTimeRef = useRef(0);
 
   // rAF 루프가 최신 값을 읽도록 ref로 미러링 (슬라이더 조작마다 이펙트/루프를 재시작하지 않기 위함)
   const chromaColorRef = useRef(chromaColor);
@@ -129,24 +136,40 @@ export function BackgroundRemovalPreviewDialog({
           const h = video.videoHeight;
           if (canvas.width !== w) canvas.width = w;
           if (canvas.height !== h) canvas.height = h;
-          if (offscreen.width !== w) offscreen.width = w;
-          if (offscreen.height !== h) offscreen.height = h;
+          const pw = Math.max(1, Math.round(w * PROCESS_SCALE));
+          const ph = Math.max(1, Math.round(h * PROCESS_SCALE));
+          if (offscreen.width !== pw) offscreen.width = pw;
+          if (offscreen.height !== ph) offscreen.height = ph;
 
           const offCtx = offscreen.getContext("2d")!;
-          offCtx.drawImage(video, 0, 0, w, h);
+          offCtx.drawImage(video, 0, 0, pw, ph);
 
           let processed = false;
 
           if (mode === "mediapipe" && segmenterRef.current) {
-            const result = segmenterRef.current.segmentForVideo(video, performance.now());
-            const masks = result.confidenceMasks;
-            if (masks && masks.length > 0) {
-              const imageData = offCtx.getImageData(0, 0, w, h);
+            const now = performance.now();
+            if (now - lastInferenceTimeRef.current >= INFERENCE_INTERVAL_MS || !lastMaskRef.current) {
+              // 다운스케일된 offscreen을 입력으로 넘겨 마스크 자체를 더 작게 받는다
+              const result = segmenterRef.current.segmentForVideo(offscreen, now);
+              const masks = result.confidenceMasks;
+              if (masks && masks.length > 0) {
+                lastMaskRef.current = {
+                  data: (masks[0].getAsFloat32Array() as Float32Array).slice(),
+                  w: masks[0].width ?? pw,
+                  h: masks[0].height ?? ph,
+                };
+                lastInferenceTimeRef.current = now;
+              }
+            }
+
+            const cached = lastMaskRef.current;
+            if (cached) {
+              const imageData = offCtx.getImageData(0, 0, pw, ph);
               const data = imageData.data;
-              const bgMask = masks[0].getAsFloat32Array() as Float32Array;
+              const bgMask = cached.data;
               const THRESH = thresholdRef.current / 100;
               const FEATHER = Math.max(featherRef.current, 1) / 100;
-              if (bgMask.length === w * h) {
+              if (bgMask.length === pw * ph) {
                 for (let i = 0; i < bgMask.length; i++) {
                   const fgConf = 1 - bgMask[i];
                   const softAlpha = Math.max(0, Math.min(1, (fgConf - THRESH) / FEATHER));
@@ -157,7 +180,7 @@ export function BackgroundRemovalPreviewDialog({
               processed = true;
             }
           } else if (mode === "chromakey") {
-            const imageData = offCtx.getImageData(0, 0, w, h);
+            const imageData = offCtx.getImageData(0, 0, pw, ph);
             const data = imageData.data;
             const { r: kr, g: kg, b: kb } = chromaColorRef.current;
             for (let i = 0; i < data.length; i += 4) {
@@ -210,6 +233,8 @@ export function BackgroundRemovalPreviewDialog({
       streamRef.current = null;
       segmenterRef.current?.close();
       segmenterRef.current = null;
+      lastMaskRef.current = null;
+      lastInferenceTimeRef.current = 0;
     };
   }, [mode]);
 
