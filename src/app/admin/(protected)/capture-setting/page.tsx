@@ -2,15 +2,29 @@
 
 import { useEffect, useState } from "react";
 
-const FIELDS: { name: string; label: string; type?: "text" | "number" | "select"; options?: { value: string; label: string }[] }[] = [
+const FIELDS: { name: string; label: string; type?: "text" | "number" | "select"; options?: { value: string; label: string }[]; min?: number; max?: number; hint?: string }[] = [
   { name: "CAPTURE_SECONDS", label: "카운트다운 (초)", type: "number" },
   { name: "CAPTURE_COUNT_MODE", label: "촬영 횟수 모드", type: "select", options: [{ value: "uniform", label: "균일" }, { value: "custom", label: "커스텀" }] },
   { name: "CAPTURE_COUNT_UNIFORM", label: "슬롯당 촬영 횟수", type: "number" },
   { name: "CAPTURE_COUNT_CUSTOM", label: "커스텀 촬영 횟수 (JSON)" },
   { name: "CHROMAKEY_MODE", label: "배경 제거 모드", type: "select", options: [{ value: "mediapipe", label: "AI 배경 제거 (기본)" }, { value: "chromakey", label: "크로마키 (그린스크린)" }, { value: "off", label: "비활성" }] },
   { name: "CHROMAKEY_RGB", label: "크로마키 색상 (R,G,B)" },
-  { name: "CAPTURE_THRESHOLD", label: "캡처 임계값", type: "number" },
-  { name: "CAPTURE_SMOOTHNESS", label: "캡처 부드러움", type: "number" },
+  {
+    name: "CAPTURE_THRESHOLD",
+    label: "AI 배경제거 경계 침식 (%)",
+    type: "number",
+    min: 0,
+    max: 100,
+    hint: "높일수록 인물 가장자리를 안쪽으로 더 깎아내 배경과의 경계가 또렷해집니다. 기본값 15.",
+  },
+  {
+    name: "CAPTURE_SMOOTHNESS",
+    label: "AI 배경제거 경계 부드러움 (%)",
+    type: "number",
+    min: 1,
+    max: 100,
+    hint: "낮을수록 경계가 딱딱하게 잘리고, 높을수록 부드럽게 번집니다. 기본값 35.",
+  },
 ];
 
 export default function CaptureSettingPage() {
@@ -64,26 +78,31 @@ export default function CaptureSettingPage() {
               <label className="text-gray-400 text-sm truncate" title={field.name}>
                 {field.label}
               </label>
-              {field.type === "select" && field.options ? (
-                <select
-                  value={settings[field.name] || ""}
-                  onChange={(e) => updateSetting(field.name, e.target.value)}
-                  className="px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white text-sm focus:outline-none focus:border-blue-500"
-                >
-                  <option value="">- 기본값 사용 -</option>
-                  {field.options.map((o) => (
-                    <option key={o.value} value={o.value}>{o.label}</option>
-                  ))}
-                </select>
-              ) : (
-                <input
-                  type={field.type === "number" ? "number" : "text"}
-                  value={settings[field.name] || ""}
-                  onChange={(e) => updateSetting(field.name, e.target.value)}
-                  className="px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white text-sm focus:outline-none focus:border-blue-500"
-                  placeholder="미설정 (기본값 사용)"
-                />
-              )}
+              <div>
+                {field.type === "select" && field.options ? (
+                  <select
+                    value={settings[field.name] || ""}
+                    onChange={(e) => updateSetting(field.name, e.target.value)}
+                    className="px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white text-sm focus:outline-none focus:border-blue-500"
+                  >
+                    <option value="">- 기본값 사용 -</option>
+                    {field.options.map((o) => (
+                      <option key={o.value} value={o.value}>{o.label}</option>
+                    ))}
+                  </select>
+                ) : (
+                  <input
+                    type={field.type === "number" ? "number" : "text"}
+                    min={field.min}
+                    max={field.max}
+                    value={settings[field.name] || ""}
+                    onChange={(e) => updateSetting(field.name, e.target.value)}
+                    className="px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white text-sm focus:outline-none focus:border-blue-500"
+                    placeholder="미설정 (기본값 사용)"
+                  />
+                )}
+                {field.hint && <p className="text-gray-500 text-xs mt-1">{field.hint}</p>}
+              </div>
             </div>
           ))}
         </div>

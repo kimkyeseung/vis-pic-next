@@ -46,6 +46,10 @@ export interface DeviceConfig {
   idleTimeoutSeconds: number;
   cameraAutoTimerSeconds: number;
   printAutoTimerSeconds: number;
+  /** AI 배경제거 경계 침식 정도 (0-100%). 높을수록 인물 가장자리를 안쪽으로 더 깎아낸다. */
+  segmentThreshold: number;
+  /** AI 배경제거 경계 부드러움 (0-100%). 낮을수록 경계가 더 또렷하게 잘린다. */
+  segmentFeather: number;
 }
 
 export interface BGImage {

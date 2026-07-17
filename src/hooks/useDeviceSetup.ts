@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import type { DeviceConfig, BGImage } from "@/types";
-import { parseIntSafe, parseBgRemovalMode, parsePaymentTerminalMode, parseCaptureModes } from "@/lib/deviceConfig";
+import { parseIntSafe, parseBgRemovalMode, parsePaymentTerminalMode, parseCaptureModes, clampPercent } from "@/lib/deviceConfig";
 
 const DEFAULT_CONFIG: DeviceConfig = {
   deviceId: "test",
@@ -16,6 +16,8 @@ const DEFAULT_CONFIG: DeviceConfig = {
   idleTimeoutSeconds: 30,
   cameraAutoTimerSeconds: 60,
   printAutoTimerSeconds: 30,
+  segmentThreshold: 15,
+  segmentFeather: 35,
 };
 
 export function useDeviceSetup(deviceId: string) {
@@ -77,6 +79,8 @@ export function useDeviceSetup(deviceId: string) {
           idleTimeoutSeconds: parseIntSafe(s.IDLE_TIMEOUT_SECONDS || "", 30),
           cameraAutoTimerSeconds: parseIntSafe(s.CAMERA_AUTO_TIMER || "", 60),
           printAutoTimerSeconds: parseIntSafe(s.PRINT_AUTO_TIMER || "", 30),
+          segmentThreshold: clampPercent(parseIntSafe(s.CAPTURE_THRESHOLD || "", 15)),
+          segmentFeather: clampPercent(parseIntSafe(s.CAPTURE_SMOOTHNESS || "", 35), 1),
         });
       } catch (err) {
         if ((err as Error).name === "AbortError") return;

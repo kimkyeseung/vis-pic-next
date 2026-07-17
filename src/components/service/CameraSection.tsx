@@ -93,6 +93,9 @@ export function CameraSection({
   const TAP_THRESHOLD = 10;
 
   const bgRemovalMode = config.bgRemovalMode;
+  // 관리자 설정(0-100%) → confidence 스케일(0-1). FEATHER는 0으로 나누기 방지를 위해 최소 1%로 clamp됨(useDeviceSetup 참고).
+  const segmentThresh = config.segmentThreshold / 100;
+  const segmentFeather = config.segmentFeather / 100;
 
   const chromaKey = useMemo(() => {
     const [r, g, b] = config.chromakeyRgb.split(",").map(Number);
@@ -406,8 +409,8 @@ export function CameraSection({
             const bgMask = masks[0].getAsFloat32Array();
             const maskW = masks[0].width ?? w;
             const maskH = masks[0].height ?? h;
-            const THRESH = 0.15;
-            const FEATHER = 0.35;
+            const THRESH = segmentThresh;
+            const FEATHER = segmentFeather;
             if (bgMask.length === w * h) {
               for (let i = 0; i < bgMask.length; i++) {
                 const fgConf = 1 - bgMask[i];
@@ -482,7 +485,7 @@ export function CameraSection({
 
     animFrameRef.current = requestAnimationFrame(processFrame);
     return () => cancelAnimationFrame(animFrameRef.current);
-  }, [selectedBackground, chromaKey, bgRemovalMode, drawBackground, frameChannelRef, snapshotWithStickers]);
+  }, [selectedBackground, chromaKey, bgRemovalMode, segmentThresh, segmentFeather, drawBackground, frameChannelRef, snapshotWithStickers]);
 
   // 카운트다운 도중 언마운트(이전/다음 이동 등) 시 타이머가 살아남아
   // onCapture가 화면 전환 후에 실행되는 것을 막는다.

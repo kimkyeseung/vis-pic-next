@@ -19,3 +19,8 @@ export function parsePaymentTerminalMode(raw: string): PaymentTerminalMode {
 export function parseCaptureModes(raw: string): string[] {
   return raw.split(",").map((m) => m.trim()).filter(Boolean);
 }
+
+/** 0-100 범위로 고정. min을 주면 0으로 나누기 등을 막기 위한 하한을 별도로 지정할 수 있다. */
+export function clampPercent(value: number, min = 0): number {
+  return Math.min(100, Math.max(min, value));
+}
