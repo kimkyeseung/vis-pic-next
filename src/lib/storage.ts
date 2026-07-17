@@ -2,24 +2,22 @@ import { createClient } from "@supabase/supabase-js";
 import { writeFile, unlink, mkdir } from "fs/promises";
 import path from "path";
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
 export const BUCKET_NAME = "pic-images";
 
 function getSupabaseClient() {
-  if (!supabaseUrl) return null;
-  // Use service role key for server-side uploads (bypasses RLS)
-  const key = supabaseServiceKey || supabaseKey;
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  if (!url) return null;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
   if (!key) return null;
-  return createClient(supabaseUrl, key);
+  return createClient(url, key);
 }
 
 /** 서비스 롤 키를 사용하는 관리자 클라이언트 (presign URL 생성 등 서버 전용) */
 export function getSupabaseAdminClient() {
-  if (!supabaseUrl || !supabaseServiceKey) return null;
-  return createClient(supabaseUrl, supabaseServiceKey);
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !serviceKey) return null;
+  return createClient(url, serviceKey);
 }
 
 function getLocalDir() {
@@ -101,6 +99,7 @@ export async function deleteImage(filename: string): Promise<void> {
 }
 
 export function getImageBaseUrl(): string {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   if (supabaseUrl) {
     return `${supabaseUrl}/storage/v1/object/public/${BUCKET_NAME}`;
   }
