@@ -158,17 +158,22 @@
 
 | 라우트 | 파일 | 설명 |
 |--------|------|------|
-| `/admin/login` | `src/app/admin/login/page.tsx` | 관리자 인증 |
-| `/admin` | `src/app/admin/page.tsx` | 관리자 대시보드 |
-| `/admin/devices` | `src/app/admin/devices/page.tsx` | 디바이스 목록 |
-| `/admin/devices/new` | `src/app/admin/devices/new/page.tsx` | 디바이스 생성 |
-| `/admin/devices/[id]` | `src/app/admin/devices/[id]/page.tsx` | 디바이스 편집 |
-| `/admin/images` | `src/app/admin/images/page.tsx` | 배경/프레임 이미지 관리 |
-| `/admin/images/upload` | `src/app/admin/images/upload/page.tsx` | 이미지 업로드 |
-| `/admin/print-setting` | `src/app/admin/print-setting/page.tsx` | 인쇄 레이아웃 치수 설정 |
-| `/admin/settings` | `src/app/admin/settings/page.tsx` | 전역 시스템 설정 |
-| `/admin/payment` | `src/app/admin/payment/page.tsx` | PayApp 결제 단말 설정 |
-| `/admin/payment-history` | `src/app/admin/payment-history/page.tsx` | 결제 내역 조회 |
+| `/admin/login` | `src/app/admin/login/page.tsx` | 관리자 인증 (`(protected)` 라우트 그룹 밖) |
+| `/admin` | `src/app/admin/(protected)/page.tsx` | 관리자 대시보드 |
+| `/admin/accounts` | `src/app/admin/(protected)/accounts/page.tsx` | 관리자 계정 추가·삭제·비밀번호 변경 |
+| `/admin/devices` | `src/app/admin/(protected)/devices/page.tsx` | 디바이스 목록 |
+| `/admin/devices/new` | `src/app/admin/(protected)/devices/new/page.tsx` | 디바이스 생성 |
+| `/admin/devices/[id]` | `src/app/admin/(protected)/devices/[id]/page.tsx` | 디바이스 편집 |
+| `/admin/images` | `src/app/admin/(protected)/images/page.tsx` | 배경/프레임/스티커 이미지 관리 |
+| `/admin/images/upload` | `src/app/admin/(protected)/images/upload/page.tsx` | 이미지 업로드 |
+| `/admin/print-setting` | `src/app/admin/(protected)/print-setting/page.tsx` | 인쇄 레이아웃 치수 설정 |
+| `/admin/capture-setting` | `src/app/admin/(protected)/capture-setting/page.tsx` | 촬영/배경 제거 설정 (§12, §23 참고) |
+| `/admin/timer-setting` | `src/app/admin/(protected)/timer-setting/page.tsx` | 유휴·촬영·인화 타이머 설정 |
+| `/admin/payment` | `src/app/admin/(protected)/payment/page.tsx` | PayApp 결제 단말 설정 |
+| `/admin/payment-history` | `src/app/admin/(protected)/payment-history/page.tsx` | 결제 내역 조회 |
+
+`/admin/settings`(전역 시스템 설정 통합 페이지)는 이후 리팩터링으로 제거되고
+`capture-setting`/`timer-setting` 등으로 쪼개졌다 — 옛 경로이니 참고 시 주의.
 
 ---
 
@@ -593,23 +598,38 @@ sticker 오버레이 (canvas.drawImage / fillText)
 
 ### MediaPipe (`bgRemovalMode: "mediapipe"`)
 
-- 모델: `selfie_multiclass_256x256.tflite`
+- 모델: `selfie_multiclass_256x256.tflite` (multiclass 세그멘터)
 - WASM: `vision_wasm_internal.js` + `.wasm` (SIMD / non-SIMD 자동 선택)
-- 출력: `ConfidenceMask` (float32 alpha 값 배열)
-- 전경 카테고리 선택 로직:
-  1. "person" 또는 "selfie" 레이블 검색
-  2. 없으면 휴리스틱: 중앙 픽셀 vs 테두리 픽셀 비율로 판단
-- 마스크를 캔버스 크기에 맞게 스케일링 후 alpha 채널 적용
+- 출력: `confidenceMasks[0]` = 배경 확신도. 전경 확신도는 `1 - masks[0][i]`로 계산
+  (레이블 검색이나 중앙/테두리 픽셀 휴리스틱 같은 건 없음 — 배경 채널을 고정 인덱스로 사용)
+- 알파 변환: `softAlpha = clamp((fgConf - THRESH) / FEATHER, 0, 1)`
+  - `THRESH`(경계 침식, %) = `CAPTURE_THRESHOLD` 설정값 / 100, 기본 15%
+  - `FEATHER`(경계 부드러움, %) = `CAPTURE_SMOOTHNESS` 설정값 / 100 (최소 1%), 기본 35%
+  - 관리자 촬영 설정 페이지(`/admin/capture-setting`)에서 두 값 모두 조정 가능 (§23 참고)
+- 성능: 세그멘테이션/합성 처리는 원본의 절반 해상도로 다운스케일(픽셀 수 1/4)하고,
+  무거운 추론(`segmentForVideo`) 자체는 200ms 간격으로만 실행해 그 사이 프레임은 직전
+  마스크를 재사용한다 (화면 갱신은 계속 최대 60fps). 최종 표시/캡처는 원본 해상도로
+  업스케일되어 화질 손실은 미미함. 이 스로틀링/다운스케일 로직은
+  `CameraSection.tsx`(메인 촬영 화면), `CameraStreamer.tsx`(서브 모니터 송출),
+  `BackgroundRemovalPreviewDialog.tsx`(관리자 미리보기) 3곳에 동일하게 구현되어 있다.
 
 ### Chromakey (`bgRemovalMode: "chromakey"`)
 
-- 설정: `CHROMAKEY_RGB` (기본: "0,255,0", 녹색)
-- RGB 색상 공간에서 유사도 임계값 기반 제거
-- `similarity` + `smoothness` 슬라이더로 조정 가능
+- 설정: `CHROMAKEY_RGB` (기본: "0,255,0", 녹색) — 관리자 촬영 설정 페이지에서 컬러피커(react-colorful)로 조정
+- RGB 색상거리 기반 제거: `distSq = dr²+dg²+db²`, `HARD = 50²`(완전 투명), `SOFT = 100²`(그 사이 부드럽게 페이드) — 코드에 고정값, 조정 UI 없음
+- ~~similarity/smoothness 슬라이더~~ 는 존재하지 않음 (과거 문서 오기)
 
 ### 없음 (`bgRemovalMode: "off"`)
 
 - 배경 제거 없이 영상 그대로 표시
+
+### 관리자 미리보기 (`BackgroundRemovalPreviewDialog`)
+
+- 관리자 촬영 설정 페이지의 "카메라로 미리보기" 버튼으로 실행. 카메라를 켜서 현재
+  `CHROMAKEY_MODE`에 맞는 처리(AI 또는 크로마키)를 실시간으로 보여주며, 다이얼로그 내
+  슬라이더/컬러피커로 값을 조정하면 미리보기와 뒤쪽 설정 폼에 동시 반영되어 바로 저장 가능
+- 제거되는 영역은 체커보드 패턴으로 표시
+- `CameraSection.tsx`와 동일한 마스크/색상거리 알고리즘을 재사용해 실제 서비스 화면과 결과가 일치함
 
 ---
 
@@ -886,12 +906,21 @@ PAYAPP_RETURN_URL      # 결제 완료 후 리다이렉트 URL
     ↓ 7개 파일 순차 다운로드 (파일별 {이름}.download 임시 파일 → 성공 시 rename)
     ↓ %LOCALAPPDATA%\ar-pic\mediapipe\ 에 저장
     ↓ server\ 디렉토리에 복사
+    ↓ 임베디드 Node 서버(node.exe) 재시작 후 포트 응답 대기
 
 이후 실행
     ↓ prepare_server_dir(): server\ 쪽 파일이 불완전하면 캐시에서 재복사
     ↓ mediapipe_is_installed() → 필수 7개 파일 전체 존재 시에만 true
     ↓ 다운로드 UI 스킵
 ```
+
+**서버 재시작이 필요한 이유**: Next.js 서버는 기동 시점에 `public/` 디렉터리 목록을
+메모리에 캐시해두고 이후 요청을 그 목록으로만 판별한다 (`node_modules/next/dist/server/lib/router-utils/filesystem.js`의
+`setupFsCheck`). 최초 실행 시 서버가 이미 mediapipe 파일 없이 기동된 상태에서 다운로드가
+끝나 파일만 디스크에 추가해봤자, 이미 떠 있는 서버 프로세스는 그 파일의 존재를 영영 인식하지
+못해 404를 반환한다 — 실제로 이 때문에 "AI 배경제거 모델" 사전 점검 항목이 앱을 껐다 켜기
+전까지 계속 경고로 남는 버그가 있었다. `download_mediapipe`가 파일 복사 직후 Node 서버를
+직접 kill 후 재기동해 이 문제를 해결한다 (`src-tauri/src/lib.rs`의 `spawn_node_server`/`wait_for_server_port`).
 
 **부분 다운로드 복구**: 다운로드가 중간에 중단되어도 (1) 임시 파일 rename
 방식이라 불완전한 파일이 최종 경로에 남지 않고, (2) 설치 검사가 전체 파일
@@ -1053,7 +1082,10 @@ npm run tauri:build
     │    ├─ [3] node.exe 복사 (Node.js 런타임 번들링)
     │    ├─ [4] sharp 네이티브 DLL 복사
     │    ├─ [5] .env 파일 복사
-    │    └─ [6] src-tauri/server/ → src-tauri/server.zip (PowerShell)
+    │    └─ [6] src-tauri/server/ → src-tauri/server.zip (임시 .ps1 + Compress-Archive)
+    │            ⚠ 임시 .ps1은 UTF-8 BOM 포함 필수 — 없으면 Windows PowerShell이
+    │              시스템 ANSI 코드페이지로 읽어 비ASCII 사용자 경로(한글 등)가 깨져
+    │              Compress-Archive가 널 경로로 실패한다 (scripts/prepare-tauri.mjs 참고)
     │
     └─ cargo build --release
          ├─ include_bytes!("server.zip") 임베딩
@@ -1098,10 +1130,13 @@ npm run tauri:build
 
 | 메뉴 | 경로 | 주요 기능 |
 |------|------|---------|
-| 디바이스 관리 | `/admin/devices` | 생성, 편집, 복제 |
-| 이미지 관리 | `/admin/images` | 배경/프레임/스티커 탭별 조회·삭제·업로드, MP4/WebM 영상 미리보기 |
+| 대시보드 | `/admin` | 요약 화면 |
+| 계정 관리 | `/admin/accounts` | 관리자 계정 추가·삭제·비밀번호 변경 (`AdminAccount` 테이블) |
+| 디바이스 관리 | `/admin/devices`, `/devices/new`, `/devices/[id]` | 생성, 편집, 복제 (활성/비활성 상태 배지 UI는 제거됨 — 필요 시 DB 직접 수정) |
+| 이미지 관리 | `/admin/images`, `/images/upload` | 배경/프레임/스티커 탭별 조회·삭제·업로드, MP4/WebM 영상 미리보기 |
 | 인화 설정 | `/admin/print-setting` | 인화지 크기, 모드별 사진 크기·간격·4방향 여백, 배경 이미지, 프린터 선택. 설정값 실시간 미리보기 + 용지 초과 경고 |
-| 시스템 설정 | `/admin/settings` | 유휴 타임아웃, 촬영 횟수, 크로마키 등 전역 설정 (그룹: 기본/촬영/기타) |
+| 촬영 설정 | `/admin/capture-setting` | 카운트다운, 촬영 횟수, 배경 제거 모드(AI/크로마키/off), 크로마키 색상(컬러피커), AI 배경제거 경계 침식/부드러움, 카메라 실시간 미리보기 (§12 참고) |
+| 타이머 설정 | `/admin/timer-setting` | 유휴 타임아웃, 촬영 자동 타이머, 인화 자동 복귀 타이머 |
 | 결제 설정 | `/admin/payment` | PayApp 활성화, 금액, 단말 모드 설정 (전역 적용, 디바이스 설정이 우선) |
 | 결제 내역 | `/admin/payment-history` | 거래 이력 조회 |
 
