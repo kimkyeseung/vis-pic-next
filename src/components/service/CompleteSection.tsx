@@ -436,7 +436,9 @@ export function CompleteSection({
       }
     } else {
       const style = document.createElement("style");
-      style.textContent = `@media print { body > * { display: none !important; } #__print_target__ { display: block !important; position: fixed; inset: 0; background: #fff; } #__print_target__ img { width: 100%; height: 100%; object-fit: contain; } }`;
+      // @page margin:0 → 브라우저가 붙이는 머리글/바닥글(날짜·제목·URL·쪽번호) 제거.
+      // kiosk-printing(무음 인쇄) 모드에서도 여백 없이 이미지만 출력된다.
+      style.textContent = `@page { size: auto; margin: 0; } @media print { html, body { margin: 0 !important; padding: 0 !important; } body > * { display: none !important; } #__print_target__ { display: block !important; position: fixed; inset: 0; background: #fff; } #__print_target__ img { width: 100%; height: 100%; object-fit: contain; } }`;
 
       const container = document.createElement("div");
       container.id = "__print_target__";
