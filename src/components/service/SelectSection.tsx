@@ -1,10 +1,17 @@
+import type { BGImage } from "@/types";
 import { useLanguage } from "@/i18n/LanguageContext";
+import { FramedPreview } from "./FramedPreview";
 
 export function SelectSection({
   photos,
   requiredCount,
   selectedPhotos,
   setSelectedPhotos,
+  selectedFrame,
+  printSettings,
+  imageBaseUrl,
+  selectedBackground,
+  backgroundImages,
   onNext,
   onPrev,
 }: {
@@ -12,6 +19,11 @@ export function SelectSection({
   requiredCount: number;
   selectedPhotos: number[];
   setSelectedPhotos: (sel: number[]) => void;
+  selectedFrame: string | null;
+  printSettings: Record<string, string>;
+  imageBaseUrl: string;
+  selectedBackground?: number | null;
+  backgroundImages?: BGImage[];
   onNext: () => void;
   onPrev: () => void;
 }) {
@@ -37,18 +49,32 @@ export function SelectSection({
         {t("select.count", { req: requiredCount, sel: selectedPhotos.length })}
       </p>
 
-      <div className="flex flex-wrap justify-center gap-8 mb-20 max-w-6xl animate-fadeInUp">
-        {photos.map((photo, i) => (
-          <div
-            key={i}
-            className={`photo-thumbnail w-80 bg-black/30 relative overflow-hidden ${selectedPhotos.includes(i) ? "selected" : ""}`}
-            style={{ aspectRatio: "auto" }}
-            onClick={() => togglePhoto(i)}
-          >
-            {selectedPhotos.includes(i) && <span className="check-mark">&#10003;</span>}
-            <img src={photo} alt={`Photo ${i + 1}`} className="w-full h-auto block" />
-          </div>
-        ))}
+      <div className="flex items-start justify-center gap-12 mb-16 max-w-6xl animate-fadeInUp">
+        <div className="flex flex-wrap justify-center gap-8 max-w-3xl">
+          {photos.map((photo, i) => (
+            <div
+              key={i}
+              className={`photo-thumbnail w-64 bg-black/30 relative overflow-hidden ${selectedPhotos.includes(i) ? "selected" : ""}`}
+              style={{ aspectRatio: "auto" }}
+              onClick={() => togglePhoto(i)}
+            >
+              {selectedPhotos.includes(i) && <span className="check-mark">&#10003;</span>}
+              <img src={photo} alt={`Photo ${i + 1}`} className="w-full h-auto block" />
+            </div>
+          ))}
+        </div>
+
+        {selectedFrame && (
+          <FramedPreview
+            selectedFrame={selectedFrame}
+            photos={photos}
+            selectedPhotos={selectedPhotos}
+            printSettings={printSettings}
+            imageBaseUrl={imageBaseUrl}
+            selectedBackground={selectedBackground}
+            backgroundImages={backgroundImages}
+          />
+        )}
       </div>
 
       <div className="flex gap-6 animate-fadeInUp" style={{ animationDelay: "0.3s" }}>

@@ -1,10 +1,17 @@
 import type { BGImage } from "@/types";
 import { useLanguage } from "@/i18n/LanguageContext";
+import { FramedPreview } from "./FramedPreview";
 
 export function PrintBgSection({
   printBgImages,
   selectedPrintBg,
   imageBaseUrl,
+  selectedFrame,
+  photos,
+  selectedPhotos,
+  printSettings,
+  selectedBackground,
+  backgroundImages,
   onSelect,
   onNext,
   onPrev,
@@ -12,6 +19,12 @@ export function PrintBgSection({
   printBgImages: BGImage[];
   selectedPrintBg: number | null;
   imageBaseUrl: string;
+  selectedFrame: string | null;
+  photos: string[];
+  selectedPhotos: number[];
+  printSettings: Record<string, string>;
+  selectedBackground?: number | null;
+  backgroundImages?: BGImage[];
   onSelect: (id: number) => void;
   onNext: () => void;
   onPrev: () => void;
@@ -24,22 +37,38 @@ export function PrintBgSection({
         {t("printbg.title")}
       </h2>
 
-      <div className="grid grid-cols-3 gap-8 mb-20 animate-fadeInUp">
-        {printBgImages.map((bg) => (
-          <div
-            key={bg.id}
-            className={`background-option w-52 h-32 relative ${selectedPrintBg === bg.id ? "selected" : ""}`}
-            onClick={() => onSelect(bg.id)}
-          >
-            {selectedPrintBg === bg.id && <span className="check-mark">&#10003;</span>}
-            <img
-              src={`${imageBaseUrl}/${bg.filename}`}
-              alt={bg.name}
-              className="w-full h-full object-cover rounded-[13px]"
-              onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
-            />
-          </div>
-        ))}
+      <div className="flex items-start justify-center gap-12 mb-16 animate-fadeInUp">
+        <div className="grid grid-cols-3 gap-8">
+          {printBgImages.map((bg) => (
+            <div
+              key={bg.id}
+              className={`background-option w-52 h-32 relative ${selectedPrintBg === bg.id ? "selected" : ""}`}
+              onClick={() => onSelect(bg.id)}
+            >
+              {selectedPrintBg === bg.id && <span className="check-mark">&#10003;</span>}
+              <img
+                src={`${imageBaseUrl}/${bg.filename}`}
+                alt={bg.name}
+                className="w-full h-full object-cover rounded-[13px]"
+                onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+              />
+            </div>
+          ))}
+        </div>
+
+        {selectedFrame && (
+          <FramedPreview
+            selectedFrame={selectedFrame}
+            photos={photos}
+            selectedPhotos={selectedPhotos}
+            printSettings={printSettings}
+            imageBaseUrl={imageBaseUrl}
+            selectedBackground={selectedBackground}
+            backgroundImages={backgroundImages}
+            selectedPrintBg={selectedPrintBg}
+            printBgImages={printBgImages}
+          />
+        )}
       </div>
 
       <div className="flex gap-6 animate-fadeInUp" style={{ animationDelay: "0.3s" }}>

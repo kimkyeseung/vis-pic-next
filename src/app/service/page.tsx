@@ -190,6 +190,11 @@ function ServiceContent() {
           requiredCount={slotsNeeded}
           selectedPhotos={flow.selectedPhotos}
           setSelectedPhotos={flow.setSelectedPhotos}
+          selectedFrame={flow.selectedFrame}
+          printSettings={printSettings}
+          imageBaseUrl={imageBaseUrl}
+          selectedBackground={selectedBackground}
+          backgroundImages={backgroundImages}
           onNext={() => { clearIdleTimer(); flow.handleSelectNext(printBgImages.length > 0); }}
           onPrev={() => {
             flow.setPhotos([]);
@@ -204,6 +209,12 @@ function ServiceContent() {
           printBgImages={printBgImages}
           selectedPrintBg={selectedPrintBg}
           imageBaseUrl={imageBaseUrl}
+          selectedFrame={flow.selectedFrame}
+          photos={flow.photos}
+          selectedPhotos={flow.selectedPhotos}
+          printSettings={printSettings}
+          selectedBackground={selectedBackground}
+          backgroundImages={backgroundImages}
           onSelect={setSelectedPrintBg}
           onNext={() => flow.goToStep("complete")}
           onPrev={() => {
