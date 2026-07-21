@@ -253,7 +253,7 @@ export function CompleteSection({
     // Background priority: user-selected print bg > PRINT_BACKGROUND setting > user AR bg > fallback gradient
     let bgDrawn = false;
 
-    // 1. User-selected print background (imageType=4)
+    // 1. User-selected print background / 프레임 (imageType=2)
     const printBgInfo = selectedPrintBg != null
       ? (printBgImages || []).find((b) => b.id === selectedPrintBg)
       : null;

@@ -49,7 +49,7 @@ export default function PrintSettingPage() {
   const [printerName, setPrinterName] = useState("");
   const [printerList, setPrinterList] = useState<string[]>([]);
 
-  // Print background images (imageType=4)
+  // 프레임(인쇄 배경) 이미지 (imageType=2) — 구 print_background(4)와 통합됨
   const [printBgImages, setPrintBgImages] = useState<PrintBgImage[]>([]);
   const [bgUploading, setBgUploading] = useState(false);
   const [bgUploadError, setBgUploadError] = useState("");
@@ -67,7 +67,7 @@ export default function PrintSettingPage() {
 
   const loadPrintBgImages = async () => {
     try {
-      const res = await fetch("/api/image/list/4/");
+      const res = await fetch("/api/image/list/2/");
       if (!res.ok) return;
       const data = await res.json();
       const imgs = (data.images || []).map((img: PrintBgImage & Record<string, unknown>) => ({
@@ -242,7 +242,7 @@ export default function PrintSettingPage() {
         const regRes = await fetch("/api/admin/images/register/", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ filename: storedFilename, name: file.name, imageType: 4, priority: 0 }),
+          body: JSON.stringify({ filename: storedFilename, name: file.name, imageType: 2, priority: 0 }),
         });
         if (regRes.ok) {
           await loadPrintBgImages();
@@ -254,7 +254,7 @@ export default function PrintSettingPage() {
       const formData = new FormData();
       formData.append("file", file);
       formData.append("name", file.name);
-      formData.append("imageType", "4");
+      formData.append("imageType", "2");
       formData.append("priority", "0");
       const uploadRes = await fetch("/api/admin/images/upload/", { method: "POST", body: formData });
       if (uploadRes.ok) {

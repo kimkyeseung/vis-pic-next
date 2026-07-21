@@ -26,12 +26,12 @@ const ko = {
   "payment.requestFailed": "결제 요청 실패",
   "payment.serverError": "서버에 연결할 수 없습니다",
 
-  "frame.title": "프레임을 선택해 주세요",
+  "frame.title": "컷을 선택해 주세요",
   "frame.cut": "{n}컷",
 
   "bg.title": "배경을 선택해 주세요",
 
-  "printbg.title": "인쇄 배경을 선택해 주세요",
+  "printbg.title": "프레임을 선택해 주세요",
 
   "camera.title": "촬영",
   "camera.shoot": "촬영하기",
@@ -93,12 +93,12 @@ const en: Record<MessageKey, string> = {
   "payment.requestFailed": "Payment request failed",
   "payment.serverError": "Cannot connect to the server",
 
-  "frame.title": "Please select a frame",
+  "frame.title": "Please select the number of cuts",
   "frame.cut": "{n}-Cut",
 
   "bg.title": "Please select a background",
 
-  "printbg.title": "Select a print background",
+  "printbg.title": "Please select a frame",
 
   "camera.title": "Capture",
   "camera.shoot": "Take Photo",
@@ -158,12 +158,12 @@ const ja: Record<MessageKey, string> = {
   "payment.requestFailed": "決済リクエストに失敗しました",
   "payment.serverError": "サーバーに接続できません",
 
-  "frame.title": "フレームを選択してください",
+  "frame.title": "カット数を選択してください",
   "frame.cut": "{n}カット",
 
   "bg.title": "背景を選択してください",
 
-  "printbg.title": "印刷背景を選択してください",
+  "printbg.title": "フレームを選択してください",
 
   "camera.title": "撮影",
   "camera.shoot": "撮影する",
@@ -223,12 +223,12 @@ const zh: Record<MessageKey, string> = {
   "payment.requestFailed": "支付请求失败",
   "payment.serverError": "无法连接服务器",
 
-  "frame.title": "请选择相框",
+  "frame.title": "请选择格数",
   "frame.cut": "{n}格",
 
   "bg.title": "请选择背景",
 
-  "printbg.title": "请选择打印背景",
+  "printbg.title": "请选择相框",
 
   "camera.title": "拍摄",
   "camera.shoot": "拍照",

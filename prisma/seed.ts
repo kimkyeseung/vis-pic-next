@@ -32,13 +32,10 @@ async function main() {
     create: { id: 3, name: "sticker" },
   });
 
-  const printBgType = await prisma.imageType.upsert({
-    where: { id: 4 },
-    update: {},
-    create: { id: 4, name: "print_background" },
-  });
+  // 구 print_background(id 4)는 프레임(id 2)으로 통합되어 더 이상 생성하지 않는다.
+  // 기존 DB의 type 4 데이터는 prisma/merge-print-background-to-frame.ts 로 이전한다.
 
-  console.log("Created image types:", { backgroundType, imageType, stickerType, printBgType });
+  console.log("Created image types:", { backgroundType, imageType, stickerType });
 
   // Create default admin account
   const hashedPassword = await bcrypt.hash("admin", 10);
