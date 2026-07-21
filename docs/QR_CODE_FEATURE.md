@@ -268,7 +268,7 @@ image_url = f"/static/prints/{filename}"
   "v_gap": 8,
   "duration": 500,
   "background_color": "#ffffff",
-  "background_image": "/static/images/print_bg.png",
+  "background_image": "print_bg.png",
   "canvas_width": 1200,
   "canvas_height": 1800,
   "start_x": 50,
@@ -595,7 +595,7 @@ QR 다운로드용 이미지를 캔버스에 합성합니다:
 | `EXTERNAL_SERVER_URL` | QR 코드에 인코딩할 외부 접근 URL | `https://photo.example.com` |
 | `PICTURE_WIDTH` | 인화 용지 가로 (cm) | `10` |
 | `PICTURE_HEIGHT` | 인화 용지 세로 (cm) | `15` |
-| `PRINT_BACKGROUND` | 인화 배경 이미지 URL | `/static/images/bg.png` |
+| `PRINT_BACKGROUND` | 인화 배경 이미지 파일명 (Supabase Storage 기준) | `bg.png` |
 | `MODE_2_2_WIDTH` | 2x2 모드 사진 가로 (cm) | `4` |
 | `MODE_2_2_HEIGHT` | 2x2 모드 사진 세로 (cm) | `6` |
 | `MODE_2_2_HGAP` | 2x2 모드 가로 간격 (cm) | `0.2` |

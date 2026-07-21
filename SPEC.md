@@ -263,7 +263,7 @@
   5. 카운트다운 타이머 표시
 - **촬영 시퀀스**:
   - 자동 타이머 경과 또는 사용자 클릭
-  - 카운트다운 (`captureSeconds`초)
+  - 카운트다운 (`captureSeconds`초) — 매 초 비프음(Web Audio 합성), 촬영 순간 셔터음(`shutter.wav`) 재생 (`src/lib/sounds.ts`)
   - 캔버스 스냅샷 저장 (data URL)
   - 중간 프레임도 `intermediateFrames[photoIndex][]`에 저장
   - `slotsNeeded × captureCount`장 촬영 완료까지 반복
@@ -376,8 +376,8 @@ useSceneSyncReceiver → BroadcastChannel.onmessage(state)   ※ 레거시
 
 | 메서드 | 경로 | 설명 |
 |--------|------|------|
-| GET | `/api/image/list/[imageType]` | 이미지 목록 (1=배경, 2+=프레임) |
-| GET | `/api/images/url` | 이미지 베이스 URL (Supabase or 로컬) |
+| GET | `/api/image/list/[imageType]` | 이미지 목록 (1=촬영 배경, 2=프레임/인쇄 배경, 3=스티커) |
+| GET | `/api/images/url` | 이미지 베이스 URL (Supabase Storage) |
 | POST | `/api/admin/images/upload` | 이미지 업로드 (최대 50MB) |
 | DELETE | `/api/admin/images/[id]` | 이미지 삭제 |
 
@@ -462,7 +462,7 @@ useSceneSyncReceiver → BroadcastChannel.onmessage(state)   ※ 레거시
 |------|------|------|
 | id | Int (PK) | 자동 증가 |
 | deviceId | String? | Device 외래키 (null=전역) |
-| imageType | Int | 1=배경, 2=프레임 |
+| imageType | Int | 1=촬영 배경, 2=프레임(인쇄 배경), 3=스티커 |
 | filename | String | 파일명 |
 | width | Int? | 이미지 너비 (px) |
 | height | Int? | 이미지 높이 (px) |
@@ -473,7 +473,9 @@ useSceneSyncReceiver → BroadcastChannel.onmessage(state)   ※ 레거시
 | 필드 | 타입 | 설명 |
 |------|------|------|
 | id | Int (PK) | 1=배경, 2=프레임, 3=스티커 |
-| name | String | 카테고리 이름 |
+| name | String | 카테고리 이름 (background/image/sticker) |
+
+> 과거 `print_background`(id 4)는 프레임(id 2)으로 통합됨 — 클라이언트 인쇄 배경 = 프레임(type 2).
 
 **`AdminAccount`** - 관리자 계정
 
@@ -1046,7 +1048,6 @@ PAYAPP_RETURN_URL=https://[도메인]/payment/return
 
 ```env
 CRON_SECRET=[웹훅 시크릿]
-UPLOAD_DIR=static/images
 ```
 
 ---

@@ -6,6 +6,7 @@ import { FALLBACK_BACKGROUNDS } from "@/constants/frames";
 import { fillGradientFromCSS } from "@/lib/canvas";
 import { AVAILABLE_STICKERS } from "@/constants/stickers";
 import { useFrameSender } from "@/hooks/useSceneSync";
+import { createSoundPlayer, type SoundPlayer } from "@/lib/sounds";
 import { CircularTimer } from "@/components/service/CircularTimer";
 import { useLanguage } from "@/i18n/LanguageContext";
 import type { MessageKey } from "@/i18n/translations";
@@ -535,10 +536,19 @@ export function CameraSection({
     captureTimersRef.current = [];
   }, []);
 
+  // 촬영 효과음 플레이어 (브라우저 전용 — 마운트 후 생성)
+  const soundRef = useRef<SoundPlayer | null>(null);
+  useEffect(() => {
+    soundRef.current = createSoundPlayer();
+    return () => { soundRef.current?.dispose(); soundRef.current = null; };
+  }, []);
+
   const capturePhoto = useCallback(() => {
     if (countdown !== null || photos.length >= maxPhotos) return;
     let count = config.captureSeconds;
     setCountdown(count);
+    // 카운트다운 숫자마다 효과음을 1초씩만 재생
+    soundRef.current?.playCountingTick();
     const frames: string[] = [];
     const pushFrame = () => {
       const snap = snapshotWithStickers(0.75, GIF_FRAME_WIDTH);
@@ -555,6 +565,7 @@ export function CameraSection({
       count--;
       if (count > 0) {
         setCountdown(count);
+        soundRef.current?.playCountingTick();
       } else {
         clearInterval(interval);
         clearInterval(frameTimer);
@@ -567,6 +578,8 @@ export function CameraSection({
           onCapture(dataUrl, frames);
         }
 
+        // 촬영 순간 셔터음 재생 + 플래시
+        soundRef.current?.playShutter();
         setFlash(true);
         setTimeout(() => setFlash(false), 200);
       }
