@@ -870,7 +870,7 @@ export function CameraSection({
             <CircularTimer value={autoTimer} total={config.cameraAutoTimerSeconds} size={72} />
           )}
           {countdown !== null && (
-            <div className="absolute inset-0 flex items-center justify-center bg-black/50">
+            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
               <span className="text-[200px] font-extrabold text-white animate-countdown" key={countdown} style={{ textShadow: "0 0 60px rgba(255,255,255,0.5)" }}>
                 {countdown}
               </span>
