@@ -8,11 +8,16 @@ export async function POST(request: NextRequest) {
   if (authError) return authError;
 
   try {
-    const { filename, name, imageType, deviceId, priority } = await request.json();
+    const { filename, name, imageType, deviceIds, priority } = await request.json();
 
     if (!filename || !name) {
       return NextResponse.json({ error: "filename and name are required" }, { status: 400 });
     }
+
+    // 연결할 디바이스 코드 목록. 비어 있으면 모든 디바이스에 적용된다.
+    const targetDeviceIds: string[] = Array.isArray(deviceIds)
+      ? deviceIds.filter((d): d is string => typeof d === "string" && d.length > 0)
+      : [];
 
     const truncatedName = String(name).slice(0, 32);
 
@@ -21,8 +26,10 @@ export async function POST(request: NextRequest) {
         name: truncatedName,
         filename,
         imageType: parseInt(imageType) || 1,
-        deviceId: deviceId || null,
         priority: parseInt(priority) || 0,
+        devices: {
+          create: targetDeviceIds.map((deviceId) => ({ deviceId })),
+        },
       },
     });
 

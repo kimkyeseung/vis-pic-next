@@ -1,20 +1,47 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+
+interface DeviceOption {
+  deviceId: string;
+  name: string;
+}
 
 export default function ImageUploadPage() {
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [name, setName] = useState("");
   const [imageType, setImageType] = useState("1");
-  const [deviceId, setDeviceId] = useState("");
+  const [devices, setDevices] = useState<DeviceOption[]>([]);
+  const [selectedDeviceIds, setSelectedDeviceIds] = useState<string[]>([]);
   const [priority, setPriority] = useState("0");
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await fetch("/api/devices/");
+        if (!res.ok) return;
+        const data = await res.json();
+        setDevices(data.devices || []);
+      } catch {
+        // 목록 로드 실패 시 전체 적용만 가능
+      }
+    })();
+  }, []);
+
+  const toggleDevice = (deviceId: string) => {
+    setSelectedDeviceIds((prev) =>
+      prev.includes(deviceId)
+        ? prev.filter((d) => d !== deviceId)
+        : [...prev, deviceId]
+    );
+  };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];
@@ -63,7 +90,7 @@ export default function ImageUploadPage() {
         formData.append("name", name);
         formData.append("imageType", imageType);
         formData.append("priority", priority);
-        if (deviceId) formData.append("deviceId", deviceId);
+        formData.append("deviceIds", JSON.stringify(selectedDeviceIds));
 
         const res = await fetch("/api/admin/images/upload/", { method: "POST", body: formData });
         const data = await res.json();
@@ -88,7 +115,7 @@ export default function ImageUploadPage() {
             filename: presignData.filename,
             name,
             imageType,
-            deviceId: deviceId || null,
+            deviceIds: selectedDeviceIds,
             priority,
           }),
         });
@@ -203,17 +230,39 @@ export default function ImageUploadPage() {
 
         <div>
           <label className="block text-gray-300 mb-2">
-            장치 ID (선택)
+            적용 장치 (선택)
           </label>
-          <input
-            type="text"
-            value={deviceId}
-            onChange={(e) => setDeviceId(e.target.value)}
-            className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-blue-500"
-            placeholder="특정 장치에만 적용하려면 입력"
-          />
+          {devices.length === 0 ? (
+            <p className="text-sm text-gray-500">
+              등록된 장치가 없어 모든 장치에 적용됩니다.
+            </p>
+          ) : (
+            <div className="space-y-2 rounded-lg border border-gray-600 bg-gray-700 p-3">
+              {devices.map((d) => (
+                <label
+                  key={d.deviceId}
+                  className="flex cursor-pointer items-center gap-3 rounded px-2 py-1.5 hover:bg-gray-600"
+                >
+                  <input
+                    type="checkbox"
+                    checked={selectedDeviceIds.includes(d.deviceId)}
+                    onChange={() => toggleDevice(d.deviceId)}
+                    className="h-4 w-4 accent-blue-500"
+                  />
+                  <span className="text-white">
+                    {d.name}
+                    <span className="ml-2 text-xs text-gray-400">
+                      {d.deviceId}
+                    </span>
+                  </span>
+                </label>
+              ))}
+            </div>
+          )}
           <p className="mt-1 text-sm text-gray-500">
-            비워두면 모든 장치에 적용됩니다
+            {selectedDeviceIds.length === 0
+              ? "선택하지 않으면 모든 장치에 적용됩니다."
+              : `${selectedDeviceIds.length}개 장치에만 적용됩니다.`}
           </p>
         </div>
 

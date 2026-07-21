@@ -100,6 +100,7 @@ model ImageType {
 
 model Image {
   id        Int       @id @default(autoincrement())
+  /// deprecated: 디바이스 지정은 pic_image_device(ImageDevice) 조인 테이블 사용. 이 컬럼은 더 이상 읽지 않는다.
   deviceId  String?   @map("device_id") @db.VarChar(64)
   imageType Int       @map("image_type")
   name      String    @db.VarChar(32)
@@ -115,8 +116,21 @@ model Image {
   focalY    Float?    @default(0.5) @map("focal_y")
   createdAt DateTime  @default(now()) @map("created_at") @db.Timestamp(6)
   type      ImageType @relation(fields: [imageType], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  devices   ImageDevice[]
 
   @@map("pic_image")
+}
+
+/// 이미지 ↔ 디바이스 다대다. 연결 행이 없으면 "모든 디바이스"에 적용된다.
+model ImageDevice {
+  imageId  Int    @map("image_id")
+  deviceId String @map("device_id") @db.VarChar(64)
+  image    Image  @relation(fields: [imageId], references: [id], onDelete: Cascade)
+  device   Device @relation(fields: [deviceId], references: [deviceId], onDelete: Cascade)
+
+  @@id([imageId, deviceId])
+  @@index([deviceId])
+  @@map("pic_image_device")
 }
 
 model Setting {
@@ -138,6 +152,7 @@ model Device {
   createdAt   DateTime        @default(now()) @map("created_at") @db.Timestamp(6)
   settings    DeviceSetting[]
   payments    PayappPayment[]
+  imageLinks  ImageDevice[]
 
   @@map("pic_device")
 }

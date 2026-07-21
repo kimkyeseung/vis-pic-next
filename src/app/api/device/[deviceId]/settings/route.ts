@@ -30,9 +30,13 @@ export async function GET(
 
     const images = await prisma.image.findMany({
       where: {
-        OR: [{ deviceId: null }, { deviceId }],
+        OR: [
+          { devices: { none: {} } },
+          { devices: { some: { deviceId } } },
+        ],
       },
       orderBy: { priority: "desc" },
+      include: { devices: { select: { deviceId: true } } },
     });
 
     return NextResponse.json({
@@ -46,7 +50,7 @@ export async function GET(
       settings,
       images: images.map((img) => ({
         id: img.id,
-        deviceId: img.deviceId,
+        deviceIds: img.devices.map((d) => d.deviceId),
         imageType: img.imageType,
         name: img.name,
         filename: img.filename,

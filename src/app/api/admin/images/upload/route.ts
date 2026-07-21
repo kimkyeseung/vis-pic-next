@@ -15,8 +15,23 @@ export async function POST(request: NextRequest) {
     const file = formData.get("file") as File | null;
     const name = formData.get("name") as string;
     const imageType = parseInt(formData.get("imageType") as string) || 1;
-    const deviceId = formData.get("deviceId") as string | null;
     const priority = parseInt(formData.get("priority") as string) || 0;
+
+    // deviceIds: JSON 배열 문자열. 비어 있으면 모든 디바이스에 적용된다.
+    let targetDeviceIds: string[] = [];
+    const deviceIdsRaw = formData.get("deviceIds");
+    if (typeof deviceIdsRaw === "string" && deviceIdsRaw) {
+      try {
+        const parsed = JSON.parse(deviceIdsRaw);
+        if (Array.isArray(parsed)) {
+          targetDeviceIds = parsed.filter(
+            (d): d is string => typeof d === "string" && d.length > 0
+          );
+        }
+      } catch {
+        // 무시하고 전체 적용
+      }
+    }
 
     if (!file) {
       return NextResponse.json(
@@ -62,8 +77,10 @@ export async function POST(request: NextRequest) {
         name: name.slice(0, 32),
         filename,
         imageType,
-        deviceId: deviceId || null,
         priority,
+        devices: {
+          create: targetDeviceIds.map((deviceId) => ({ deviceId })),
+        },
       },
     });
 
