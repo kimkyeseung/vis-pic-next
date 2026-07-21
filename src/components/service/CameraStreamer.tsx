@@ -82,10 +82,12 @@ export function CameraStreamer({
       bgSourceRef.current = vid;
       return () => { vid.pause(); vid.src = ""; };
     } else {
+      let stale = false;
       const img = new Image();
       img.crossOrigin = "anonymous";
-      img.onload = () => { bgSourceRef.current = img; };
+      img.onload = () => { if (!stale) bgSourceRef.current = img; };
       img.src = url;
+      return () => { stale = true; };
     }
   }, [selectedBackground, backgroundImages, imageBaseUrl]);
 
@@ -132,6 +134,7 @@ export function CameraStreamer({
   useEffect(() => {
     if (!enabled) return;
 
+    let cancelled = false;
     let stream: MediaStream | null = null;
     let animFrame = 0;
     const video = document.createElement("video");
@@ -165,11 +168,36 @@ export function CameraStreamer({
       ctx.restore();
     };
 
-    navigator.mediaDevices
-      .getUserMedia({ video: { width: { ideal: 1280 }, height: { ideal: 720 } } })
-      .then((s) => {
-        stream = s;
-        video.srcObject = s;
+    // 촬영 단계(CameraSection)가 카메라를 막 놓은 직후엔 OS가 아직 장치를 물고
+    // 있어 NotReadableError가 날 수 있다 → 잠시 후 재시도한다. 재시도가 없으면
+    // 서브 모니터가 촬영 마지막 프레임에 멈춘 채 복구되지 않는다 (CameraSection과 동일 대응).
+    const acquireStream = async (): Promise<MediaStream | null> => {
+      for (let attempt = 0; !cancelled; attempt++) {
+        try {
+          return await navigator.mediaDevices.getUserMedia({
+            video: { width: { ideal: 1280 }, height: { ideal: 720 } },
+          });
+        } catch (err) {
+          const e = err as DOMException;
+          if (e.name === "NotReadableError" && attempt < 2 && !cancelled) {
+            await new Promise((r) => setTimeout(r, 800));
+            continue;
+          }
+          return null;
+        }
+      }
+      return null;
+    };
+
+    acquireStream().then((s) => {
+      if (!s) return;
+      // 언마운트 후 늦게 도착한 스트림은 즉시 정리해 카메라 점유 누수를 막는다
+      if (cancelled) {
+        s.getTracks().forEach((t) => t.stop());
+        return;
+      }
+      stream = s;
+      video.srcObject = s;
 
         const tick = () => {
           animFrame = requestAnimationFrame(tick);
@@ -284,10 +312,10 @@ export function CameraStreamer({
         };
 
         animFrame = requestAnimationFrame(tick);
-      })
-      .catch(() => {});
+    });
 
     return () => {
+      cancelled = true;
       cancelAnimationFrame(animFrame);
       stream?.getTracks().forEach((t) => t.stop());
       video.srcObject = null;

@@ -264,10 +264,18 @@ export function CameraSection({
   }, [stopCamera]);
 
   useEffect(() => {
+    let active = true;
     (async () => {
       await startCamera();
+      // 획득이 (재시도 대기 등으로) 늦어지는 동안 언마운트됐다면, 뒤늦게 잡힌
+      // 스트림을 정리한다. 안 그러면 카메라가 계속 점유돼 CameraStreamer가
+      // 재획득하지 못하고 서브 모니터가 멈춘다.
+      if (!active) stopCamera();
     })();
-    return stopCamera;
+    return () => {
+      active = false;
+      stopCamera();
+    };
   }, [startCamera, stopCamera]);
 
   // DB 스티커 이미지 목록 로드
