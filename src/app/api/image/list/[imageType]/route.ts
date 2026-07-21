@@ -1,7 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/db";
-import { existsSync } from "fs";
-import { join } from "path";
 import { getImageBaseUrl } from "@/lib/storage";
 
 export async function GET(
@@ -12,7 +10,6 @@ export async function GET(
     const { imageType } = await params;
     const searchParams = request.nextUrl.searchParams;
     const deviceId = searchParams.get("device_id");
-    const checkFiles = searchParams.get("check_files") === "1";
 
     const whereClause: Record<string, unknown> = {
       imageType: parseInt(imageType),
@@ -27,7 +24,7 @@ export async function GET(
       orderBy: { priority: "desc" },
     });
 
-    let result = images.map((img) => ({
+    const result = images.map((img) => ({
       id: img.id,
       deviceId: img.deviceId,
       imageType: img.imageType,
@@ -44,16 +41,7 @@ export async function GET(
       focalY: img.focalY ?? 0.5,
     }));
 
-    const publicDir = join(process.cwd(), "public", "static", "images");
-    let baseUrl = getImageBaseUrl();
-
-    // Only filter by local file existence when Supabase is not configured.
-    // On Vercel (read-only FS), existsSync always returns false even for
-    // images stored in Supabase, which would incorrectly hide all images.
-    if (checkFiles && !process.env.NEXT_PUBLIC_SUPABASE_URL) {
-      result = result.filter((img) => existsSync(join(publicDir, img.filename)));
-      baseUrl = "/static/images";
-    }
+    const baseUrl = getImageBaseUrl();
 
     return NextResponse.json({ images: result, baseUrl });
   } catch (error) {

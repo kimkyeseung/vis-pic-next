@@ -22,7 +22,7 @@ export default function ImagesPage() {
   const [imageTypes, setImageTypes] = useState<ImageType[]>([]);
   const [selectedType, setSelectedType] = useState<number>(1);
   const [loading, setLoading] = useState(true);
-  const [imageBaseUrl, setImageBaseUrl] = useState<string>("/static/images");
+  const [imageBaseUrl, setImageBaseUrl] = useState<string>("");
 
   useEffect(() => {
     const loadImageBaseUrl = async () => {

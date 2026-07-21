@@ -53,8 +53,8 @@ export async function POST(request: NextRequest) {
     const uid = crypto.randomUUID().replace(/-/g, "").slice(0, 12);
     const filename = `${uid}.${ext}`;
 
-    // Upload to storage (local + Supabase if configured)
-    const { supabaseOk } = await uploadImage(file, filename);
+    // Upload to Supabase Storage (throws on failure)
+    await uploadImage(file, filename);
 
     // Save to database (name is VarChar(32))
     const image = await prisma.image.create({
@@ -73,7 +73,7 @@ export async function POST(request: NextRequest) {
         id: image.id,
         name: image.name,
         filename: image.filename,
-        url: supabaseOk ? `${getImageBaseUrl()}/${image.filename}` : `/static/images/${image.filename}`,
+        url: `${getImageBaseUrl()}/${image.filename}`,
         imageType: image.imageType,
       },
     });

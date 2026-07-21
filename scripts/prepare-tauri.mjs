@@ -37,9 +37,12 @@ cpSync(
 
 // prints: 로컬 폴백 코드가 mkdir으로 생성하므로 통째로 제외
 // mediapipe: 앱 최초 실행 시 온라인에서 다운로드하므로 제외 (~48MB 절감)
+// images: 런타임 이미지는 Supabase Storage에서 서빙하므로 제외 (~17MB 절감).
+//         유일하게 로컬로 참조되는 로고는 public/static/viswave_logo.png 로 분리됨.
 const EXCLUDED = [
   join("public", "static", "prints"),
   join("public", "static", "mediapipe"),
+  join("public", "static", "images"),
 ];
 cpSync(join(ROOT, "public"), join(SERVER_DIR, "public"), {
   recursive: true,

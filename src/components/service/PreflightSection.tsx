@@ -152,7 +152,7 @@ export function PreflightSection({
       // ④ 배경 애셋 (경고 등급)
       if (serverOk) {
         try {
-          const res = await withTimeout(fetch(`/api/image/list/1/?device_id=${deviceId}&check_files=1`));
+          const res = await withTimeout(fetch(`/api/image/list/1/?device_id=${deviceId}`));
           if (!res.ok) throw new Error(`HTTP ${res.status}`);
           const data = await res.json();
           const first = data.images?.[0];

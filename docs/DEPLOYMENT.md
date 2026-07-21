@@ -78,7 +78,10 @@ npx tsx prisma/hash-passwords.ts
    - INSERT (업로드): `authenticated` 또는 `true`
 4. 기존 로컬 이미지를 버킷에 업로드
 
-설정하지 않으면 로컬 파일시스템(`public/static/images/`)으로 자동 폴백됩니다.
+이미지는 항상 Supabase Storage에서 서빙되므로 `NEXT_PUBLIC_SUPABASE_URL` 설정이 필수입니다.
+(설정하지 않으면 `getImageBaseUrl()`이 `/static/images`를 반환하지만, 해당 디렉터리는 더 이상
+번들·리포지토리에 포함되지 않으므로 이미지가 표시되지 않는다. 유일한 로컬 정적 자산은
+시작 화면 로고 `public/static/viswave_logo.png` 뿐이다.)
 
 ---
 

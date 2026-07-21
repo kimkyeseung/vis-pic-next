@@ -94,33 +94,11 @@ async function main() {
 
   console.log("Created default settings");
 
-  // Create background images
-  const backgrounds = [
-    { name: "핑크 퍼플", filename: "bg_pink_purple.svg", priority: 6 },
-    { name: "블루 시안", filename: "bg_blue_cyan.svg", priority: 5 },
-    { name: "그린 민트", filename: "bg_green_mint.svg", priority: 4 },
-    { name: "핑크 옐로우", filename: "bg_pink_yellow.svg", priority: 3 },
-    { name: "인디고 퍼플", filename: "bg_indigo_purple.svg", priority: 2 },
-    { name: "핑크 레드", filename: "bg_pink_red.svg", priority: 1 },
-  ];
-
-  for (const bg of backgrounds) {
-    await prisma.image.upsert({
-      where: { id: backgrounds.indexOf(bg) + 1 },
-      update: {},
-      create: {
-        deviceId: null,
-        imageType: 1,
-        name: bg.name,
-        filename: bg.filename,
-        width: 1200,
-        height: 800,
-        priority: bg.priority,
-      },
-    });
-  }
-
-  console.log("Created background images:", backgrounds.length);
+  // 기본 배경 이미지 시드 제거:
+  //  - 과거 bg_*.svg 그라디언트 파일(public/static/images)에 의존했으나 해당 파일을
+  //    삭제하고 런타임 이미지는 Supabase Storage로 일원화함(bg_*.svg는 Supabase에 없음).
+  //  - DB에 배경이 없으면 클라이언트가 코드 상수 FALLBACK_BACKGROUNDS(그라디언트 6종)로
+  //    표시하므로 out-of-box 동작에는 문제 없다. 실제 배경은 관리자에서 업로드한다.
 
   // Create global settings
   const globalSettings = [

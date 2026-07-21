@@ -79,7 +79,7 @@ export default function Home() {
         </div>
 
         <img
-          src="/static/images/viswave_logo.png"
+          src="/static/viswave_logo.png"
           className="mt-24 opacity-80"
           style={{ width: "200px" }}
           alt="Viswave"

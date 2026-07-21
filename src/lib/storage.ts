@@ -1,6 +1,4 @@
 import { createClient } from "@supabase/supabase-js";
-import { writeFile, unlink, mkdir } from "fs/promises";
-import path from "path";
 
 export const BUCKET_NAME = "pic-images";
 
@@ -20,90 +18,59 @@ export function getSupabaseAdminClient() {
   return createClient(url, serviceKey);
 }
 
-function getLocalDir() {
-  return path.join(process.cwd(), "public", "static", "images");
-}
-
 /**
- * Upload an image to both Supabase Storage and local filesystem.
- * Falls back to local-only if Supabase upload fails.
- * Returns the filename (not the full URL).
+ * Upload an image to Supabase Storage. Returns the filename (not the full URL).
+ * 이미지는 Supabase Storage로 일원화되어 있어 미설정·실패 시 그대로 throw 한다.
  */
 export async function uploadImage(
   file: File | Buffer,
   filename: string
-): Promise<{ filename: string; supabaseOk: boolean }> {
+): Promise<{ filename: string }> {
   const buffer =
     Buffer.isBuffer(file) ? file : Buffer.from(await (file as File).arrayBuffer());
 
-  // Upload to Supabase Storage first (required on Vercel where FS is read-only)
-  let supabaseOk = false;
   const supabase = getSupabaseClient();
-  if (supabase) {
-    const { error } = await supabase.storage
-      .from(BUCKET_NAME)
-      .upload(filename, buffer, {
-        contentType: getContentType(filename),
-        upsert: true,
-      });
-    if (error) {
-      console.warn("Supabase Storage upload failed:", error.message);
-    } else {
-      supabaseOk = true;
-    }
+  if (!supabase) {
+    throw new Error("Supabase Storage is not configured");
   }
 
-  // Write to local filesystem (best-effort: fails silently on read-only FS like Vercel)
-  try {
-    const uploadDir = getLocalDir();
-    await mkdir(uploadDir, { recursive: true });
-    await writeFile(path.join(uploadDir, filename), buffer);
-  } catch (err) {
-    if (supabase) {
-      console.warn("Local filesystem write skipped:", (err as Error).message);
-    } else {
-      throw err;
-    }
+  const { error } = await supabase.storage
+    .from(BUCKET_NAME)
+    .upload(filename, buffer, {
+      contentType: getContentType(filename),
+      upsert: true,
+    });
+  if (error) {
+    throw new Error(`Supabase Storage upload failed: ${error.message}`);
   }
 
-  return { filename, supabaseOk };
+  return { filename };
 }
 
 /**
- * Delete an image from both Supabase Storage and local filesystem.
- * Errors are silenced for either target.
+ * Delete an image from Supabase Storage (best-effort).
  */
 export async function deleteImage(filename: string): Promise<void> {
-  // Delete from local filesystem
-  try {
-    const filepath = path.join(getLocalDir(), filename);
-    await unlink(filepath);
-  } catch {
-    // File may not exist locally, continue
-  }
-
-  // Delete from Supabase Storage (best-effort)
   const supabase = getSupabaseClient();
-  if (supabase) {
-    try {
-      const { error } = await supabase.storage
-        .from(BUCKET_NAME)
-        .remove([filename]);
-      if (error) {
-        console.warn("Supabase Storage delete failed:", error.message);
-      }
-    } catch (err) {
-      console.warn("Supabase Storage delete error:", err);
+  if (!supabase) return;
+  try {
+    const { error } = await supabase.storage
+      .from(BUCKET_NAME)
+      .remove([filename]);
+    if (error) {
+      console.warn("Supabase Storage delete failed:", error.message);
     }
+  } catch (err) {
+    console.warn("Supabase Storage delete error:", err);
   }
 }
 
 export function getImageBaseUrl(): string {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  if (supabaseUrl) {
-    return `${supabaseUrl}/storage/v1/object/public/${BUCKET_NAME}`;
+  if (!supabaseUrl) {
+    throw new Error("NEXT_PUBLIC_SUPABASE_URL is not configured");
   }
-  return "/static/images";
+  return `${supabaseUrl}/storage/v1/object/public/${BUCKET_NAME}`;
 }
 
 function getContentType(filename: string): string {

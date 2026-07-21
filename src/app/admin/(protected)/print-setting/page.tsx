@@ -45,7 +45,7 @@ export default function PrintSettingPage() {
     [customModeInfo]
   );
 
-  const [imageBaseUrl, setImageBaseUrl] = useState("/static/images");
+  const [imageBaseUrl, setImageBaseUrl] = useState("");
   const [printerName, setPrinterName] = useState("");
   const [printerList, setPrinterList] = useState<string[]>([]);
 

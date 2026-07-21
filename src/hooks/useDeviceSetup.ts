@@ -24,7 +24,7 @@ export function useDeviceSetup(deviceId: string) {
   const [config, setConfig] = useState<DeviceConfig>(DEFAULT_CONFIG);
   const [backgroundImages, setBackgroundImages] = useState<BGImage[]>([]);
   const [printBgImages, setPrintBgImages] = useState<BGImage[]>([]);
-  const [imageBaseUrl, setImageBaseUrl] = useState<string>("/static/images");
+  const [imageBaseUrl, setImageBaseUrl] = useState<string>("");
   const [printSettings, setPrintSettings] = useState<Record<string, string>>({});
 
   useEffect(() => {
@@ -97,7 +97,7 @@ export function useDeviceSetup(deviceId: string) {
         signal.addEventListener("abort", () => clearTimeout(timer), { once: true });
       };
       try {
-        const res = await fetch(`/api/image/list/1/?device_id=${id}&check_files=1`, { signal });
+        const res = await fetch(`/api/image/list/1/?device_id=${id}`, { signal });
         if (!res.ok) {
           retry();
           return;
@@ -119,7 +119,7 @@ export function useDeviceSetup(deviceId: string) {
         signal.addEventListener("abort", () => clearTimeout(timer), { once: true });
       };
       try {
-        const res = await fetch(`/api/image/list/2/?device_id=${id}&check_files=1`, { signal });
+        const res = await fetch(`/api/image/list/2/?device_id=${id}`, { signal });
         if (!res.ok) { retry(); return; }
         const data = await res.json();
         if (data.images) setPrintBgImages(data.images);
