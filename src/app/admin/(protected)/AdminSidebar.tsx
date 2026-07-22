@@ -22,6 +22,7 @@ export function AdminSidebar({ adminName, children }: AdminSidebarProps) {
 
   const deviceMenuItems = [
     { href: "/admin/images", label: "이미지 관리", icon: "🖼️" },
+    { href: "/admin/theme-setting", label: "테마 관리", icon: "🎨" },
     { href: "/admin/print-setting", label: "인화 설정", icon: "🖨️" },
     { href: "/admin/capture-setting", label: "촬영 설정", icon: "📷" },
     { href: "/admin/timer-setting", label: "타이머 설정", icon: "⏱️" },

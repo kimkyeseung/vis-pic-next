@@ -143,6 +143,7 @@ npm run tauri:dev
 | `/admin/devices/[id]` | 장치 편집 |
 | `/admin/images` | 이미지 관리 |
 | `/admin/images/upload` | 이미지 업로드 |
+| `/admin/theme-setting` | 테마 관리 (서비스 화면 배경화면·글자색) |
 | `/admin/print-setting` | 인화 설정 (용지 크기·촬영 모드·배경·focal point 조절) |
 | `/admin/capture-setting` | 촬영 설정 (카운트다운·크로마키 등) |
 | `/admin/timer-setting` | 타이머 설정 (유휴·촬영·인화 타이머) |
@@ -178,6 +179,7 @@ npm run tauri:dev
 | `CHROMAKEY_RGB` | `0,255,0` | 크로마키 색상 (R,G,B). 관리자 촬영 설정 페이지에서 컬러피커로 조정 (크로마키 모드일 때만 노출) |
 | `CAPTURE_THRESHOLD` | 15 | AI 배경제거 경계 침식 정도 (0-100%). 높일수록 인물 가장자리를 안쪽으로 더 깎아 배경과의 경계가 또렷해짐 |
 | `CAPTURE_SMOOTHNESS` | 35 | AI 배경제거 경계 부드러움 (0-100%, 최소 1). 낮을수록 경계가 딱딱하게 잘림 |
+| `THEME_TEXT_COLOR` | `#ffffff` | 서비스 화면 글자색. 관리자 테마 관리 페이지에서 조정. 배경화면 이미지는 이미지 타입 5(wallpaper)로 별도 저장 |
 | `PAYMENT_ENABLED` | `0` | 결제 활성화 여부 |
 
 관리자 촬영 설정 페이지(`/admin/capture-setting`)에서 "카메라로 미리보기" 버튼으로 실제 카메라를 켜서

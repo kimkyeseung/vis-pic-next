@@ -12,6 +12,7 @@
     "tauri:build": "tauri build",
     "db:push": "prisma db push",
     "db:seed": "npx tsx prisma/seed.ts",
+    "db:add-theme": "npx tsx prisma/add-theme-wallpaper.ts",
     "db:reset": "prisma db push --force-reset && npm run db:seed",
     "test": "vitest run",
     "test:watch": "vitest",

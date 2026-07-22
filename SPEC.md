@@ -30,6 +30,8 @@
 22. [빌드 시스템](#22-빌드-시스템)
 23. [관리자 패널](#23-관리자-패널)
 24. [다국어 (i18n)](#24-다국어-i18n)
+25. [테마 관리 (배경화면 / 글자색)](#25-테마-관리-배경화면--글자색)
+26. [손바닥 제스처 촬영](#26-손바닥-제스처-촬영)
 
 ---
 
@@ -166,6 +168,7 @@
 | `/admin/devices/[id]` | `src/app/admin/(protected)/devices/[id]/page.tsx` | 디바이스 편집 |
 | `/admin/images` | `src/app/admin/(protected)/images/page.tsx` | 배경/프레임/스티커 이미지 관리 |
 | `/admin/images/upload` | `src/app/admin/(protected)/images/upload/page.tsx` | 이미지 업로드 |
+| `/admin/theme-setting` | `src/app/admin/(protected)/theme-setting/page.tsx` | 테마 관리 — 서비스 화면 배경화면(wallpaper)·글자색 (§25 참고) |
 | `/admin/print-setting` | `src/app/admin/(protected)/print-setting/page.tsx` | 인쇄 레이아웃 치수 설정 |
 | `/admin/capture-setting` | `src/app/admin/(protected)/capture-setting/page.tsx` | 촬영/배경 제거 설정 (§12, §23 참고) |
 | `/admin/timer-setting` | `src/app/admin/(protected)/timer-setting/page.tsx` | 유휴·촬영·인화 타이머 설정 |
@@ -262,7 +265,7 @@
   4. 서브 모니터 동기화 (활성 시 `/api/camera-frame` POST)
   5. 카운트다운 타이머 표시
 - **촬영 시퀀스**:
-  - 자동 타이머 경과 또는 사용자 클릭
+  - 자동 타이머 경과, 사용자 클릭, 또는 **손바닥 제스처**(§26) 중 하나로 시작
   - 카운트다운 (`captureSeconds`초) — 매 초 비프음(Web Audio 합성), 촬영 순간 셔터음(`shutter.wav`) 재생 (`src/lib/sounds.ts`)
   - 캔버스 스냅샷 저장 (data URL)
   - 중간 프레임도 `intermediateFrames[photoIndex][]`에 저장
@@ -376,7 +379,7 @@ useSceneSyncReceiver → BroadcastChannel.onmessage(state)   ※ 레거시
 
 | 메서드 | 경로 | 설명 |
 |--------|------|------|
-| GET | `/api/image/list/[imageType]` | 이미지 목록 (1=촬영 배경, 2=프레임/인쇄 배경, 3=스티커) |
+| GET | `/api/image/list/[imageType]` | 이미지 목록 (1=촬영 배경, 2=프레임/인쇄 배경, 3=스티커, 5=배경화면/테마) |
 | GET | `/api/images/url` | 이미지 베이스 URL (Supabase Storage) |
 | POST | `/api/admin/images/upload` | 이미지 업로드 (최대 50MB) |
 | DELETE | `/api/admin/images/[id]` | 이미지 삭제 |
@@ -462,7 +465,7 @@ useSceneSyncReceiver → BroadcastChannel.onmessage(state)   ※ 레거시
 |------|------|------|
 | id | Int (PK) | 자동 증가 |
 | deviceId | String? | Device 외래키 (null=전역) |
-| imageType | Int | 1=촬영 배경, 2=프레임(인쇄 배경), 3=스티커 |
+| imageType | Int | 1=촬영 배경, 2=프레임(인쇄 배경), 3=스티커, 5=배경화면(테마) |
 | filename | String | 파일명 |
 | width | Int? | 이미지 너비 (px) |
 | height | Int? | 이미지 높이 (px) |
@@ -472,10 +475,11 @@ useSceneSyncReceiver → BroadcastChannel.onmessage(state)   ※ 레거시
 
 | 필드 | 타입 | 설명 |
 |------|------|------|
-| id | Int (PK) | 1=배경, 2=프레임, 3=스티커 |
-| name | String | 카테고리 이름 (background/image/sticker) |
+| id | Int (PK) | 1=배경, 2=프레임, 3=스티커, 5=배경화면(wallpaper) |
+| name | String | 카테고리 이름 (background/image/sticker/wallpaper) |
 
 > 과거 `print_background`(id 4)는 프레임(id 2)으로 통합됨 — 클라이언트 인쇄 배경 = 프레임(type 2).
+> 테마 배경화면은 id 4 잔재와 충돌을 피해 **id 5(wallpaper)** 를 사용한다 (§25).
 
 **`AdminAccount`** - 관리자 계정
 
@@ -516,7 +520,7 @@ useSceneSyncReceiver → BroadcastChannel.onmessage(state)   ※ 레거시
 | `get_printers` | `Vec<String>` | Windows 프린터 목록 (PowerShell) |
 | `get_cameras` | `Vec<String>` | 연결된 카메라 목록 (PnP) |
 | `print_image(printer_name, image_data)` | `Result<bool, String>` | base64 JPEG 출력 (.NET PrintDocument) |
-| `mediapipe_is_installed` | `bool` | 필수 파일 **전체**(wasm 6개 + 모델)의 완전성 검사 (디버그 모드: 항상 true) |
+| `mediapipe_is_installed` | `bool` | 필수 파일 **전체**(wasm 6개 + 모델 2개: 세그멘터·제스처)의 완전성 검사 (디버그 모드: 항상 true) |
 | `download_mediapipe` | `Result<(), String>` | CDN에서 MediaPipe 다운로드 + `mediapipe-progress` 이벤트 발행. 임시 파일(`.download`)로 받은 뒤 rename하여 부분 다운로드 잔존 방지 |
 | `save_settings` | `Result<bool, String>` | `%APPDATA%\ar-pic\settings.json` 저장 |
 | `load_settings` | `Result<HashMap<String,String>, String>` | 설정 JSON 로드 |
@@ -888,7 +892,7 @@ PAYAPP_RETURN_URL      # 결제 완료 후 리다이렉트 URL
 
 ## 18. MediaPipe 다운로드 및 캐시
 
-### 다운로드 파일 목록 (v0.10.35, 총 7개)
+### 다운로드 파일 목록 (v0.10.35, 총 8개)
 
 | 파일 | 출처 | 크기(약) |
 |------|------|---------|
@@ -899,6 +903,7 @@ PAYAPP_RETURN_URL      # 결제 완료 후 리다이렉트 URL
 | `wasm/vision_wasm_nosimd_internal.js` | jsDelivr | ~800KB |
 | `wasm/vision_wasm_nosimd_internal.wasm` | jsDelivr | ~7MB |
 | `model/selfie_multiclass_256x256.tflite` | Google Storage | ~20MB |
+| `model/gesture_recognizer.task` | Google Storage | ~8MB (손바닥 촬영, §26) |
 
 ### 캐시 전략
 
@@ -907,14 +912,14 @@ PAYAPP_RETURN_URL      # 결제 완료 후 리다이렉트 URL
     ↓ mediapipe_is_installed() → false
     ↓ MediapipeLoader.tsx: 다운로드 UI 표시
     ↓ download_mediapipe() Rust 명령어
-    ↓ 7개 파일 순차 다운로드 (파일별 {이름}.download 임시 파일 → 성공 시 rename)
+    ↓ 8개 파일 순차 다운로드 (파일별 {이름}.download 임시 파일 → 성공 시 rename)
     ↓ %LOCALAPPDATA%\ar-pic\mediapipe\ 에 저장
     ↓ server\ 디렉토리에 복사
     ↓ 임베디드 Node 서버(node.exe) 재시작 후 포트 응답 대기
 
 이후 실행
     ↓ prepare_server_dir(): server\ 쪽 파일이 불완전하면 캐시에서 재복사
-    ↓ mediapipe_is_installed() → 필수 7개 파일 전체 존재 시에만 true
+    ↓ mediapipe_is_installed() → 필수 8개 파일 전체 존재 시에만 true
     ↓ 다운로드 UI 스킵
 ```
 
@@ -1014,6 +1019,7 @@ MediaPipe WASM 4종 + 모델 1종
 | `PRINTER_NAME` | "" | 출력 프린터 (비우면 기본 프린터) |
 | `MODE_2_2_WIDTH` | — | 2×2 모드 사진 슬롯 너비 (cm) |
 | `MODE_2_2_HEIGHT` | — | 2×2 모드 사진 슬롯 높이 (cm) |
+| `THEME_TEXT_COLOR` | "#ffffff" | 서비스 화면 글자색 (테마 관리, §25) |
 
 ---
 
@@ -1189,6 +1195,57 @@ npm run tauri:build
   표시), 개발용 버튼, 장치 진단 문자열.
 - 프레임 라벨(`1컷` 등)은 `frame.cut` 키 + 슬롯 수 파라미터로 생성
   (예: en `4-Cut`, ja `4カット`, zh `4格`).
+
+---
+
+## 25. 테마 관리 (배경화면 / 글자색)
+
+관리자 **테마 관리** 페이지(`/admin/theme-setting`)에서 서비스(키오스크) 화면의
+배경화면 이미지와 글자색을 설정한다. 관리자 UI에는 적용되지 않고 `/service`에만 적용된다.
+
+### 배경화면 (wallpaper)
+
+- 이미지 타입 **id 5(wallpaper)** 로 저장 — 기존 이미지 업로드/목록/삭제 API를 그대로 재사용
+  (`/api/admin/images/upload`, `/api/image/list/5/`, `DELETE /api/admin/images/[id]`).
+- **한 장만 유지**: 새 이미지 업로드 시 기존 wallpaper를 먼저 삭제한다.
+- `deviceIds: []`(모든 디바이스)로 업로드 → 어느 디바이스에서든 노출.
+- `useDeviceSetup`이 type 5 목록의 첫 항목을 `wallpaperUrl`로 노출하고,
+  service 페이지 루트 `<div>`의 `background-image`(cover)로 적용. 미설정 시 기본 `#2a2a2a`.
+
+### 글자색
+
+- 전역 설정 `THEME_TEXT_COLOR`(기본 `#ffffff`)로 저장 (§20).
+- service 루트에 `service-theme` 클래스 + `--theme-text` CSS 변수를 내리고,
+  `globals.css`의 `.service-theme .text-white`(및 `/90`~`/30` 투명도 변형, `color-mix`로 톤 유지)
+  규칙이 **본문 흰색 텍스트**를 테마색으로 치환한다 (규칙이 레이어 밖이라 Tailwind 유틸보다 우선).
+- **제외 대상(대비 안전)**: 자체 배경색을 가진 버튼 — 흰 배경·어두운 글자의 `.service-button`,
+  색 버튼의 인라인 흰 글자는 그대로 둔다.
+
+### DB 준비
+
+- ImageType `id 5`와 `THEME_TEXT_COLOR` 기본값은 `prisma/seed.ts`에 포함.
+- 운영 DB에는 전체 seed(가드 `SEED_FORCE`) 대신 멱등 스크립트 사용:
+  `npm run db:add-theme` (`prisma/add-theme-wallpaper.ts`) — 이 2개 행만 안전하게 추가.
+
+---
+
+## 26. 손바닥 제스처 촬영
+
+촬영 단계(`CameraSection`)에서 카메라에 **손바닥을 펼쳐 보이면**(Open_Palm) "촬영하기"
+버튼을 누른 것과 동일하게(`handleManualCapture`) 촬영이 시작된다.
+
+- **인식기**: MediaPipe `GestureRecognizer`(배경제거용 `ImageSegmenter`와 동일한
+  `@mediapipe/tasks-vision` 패키지·WASM 파일셋 재사용). 모델은 `model/gesture_recognizer.task`(§18).
+- **배경 제거 모드와 무관하게 항상 동작**하며, 인식기 초기화 실패 시 제스처 촬영만 비활성
+  (버튼 촬영은 정상).
+- **판정 로직**(별도 rAF 루프):
+  - 추론은 200ms 간격으로 스로틀 (세그멘터와 동시 구동 부하 완화).
+  - `Open_Palm` 신뢰도 ≥ 0.6이 **HOLD_MS(500ms) 이상 유지**되면 발동 (순간 오탐 방지).
+  - **엣지 트리거**: 한 번 촬영하면 손을 내렸다(비-손바닥 프레임) 다시 펴야 재발동.
+    촬영 중(countdown)에는 `capturePhoto` 내부 가드가 재트리거를 막는다.
+- **튜닝 상수**(`CameraSection.tsx` 감지 루프): `HOLD_MS`, `MIN_SCORE`, `GESTURE_INTERVAL_MS`.
+- **성능**: `mediapipe` 배경 모드에서는 세그멘터+제스처 추론이 함께 돌아 부하가 증가하므로
+  프레임 드롭 시 `GESTURE_INTERVAL_MS`를 올린다.
 
 ---
 

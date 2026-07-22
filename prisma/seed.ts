@@ -35,7 +35,15 @@ async function main() {
   // 구 print_background(id 4)는 프레임(id 2)으로 통합되어 더 이상 생성하지 않는다.
   // 기존 DB의 type 4 데이터는 prisma/merge-print-background-to-frame.ts 로 이전한다.
 
-  console.log("Created image types:", { backgroundType, imageType, stickerType });
+  // 테마관리용 배경화면(wallpaper) — 키오스크 서비스 화면 전체 배경. id 4는
+  // 구 print_background 잔재와 충돌할 수 있어 id 5를 사용한다.
+  const wallpaperType = await prisma.imageType.upsert({
+    where: { id: 5 },
+    update: {},
+    create: { id: 5, name: "wallpaper" },
+  });
+
+  console.log("Created image types:", { backgroundType, imageType, stickerType, wallpaperType });
 
   // Create default admin account
   const hashedPassword = await bcrypt.hash("admin", 10);
@@ -105,6 +113,7 @@ async function main() {
     { name: "PICTURE_WIDTH", value: "10", description: "인화 가로 크기(cm)" },
     { name: "PICTURE_HEIGHT", value: "15", description: "인화 세로 크기(cm)" },
     { name: "CAPTURE_MODES", value: "1x1,2x1,2x2", description: "지원 프레임" },
+    { name: "THEME_TEXT_COLOR", value: "#ffffff", description: "테마 글자 색상 (서비스 화면)" },
   ];
 
   for (const setting of globalSettings) {

@@ -50,6 +50,8 @@ export interface DeviceConfig {
   segmentThreshold: number;
   /** AI 배경제거 경계 부드러움 (0-100%). 낮을수록 경계가 더 또렷하게 잘린다. */
   segmentFeather: number;
+  /** 테마 글자 색상 (서비스 화면). 미설정 시 #ffffff. */
+  themeTextColor: string;
 }
 
 export interface BGImage {

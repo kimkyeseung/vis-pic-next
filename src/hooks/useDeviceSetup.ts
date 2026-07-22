@@ -18,6 +18,7 @@ const DEFAULT_CONFIG: DeviceConfig = {
   printAutoTimerSeconds: 30,
   segmentThreshold: 15,
   segmentFeather: 35,
+  themeTextColor: "#ffffff",
 };
 
 export function useDeviceSetup(deviceId: string) {
@@ -26,6 +27,7 @@ export function useDeviceSetup(deviceId: string) {
   const [printBgImages, setPrintBgImages] = useState<BGImage[]>([]);
   const [imageBaseUrl, setImageBaseUrl] = useState<string>("");
   const [printSettings, setPrintSettings] = useState<Record<string, string>>({});
+  const [wallpaperUrl, setWallpaperUrl] = useState<string | null>(null);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -81,6 +83,7 @@ export function useDeviceSetup(deviceId: string) {
           printAutoTimerSeconds: parseIntSafe(s.PRINT_AUTO_TIMER || "", 30),
           segmentThreshold: clampPercent(parseIntSafe(s.CAPTURE_THRESHOLD || "", 15)),
           segmentFeather: clampPercent(parseIntSafe(s.CAPTURE_SMOOTHNESS || "", 35), 1),
+          themeTextColor: s.THEME_TEXT_COLOR || "#ffffff",
         });
       } catch (err) {
         if ((err as Error).name === "AbortError") return;
@@ -135,12 +138,37 @@ export function useDeviceSetup(deviceId: string) {
       }
     }
 
+    // 테마 배경화면(wallpaper, imageType 5) — 서비스 화면 전체 배경.
+    // 여러 장 있으면 priority 최상위(목록 첫 항목) 한 장만 사용한다.
+    async function loadWallpaper(id: string, attempt = 0) {
+      const MAX_RETRIES = 5;
+      const retry = () => {
+        if (signal.aborted || attempt >= MAX_RETRIES) return;
+        const timer = setTimeout(() => loadWallpaper(id, attempt + 1), 3000);
+        signal.addEventListener("abort", () => clearTimeout(timer), { once: true });
+      };
+      try {
+        const res = await fetch(`/api/image/list/5/?device_id=${id}`, {
+          signal,
+          cache: "no-store",
+        });
+        if (!res.ok) { retry(); return; }
+        const data = await res.json();
+        const first = data.images?.[0];
+        setWallpaperUrl(first && data.baseUrl ? `${data.baseUrl}/${first.filename}` : null);
+      } catch (err) {
+        if ((err as Error).name === "AbortError") return;
+        retry();
+      }
+    }
+
     loadSettings(deviceId);
     loadBackgrounds(deviceId);
     loadPrintBackgrounds(deviceId);
+    loadWallpaper(deviceId);
 
     return () => controller.abort();
   }, [deviceId]);
 
-  return { config, backgroundImages, printBgImages, imageBaseUrl, printSettings };
+  return { config, backgroundImages, printBgImages, imageBaseUrl, printSettings, wallpaperUrl };
 }

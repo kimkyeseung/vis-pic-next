@@ -18,6 +18,21 @@ body {
   color: #ffffff;
 }
 
+/* 테마 글자색: 서비스 화면(.service-theme) 내부의 흰색 본문 텍스트를 관리자가 지정한
+   색(--theme-text)으로 치환한다. 미설정 시 #ffffff 폴백.
+   자체 배경색을 가진 요소(예: 흰 배경의 .service-button = 어두운 글자, 색 버튼의 인라인
+   흰 글자)는 대상에서 제외 — text-white 유틸을 쓰는 본문 텍스트만 대상으로 한다.
+   규칙이 레이어 밖(unlayered)이라 Tailwind의 레이어드 text-white 유틸보다 항상 우선한다. */
+.service-theme { color: var(--theme-text, #ffffff); }
+.service-theme .text-white { color: var(--theme-text, #ffffff); }
+.service-theme .text-white\/90 { color: color-mix(in oklab, var(--theme-text, #ffffff) 90%, transparent); }
+.service-theme .text-white\/80 { color: color-mix(in oklab, var(--theme-text, #ffffff) 80%, transparent); }
+.service-theme .text-white\/70 { color: color-mix(in oklab, var(--theme-text, #ffffff) 70%, transparent); }
+.service-theme .text-white\/60 { color: color-mix(in oklab, var(--theme-text, #ffffff) 60%, transparent); }
+.service-theme .text-white\/50 { color: color-mix(in oklab, var(--theme-text, #ffffff) 50%, transparent); }
+.service-theme .text-white\/40 { color: color-mix(in oklab, var(--theme-text, #ffffff) 40%, transparent); }
+.service-theme .text-white\/30 { color: color-mix(in oklab, var(--theme-text, #ffffff) 30%, transparent); }
+
 /* 스크롤바 숨기기 */
 ::-webkit-scrollbar {
   display: none;

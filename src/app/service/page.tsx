@@ -26,7 +26,7 @@ function ServiceContent() {
   const deviceId = searchParams.get("device") || "test";
   const [preflightDone, setPreflightDone] = useState(false);
 
-  const { config, backgroundImages, printBgImages, imageBaseUrl, printSettings } = useDeviceSetup(deviceId);
+  const { config, backgroundImages, printBgImages, imageBaseUrl, printSettings, wallpaperUrl } = useDeviceSetup(deviceId);
   const flow = usePhotoFlow(deviceId, config);
   const { monitors, syncEnabled, setSyncEnabled, selectedMonitorIndex, setSelectedMonitorIndex } = useTauriMonitor();
   const { idleRemaining, clearIdleTimer } = useIdleTimer(
@@ -89,8 +89,23 @@ function ServiceContent() {
   const maxCaptures = slotsNeeded * config.captureCount;
   const showTimer = currentStep !== "start" && currentStep !== "camera" && currentStep !== "payment" && currentStep !== "complete" && idleRemaining !== null && config.idleTimeoutSeconds > 0;
 
+  // 테마관리에서 설정한 배경화면/글자색을 서비스 화면 전체에 적용 (어드민 화면에는 미적용).
+  // 글자색은 --theme-text 변수로 내려 globals.css의 .service-theme 규칙이 본문 흰 텍스트를 치환한다.
+  // 배경화면 미설정 시 globals.css의 기본 배경(#2a2a2a)이 그대로 비쳐 보인다.
+  const themeStyle: React.CSSProperties = {
+    ...(config.themeTextColor ? { ["--theme-text"]: config.themeTextColor } : {}),
+    ...(wallpaperUrl
+      ? {
+          backgroundImage: `url(${wallpaperUrl})`,
+          backgroundSize: "cover",
+          backgroundPosition: "center",
+          backgroundRepeat: "no-repeat",
+        }
+      : {}),
+  } as React.CSSProperties;
+
   return (
-    <div className="w-full h-screen overflow-hidden relative">
+    <div className="service-theme w-full h-screen overflow-hidden relative" style={themeStyle}>
       {showTimer && (
         <CircularTimer value={idleRemaining!} total={config.idleTimeoutSeconds} testId="page-idle-timer" />
       )}
