@@ -28,7 +28,7 @@ export default function MediapipeLoader({ children }: { children: React.ReactNod
         }
 
         setStatus("downloading");
-        setProgress({ done: 0, total: 7 });
+        setProgress({ done: 0, total: 8 });
 
         const { listen } = await import("@tauri-apps/api/event");
         unlisten = await listen<{ done: number; total: number }>("mediapipe-progress", (e) => {

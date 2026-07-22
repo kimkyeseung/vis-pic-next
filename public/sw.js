@@ -13,6 +13,7 @@ const STATIC_ASSETS = [
   "/static/mediapipe/wasm/vision_wasm_nosimd_internal.js",
   "/static/mediapipe/wasm/vision_wasm_nosimd_internal.wasm",
   "/static/mediapipe/model/selfie_multiclass_256x256.tflite",
+  "/static/mediapipe/model/gesture_recognizer.task",
 ];
 
 self.addEventListener("install", (event) => {

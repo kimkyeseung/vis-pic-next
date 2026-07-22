@@ -90,6 +90,10 @@ export function CameraSection({
   const cameraStreamRef = useRef<MediaStream | null>(null);
   const frameChannelRef = useFrameSender(syncEnabled);
   const lastFrameSentRef = useRef(0);
+  // 손바닥(Open_Palm) 제스처 인식기 + 최신 촬영 핸들러 참조 (감지 루프가 재생성 없이 호출)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const gestureRef = useRef<any>(null);
+  const handleManualCaptureRef = useRef<() => void>(() => {});
 
   type TouchGesture =
     | { mode: "drag"; stickerId: string; touchId: number; ox: number; oy: number; startX: number; startY: number; didMove: boolean }
@@ -196,6 +200,88 @@ export function CameraSection({
       lastInferenceTimeRef.current = 0;
     };
   }, [bgRemovalMode]);
+
+  // 손바닥(Open_Palm) 제스처 인식기 초기화 — 배경 제거 모드와 무관하게 항상 동작.
+  // 배경제거용 ImageSegmenter와 같은 tasks-vision 패키지·WASM 파일셋을 재사용한다.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      // WASM 초기화 중 내부 stdout/stderr 로그 억제 (세그멘터 init과 동일 처리)
+      const noop = () => {};
+      const origLog = console.log, origInfo = console.info, origWarn = console.warn;
+      console.log = noop; console.info = noop; console.warn = noop;
+      try {
+        const { FilesetResolver, GestureRecognizer } = await import("@mediapipe/tasks-vision");
+        if (cancelled) return;
+        const vision = await FilesetResolver.forVisionTasks("/static/mediapipe/wasm");
+        if (cancelled) return;
+        const recognizer = await GestureRecognizer.createFromOptions(vision, {
+          baseOptions: { modelAssetPath: "/static/mediapipe/model/gesture_recognizer.task" },
+          runningMode: "VIDEO",
+          numHands: 1,
+        });
+        if (cancelled) { recognizer.close(); return; }
+        gestureRef.current = recognizer;
+      } catch {
+        // 초기화 실패 시 제스처 촬영만 비활성 — 버튼 촬영은 그대로 동작
+      } finally {
+        console.log = origLog; console.info = origInfo; console.warn = origWarn;
+      }
+    })();
+    return () => {
+      cancelled = true;
+      gestureRef.current?.close();
+      gestureRef.current = null;
+    };
+  }, []);
+
+  // 손바닥을 펼쳐 보이면 "촬영하기" 버튼 클릭과 동일하게 촬영을 트리거한다.
+  // - 세그멘터와 동시 구동 부하를 줄이려 추론은 스로틀링.
+  // - HOLD_MS 이상 유지돼야 발동(순간 오탐 방지).
+  // - 한 번 촬영하면 손을 내렸다(비-손바닥 프레임) 다시 펴야 재발동(연속 오발 방지).
+  //   촬영 중(countdown)에는 capturePhoto 내부 가드가 재트리거를 막는다.
+  useEffect(() => {
+    let raf = 0;
+    const GESTURE_INTERVAL_MS = 200;
+    const HOLD_MS = 500;
+    const MIN_SCORE = 0.6;
+    let lastInfer = 0;
+    let palmSince = 0;
+    let armed = true;
+
+    const tick = () => {
+      raf = requestAnimationFrame(tick);
+      const recognizer = gestureRef.current;
+      const video = videoRef.current;
+      if (!recognizer || !video || video.readyState < 2 || !video.videoWidth) return;
+      const now = performance.now();
+      if (now - lastInfer < GESTURE_INTERVAL_MS) return;
+      lastInfer = now;
+
+      let isPalm = false;
+      try {
+        const res = recognizer.recognizeForVideo(video, now);
+        const g = res.gestures?.[0]?.[0];
+        isPalm = g?.categoryName === "Open_Palm" && g.score >= MIN_SCORE;
+      } catch {
+        return;
+      }
+
+      if (isPalm) {
+        if (palmSince === 0) palmSince = now;
+        if (armed && now - palmSince >= HOLD_MS) {
+          armed = false;
+          handleManualCaptureRef.current();
+        }
+      } else {
+        palmSince = 0;
+        armed = true;
+      }
+    };
+
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, []);
 
   const drawBackground = useCallback((ctx: CanvasRenderingContext2D, w: number, h: number) => {
     if (bgSourceRef.current) {
@@ -619,6 +705,9 @@ export function CameraSection({
     setAutoTimer(null);
     capturePhoto();
   }, [capturePhoto]);
+
+  // 제스처 감지 루프가 최신 촬영 핸들러를 참조하도록 유지 (루프 재생성 없이)
+  useEffect(() => { handleManualCaptureRef.current = handleManualCapture; }, [handleManualCapture]);
 
   const addSticker = useCallback((opts: { emoji?: string; src?: string }) => {
     const newSticker: Sticker = {

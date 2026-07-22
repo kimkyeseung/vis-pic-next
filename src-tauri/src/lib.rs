@@ -85,14 +85,17 @@ const MEDIAPIPE_FILES: &[(&str, &str)] = &[
     ("wasm/vision_wasm_nosimd_internal.js",   "wasm/vision_wasm_nosimd_internal.js"),
     ("wasm/vision_wasm_nosimd_internal.wasm", "wasm/vision_wasm_nosimd_internal.wasm"),
     ("model/selfie_multiclass_256x256.tflite", ""),  // 두 번째 필드는 미사용 (아래에서 URL 직접 구성)
+    ("model/gesture_recognizer.task", ""),           // 손바닥(Open_Palm) 제스처 촬영용
 ];
 
 fn mediapipe_url(rel_path: &str) -> String {
     if rel_path.starts_with("wasm/") {
         let file = rel_path.strip_prefix("wasm/").unwrap_or(rel_path);
         format!("https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@{}/wasm/{}", MEDIAPIPE_VERSION, file)
+    } else if rel_path.ends_with("gesture_recognizer.task") {
+        "https://storage.googleapis.com/mediapipe-models/gesture_recognizer/gesture_recognizer/float16/latest/gesture_recognizer.task".to_string()
     } else {
-        // model
+        // selfie 세그멘테이션 모델
         "https://storage.googleapis.com/mediapipe-models/image_segmenter/selfie_multiclass_256x256/float32/latest/selfie_multiclass_256x256.tflite".to_string()
     }
 }
