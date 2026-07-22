@@ -19,6 +19,8 @@ export function usePhotoFlow(deviceId: string, config: DeviceConfig) {
   const [preparedGifUrl, setPreparedGifUrl] = useState<string | null>(null);
   const [preparedExpiryDate, setPreparedExpiryDate] = useState<string | null>(null);
   const [isPreparingComplete, setIsPreparingComplete] = useState(false);
+  // 결제 화면에서 고른 인쇄 매수 — 인화 단계에서 이 수만큼 출력한다.
+  const [printQuantity, setPrintQuantity] = useState(1);
 
   const slotsNeeded = selectedFrame ? FRAME_INFO[selectedFrame]?.count || 1 : 1;
 
@@ -41,6 +43,7 @@ export function usePhotoFlow(deviceId: string, config: DeviceConfig) {
         if (s.photos?.length > 0) setPhotos(s.photos);
         if (s.intermediateFrames?.length > 0) setIntermediateFrames(s.intermediateFrames);
         if (s.selectedPhotos?.length > 0) setSelectedPhotos(s.selectedPhotos);
+        if (typeof s.printQuantity === "number" && s.printQuantity > 0) setPrintQuantity(s.printQuantity);
       } catch {
         // ignore parse errors
       }
@@ -62,11 +65,12 @@ export function usePhotoFlow(deviceId: string, config: DeviceConfig) {
         photos,
         intermediateFrames,
         selectedPhotos,
+        printQuantity,
       }));
     } catch {
       // sessionStorage full or unavailable
     }
-  }, [currentStep, deviceId, orderId, selectedFrame, selectedBackground, selectedPrintBg, photos, intermediateFrames, selectedPhotos]);
+  }, [currentStep, deviceId, orderId, selectedFrame, selectedBackground, selectedPrintBg, photos, intermediateFrames, selectedPhotos, printQuantity]);
 
   const goToStep = (step: Step) => setCurrentStep(step);
 
@@ -94,6 +98,7 @@ export function usePhotoFlow(deviceId: string, config: DeviceConfig) {
     setPreparedExpiryDate(null);
     setIsPreparingComplete(false);
     setStickers([]);
+    setPrintQuantity(1);
     try { sessionStorage.removeItem(SESSION_KEY); } catch {}
   };
 
@@ -210,6 +215,7 @@ export function usePhotoFlow(deviceId: string, config: DeviceConfig) {
     stickers, setStickers,
     intermediateFrames,
     selectedPhotos, setSelectedPhotos,
+    printQuantity, setPrintQuantity,
     compositeImage, setCompositeImage,
     preparedPhotoUrl,
     preparedGifUrl,

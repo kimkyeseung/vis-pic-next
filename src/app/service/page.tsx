@@ -138,6 +138,7 @@ function ServiceContent() {
       {preflightDone && currentStep === "start" && (
         <StartSection
           onNext={flow.handleStart}
+          showLanguage={!config.paymentEnabled}
           monitors={monitors}
           syncEnabled={syncEnabled}
           selectedMonitorIndex={selectedMonitorIndex}
@@ -150,6 +151,8 @@ function ServiceContent() {
           config={config}
           orderId={flow.orderId}
           setOrderId={flow.setOrderId}
+          printQuantity={flow.printQuantity}
+          setPrintQuantity={flow.setPrintQuantity}
           onNext={() => flow.goToStep("frame")}
           onPrev={flow.resetAll}
         />
@@ -249,6 +252,7 @@ function ServiceContent() {
           selectedBackground={selectedBackground}
           backgroundImages={backgroundImages}
           imageBaseUrl={imageBaseUrl}
+          printQuantity={flow.printQuantity}
           compositeImage={flow.compositeImage}
           setCompositeImage={flow.setCompositeImage}
           intermediateFrames={flow.intermediateFrames}

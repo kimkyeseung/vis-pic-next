@@ -1,12 +1,13 @@
 import { useState, useEffect } from "react";
 import type { DeviceConfig, BGImage } from "@/types";
-import { parseIntSafe, parseBgRemovalMode, parsePaymentTerminalMode, parseCaptureModes, clampPercent } from "@/lib/deviceConfig";
+import { parseIntSafe, parseBgRemovalMode, parsePaymentTerminalMode, parseCaptureModes, parseQuantityOptions, clampPercent } from "@/lib/deviceConfig";
 
 const DEFAULT_CONFIG: DeviceConfig = {
   deviceId: "test",
   deviceName: "테스트 장치",
   paymentEnabled: false,
   paymentAmount: 1000,
+  paymentQuantityOptions: [1, 2, 4],
   paymentTerminalMode: "payapp_lite",
   captureSeconds: 3,
   captureCount: 4,
@@ -72,6 +73,7 @@ export function useDeviceSetup(deviceId: string) {
           deviceName: deviceData.device?.name || id,
           paymentEnabled: s.PAYMENT_ENABLED === "1",
           paymentAmount: parseIntSafe(s.PAYMENT_AMOUNT || "", 1000),
+          paymentQuantityOptions: parseQuantityOptions(s.PAYMENT_QUANTITY_OPTIONS || "1,2,4"),
           paymentTerminalMode,
           captureSeconds: parseIntSafe(s.CAPTURE_SECONDS || "", 3),
           captureCount,

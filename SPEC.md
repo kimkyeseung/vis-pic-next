@@ -222,9 +222,13 @@
 ### Step 2: PAYMENT (조건부)
 
 - `config.paymentEnabled === false`이면 자동 스킵
-- **Manual 모드**: 사용자가 결제 완료 버튼 누르면 진행
+- **인쇄 매수 선택**: `PAYMENT_QUANTITY_OPTIONS`(예: 1,2,4) 카드 중 선택 →
+  **총액 = `PAYMENT_AMOUNT`(장당 금액) × 선택 수량**, 하단에 선택 총액 실시간 표시.
+  선택한 매수는 `usePhotoFlow.printQuantity`에 저장되어 인화 단계에서 그 수만큼 출력된다(§16).
+- **언어 선택**: 언어 버튼이 이 화면에 있다(결제 비활성 시에는 시작 화면에 표시 — §24).
+- **Manual 모드**: 결제하기 → 결제 완료로 간주하고 진행
 - **PayApp Lite 모드**:
-  1. `POST /api/payments/request` → orderId + payUrl 반환
+  1. `POST /api/payments/request`(amount = 선택 총액) → orderId + payUrl 반환
   2. 사용자가 PayApp 단말 UI에서 카드 결제
   3. PayApp이 `POST /api/payments/feedback` 콜백 전송
   4. 앱이 `GET /api/payments/status/{orderId}` 2초 간격 폴링 (최대 300초)
@@ -519,7 +523,7 @@ useSceneSyncReceiver → BroadcastChannel.onmessage(state)   ※ 레거시
 | `close_camera_window` | `void` | 서브 윈도우 닫기 |
 | `get_printers` | `Vec<String>` | Windows 프린터 목록 (PowerShell) |
 | `get_cameras` | `Vec<String>` | 연결된 카메라 목록 (PnP) |
-| `print_image(printer_name, image_data)` | `Result<bool, String>` | base64 JPEG 출력 (.NET PrintDocument) |
+| `print_image(printer_name, image_data, copies)` | `Result<bool, String>` | base64 JPEG 출력 (.NET PrintDocument). `copies`(1~99, 기본 1)만큼 인쇄 — 결제 화면 선택 매수 |
 | `mediapipe_is_installed` | `bool` | 필수 파일 **전체**(wasm 6개 + 모델 2개: 세그멘터·제스처)의 완전성 검사 (디버그 모드: 항상 true) |
 | `download_mediapipe` | `Result<(), String>` | CDN에서 MediaPipe 다운로드 + `mediapipe-progress` 이벤트 발행. 임시 파일(`.download`)로 받은 뒤 rename하여 부분 다운로드 잔존 방지 |
 | `save_settings` | `Result<bool, String>` | `%APPDATA%\ar-pic\settings.json` 저장 |
@@ -847,12 +851,18 @@ open_camera_window(x, y, width, height)
    - `System.Drawing.Image`로 이미지 로드
    - 가로(width > height) / 세로 자동 감지
    - `PrintDocument` + `CenterImage` 여백 설정
+   - `PrinterSettings.Copies = copies` — 결제 화면 선택 매수만큼 출력
    - .NET 프린터 API 호출
 3. 임시 파일 정리
+
+> 브라우저 폴백(비 Tauri)에서는 무음 인쇄 환경에서 `window.print()`를 매수만큼 반복 호출한다.
 
 ---
 
 ## 17. 결제 시스템 (PayApp)
+
+> 결제 금액은 고정이 아니라 **`PAYMENT_AMOUNT`(장당 금액) × 결제 화면에서 고른 매수**로 계산된다(§5 Step 2).
+> 선택 매수는 인화 단계에서 실제 출력 매수로 쓰인다(§16).
 
 ### 결제 흐름
 
@@ -1011,7 +1021,8 @@ MediaPipe WASM 4종 + 모델 1종
 | `CHROMAKEY_MODE` | "mediapipe" | 배경 제거 모드 |
 | `CHROMAKEY_RGB` | "0,255,0" | 크로마키 색상 |
 | `PAYMENT_ENABLED` | "0" | 결제 활성화 |
-| `PAYMENT_AMOUNT` | "1000" | 결제 금액 (원) |
+| `PAYMENT_AMOUNT` | "1000" | 장당(1장) 금액 (원) — 총액 = 금액 × 선택 매수 |
+| `PAYMENT_QUANTITY_OPTIONS` | "1,2,4" | 결제 화면 인쇄 매수 옵션 (쉼표 구분). 미설정 시 코드 기본 1,2,4 |
 | `PAYMENT_TERMINAL_MODE` | "manual" | 결제 모드 |
 | `IDLE_TIMEOUT_SECONDS` | "30" | 자동 진행 타임아웃 |
 | `CAMERA_AUTO_TIMER` | "60" | 자동 촬영 타이머 (초) |

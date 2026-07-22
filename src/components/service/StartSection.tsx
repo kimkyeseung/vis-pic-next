@@ -5,6 +5,7 @@ import { LOCALES } from "@/i18n/translations";
 
 export function StartSection({
   onNext,
+  showLanguage = true,
   monitors,
   syncEnabled,
   selectedMonitorIndex,
@@ -12,6 +13,8 @@ export function StartSection({
   onMonitorIndexChange,
 }: {
   onNext: () => void;
+  // 결제 화면으로 언어 선택을 옮겼으므로, 결제 비활성(결제 화면 없음)일 때만 시작 화면에 표시한다.
+  showLanguage?: boolean;
   monitors: MonitorInfo[];
   syncEnabled: boolean;
   selectedMonitorIndex: number | null;
@@ -41,22 +44,24 @@ export function StartSection({
           {t("start.touch")}
         </button>
 
-        {/* 언어 선택 */}
-        <div className="flex gap-3 mt-12" onClick={(e) => e.stopPropagation()}>
-          {LOCALES.map(({ code, label }) => (
-            <button
-              key={code}
-              className={`px-6 py-3 rounded-full text-base font-semibold transition-all ${
-                lang === code
-                  ? "bg-white text-gray-900 shadow-lg"
-                  : "bg-white/10 text-white/60 hover:bg-white/20 hover:text-white"
-              }`}
-              onClick={() => setLang(code)}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
+        {/* 언어 선택 — 결제 화면으로 이동. 결제 비활성 시에만 여기 표시. */}
+        {showLanguage && (
+          <div className="flex gap-3 mt-12" onClick={(e) => e.stopPropagation()}>
+            {LOCALES.map(({ code, label }) => (
+              <button
+                key={code}
+                className={`px-6 py-3 rounded-full text-base font-semibold transition-all ${
+                  lang === code
+                    ? "bg-white text-gray-900 shadow-lg"
+                    : "bg-white/10 text-white/60 hover:bg-white/20 hover:text-white"
+                }`}
+                onClick={() => setLang(code)}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        )}
         <img src="/static/viswave_logo.png" className="mt-24 opacity-80" style={{ width: "200px" }} alt="Viswave" onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
       </div>
 

@@ -352,8 +352,11 @@ fn get_printers() -> Result<Vec<String>, String> {
 }
 
 #[tauri::command]
-fn print_image(printer_name: String, image_data: String) -> Result<bool, String> {
+fn print_image(printer_name: String, image_data: String, copies: Option<u32>) -> Result<bool, String> {
     use std::io::Write;
+
+    // 결제 화면에서 고른 인쇄 매수 (미지정 시 1장)
+    let copies = copies.unwrap_or(1).clamp(1, 99);
 
     let bytes = base64_decode(&image_data)?;
 
@@ -367,7 +370,7 @@ fn print_image(printer_name: String, image_data: String) -> Result<bool, String>
     }
 
     let temp_path_forward = temp_path_str.replace('\\', "/");
-    let result = print_file(&printer_name, &temp_path_forward);
+    let result = print_file(&printer_name, &temp_path_forward, copies);
 
     let _ = std::fs::remove_file(&temp_path);
 
@@ -402,7 +405,7 @@ fn base64_decode(input: &str) -> Result<Vec<u8>, String> {
     Ok(buf)
 }
 
-fn print_file(printer_name: &str, file_path: &str) -> Result<bool, String> {
+fn print_file(printer_name: &str, file_path: &str, copies: u32) -> Result<bool, String> {
     #[cfg(target_os = "windows")]
     {
         // Only set PrinterName when non-empty; empty string causes .NET to throw.
@@ -418,6 +421,7 @@ fn print_file(printer_name: &str, file_path: &str) -> Result<bool, String> {
             $img = [System.Drawing.Image]::FromFile("{}")
             $pd = New-Object System.Drawing.Printing.PrintDocument
             {}
+            $pd.PrinterSettings.Copies = {}
             if ($img.Width -gt $img.Height) {{
                 $pd.DefaultPageSettings.Landscape = $true
             }}
@@ -441,7 +445,8 @@ fn print_file(printer_name: &str, file_path: &str) -> Result<bool, String> {
             $img.Dispose()
             "#,
             file_path,
-            set_printer
+            set_printer,
+            copies
         );
 
         let output = Command::new("powershell")
@@ -461,7 +466,7 @@ fn print_file(printer_name: &str, file_path: &str) -> Result<bool, String> {
     #[cfg(not(target_os = "windows"))]
     {
         let output = Command::new("lp")
-            .args(["-d", printer_name, file_path])
+            .args(["-d", printer_name, "-n", &copies.to_string(), file_path])
             .output()
             .map_err(|e| e.to_string())?;
 

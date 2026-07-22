@@ -32,6 +32,7 @@ export function CompleteSection({
   preparedPhotoUrl,
   preparedGifUrl,
   preparedExpiryDate,
+  printQuantity = 1,
   onRestart,
 }: {
   photos: string[];
@@ -49,6 +50,8 @@ export function CompleteSection({
   preparedPhotoUrl?: string | null;
   preparedGifUrl?: string | null;
   preparedExpiryDate?: string | null;
+  /** 결제 화면에서 선택한 인쇄 매수. 이 수만큼 출력한다. */
+  printQuantity?: number;
   onRestart: () => void;
 }) {
   const { t } = useLanguage();
@@ -419,6 +422,8 @@ export function CompleteSection({
     if (!compositeImage) return;
     setPrintStatus("printing");
 
+    // 결제 화면에서 고른 매수만큼 출력 (최소 1장)
+    const copies = Math.max(1, Math.floor(printQuantity || 1));
     const isTauri = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
 
     if (isTauri) {
@@ -426,7 +431,7 @@ export function CompleteSection({
         const { invoke } = await import("@tauri-apps/api/core");
         const base64 = stripDataUriPrefix(compositeImage);
         const printerName = printSettings.PRINTER_NAME || "";
-        await invoke("print_image", { printerName, imageData: base64 });
+        await invoke("print_image", { printerName, imageData: base64, copies });
         setPrintStatus("done");
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
@@ -449,7 +454,8 @@ export function CompleteSection({
 
       document.head.appendChild(style);
       document.body.appendChild(container);
-      window.print();
+      // 브라우저 폴백: 무음 인쇄(kiosk-printing) 환경에서 매수만큼 반복 호출
+      for (let i = 0; i < copies; i++) window.print();
       document.head.removeChild(style);
       document.body.removeChild(container);
       setPrintStatus("done");

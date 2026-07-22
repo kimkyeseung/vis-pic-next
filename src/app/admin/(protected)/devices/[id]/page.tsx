@@ -93,7 +93,8 @@ export default function DeviceEditPage({
         { value: "0", label: "사용 안함" },
       ],
     },
-    { name: "PAYMENT_AMOUNT", label: "결제 금액 (원)", type: "number" },
+    { name: "PAYMENT_AMOUNT", label: "장당 금액 (원)", type: "number" },
+    { name: "PAYMENT_QUANTITY_OPTIONS", label: "인쇄 매수 옵션 (예: 1,2,4)", type: "text" },
     { name: "CAPTURE_SECONDS", label: "촬영 카운트다운 (초)", type: "number" },
     {
       name: "CAPTURE_COUNT_MODE",

@@ -36,7 +36,10 @@ export interface DeviceConfig {
   deviceId: string;
   deviceName: string;
   paymentEnabled: boolean;
+  /** 장당(1장) 금액. 결제 총액 = paymentAmount × 선택 수량. */
   paymentAmount: number;
+  /** 결제 화면에서 고를 수 있는 인쇄 매수 옵션 (예: [1, 2, 4]). */
+  paymentQuantityOptions: number[];
   paymentTerminalMode: PaymentTerminalMode;
   captureSeconds: number;
   captureCount: number;
