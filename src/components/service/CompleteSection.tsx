@@ -474,17 +474,20 @@ export function CompleteSection({
 
         {(printStatus === "ready" || printStatus === "done") && compositeImage && (
           <>
-            <h2 className="text-5xl font-extrabold text-white mb-6" style={{ textShadow: "0 2px 15px rgba(0,0,0,0.5)" }}>
+            <h2 className="text-5xl font-extrabold text-white mb-6 portrait:mb-4 animate-fadeInDown" style={{ textShadow: "0 2px 15px rgba(0,0,0,0.5)" }}>
               {printStatus === "done" ? t("complete.done") : t("complete.ready")}
             </h2>
 
-            <div className="flex items-start justify-center gap-12 mb-10">
-              <div className="rounded-2xl overflow-hidden" style={{ maxWidth: "500px", boxShadow: "0 20px 50px rgba(0,0,0,0.4)" }}>
-                <img src={compositeImage} alt="Composite" className="w-full" />
+            {/* 좌우 반반(12컬럼 6/6): 미리보기 | QR. 세로에선 상하 스택. */}
+            <div className="flex items-center justify-center gap-8 mb-10 w-full max-w-5xl portrait:flex-col portrait:items-center portrait:gap-6">
+              <div className="flex-1 flex justify-center min-w-0 portrait:w-full">
+                <div className="rounded-2xl overflow-hidden" style={{ maxWidth: "440px", boxShadow: "0 20px 50px rgba(0,0,0,0.4)" }}>
+                  <img src={compositeImage} alt="Composite" className="w-full" />
+                </div>
               </div>
 
               {(qrPhotoUrl || qrGifUrl) && (
-                <div className="flex flex-col items-center gap-6">
+                <div className="flex-1 flex flex-col items-center gap-6 min-w-0 portrait:w-full">
                   <div className="flex gap-6">
                     {qrPhotoUrl && (
                       <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-5 border border-white/20 text-center">
