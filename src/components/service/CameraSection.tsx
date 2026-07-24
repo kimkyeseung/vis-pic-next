@@ -68,12 +68,14 @@ export function CameraSection({
   const [countdown, setCountdown] = useState<number | null>(null);
   const [cameraError, setCameraError] = useState<{ key: MessageKey; reason?: string } | null>(null);
   const [flash, setFlash] = useState(false);
+  // 촬영 직후 촬영본을 0.5초간 프리뷰로 보여준다.
+  const [capturedPreview, setCapturedPreview] = useState<string | null>(null);
+  const capturedPreviewTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [segmenterStatus, setSegmenterStatus] = useState<"idle" | "loading" | "ready" | "error">("idle");
   const [segmenterError, setSegmenterError] = useState<string | null>(null);
   const [cameraDeviceDiag, setCameraDeviceDiag] = useState<string | null>(null);
   const [autoTimer, setAutoTimer] = useState<number | null>(null);
   const autoTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const [showStickerPicker, setShowStickerPicker] = useState(false);
   const [stickerTab, setStickerTab] = useState<"emoji" | "image">("emoji");
   const [dbStickerImages, setDbStickerImages] = useState<Array<{ id: number; filename: string; name: string }>>([]);
   const [draggingId, setDraggingId] = useState<string | null>(null);
@@ -620,6 +622,7 @@ export function CameraSection({
   useEffect(() => () => {
     captureTimersRef.current.forEach((t) => clearInterval(t));
     captureTimersRef.current = [];
+    if (capturedPreviewTimerRef.current) clearTimeout(capturedPreviewTimerRef.current);
   }, []);
 
   // 촬영 효과음 플레이어 (브라우저 전용 — 마운트 후 생성)
@@ -662,6 +665,10 @@ export function CameraSection({
         const dataUrl = snapshotWithStickers(0.92);
         if (dataUrl) {
           onCapture(dataUrl, frames);
+          // 촬영본 0.5초 프리뷰
+          setCapturedPreview(dataUrl);
+          if (capturedPreviewTimerRef.current) clearTimeout(capturedPreviewTimerRef.current);
+          capturedPreviewTimerRef.current = setTimeout(() => setCapturedPreview(null), 500);
         }
 
         // 촬영 순간 셔터음 재생 + 플래시
@@ -718,7 +725,6 @@ export function CameraSection({
       scale: 1,
     };
     onStickersChange([...stickers, newSticker]);
-    setShowStickerPicker(false);
   }, [stickers, onStickersChange]);
 
   const removeSticker = useCallback((id: string) => {
@@ -965,6 +971,11 @@ export function CameraSection({
               <canvas ref={stickerCanvasRef} className="camera-video absolute inset-0 pointer-events-none" />
             </>
           )}
+          {/* 촬영 직후 촬영본 0.5초 프리뷰 (카메라 위에 덮어씀) */}
+          {capturedPreview && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={capturedPreview} alt="captured" className="absolute inset-0 w-full h-full object-cover z-30 rounded-[17px]" />
+          )}
           {bgRemovalMode === "mediapipe" && segmenterStatus === "loading" && (
             <div className="absolute bottom-4 left-4 bg-black/70 text-white text-sm px-4 py-2 rounded-lg">
               {t("camera.aiLoading")}
@@ -1060,83 +1071,75 @@ export function CameraSection({
           &#128248; {t("camera.shoot")}
         </button>
 
-        {/* 스티커 버튼 */}
-        <div className="relative mb-4">
-          <button
-            className="w-full py-3 rounded-2xl text-sm font-medium transition-colors"
-            style={{ background: showStickerPicker ? "rgba(99,102,241,0.6)" : "rgba(255,255,255,0.1)", color: "#fff" }}
-            onClick={() => setShowStickerPicker((v) => !v)}
-          >
-            ✨ {t("camera.sticker")}
-          </button>
-          {showStickerPicker && (
-            <div className="absolute bottom-full mb-2 left-0 right-0 bg-black/80 border border-white/20 rounded-2xl p-3 backdrop-blur-sm">
-              {/* 탭 */}
-              <div className="flex gap-1 mb-3">
-                {(["emoji", "image"] as const).map((tab) => (
+        {/* 스티커 패널 (상시 노출) */}
+        <div className="flex-1 min-h-0 flex flex-col mb-4">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-white/80 text-sm font-semibold">✨ {t("camera.sticker")}</span>
+            {stickers.length > 0 && (
+              <button
+                className="text-xs text-white/40 hover:text-white/70 transition-colors"
+                onClick={() => onStickersChange([])}
+              >
+                {t("camera.clearStickers")}
+              </button>
+            )}
+          </div>
+
+          <div className="flex gap-1 mb-2">
+            {(["emoji", "image"] as const).map((tab) => (
+              <button
+                key={tab}
+                className={`flex-1 py-1 rounded-lg text-xs font-medium transition-colors ${stickerTab === tab ? "bg-white/20 text-white" : "text-white/50 hover:text-white/70"}`}
+                onClick={() => setStickerTab(tab)}
+              >
+                {tab === "emoji" ? t("camera.stickerEmoji") : t("camera.stickerImage")}
+              </button>
+            ))}
+          </div>
+
+          <div className="flex-1 min-h-0 overflow-y-auto bg-black/20 rounded-2xl p-2">
+            {stickerTab === "emoji" && (
+              <div className="grid grid-cols-4 gap-2">
+                {AVAILABLE_STICKERS.map((def) => (
                   <button
-                    key={tab}
-                    className={`flex-1 py-1 rounded-lg text-xs font-medium transition-colors ${stickerTab === tab ? "bg-white/20 text-white" : "text-white/50 hover:text-white/70"}`}
-                    onClick={() => setStickerTab(tab)}
+                    key={def.emoji}
+                    className="aspect-square flex items-center justify-center text-2xl rounded-xl hover:bg-white/20 transition-colors"
+                    onClick={() => addSticker({ emoji: def.emoji })}
+                    title={def.label}
                   >
-                    {tab === "emoji" ? t("camera.stickerEmoji") : t("camera.stickerImage")}
+                    {def.emoji}
                   </button>
                 ))}
               </div>
+            )}
 
-              {stickerTab === "emoji" && (
+            {stickerTab === "image" && (
+              dbStickerImages.length === 0 ? (
+                <p className="text-center text-white/40 text-xs py-4">
+                  {t("camera.noStickers")}
+                </p>
+              ) : (
                 <div className="grid grid-cols-4 gap-2">
-                  {AVAILABLE_STICKERS.map((def) => (
+                  {dbStickerImages.map((img) => (
                     <button
-                      key={def.emoji}
-                      className="aspect-square flex items-center justify-center text-2xl rounded-xl hover:bg-white/20 transition-colors"
-                      onClick={() => addSticker({ emoji: def.emoji })}
-                      title={def.label}
+                      key={img.id}
+                      className="aspect-square rounded-xl overflow-hidden hover:ring-2 hover:ring-white/50 transition-all bg-white/5"
+                      onClick={() => addSticker({ src: `${imageBaseUrl}/${img.filename}` })}
+                      title={img.name}
                     >
-                      {def.emoji}
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={`${imageBaseUrl}/${img.filename}`}
+                        alt={img.name}
+                        className="w-full h-full object-contain"
+                      />
                     </button>
                   ))}
                 </div>
-              )}
-
-              {stickerTab === "image" && (
-                dbStickerImages.length === 0 ? (
-                  <p className="text-center text-white/40 text-xs py-4">
-                    {t("camera.noStickers")}
-                  </p>
-                ) : (
-                  <div className="grid grid-cols-4 gap-2 max-h-40 overflow-y-auto">
-                    {dbStickerImages.map((img) => (
-                      <button
-                        key={img.id}
-                        className="aspect-square rounded-xl overflow-hidden hover:ring-2 hover:ring-white/50 transition-all bg-white/5"
-                        onClick={() => addSticker({ src: `${imageBaseUrl}/${img.filename}` })}
-                        title={img.name}
-                      >
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img
-                          src={`${imageBaseUrl}/${img.filename}`}
-                          alt={img.name}
-                          className="w-full h-full object-contain"
-                        />
-                      </button>
-                    ))}
-                  </div>
-                )
-              )}
-
-              {stickers.length > 0 && (
-                <button
-                  className="mt-2 w-full text-xs text-white/40 hover:text-white/70 transition-colors py-1"
-                  onClick={() => { onStickersChange([]); setShowStickerPicker(false); }}
-                >
-                  {t("camera.clearStickers")}
-                </button>
-              )}
-            </div>
-          )}
+              )
+            )}
+          </div>
         </div>
-
 
         <div className="mt-auto flex flex-col gap-3">
           <button className="service-button nav-button w-full" style={{ background: "rgba(255,255,255,0.1)", color: "#fff" }} onClick={onPrev}>
