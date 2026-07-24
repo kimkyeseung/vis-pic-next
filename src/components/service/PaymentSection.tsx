@@ -30,13 +30,14 @@ export function PaymentSection({
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const isManual = config.paymentTerminalMode === "manual";
-  const options = config.paymentQuantityOptions.length > 0 ? config.paymentQuantityOptions : [1];
+  const tiers = config.paymentTiers.length > 0 ? config.paymentTiers : [{ qty: 1, price: config.paymentAmount }];
 
-  // 선택 수량: 세션 복원값(printQuantity)이 옵션에 있으면 유지, 아니면 첫 옵션.
+  // 선택 티어: 세션 복원값(printQuantity)의 매수가 티어에 있으면 유지, 아니면 첫 티어.
   const [selectedQty, setSelectedQty] = useState<number>(
-    options.includes(printQuantity) ? printQuantity : options[0]
+    tiers.some((t) => t.qty === printQuantity) ? printQuantity : tiers[0].qty
   );
-  const totalAmount = selectedQty * config.paymentAmount;
+  const selectedTier = tiers.find((t) => t.qty === selectedQty) ?? tiers[0];
+  const totalAmount = selectedTier.price;
 
   const selectQty = (qty: number) => {
     setSelectedQty(qty);
@@ -147,26 +148,26 @@ export function PaymentSection({
             ))}
           </div>
 
-          {/* 수량 옵션 카드 */}
+          {/* 매수/가격 티어 카드 */}
           <div className="flex gap-6 justify-center flex-wrap mb-12">
-            {options.map((qty) => {
-              const selected = qty === selectedQty;
+            {tiers.map((tier) => {
+              const selected = tier.qty === selectedQty;
               return (
                 <button
-                  key={qty}
-                  onClick={() => selectQty(qty)}
+                  key={tier.qty}
+                  onClick={() => selectQty(tier.qty)}
                   className={`w-56 h-56 rounded-2xl flex flex-col items-center justify-center gap-2 transition-all duration-200 border-2 ${
                     selected
                       ? "bg-white border-white scale-[1.04] shadow-2xl"
                       : "border-white/20 hover:border-white/40"
                   }`}
-                  style={selected ? {} : { background: "rgba(105,108,180,0.85)" }}
+                  style={selected ? {} : { background: "var(--theme-primary, #6c6fb4)" }}
                 >
                   <span className={`text-5xl font-extrabold ${selected ? "text-[#4a4e8c]" : "text-white"}`}>
-                    {t("payment.sheets", { count: String(qty) })}
+                    {t("payment.sheets", { count: String(tier.qty) })}
                   </span>
                   <span className={`text-2xl font-bold ${selected ? "text-[#4a4e8c]" : "text-white/90"}`}>
-                    {t("payment.amount", { amount: fmt(qty * config.paymentAmount) })}
+                    {t("payment.amount", { amount: fmt(tier.price) })}
                   </span>
                 </button>
               );

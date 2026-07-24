@@ -4,8 +4,7 @@ import { useEffect, useState } from "react";
 
 const PAYMENT_FIELDS = [
   { name: "PAYMENT_ENABLED", label: "결제 사용", type: "select" as const, options: [{ value: "1", label: "사용" }, { value: "0", label: "사용 안함" }] },
-  { name: "PAYMENT_AMOUNT", label: "장당 금액 (원)", type: "number" as const, hint: "총 결제액 = 장당 금액 × 고객이 선택한 매수" },
-  { name: "PAYMENT_QUANTITY_OPTIONS", label: "인쇄 매수 옵션", type: "text" as const, hint: "결제 화면에 표시할 매수 목록. 쉼표로 구분 (예: 1,2,4)" },
+  { name: "PAYMENT_TIERS", label: "인쇄 매수/가격", type: "text" as const, hint: "매수별 개별 가격 티어. `수량:가격` 목록, 쉼표 구분 (예: 1:5000,2:9000,4:18000)" },
   { name: "PAYMENT_TERMINAL_MODE", label: "결제 방식", type: "select" as const, options: [{ value: "manual", label: "수동" }, { value: "payapp_lite", label: "PayApp Lite" }] },
 ];
 
@@ -87,7 +86,7 @@ export default function PaymentPage() {
                 </select>
               ) : (
                 <input
-                  type={field.type === "number" ? "number" : "text"}
+                  type="text"
                   value={settings[field.name] || ""}
                   onChange={(e) => update(field.name, e.target.value)}
                   className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white text-sm focus:outline-none focus:border-blue-500"

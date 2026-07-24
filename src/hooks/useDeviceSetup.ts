@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import type { DeviceConfig, BGImage } from "@/types";
-import { parseIntSafe, parseBgRemovalMode, parsePaymentTerminalMode, parseCaptureModes, parseQuantityOptions, clampPercent } from "@/lib/deviceConfig";
+import { parseIntSafe, parseBgRemovalMode, parsePaymentTerminalMode, parseCaptureModes, parseQuantityOptions, parsePaymentTiers, clampPercent } from "@/lib/deviceConfig";
 import { MAX_ACTIVE_BACKGROUNDS, LOGO_IMAGE_TYPE } from "@/constants/images";
 
 const DEFAULT_CONFIG: DeviceConfig = {
@@ -9,6 +9,11 @@ const DEFAULT_CONFIG: DeviceConfig = {
   paymentEnabled: false,
   paymentAmount: 1000,
   paymentQuantityOptions: [1, 2, 4],
+  paymentTiers: [
+    { qty: 1, price: 5000 },
+    { qty: 2, price: 9000 },
+    { qty: 4, price: 18000 },
+  ],
   paymentTerminalMode: "payapp_lite",
   captureSeconds: 3,
   captureCount: 4,
@@ -67,6 +72,13 @@ export function useDeviceSetup(deviceId: string) {
         setPrintSettings(s);
 
         const captureCount = parseIntSafe(s.CAPTURE_COUNT_UNIFORM || "", 4) || 4;
+        // 티어별 개별가: PAYMENT_TIERS 우선, 없으면 (장당 금액 × 매수 옵션)으로 폴백(하위호환)
+        const perSheet = parseIntSafe(s.PAYMENT_AMOUNT || "", 1000);
+        const quantityOptions = parseQuantityOptions(s.PAYMENT_QUANTITY_OPTIONS || "1,2,4");
+        const tiersFromSetting = parsePaymentTiers(s.PAYMENT_TIERS || "");
+        const paymentTiers = tiersFromSetting.length > 0
+          ? tiersFromSetting
+          : quantityOptions.map((qty) => ({ qty, price: qty * perSheet }));
         const modes = parseCaptureModes(s.CAPTURE_MODES || "1x1,2x2");
         const bgRemovalMode = parseBgRemovalMode(s.CHROMAKEY_MODE || "mediapipe");
         const paymentTerminalMode = parsePaymentTerminalMode(s.PAYMENT_TERMINAL_MODE || "payapp_lite");
@@ -75,8 +87,9 @@ export function useDeviceSetup(deviceId: string) {
           deviceId: id,
           deviceName: deviceData.device?.name || id,
           paymentEnabled: s.PAYMENT_ENABLED === "1",
-          paymentAmount: parseIntSafe(s.PAYMENT_AMOUNT || "", 1000),
-          paymentQuantityOptions: parseQuantityOptions(s.PAYMENT_QUANTITY_OPTIONS || "1,2,4"),
+          paymentAmount: perSheet,
+          paymentQuantityOptions: quantityOptions,
+          paymentTiers,
           paymentTerminalMode,
           captureSeconds: parseIntSafe(s.CAPTURE_SECONDS || "", 3),
           captureCount,
