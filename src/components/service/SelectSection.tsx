@@ -45,16 +45,16 @@ export function SelectSection({
       <h2 className="text-4xl font-extrabold text-white mb-6 animate-fadeInDown" style={{ textShadow: "0 2px 15px rgba(0,0,0,0.5)" }}>
         {t("select.title")}
       </h2>
-      <p className="text-gray-400 text-xl mb-16 animate-fadeInDown">
+      <p className="text-gray-400 text-xl mb-16 portrait:mb-6 animate-fadeInDown">
         {t("select.count", { req: requiredCount, sel: selectedPhotos.length })}
       </p>
 
-      <div className="flex items-start justify-center gap-12 mb-16 max-w-6xl animate-fadeInUp">
-        <div className="flex flex-wrap justify-center gap-8 max-w-3xl">
+      <div className="flex items-start justify-center gap-12 mb-16 max-w-6xl animate-fadeInUp portrait:flex-col portrait:items-center portrait:gap-6 portrait:mb-8">
+        <div className="flex flex-wrap justify-center gap-8 max-w-3xl portrait:gap-4">
           {photos.map((photo, i) => (
             <div
               key={i}
-              className={`photo-thumbnail w-64 bg-black/30 relative overflow-hidden ${selectedPhotos.includes(i) ? "selected" : ""}`}
+              className={`photo-thumbnail w-64 portrait:w-40 bg-black/30 relative overflow-hidden ${selectedPhotos.includes(i) ? "selected" : ""}`}
               style={{ aspectRatio: "auto" }}
               onClick={() => togglePhoto(i)}
             >
