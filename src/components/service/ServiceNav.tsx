@@ -21,22 +21,28 @@ export function ServiceNav({
   nextDisabled?: boolean;
 }) {
   const { t } = useLanguage();
+  // 버튼을 절대배치 래퍼로 감싼다 — .service-button 자체가 position:relative(언레이어드)라
+  // 버튼에 직접 Tailwind absolute를 걸면 무시된다.
   return (
     <>
-      <button
-        className="service-button nav-button absolute bottom-8 left-8 z-20 portrait:bottom-5 portrait:left-5"
-        style={{ background: "rgba(255,255,255,0.1)", color: "#fff" }}
-        onClick={onPrev}
-      >
-        &#9664; {t(prevKey)}
-      </button>
-      <button
-        className="service-button nav-button nav-next-lg absolute bottom-8 right-8 z-20 portrait:bottom-5 portrait:right-5"
-        onClick={onNext}
-        style={nextDisabled ? { opacity: 0.5, pointerEvents: "none" } : {}}
-      >
-        {t("common.next")} &#9654;
-      </button>
+      <div className="absolute bottom-8 left-8 z-20 portrait:bottom-5 portrait:left-5">
+        <button
+          className="service-button nav-button"
+          style={{ background: "rgba(255,255,255,0.1)", color: "#fff" }}
+          onClick={onPrev}
+        >
+          &#9664; {t(prevKey)}
+        </button>
+      </div>
+      <div className="absolute bottom-8 right-8 z-20 portrait:bottom-5 portrait:right-5">
+        <button
+          className="service-button nav-button nav-next-lg"
+          onClick={onNext}
+          style={nextDisabled ? { opacity: 0.5, pointerEvents: "none" } : {}}
+        >
+          {t("common.next")} &#9654;
+        </button>
+      </div>
     </>
   );
 }
