@@ -91,19 +91,19 @@ export function FrameSection({
 
   return (
     <section className="w-full h-full flex flex-col items-center justify-center relative z-10">
-      <h2 className="text-4xl font-extrabold text-white mb-16 animate-fadeInDown" style={{ textShadow: "0 2px 15px rgba(0,0,0,0.5)" }}>
+      <h2 className="text-4xl font-extrabold text-white mb-16 portrait:mb-8 animate-fadeInDown" style={{ textShadow: "0 2px 15px rgba(0,0,0,0.5)" }}>
         {t("frame.title")}
       </h2>
 
-      <div className="flex gap-10 mb-20 animate-fadeInUp">
+      <div className="flex gap-10 mb-20 animate-fadeInUp portrait:flex-col portrait:gap-5 portrait:mb-10 portrait:w-full portrait:max-w-md portrait:items-stretch">
         {frames.map((frame) => (
           <div
             key={frame.id}
-            className={`frame-option w-64 text-center ${selectedFrame === frame.id ? "selected" : ""}`}
+            className={`frame-option w-64 portrait:w-full text-center ${selectedFrame === frame.id ? "selected" : ""}`}
             onClick={() => onSelect(frame.id)}
           >
             {selectedFrame === frame.id && <span className="check-mark">&#10003;</span>}
-            <div className="h-48 flex items-center justify-center mb-5">
+            <div className="h-48 portrait:h-36 flex items-center justify-center mb-5">
               <PaperPreview mode={frame.id} frame={frame} backgroundStyle={backgroundStyle} />
             </div>
             <span className="text-2xl font-bold text-white">{t("frame.cut", { n: frame.count })}</span>
