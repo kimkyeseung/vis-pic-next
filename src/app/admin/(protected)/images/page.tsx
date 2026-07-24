@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import OrderDialog from "./OrderDialog";
 import EditDialog from "./EditDialog";
+import { useAdmin } from "@/app/admin/AdminContext";
 import { BACKGROUND_IMAGE_TYPE, MAX_ACTIVE_BACKGROUNDS, WALLPAPER_IMAGE_TYPE, LOGO_IMAGE_TYPE } from "@/constants/images";
 
 // 테마관리에서 다루는 타입(배경화면·로고)은 이미지 관리 탭에서 숨긴다.
@@ -52,6 +53,10 @@ export default function ImagesPage() {
   const [showOrderDialog, setShowOrderDialog] = useState(false);
   const [devices, setDevices] = useState<DeviceOption[]>([]);
   const [editingImage, setEditingImage] = useState<Image | null>(null);
+  // 전체 이미지 vs 선택 장치에 적용되는 이미지만 보기
+  const { selectedDevice } = useAdmin();
+  const [deviceFilter, setDeviceFilter] = useState<"all" | "device">("all");
+  const currentDeviceId = selectedDevice?.deviceId ?? null;
 
   useEffect(() => {
     const loadImageBaseUrl = async () => {
@@ -83,7 +88,9 @@ export default function ImagesPage() {
     setLoading(true);
     setSizes({});
     try {
-      const res = await fetch(`/api/image/list/${typeId}/`, { cache: "no-store" });
+      // "이 장치" 필터: 연결 없음(전체 장치) + 해당 장치에 연결된 이미지만
+      const q = deviceFilter === "device" && currentDeviceId ? `?device_id=${currentDeviceId}` : "";
+      const res = await fetch(`/api/image/list/${typeId}/${q}`, { cache: "no-store" });
       const data = await res.json();
       setImages(data.images || []);
     } catch (error) {
@@ -107,7 +114,9 @@ export default function ImagesPage() {
     (async () => {
       await Promise.all([fetchImageTypes(), fetchImages(selectedType)]);
     })();
-  }, [selectedType]);
+    // deviceFilter/currentDeviceId 변경 시에도 재조회
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedType, deviceFilter, currentDeviceId]);
 
   useEffect(() => {
     if (!imageBaseUrl || images.length === 0) return;
@@ -247,13 +256,32 @@ export default function ImagesPage() {
             </button>
           ))}
         </div>
-        <button
-          onClick={() => setShowOrderDialog(true)}
-          disabled={images.length === 0}
-          className="px-4 py-2 rounded-lg bg-gray-700 text-gray-200 hover:bg-gray-600 transition-colors disabled:opacity-50"
-        >
-          순서 관리
-        </button>
+        <div className="flex items-center gap-2">
+          {/* 전체 / 이 장치 이미지 보기 토글 */}
+          <div className="flex rounded-lg overflow-hidden border border-gray-600 text-sm">
+            <button
+              onClick={() => setDeviceFilter("all")}
+              className={`px-3 py-2 transition-colors ${deviceFilter === "all" ? "bg-blue-600 text-white" : "bg-gray-700 text-gray-300 hover:bg-gray-600"}`}
+            >
+              전체
+            </button>
+            <button
+              onClick={() => setDeviceFilter("device")}
+              disabled={!currentDeviceId}
+              title={currentDeviceId ? undefined : "장치를 먼저 선택하세요"}
+              className={`px-3 py-2 transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${deviceFilter === "device" ? "bg-blue-600 text-white" : "bg-gray-700 text-gray-300 hover:bg-gray-600"}`}
+            >
+              {selectedDevice ? `${selectedDevice.name} 이미지` : "이 장치"}
+            </button>
+          </div>
+          <button
+            onClick={() => setShowOrderDialog(true)}
+            disabled={images.length === 0}
+            className="px-4 py-2 rounded-lg bg-gray-700 text-gray-200 hover:bg-gray-600 transition-colors disabled:opacity-50"
+          >
+            순서 관리
+          </button>
+        </div>
       </div>
 
       {isBackgroundTab && (
