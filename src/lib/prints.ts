@@ -18,10 +18,14 @@ export function decodeBase64Image(dataUrl: string): Buffer {
   return Buffer.from(raw, "base64");
 }
 
+/** 만료일을 로케일 중립 ISO(YYYY-MM-DD)로 반환. 표시 포맷은 클라이언트가 언어에 맞춰 처리한다. */
 export function formatExpiryDate(days = EXPIRY_DAYS): string {
   const expiry = new Date();
   expiry.setDate(expiry.getDate() + days);
-  return `${expiry.getFullYear()}년 ${String(expiry.getMonth() + 1).padStart(2, "0")}월 ${String(expiry.getDate()).padStart(2, "0")}일`;
+  const y = expiry.getFullYear();
+  const m = String(expiry.getMonth() + 1).padStart(2, "0");
+  const d = String(expiry.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
 }
 
 export async function uploadPrintFile(
