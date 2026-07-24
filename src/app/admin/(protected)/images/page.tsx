@@ -4,7 +4,10 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import OrderDialog from "./OrderDialog";
 import EditDialog from "./EditDialog";
-import { BACKGROUND_IMAGE_TYPE, MAX_ACTIVE_BACKGROUNDS } from "@/constants/images";
+import { BACKGROUND_IMAGE_TYPE, MAX_ACTIVE_BACKGROUNDS, WALLPAPER_IMAGE_TYPE, LOGO_IMAGE_TYPE } from "@/constants/images";
+
+// 테마관리에서 다루는 타입(배경화면·로고)은 이미지 관리 탭에서 숨긴다.
+const THEME_MANAGED_TYPES = new Set<number>([WALLPAPER_IMAGE_TYPE, LOGO_IMAGE_TYPE]);
 
 interface Image {
   id: number;
@@ -230,7 +233,7 @@ export default function ImagesPage() {
 
       <div className="flex items-center justify-between gap-2">
         <div className="flex gap-2">
-          {imageTypes.map((type) => (
+          {imageTypes.filter((type) => !THEME_MANAGED_TYPES.has(type.id)).map((type) => (
             <button
               key={type.id}
               onClick={() => setSelectedType(type.id)}
