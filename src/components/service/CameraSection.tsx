@@ -862,7 +862,7 @@ export function CameraSection({
   const bgOptions = backgroundImages.length > 0 ? backgroundImages : FALLBACK_BACKGROUNDS;
 
   return (
-    <section className="w-full h-full flex relative z-10">
+    <section className="w-full h-full flex portrait:flex-col relative z-10">
       <video ref={videoRef} autoPlay playsInline muted className="hidden" />
 
       {flash && <div className="fixed inset-0 bg-white z-50 pointer-events-none animate-flash" />}
@@ -1038,7 +1038,7 @@ export function CameraSection({
       </div>
 
       {/* 우측: 촬영 컨트롤 패널 */}
-      <div className="w-80 shrink-0 p-6 flex flex-col border-l border-white/10 bg-black/20">
+      <div className="w-80 shrink-0 p-6 flex flex-col border-l border-white/10 bg-black/20 portrait:w-full portrait:border-l-0 portrait:border-t portrait:max-h-[46vh]">
         <div className="flex items-baseline justify-between mb-5">
           <h3 className="text-xl font-bold text-white">{t("camera.title")}</h3>
           <span className="text-white/60 text-sm font-semibold tabular-nums">
@@ -1046,7 +1046,7 @@ export function CameraSection({
           </span>
         </div>
 
-        <div className="grid grid-cols-2 gap-2 mb-6">
+        <div className="grid grid-cols-2 gap-2 mb-6 portrait:grid-cols-4 portrait:mb-3">
           {Array.from({ length: maxPhotos }, (_, i) => (
             <div
               key={i}
