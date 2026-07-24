@@ -1,6 +1,7 @@
 import type { BGImage } from "@/types";
 import { useLanguage } from "@/i18n/LanguageContext";
 import { FramedPreview } from "./FramedPreview";
+import { ServiceNav } from "./ServiceNav";
 
 export function SelectSection({
   photos,
@@ -77,18 +78,7 @@ export function SelectSection({
         )}
       </div>
 
-      <div className="flex gap-6 animate-fadeInUp" style={{ animationDelay: "0.3s" }}>
-        <button className="service-button nav-button" style={{ background: "rgba(255,255,255,0.1)", color: "#fff" }} onClick={onPrev}>
-          &#9664; {t("select.reshoot")}
-        </button>
-        <button
-          className="service-button nav-button"
-          onClick={onNext}
-          style={!canProceed ? { opacity: 0.5, pointerEvents: "none" } : {}}
-        >
-          {t("common.next")} &#9654;
-        </button>
-      </div>
+      <ServiceNav onPrev={onPrev} onNext={onNext} prevKey="select.reshoot" nextDisabled={!canProceed} />
     </section>
   );
 }

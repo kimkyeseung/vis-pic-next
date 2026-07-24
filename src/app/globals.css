@@ -259,6 +259,22 @@ body {
   pointer-events: none;
 }
 
+/* "다음" 강조 버튼 — 우하단 크게. primary 색상 사용. */
+.nav-next-lg {
+  min-height: 110px;
+  padding: 22px 72px;
+  font-size: 1.7em;
+  background: var(--theme-primary, #6c6fb4);
+  color: #ffffff;
+}
+.nav-next-lg:hover {
+  background: var(--theme-primary, #6c6fb4);
+  filter: brightness(1.08);
+}
+@media (orientation: portrait) {
+  .nav-next-lg { min-height: 88px; padding: 16px 44px; font-size: 1.4em; }
+}
+
 /* 프레임 옵션 */
 .frame-option {
   border: 3px solid transparent;

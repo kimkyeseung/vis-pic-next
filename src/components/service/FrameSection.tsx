@@ -2,6 +2,7 @@ import type { CSSProperties } from "react";
 import { FRAME_INFO, FALLBACK_BACKGROUNDS } from "@/constants/frames";
 import { computePrintLayout } from "@/lib/printLayout";
 import { useLanguage } from "@/i18n/LanguageContext";
+import { ServiceNav } from "./ServiceNav";
 import type { BGImage, FrameInfoEntry } from "@/types";
 
 // 미리보기 축척: 1cm → 12px (인화지 10×15cm 기준 120×180px)
@@ -111,18 +112,7 @@ export function FrameSection({
         ))}
       </div>
 
-      <div className="flex gap-6 animate-fadeInUp" style={{ animationDelay: "0.3s" }}>
-        <button className="service-button nav-button" style={{ background: "rgba(255,255,255,0.1)", color: "#fff" }} onClick={onPrev}>
-          &#9664; {t("common.prev")}
-        </button>
-        <button
-          className={`service-button nav-button ${!selectedFrame ? "disabled" : ""}`}
-          onClick={onNext}
-          style={!selectedFrame ? { opacity: 0.5, pointerEvents: "none" } : {}}
-        >
-          {t("common.next")} &#9654;
-        </button>
-      </div>
+      <ServiceNav onPrev={onPrev} onNext={onNext} nextDisabled={!selectedFrame} />
     </section>
   );
 }
