@@ -32,19 +32,19 @@ export function StartSection({
       <div className="absolute top-4 right-5 text-gray-500 text-xs select-none">
         빌드 {process.env.NEXT_PUBLIC_BUILD_DATE}
       </div>
-      <div className="main-container flex flex-col items-center">
-        <div className="logo-section text-center mb-24 animate-fadeInDown">
+      <div className="main-container flex flex-col items-center max-w-[92vw]">
+        <div className="logo-section text-center mb-24 portrait:mb-12 animate-fadeInDown">
           {logoUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={logoUrl} alt="logo" className="mx-auto mb-5 max-h-40 w-auto object-contain" style={{ filter: "drop-shadow(0 2px 15px rgba(0,0,0,0.5))" }} />
+            <img src={logoUrl} alt="logo" className="mx-auto mb-5 max-h-40 portrait:max-h-32 w-auto max-w-[80vw] object-contain" style={{ filter: "drop-shadow(0 2px 15px rgba(0,0,0,0.5))" }} />
           ) : (
-            <h1 className="text-7xl font-extrabold mb-5 tracking-widest text-white" style={{ textShadow: "0 2px 15px rgba(0,0,0,0.5)" }}>
+            <h1 className="text-7xl portrait:text-6xl font-extrabold mb-5 tracking-widest text-white" style={{ textShadow: "0 2px 15px rgba(0,0,0,0.5)" }}>
               AR-pic
             </h1>
           )}
         </div>
         <button
-          className="service-button touch-button animate-pulse-button"
+          className="service-button touch-button animate-pulse-button max-w-[85vw]"
           style={{ animationDelay: "0.5s" }}
           onClick={(e) => { e.stopPropagation(); onNext(); }}
         >
@@ -54,7 +54,7 @@ export function StartSection({
 
         {/* 언어 선택 — 결제 화면으로 이동. 결제 비활성 시에만 여기 표시. */}
         {showLanguage && (
-          <div className="flex gap-3 mt-12" onClick={(e) => e.stopPropagation()}>
+          <div className="flex gap-3 mt-12 portrait:mt-8 flex-wrap justify-center" onClick={(e) => e.stopPropagation()}>
             {LOCALES.map(({ code, label }) => (
               <button
                 key={code}
@@ -70,7 +70,7 @@ export function StartSection({
             ))}
           </div>
         )}
-        <img src="/static/viswave_logo.png" className="mt-24 opacity-80" style={{ width: "200px" }} alt="Viswave" onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
+        <img src="/static/viswave_logo.png" className="mt-24 portrait:mt-12 opacity-80 max-w-[50vw]" style={{ width: "200px" }} alt="Viswave" onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
       </div>
 
       <div className="absolute bottom-16 text-center text-gray-500 animate-fadeInUp" style={{ animationDelay: "1s" }}>
