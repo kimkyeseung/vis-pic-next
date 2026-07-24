@@ -871,7 +871,7 @@ export function CameraSection({
       <div className="flex-1 min-w-0 flex flex-col items-center justify-center gap-4 px-6 py-4">
         <div
           className="camera-preview w-full aspect-video relative"
-          style={{ maxWidth: showBgStrip ? "calc((100vh - 180px) * 16 / 9)" : "calc((100vh - 64px) * 16 / 9)" }}
+          style={{ maxWidth: showBgStrip ? "calc((100vh - 320px) * 16 / 9)" : "calc((100vh - 220px) * 16 / 9)" }}
         >
           {/* 스티커 드래그 오버레이 */}
           <div
@@ -1035,6 +1035,18 @@ export function CameraSection({
             </div>
           </div>
         )}
+
+        {/* 촬영하기 — 카메라 하단 중앙 큰 버튼 */}
+        <button
+          className="service-button w-full shrink-0 rounded-2xl font-extrabold py-6 portrait:py-4 text-3xl portrait:text-2xl"
+          onClick={handleManualCapture}
+          style={{
+            maxWidth: showBgStrip ? "calc((100vh - 320px) * 16 / 9)" : "calc((100vh - 220px) * 16 / 9)",
+            ...(countdown !== null || photos.length >= maxPhotos ? { opacity: 0.5, pointerEvents: "none" } : {}),
+          }}
+        >
+          &#128248; {t("camera.shoot")}
+        </button>
       </div>
 
       {/* 우측: 촬영 컨트롤 패널 */}
@@ -1062,14 +1074,6 @@ export function CameraSection({
             </div>
           ))}
         </div>
-
-        <button
-          className="service-button w-full py-5 rounded-2xl text-xl mb-6"
-          onClick={handleManualCapture}
-          style={countdown !== null || photos.length >= maxPhotos ? { opacity: 0.5, pointerEvents: "none" } : {}}
-        >
-          &#128248; {t("camera.shoot")}
-        </button>
 
         {/* 스티커 패널 (상시 노출) */}
         <div className="flex-1 min-h-0 flex flex-col mb-4">
