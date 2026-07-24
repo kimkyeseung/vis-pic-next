@@ -12,12 +12,15 @@ export function ServiceNav({
   onPrev,
   onNext,
   prevKey = "common.prev",
+  nextKey = "common.next",
   nextDisabled = false,
 }: {
   onPrev: () => void;
   onNext: () => void;
   /** 이전 버튼 라벨 키 (예: 재촬영은 "select.reshoot") */
   prevKey?: MessageKey;
+  /** 다음 버튼 라벨 키 (예: 완료 화면은 "complete.print") */
+  nextKey?: MessageKey;
   nextDisabled?: boolean;
 }) {
   const { t } = useLanguage();
@@ -40,7 +43,7 @@ export function ServiceNav({
           onClick={onNext}
           style={nextDisabled ? { opacity: 0.5, pointerEvents: "none" } : {}}
         >
-          {t("common.next")} &#9654;
+          {t(nextKey)} &#9654;
         </button>
       </div>
     </>

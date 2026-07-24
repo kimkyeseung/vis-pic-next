@@ -15,6 +15,7 @@ import {
   FRAME_BORDER_COLOR,
 } from "@/lib/printLayout";
 import { useLanguage } from "@/i18n/LanguageContext";
+import { ServiceNav } from "./ServiceNav";
 
 export function CompleteSection({
   photos,
@@ -33,6 +34,7 @@ export function CompleteSection({
   preparedGifUrl,
   preparedExpiryDate,
   printQuantity = 1,
+  onPrev,
   onRestart,
 }: {
   photos: string[];
@@ -52,6 +54,8 @@ export function CompleteSection({
   preparedExpiryDate?: string | null;
   /** 결제 화면에서 선택한 인쇄 매수. 이 수만큼 출력한다. */
   printQuantity?: number;
+  /** 이전 단계로 이동 (좌하단 "이전") */
+  onPrev: () => void;
   onRestart: () => void;
 }) {
   const { t } = useLanguage();
@@ -482,7 +486,7 @@ export function CompleteSection({
             <div className="flex items-center justify-center gap-8 mb-6 w-full max-w-5xl portrait:flex-col portrait:items-center portrait:gap-5">
               <div className="flex-1 flex justify-center min-w-0 portrait:w-full">
                 <div className="rounded-2xl overflow-hidden" style={{ boxShadow: "0 20px 50px rgba(0,0,0,0.4)" }}>
-                  <img src={compositeImage} alt="Composite" className="max-h-[58vh] portrait:max-h-[42vh] w-auto object-contain block" />
+                  <img src={compositeImage} alt="Composite" className="max-h-[54vh] portrait:max-h-[40vh] w-auto object-contain block" />
                 </div>
               </div>
 
@@ -529,25 +533,21 @@ export function CompleteSection({
               )}
             </div>
 
+            {printStatus === "done" && (
+              <p className="text-gray-400 text-lg">{t("complete.printDone")}</p>
+            )}
+
+            {/* 하단 모서리 버튼 (시안): 이전(좌하단) / 인화하기(우하단) */}
             {printStatus === "ready" && (
-              <div className="flex gap-6 justify-center mb-4">
-                <button className="service-button nav-button nav-next-lg" onClick={handlePrint}>
-                  &#128424; {t("complete.print")}
+              <ServiceNav onPrev={onPrev} onNext={handlePrint} nextKey="complete.print" />
+            )}
+            {printStatus === "done" && (
+              <div className="absolute bottom-8 right-8 z-20 portrait:bottom-5 portrait:right-5">
+                <button className="service-button nav-button nav-next-lg" onClick={onRestart}>
+                  {t("complete.restart")}
                 </button>
               </div>
             )}
-
-            {printStatus === "done" && (
-              <p className="text-gray-400 text-lg mb-4">{t("complete.printDone")}</p>
-            )}
-
-            <button
-              className="service-button touch-button"
-              style={{ width: "auto", minHeight: "auto", padding: "18px 48px", fontSize: "1.3em" }}
-              onClick={onRestart}
-            >
-              {t("complete.restart")}
-            </button>
           </>
         )}
 

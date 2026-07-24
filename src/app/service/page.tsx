@@ -264,6 +264,7 @@ function ServiceContent() {
           preparedPhotoUrl={flow.preparedPhotoUrl}
           preparedGifUrl={flow.preparedGifUrl}
           preparedExpiryDate={flow.preparedExpiryDate}
+          onPrev={() => flow.goToStep(printBgImages.length > 0 ? "printbg" : "select")}
           onRestart={flow.resetAll}
         />
       )}
