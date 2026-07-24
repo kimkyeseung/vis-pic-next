@@ -22,11 +22,11 @@ export function BackgroundSection({
 
   return (
     <section className="w-full h-full flex flex-col items-center justify-center relative z-10">
-      <h2 className="text-4xl font-extrabold text-white mb-16 animate-fadeInDown" style={{ textShadow: "0 2px 15px rgba(0,0,0,0.5)" }}>
+      <h2 className="text-4xl font-extrabold text-white mb-16 portrait:mb-8 animate-fadeInDown" style={{ textShadow: "0 2px 15px rgba(0,0,0,0.5)" }}>
         {t("bg.title")}
       </h2>
 
-      <div className="grid grid-cols-3 gap-8 mb-20 animate-fadeInUp">
+      <div className="grid grid-cols-3 gap-8 mb-20 animate-fadeInUp portrait:grid-cols-2 portrait:gap-5 portrait:mb-10">
         {hasDbImages
           ? backgroundImages.map((bg) => {
               const isVideo = bg.filename.endsWith(".mp4") || bg.filename.endsWith(".webm");
