@@ -132,7 +132,7 @@ export function PaymentSection({
           </h2>
 
           {/* 언어 선택 */}
-          <div className="flex gap-3 mb-10">
+          <div className="flex gap-3 mb-10 portrait:mb-8 flex-wrap justify-center">
             {LOCALES.map(({ code, label }) => (
               <button
                 key={code}
@@ -148,25 +148,25 @@ export function PaymentSection({
             ))}
           </div>
 
-          {/* 매수/가격 티어 카드 */}
-          <div className="flex gap-6 justify-center flex-wrap mb-12">
+          {/* 매수/가격 티어 카드 — 세로에선 전체폭 세로 스택 */}
+          <div className="flex gap-6 justify-center flex-wrap mb-12 portrait:flex-col portrait:flex-nowrap portrait:w-full portrait:items-stretch portrait:gap-4">
             {tiers.map((tier) => {
               const selected = tier.qty === selectedQty;
               return (
                 <button
                   key={tier.qty}
                   onClick={() => selectQty(tier.qty)}
-                  className={`w-56 h-56 rounded-2xl flex flex-col items-center justify-center gap-2 transition-all duration-200 border-2 ${
+                  className={`w-56 h-56 portrait:w-full portrait:h-32 rounded-2xl flex flex-col items-center justify-center gap-2 transition-all duration-200 border-2 ${
                     selected
                       ? "bg-white border-white scale-[1.04] shadow-2xl"
                       : "border-white/20 hover:border-white/40"
                   }`}
                   style={selected ? {} : { background: "var(--theme-primary, #6c6fb4)" }}
                 >
-                  <span className={`text-5xl font-extrabold ${selected ? "text-[#4a4e8c]" : "text-white"}`}>
+                  <span className={`text-5xl portrait:text-4xl font-extrabold ${selected ? "text-[#4a4e8c]" : "text-white"}`}>
                     {t("payment.sheets", { count: String(tier.qty) })}
                   </span>
-                  <span className={`text-2xl font-bold ${selected ? "text-[#4a4e8c]" : "text-white/90"}`}>
+                  <span className={`text-2xl portrait:text-xl font-bold ${selected ? "text-[#4a4e8c]" : "text-white/90"}`}>
                     {t("payment.amount", { amount: fmt(tier.price) })}
                   </span>
                 </button>
