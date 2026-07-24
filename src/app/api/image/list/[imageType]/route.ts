@@ -42,6 +42,7 @@ export async function GET(
       right: img.right,
       bottom: img.bottom,
       priority: img.priority,
+      active: img.active,
       focalX: img.focalX ?? 0.5,
       focalY: img.focalY ?? 0.5,
     }));

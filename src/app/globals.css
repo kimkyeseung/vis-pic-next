@@ -295,7 +295,7 @@ body {
 }
 
 .frame-option.selected {
-  border-color: #ffffff;
+  border-color: var(--theme-primary, #ffffff);
   background: rgba(255,255,255,0.15);
   transform: translateY(-5px);
   box-shadow: 0 15px 35px rgba(0,0,0,0.4);
@@ -317,7 +317,7 @@ body {
 }
 
 .background-option.selected {
-  border-color: #ffffff;
+  border-color: var(--theme-primary, #ffffff);
   transform: scale(1.02);
   box-shadow: 0 10px 25px rgba(0,0,0,0.5);
 }
@@ -355,8 +355,8 @@ body {
 }
 
 .photo-thumbnail.selected {
-  border-color: #4CAF50;
-  box-shadow: 0 0 20px rgba(76, 175, 80, 0.5);
+  border-color: var(--theme-primary, #4CAF50);
+  box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
 }
 
 /* 선택 체크마크 */
@@ -364,7 +364,7 @@ body {
   position: absolute;
   top: 10px;
   right: 15px;
-  background: #4CAF50;
+  background: var(--theme-primary, #4CAF50);
   color: white;
   border-radius: 50%;
   width: 30px;

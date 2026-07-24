@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/db";
 import { requireAdmin } from "@/lib/adminAuth";
 import { getImageBaseUrl } from "@/lib/storage";
+import { defaultActiveForNewImage } from "@/lib/imageActive";
 
 export async function POST(request: NextRequest) {
   const authError = await requireAdmin();
@@ -20,13 +21,15 @@ export async function POST(request: NextRequest) {
       : [];
 
     const truncatedName = String(name).slice(0, 32);
+    const resolvedType = parseInt(imageType) || 1;
 
     const image = await prisma.image.create({
       data: {
         name: truncatedName,
         filename,
-        imageType: parseInt(imageType) || 1,
+        imageType: resolvedType,
         priority: parseInt(priority) || 0,
+        active: await defaultActiveForNewImage(resolvedType),
         devices: {
           create: targetDeviceIds.map((deviceId) => ({ deviceId })),
         },

@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import type { DeviceConfig, BGImage } from "@/types";
 import { parseIntSafe, parseBgRemovalMode, parsePaymentTerminalMode, parseCaptureModes, parseQuantityOptions, clampPercent } from "@/lib/deviceConfig";
+import { MAX_ACTIVE_BACKGROUNDS, LOGO_IMAGE_TYPE } from "@/constants/images";
 
 const DEFAULT_CONFIG: DeviceConfig = {
   deviceId: "test",
@@ -20,6 +21,7 @@ const DEFAULT_CONFIG: DeviceConfig = {
   segmentThreshold: 15,
   segmentFeather: 35,
   themeTextColor: "#ffffff",
+  themePrimaryColor: "#6c6fb4",
 };
 
 export function useDeviceSetup(deviceId: string) {
@@ -29,6 +31,7 @@ export function useDeviceSetup(deviceId: string) {
   const [imageBaseUrl, setImageBaseUrl] = useState<string>("");
   const [printSettings, setPrintSettings] = useState<Record<string, string>>({});
   const [wallpaperUrl, setWallpaperUrl] = useState<string | null>(null);
+  const [logoUrl, setLogoUrl] = useState<string | null>(null);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -86,6 +89,7 @@ export function useDeviceSetup(deviceId: string) {
           segmentThreshold: clampPercent(parseIntSafe(s.CAPTURE_THRESHOLD || "", 15)),
           segmentFeather: clampPercent(parseIntSafe(s.CAPTURE_SMOOTHNESS || "", 35), 1),
           themeTextColor: s.THEME_TEXT_COLOR || "#ffffff",
+          themePrimaryColor: s.THEME_PRIMARY_COLOR || "#6c6fb4",
         });
       } catch (err) {
         if ((err as Error).name === "AbortError") return;
@@ -111,7 +115,13 @@ export function useDeviceSetup(deviceId: string) {
           return;
         }
         const data = await res.json();
-        if (data.images?.length > 0) setBackgroundImages(data.images);
+        // 활성 배경만, 우선순위 상위 최대 6개만 서비스 화면에 노출
+        if (data.images?.length > 0) {
+          const activeBgs = data.images
+            .filter((img: { active?: boolean }) => img.active !== false)
+            .slice(0, MAX_ACTIVE_BACKGROUNDS);
+          setBackgroundImages(activeBgs);
+        }
         if (data.baseUrl) setImageBaseUrl(data.baseUrl);
       } catch (err) {
         if ((err as Error).name === "AbortError") return;
@@ -164,13 +174,37 @@ export function useDeviceSetup(deviceId: string) {
       }
     }
 
+    // 테마 로고(imageType 6) — 서비스 화면 로고. 첫 항목 한 장만 사용.
+    async function loadLogo(id: string, attempt = 0) {
+      const MAX_RETRIES = 5;
+      const retry = () => {
+        if (signal.aborted || attempt >= MAX_RETRIES) return;
+        const timer = setTimeout(() => loadLogo(id, attempt + 1), 3000);
+        signal.addEventListener("abort", () => clearTimeout(timer), { once: true });
+      };
+      try {
+        const res = await fetch(`/api/image/list/${LOGO_IMAGE_TYPE}/?device_id=${id}`, {
+          signal,
+          cache: "no-store",
+        });
+        if (!res.ok) { retry(); return; }
+        const data = await res.json();
+        const first = data.images?.[0];
+        setLogoUrl(first && data.baseUrl ? `${data.baseUrl}/${first.filename}` : null);
+      } catch (err) {
+        if ((err as Error).name === "AbortError") return;
+        retry();
+      }
+    }
+
     loadSettings(deviceId);
     loadBackgrounds(deviceId);
     loadPrintBackgrounds(deviceId);
     loadWallpaper(deviceId);
+    loadLogo(deviceId);
 
     return () => controller.abort();
   }, [deviceId]);
 
-  return { config, backgroundImages, printBgImages, imageBaseUrl, printSettings, wallpaperUrl };
+  return { config, backgroundImages, printBgImages, imageBaseUrl, printSettings, wallpaperUrl, logoUrl };
 }

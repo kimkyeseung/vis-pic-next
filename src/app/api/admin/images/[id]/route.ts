@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/db";
 import { deleteImage } from "@/lib/storage";
 import { requireAdmin } from "@/lib/adminAuth";
+import { BACKGROUND_IMAGE_TYPE, MAX_ACTIVE_BACKGROUNDS } from "@/constants/images";
 
 export async function PATCH(
   request: NextRequest,
@@ -21,6 +22,32 @@ export async function PATCH(
     if (typeof body.name === "string") data.name = body.name.slice(0, 32);
     if (typeof body.priority === "number" && Number.isFinite(body.priority)) {
       data.priority = Math.trunc(body.priority);
+    }
+    if (typeof body.active === "boolean") data.active = body.active;
+
+    // 배경(type 1)을 활성화하려는 경우, 이미 최대치만큼 활성화돼 있으면 거부한다.
+    if (data.active === true) {
+      const target = await prisma.image.findUnique({
+        where: { id: imageId },
+        select: { imageType: true, active: true },
+      });
+      if (
+        target?.imageType === BACKGROUND_IMAGE_TYPE &&
+        !target.active // 이미 활성인 것을 다시 활성화하는 요청은 카운트 변화 없음
+      ) {
+        const activeCount = await prisma.image.count({
+          where: { imageType: BACKGROUND_IMAGE_TYPE, active: true },
+        });
+        if (activeCount >= MAX_ACTIVE_BACKGROUNDS) {
+          return NextResponse.json(
+            {
+              error: `배경은 최대 ${MAX_ACTIVE_BACKGROUNDS}개까지만 활성화할 수 있습니다.`,
+              code: "MAX_ACTIVE_BACKGROUNDS",
+            },
+            { status: 409 },
+          );
+        }
+      }
     }
 
     // deviceIds 배열이 오면 조인 행을 통째로 교체한다(빈 배열 = 모든 디바이스).
@@ -58,6 +85,7 @@ export async function PATCH(
         id: updated.id,
         name: updated.name,
         priority: updated.priority,
+        active: updated.active,
         focalX: updated.focalX,
         focalY: updated.focalY,
         deviceIds: updated.devices.map((d) => d.deviceId),

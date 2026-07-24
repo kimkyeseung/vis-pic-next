@@ -26,7 +26,7 @@ function ServiceContent() {
   const deviceId = searchParams.get("device") || "test";
   const [preflightDone, setPreflightDone] = useState(false);
 
-  const { config, backgroundImages, printBgImages, imageBaseUrl, printSettings, wallpaperUrl } = useDeviceSetup(deviceId);
+  const { config, backgroundImages, printBgImages, imageBaseUrl, printSettings, wallpaperUrl, logoUrl } = useDeviceSetup(deviceId);
   const flow = usePhotoFlow(deviceId, config);
   const { monitors, syncEnabled, setSyncEnabled, selectedMonitorIndex, setSelectedMonitorIndex } = useTauriMonitor();
   const { idleRemaining, clearIdleTimer } = useIdleTimer(
@@ -94,6 +94,7 @@ function ServiceContent() {
   // 배경화면 미설정 시 globals.css의 기본 배경(#2a2a2a)이 그대로 비쳐 보인다.
   const themeStyle: React.CSSProperties = {
     ...(config.themeTextColor ? { ["--theme-text"]: config.themeTextColor } : {}),
+    ...(config.themePrimaryColor ? { ["--theme-primary"]: config.themePrimaryColor } : {}),
     ...(wallpaperUrl
       ? {
           backgroundImage: `url(${wallpaperUrl})`,
@@ -139,6 +140,7 @@ function ServiceContent() {
         <StartSection
           onNext={flow.handleStart}
           showLanguage={!config.paymentEnabled}
+          logoUrl={logoUrl}
           monitors={monitors}
           syncEnabled={syncEnabled}
           selectedMonitorIndex={selectedMonitorIndex}

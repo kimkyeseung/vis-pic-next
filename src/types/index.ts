@@ -55,12 +55,15 @@ export interface DeviceConfig {
   segmentFeather: number;
   /** 테마 글자 색상 (서비스 화면). 미설정 시 #ffffff. */
   themeTextColor: string;
+  /** 테마 강조(primary) 색상 — 선택 강조·주요 버튼. 미설정 시 #6c6fb4. */
+  themePrimaryColor: string;
 }
 
 export interface BGImage {
   id: number;
   name: string;
   filename: string;
+  active?: boolean;
   focalX?: number;
   focalY?: number;
 }

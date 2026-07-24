@@ -112,6 +112,8 @@ model Image {
   right     Int?
   bottom    Int?
   priority  Int       @default(0)
+  /// 활성 여부. 서비스 화면에는 active=true인 이미지만 노출. 배경(type 1)은 최대 6개까지만 활성 허용.
+  active    Boolean   @default(true)
   focalX    Float?    @default(0.5) @map("focal_x")
   focalY    Float?    @default(0.5) @map("focal_y")
   createdAt DateTime  @default(now()) @map("created_at") @db.Timestamp(6)

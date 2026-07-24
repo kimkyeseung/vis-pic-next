@@ -43,7 +43,14 @@ async function main() {
     create: { id: 5, name: "wallpaper" },
   });
 
-  console.log("Created image types:", { backgroundType, imageType, stickerType, wallpaperType });
+  // 테마관리용 로고(logo) — 서비스 화면 로고 이미지
+  const logoType = await prisma.imageType.upsert({
+    where: { id: 6 },
+    update: {},
+    create: { id: 6, name: "logo" },
+  });
+
+  console.log("Created image types:", { backgroundType, imageType, stickerType, wallpaperType, logoType });
 
   // Create default admin account
   const hashedPassword = await bcrypt.hash("admin", 10);
@@ -115,6 +122,7 @@ async function main() {
     { name: "PICTURE_HEIGHT", value: "15", description: "인화 세로 크기(cm)" },
     { name: "CAPTURE_MODES", value: "1x1,2x1,2x2", description: "지원 프레임" },
     { name: "THEME_TEXT_COLOR", value: "#ffffff", description: "테마 글자 색상 (서비스 화면)" },
+    { name: "THEME_PRIMARY_COLOR", value: "#6c6fb4", description: "테마 강조(primary) 색상 — 선택 강조·주요 버튼" },
   ];
 
   for (const setting of globalSettings) {

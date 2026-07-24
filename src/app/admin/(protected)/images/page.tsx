@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import OrderDialog from "./OrderDialog";
 import EditDialog from "./EditDialog";
+import { BACKGROUND_IMAGE_TYPE, MAX_ACTIVE_BACKGROUNDS } from "@/constants/images";
 
 interface Image {
   id: number;
@@ -12,6 +13,7 @@ interface Image {
   name: string;
   filename: string;
   priority: number;
+  active: boolean;
 }
 
 interface ImageType {
@@ -168,6 +170,37 @@ export default function ImagesPage() {
     }
   };
 
+  const isBackgroundTab = selectedType === BACKGROUND_IMAGE_TYPE;
+  const activeBackgroundCount = images.filter((img) => img.active).length;
+
+  const handleToggleActive = async (image: Image) => {
+    const next = !image.active;
+    // 활성화 시도인데 이미 6개 활성이면 클라이언트에서 먼저 차단 (서버도 재검증)
+    if (
+      next &&
+      image.imageType === BACKGROUND_IMAGE_TYPE &&
+      activeBackgroundCount >= MAX_ACTIVE_BACKGROUNDS
+    ) {
+      alert(`배경은 최대 ${MAX_ACTIVE_BACKGROUNDS}개까지만 활성화할 수 있습니다.`);
+      return;
+    }
+    try {
+      const res = await fetch(`/api/admin/images/${image.id}/`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ active: next }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        alert(data.error || "상태 변경에 실패했습니다.");
+        return;
+      }
+      setImages((prev) => prev.map((img) => (img.id === image.id ? { ...img, active: next } : img)));
+    } catch {
+      alert("서버 연결에 실패했습니다.");
+    }
+  };
+
   const TYPE_LABELS: Record<string, string> = {
     background: "배경",
     image: "프레임",
@@ -220,6 +253,24 @@ export default function ImagesPage() {
         </button>
       </div>
 
+      {isBackgroundTab && (
+        <div
+          className={`px-4 py-3 rounded-lg border text-sm ${
+            activeBackgroundCount > MAX_ACTIVE_BACKGROUNDS
+              ? "bg-red-900/40 border-red-600 text-red-300"
+              : "bg-gray-800 border-gray-700 text-gray-300"
+          }`}
+        >
+          활성 배경{" "}
+          <span className={activeBackgroundCount > MAX_ACTIVE_BACKGROUNDS ? "font-bold" : "font-semibold text-white"}>
+            {activeBackgroundCount} / {MAX_ACTIVE_BACKGROUNDS}
+          </span>
+          {" "}— 서비스 화면에는 활성 배경만 최대 {MAX_ACTIVE_BACKGROUNDS}개까지 표시됩니다.
+          {activeBackgroundCount > MAX_ACTIVE_BACKGROUNDS &&
+            ` 현재 ${MAX_ACTIVE_BACKGROUNDS}개를 초과했습니다 — 우선순위 상위 ${MAX_ACTIVE_BACKGROUNDS}개만 노출되니 초과분을 비활성화하세요.`}
+        </div>
+      )}
+
       {loading ? (
         <div className="text-gray-400">로딩중...</div>
       ) : images.length === 0 ? (
@@ -243,12 +294,19 @@ export default function ImagesPage() {
             >
               <div
                 onClick={() => setEditingImage(image)}
-                className="aspect-video bg-gray-700 flex items-center justify-center cursor-pointer group relative"
+                className={`aspect-video bg-gray-700 flex items-center justify-center cursor-pointer group relative ${
+                  isBackgroundTab && !image.active ? "opacity-40" : ""
+                }`}
                 title="클릭하여 편집"
               >
                 <span className="absolute inset-0 z-10 hidden items-center justify-center bg-black/40 text-sm font-medium text-white group-hover:flex">
                   편집
                 </span>
+                {isBackgroundTab && !image.active && (
+                  <span className="absolute top-2 left-2 z-20 bg-black/70 text-gray-200 text-xs px-2 py-0.5 rounded">
+                    비활성
+                  </span>
+                )}
                 {isVideo(image.filename) ? (
                   <video
                     src={`${imageBaseUrl}/${image.filename}`}
@@ -288,6 +346,18 @@ export default function ImagesPage() {
                   </span>
                 </div>
                 <div className="mt-3 space-y-2">
+                  {isBackgroundTab && (
+                    <button
+                      onClick={() => handleToggleActive(image)}
+                      className={`w-full px-2 py-1 text-sm rounded transition-colors ${
+                        image.active
+                          ? "bg-green-600 text-white hover:bg-green-500"
+                          : "bg-gray-600 text-gray-200 hover:bg-gray-500"
+                      }`}
+                    >
+                      {image.active ? "활성 (클릭 시 비활성)" : "비활성 (클릭 시 활성)"}
+                    </button>
+                  )}
                   <button
                     onClick={() => setEditingImage(image)}
                     className="w-full px-2 py-1 bg-gray-700 text-white text-sm rounded hover:bg-gray-600 transition-colors"
