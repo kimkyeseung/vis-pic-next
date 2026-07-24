@@ -7,7 +7,7 @@ html, body {
   -moz-user-select: none;
   -ms-user-select: none;
   user-select: none;
-  font-family: 'Pretendard', 'Arial', sans-serif;
+  font-family: 'Pretendard', 'Malgun Gothic', 'Microsoft YaHei', 'PingFang SC', 'Yu Gothic', 'Meiryo', 'Noto Sans CJK SC', 'Arial', sans-serif;
   width: 100%;
   height: 100%;
   overflow: hidden;
@@ -16,6 +16,16 @@ html, body {
 body {
   background: #2a2a2a;
   color: #ffffff;
+}
+
+/* 중국어·일본어는 Pretendard가 한자를 일부만 커버해 시스템 명조(SimSun 등)로 폴백되어
+   명조/고딕이 섞인다. 언어별로 CJK 고딕 폰트를 우선 지정해 일관되게 표시한다.
+   (LanguageContext가 <html lang="…">을 설정) */
+:lang(zh) {
+  font-family: 'Microsoft YaHei', 'PingFang SC', 'Noto Sans CJK SC', 'Noto Sans SC', sans-serif;
+}
+:lang(ja) {
+  font-family: 'Yu Gothic', 'Meiryo', 'Hiragino Sans', 'Noto Sans CJK JP', 'Noto Sans JP', sans-serif;
 }
 
 /* 테마 글자색: 서비스 화면(.service-theme) 내부의 흰색 본문 텍스트를 관리자가 지정한

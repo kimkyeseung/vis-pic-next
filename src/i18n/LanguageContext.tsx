@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useState, useCallback, useMemo, type ReactNode } from "react";
+import { createContext, useContext, useState, useCallback, useMemo, useEffect, type ReactNode } from "react";
 import { translate, type Locale, type MessageKey } from "./translations";
 
 interface LanguageContextValue {
@@ -17,6 +17,11 @@ const LanguageContext = createContext<LanguageContextValue>({
 
 export function LanguageProvider({ children }: { children: ReactNode }) {
   const [lang, setLang] = useState<Locale>("ko");
+
+  // 문서 lang 속성 반영 → globals.css의 :lang(zh)/:lang(ja) CJK 고딕 폰트 규칙이 적용된다.
+  useEffect(() => {
+    document.documentElement.lang = lang;
+  }, [lang]);
 
   const t = useCallback(
     (key: MessageKey, params?: Record<string, string | number>) => translate(lang, key, params),
