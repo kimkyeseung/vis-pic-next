@@ -8,6 +8,7 @@ import { AVAILABLE_STICKERS } from "@/constants/stickers";
 import { useFrameSender } from "@/hooks/useSceneSync";
 import { createSoundPlayer, type SoundPlayer } from "@/lib/sounds";
 import { CircularTimer } from "@/components/service/CircularTimer";
+import { ServiceNav } from "@/components/service/ServiceNav";
 import { useLanguage } from "@/i18n/LanguageContext";
 import type { MessageKey } from "@/i18n/translations";
 
@@ -867,11 +868,47 @@ export function CameraSection({
 
       {flash && <div className="fixed inset-0 bg-white z-50 pointer-events-none animate-flash" />}
 
-      {/* 좌측: 카메라 미리보기 + 배경 선택 스트립 */}
+      {/* 좌측: 배경 변경 패널 */}
+      {showBgStrip && (
+        <div className="w-64 shrink-0 flex flex-col px-4 py-6 pb-32 border-r border-white/10 portrait:w-full portrait:border-r-0 portrait:border-b portrait:py-3 portrait:pb-3">
+          <h3 className="text-white/80 text-sm font-semibold mb-3 shrink-0">{t("camera.bgChange")}</h3>
+          <div className="grid grid-cols-2 gap-3 overflow-y-auto content-start portrait:grid-cols-6">
+            {bgOptions.map((bg) => {
+              const isSelected = selectedBackground === bg.id;
+              const isDb = "filename" in bg;
+              const isVideo = isDb && (bg.filename.endsWith(".mp4") || bg.filename.endsWith(".webm"));
+              return (
+                <button
+                  key={bg.id}
+                  className={`relative aspect-video rounded-xl overflow-hidden transition-all duration-200 ${
+                    isSelected
+                      ? "ring-[3px] ring-[var(--theme-primary,#6c6fb4)] shadow-lg"
+                      : "ring-1 ring-white/20 opacity-70 hover:opacity-100"
+                  }`}
+                  style={isDb ? undefined : { background: bg.gradient }}
+                  onClick={() => onBackgroundSelect(bg.id)}
+                >
+                  {isDb && (isVideo ? (
+                    <video src={`${imageBaseUrl}/${bg.filename}`} className="w-full h-full object-cover" muted loop autoPlay playsInline />
+                  ) : (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={`${imageBaseUrl}/${bg.filename}`} alt={bg.name} className="w-full h-full object-cover" />
+                  ))}
+                  {isSelected && (
+                    <span className="absolute inset-0 flex items-center justify-center bg-black/25 text-white text-lg font-bold">&#10003;</span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* 중앙: 카메라 미리보기 + 촬영하기 */}
       <div className="flex-1 min-w-0 flex flex-col items-center justify-center gap-4 px-6 py-4">
         <div
           className="camera-preview w-full aspect-video relative"
-          style={{ maxWidth: showBgStrip ? "calc((100vh - 320px) * 16 / 9)" : "calc((100vh - 220px) * 16 / 9)" }}
+          style={{ maxWidth: "calc((100vh - 240px) * 16 / 9)" }}
         >
           {/* 스티커 드래그 오버레이 */}
           <div
@@ -999,49 +1036,12 @@ export function CameraSection({
           )}
         </div>
 
-        {/* 배경 선택 스트립: 촬영 중 실시간 배경 변경 */}
-        {showBgStrip && (
-          <div className="w-full flex justify-center shrink-0">
-            <div className="flex gap-3 overflow-x-auto px-2 py-2 max-w-full">
-              {bgOptions.map((bg) => {
-                const isSelected = selectedBackground === bg.id;
-                const isDb = "filename" in bg;
-                const isVideo = isDb && (bg.filename.endsWith(".mp4") || bg.filename.endsWith(".webm"));
-                return (
-                  <button
-                    key={bg.id}
-                    className={`relative w-28 aspect-video shrink-0 rounded-xl overflow-hidden transition-all duration-200 ${
-                      isSelected
-                        ? "ring-[3px] ring-white shadow-lg scale-[1.06]"
-                        : "ring-1 ring-white/20 opacity-60 hover:opacity-100"
-                    }`}
-                    style={isDb ? undefined : { background: bg.gradient }}
-                    onClick={() => onBackgroundSelect(bg.id)}
-                  >
-                    {isDb && (isVideo ? (
-                      <video src={`${imageBaseUrl}/${bg.filename}`} className="w-full h-full object-cover" muted loop autoPlay playsInline />
-                    ) : (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={`${imageBaseUrl}/${bg.filename}`} alt={bg.name} className="w-full h-full object-cover" />
-                    ))}
-                    {isSelected && (
-                      <span className="absolute inset-0 flex items-center justify-center bg-black/25 text-white text-lg font-bold">
-                        &#10003;
-                      </span>
-                    )}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        )}
-
         {/* 촬영하기 — 카메라 하단 중앙 큰 버튼 */}
         <button
           className="service-button w-full shrink-0 rounded-2xl font-extrabold py-6 portrait:py-4 text-3xl portrait:text-2xl"
           onClick={handleManualCapture}
           style={{
-            maxWidth: showBgStrip ? "calc((100vh - 320px) * 16 / 9)" : "calc((100vh - 220px) * 16 / 9)",
+            maxWidth: "calc((100vh - 240px) * 16 / 9)",
             ...(countdown !== null || photos.length >= maxPhotos ? { opacity: 0.5, pointerEvents: "none" } : {}),
           }}
         >
@@ -1049,36 +1049,13 @@ export function CameraSection({
         </button>
       </div>
 
-      {/* 우측: 촬영 컨트롤 패널 */}
-      <div className="w-80 shrink-0 p-6 flex flex-col border-l border-white/10 bg-black/20 portrait:w-full portrait:border-l-0 portrait:border-t portrait:max-h-[46vh]">
-        <div className="flex items-baseline justify-between mb-5">
-          <h3 className="text-xl font-bold text-white">{t("camera.title")}</h3>
-          <span className="text-white/60 text-sm font-semibold tabular-nums">
-            {photos.length} / {maxPhotos}
-          </span>
-        </div>
-
-        <div className="grid grid-cols-2 gap-2 mb-6 portrait:grid-cols-4 portrait:mb-3">
-          {Array.from({ length: maxPhotos }, (_, i) => (
-            <div
-              key={i}
-              className={`aspect-[4/3] bg-black/30 rounded-xl flex items-center justify-center border-2 overflow-hidden ${
-                i === photos.length ? "border-white/50" : "border-white/10"
-              }`}
-            >
-              {photos[i] ? (
-                <img src={photos[i]} alt={`Photo ${i + 1}`} className="w-full h-full object-cover" />
-              ) : (
-                <span className="text-white/30 text-xl">{i + 1}</span>
-              )}
-            </div>
-          ))}
-        </div>
+      {/* 우측: 스티커 + 남은 촬영 횟수 패널 */}
+      <div className="w-80 shrink-0 p-6 pb-40 flex flex-col border-l border-white/10 bg-black/20 portrait:w-full portrait:border-l-0 portrait:border-t portrait:max-h-[46vh] portrait:pb-24">
+        <h3 className="text-white/80 text-base font-semibold mb-3 shrink-0">{t("camera.stickerPrompt")}</h3>
 
         {/* 스티커 패널 (상시 노출) */}
         <div className="flex-1 min-h-0 flex flex-col mb-4">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-white/80 text-sm font-semibold">✨ {t("camera.sticker")}</span>
+          <div className="flex items-center justify-end mb-2 min-h-[22px]">
             {stickers.length > 0 && (
               <button
                 className="text-xs text-white/40 hover:text-white/70 transition-colors"
@@ -1145,19 +1122,15 @@ export function CameraSection({
           </div>
         </div>
 
-        <div className="mt-auto flex flex-col gap-3">
-          <button className="service-button nav-button w-full" style={{ background: "rgba(255,255,255,0.1)", color: "#fff" }} onClick={onPrev}>
-            &#9664; {t("common.prev")}
-          </button>
-          <button
-            className="service-button nav-button w-full"
-            onClick={onNext}
-            style={!canProceed ? { opacity: 0.5, pointerEvents: "none" } : {}}
-          >
-            {t("common.next")} &#9654;
-          </button>
+        {/* 남은 촬영 횟수 */}
+        <div className="mt-auto shrink-0 text-center border border-dashed border-white/30 rounded-xl py-3">
+          <span className="text-white font-bold text-lg">
+            {t("camera.remaining", { n: String(Math.max(0, maxPhotos - photos.length)) })}
+          </span>
         </div>
       </div>
+
+      <ServiceNav onPrev={onPrev} onNext={onNext} nextDisabled={!canProceed} />
     </section>
   );
 }
