@@ -882,7 +882,7 @@ export function CameraSection({
       {/* 좌측: 배경 변경 패널 */}
       {showBgStrip && (
         <div className="w-64 shrink-0 flex flex-col px-4 py-6 pb-32 border-r border-white/10 portrait:w-full portrait:border-r-0 portrait:border-b portrait:py-3 portrait:pb-3">
-          <h3 className="text-white/80 text-sm font-semibold mb-3 shrink-0">{t("camera.bgChange")}</h3>
+          <h3 className="text-white text-xl font-bold text-center mb-4 shrink-0">{t("camera.bgChange")}</h3>
           <div className="grid grid-cols-2 gap-3 overflow-y-auto content-start portrait:grid-cols-6">
             {bgOptions.map((bg) => {
               const isSelected = selectedBackground === bg.id;
@@ -1062,7 +1062,7 @@ export function CameraSection({
 
       {/* 우측: 스티커 + 남은 촬영 횟수 패널 */}
       <div className="w-80 shrink-0 p-6 pb-40 flex flex-col border-l border-white/10 bg-black/20 portrait:w-full portrait:border-l-0 portrait:border-t portrait:max-h-[46vh] portrait:pb-24">
-        <h3 className="text-white/80 text-base font-semibold mb-3 shrink-0">{t("camera.stickerPrompt")}</h3>
+        <h3 className="text-white text-xl font-bold text-center mb-4 shrink-0">{t("camera.stickerPrompt")}</h3>
 
         {/* 스티커 패널 (상시 노출) */}
         <div className="flex-1 min-h-0 flex flex-col mb-4">
