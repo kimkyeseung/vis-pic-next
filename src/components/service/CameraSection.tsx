@@ -717,6 +717,17 @@ export function CameraSection({
   // 제스처 감지 루프가 최신 촬영 핸들러를 참조하도록 유지 (루프 재생성 없이)
   useEffect(() => { handleManualCaptureRef.current = handleManualCapture; }, [handleManualCapture]);
 
+  // 남은 촬영 횟수가 0이 되면(최대 매수 도달) 자동으로 다음 단계로 이동한다.
+  // 마지막 촬영본 프리뷰(1초)를 보여준 뒤 넘어가도록 약간의 지연을 둔다.
+  const onNextRef = useRef(onNext);
+  useEffect(() => { onNextRef.current = onNext; }, [onNext]);
+  useEffect(() => {
+    if (maxPhotos > 0 && photos.length >= maxPhotos) {
+      const timer = setTimeout(() => onNextRef.current(), 1200);
+      return () => clearTimeout(timer);
+    }
+  }, [photos.length, maxPhotos]);
+
   const addSticker = useCallback((opts: { emoji?: string; src?: string }) => {
     const newSticker: Sticker = {
       id: `${Date.now()}-${Math.random()}`,
