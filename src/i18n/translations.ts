@@ -13,7 +13,7 @@ const ko = {
   "start.waiting": "● 대기중 ●",
 
   "payment.title": "결제",
-  "payment.selectQuantity": "인쇄 매수를 선택해 주세요",
+  "payment.selectQuantity": "결제를 완료해 주세요",
   "payment.sheets": "{count}장",
   "payment.amount": "{amount}원",
   "payment.manualGuide": "결제 후 아래 버튼을 눌러주세요",
@@ -85,7 +85,7 @@ const en: Record<MessageKey, string> = {
   "start.waiting": "● Waiting ●",
 
   "payment.title": "Payment",
-  "payment.selectQuantity": "Select number of prints",
+  "payment.selectQuantity": "Please complete your payment",
   "payment.sheets": "{count} prints",
   "payment.amount": "₩{amount}",
   "payment.manualGuide": "After paying, press the button below",
@@ -155,7 +155,7 @@ const ja: Record<MessageKey, string> = {
   "start.waiting": "● 待機中 ●",
 
   "payment.title": "決済",
-  "payment.selectQuantity": "印刷枚数を選択してください",
+  "payment.selectQuantity": "決済を完了してください",
   "payment.sheets": "{count}枚",
   "payment.amount": "₩{amount}",
   "payment.manualGuide": "お支払い後、下のボタンを押してください",
@@ -225,7 +225,7 @@ const zh: Record<MessageKey, string> = {
   "start.waiting": "● 待机中 ●",
 
   "payment.title": "支付",
-  "payment.selectQuantity": "请选择打印数量",
+  "payment.selectQuantity": "请完成支付",
   "payment.sheets": "{count}张",
   "payment.amount": "₩{amount}",
   "payment.manualGuide": "付款后请按下方按钮",
