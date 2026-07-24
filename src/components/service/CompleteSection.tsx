@@ -474,15 +474,15 @@ export function CompleteSection({
 
         {(printStatus === "ready" || printStatus === "done") && compositeImage && (
           <>
-            <h2 className="text-5xl font-extrabold text-white mb-6 portrait:mb-4 animate-fadeInDown" style={{ textShadow: "0 2px 15px rgba(0,0,0,0.5)" }}>
+            <h2 className="text-4xl font-extrabold text-white mb-4 animate-fadeInDown" style={{ textShadow: "0 2px 15px rgba(0,0,0,0.5)" }}>
               {printStatus === "done" ? t("complete.done") : t("complete.ready")}
             </h2>
 
             {/* 좌우 반반(12컬럼 6/6): 미리보기 | QR. 세로에선 상하 스택. */}
-            <div className="flex items-center justify-center gap-8 mb-10 w-full max-w-5xl portrait:flex-col portrait:items-center portrait:gap-6">
+            <div className="flex items-center justify-center gap-8 mb-6 w-full max-w-5xl portrait:flex-col portrait:items-center portrait:gap-5">
               <div className="flex-1 flex justify-center min-w-0 portrait:w-full">
-                <div className="rounded-2xl overflow-hidden" style={{ maxWidth: "440px", boxShadow: "0 20px 50px rgba(0,0,0,0.4)" }}>
-                  <img src={compositeImage} alt="Composite" className="w-full" />
+                <div className="rounded-2xl overflow-hidden" style={{ boxShadow: "0 20px 50px rgba(0,0,0,0.4)" }}>
+                  <img src={compositeImage} alt="Composite" className="max-h-[58vh] portrait:max-h-[42vh] w-auto object-contain block" />
                 </div>
               </div>
 
@@ -530,20 +530,20 @@ export function CompleteSection({
             </div>
 
             {printStatus === "ready" && (
-              <div className="flex gap-6 justify-center mb-8">
-                <button className="service-button nav-button" onClick={handlePrint}>
+              <div className="flex gap-6 justify-center mb-4">
+                <button className="service-button nav-button nav-next-lg" onClick={handlePrint}>
                   &#128424; {t("complete.print")}
                 </button>
               </div>
             )}
 
             {printStatus === "done" && (
-              <p className="text-gray-400 text-lg mb-8">{t("complete.printDone")}</p>
+              <p className="text-gray-400 text-lg mb-4">{t("complete.printDone")}</p>
             )}
 
             <button
               className="service-button touch-button"
-              style={{ width: "auto", minHeight: "auto", padding: "25px 60px", fontSize: "1.5em" }}
+              style={{ width: "auto", minHeight: "auto", padding: "18px 48px", fontSize: "1.3em" }}
               onClick={onRestart}
             >
               {t("complete.restart")}

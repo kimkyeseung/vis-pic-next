@@ -57,7 +57,7 @@ const ko = {
   "select.reshoot": "다시 촬영",
 
   "complete.compositing": "사진 합성 중...",
-  "complete.ready": "사진이 완성되었습니다!",
+  "complete.ready": "QR 스캔 후 인화하기를 터치해주세요",
   "complete.done": "완료!",
   "complete.photoDl": "사진 다운로드",
   "complete.gifDl": "GIF 다운로드",
@@ -129,7 +129,7 @@ const en: Record<MessageKey, string> = {
   "select.reshoot": "Retake",
 
   "complete.compositing": "Creating your photo...",
-  "complete.ready": "Your photo is ready!",
+  "complete.ready": "Scan the QR, then tap Print",
   "complete.done": "Done!",
   "complete.photoDl": "Photo Download",
   "complete.gifDl": "GIF Download",
@@ -199,7 +199,7 @@ const ja: Record<MessageKey, string> = {
   "select.reshoot": "撮り直す",
 
   "complete.compositing": "写真を合成中...",
-  "complete.ready": "写真が完成しました！",
+  "complete.ready": "QRスキャン後、印刷をタップしてください",
   "complete.done": "完了！",
   "complete.photoDl": "写真ダウンロード",
   "complete.gifDl": "GIFダウンロード",
@@ -269,7 +269,7 @@ const zh: Record<MessageKey, string> = {
   "select.reshoot": "重新拍摄",
 
   "complete.compositing": "正在合成照片...",
-  "complete.ready": "照片完成了！",
+  "complete.ready": "扫描二维码后点击打印",
   "complete.done": "完成！",
   "complete.photoDl": "下载照片",
   "complete.gifDl": "下载GIF",
