@@ -69,7 +69,7 @@ export function CameraSection({
   const [countdown, setCountdown] = useState<number | null>(null);
   const [cameraError, setCameraError] = useState<{ key: MessageKey; reason?: string } | null>(null);
   const [flash, setFlash] = useState(false);
-  // 촬영 직후 촬영본을 0.5초간 프리뷰로 보여준다.
+  // 촬영 직후 촬영본을 1초간 프리뷰로 보여준다.
   const [capturedPreview, setCapturedPreview] = useState<string | null>(null);
   const capturedPreviewTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [segmenterStatus, setSegmenterStatus] = useState<"idle" | "loading" | "ready" | "error">("idle");
@@ -666,10 +666,10 @@ export function CameraSection({
         const dataUrl = snapshotWithStickers(0.92);
         if (dataUrl) {
           onCapture(dataUrl, frames);
-          // 촬영본 0.5초 프리뷰
+          // 촬영본 1초 프리뷰
           setCapturedPreview(dataUrl);
           if (capturedPreviewTimerRef.current) clearTimeout(capturedPreviewTimerRef.current);
-          capturedPreviewTimerRef.current = setTimeout(() => setCapturedPreview(null), 500);
+          capturedPreviewTimerRef.current = setTimeout(() => setCapturedPreview(null), 1000);
         }
 
         // 촬영 순간 셔터음 재생 + 플래시
