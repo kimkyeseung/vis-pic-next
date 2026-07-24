@@ -37,6 +37,7 @@ const ko = {
 
   "camera.title": "촬영",
   "camera.shoot": "촬영하기",
+  "camera.start": "사진 촬영을 시작해 주세요!",
   "camera.sticker": "스티커 추가",
   "camera.bgChange": "배경 변경이 가능해요!",
   "camera.stickerPrompt": "스티커를 추가해 보세요!",
@@ -109,6 +110,7 @@ const en: Record<MessageKey, string> = {
 
   "camera.title": "Capture",
   "camera.shoot": "Take Photo",
+  "camera.start": "Let's start taking photos!",
   "camera.sticker": "Add Sticker",
   "camera.bgChange": "You can change the background!",
   "camera.stickerPrompt": "Try adding stickers!",
@@ -179,6 +181,7 @@ const ja: Record<MessageKey, string> = {
 
   "camera.title": "撮影",
   "camera.shoot": "撮影する",
+  "camera.start": "写真撮影を始めましょう！",
   "camera.sticker": "ステッカー追加",
   "camera.bgChange": "背景を変更できます！",
   "camera.stickerPrompt": "ステッカーを追加してみましょう！",
@@ -249,6 +252,7 @@ const zh: Record<MessageKey, string> = {
 
   "camera.title": "拍摄",
   "camera.shoot": "拍照",
+  "camera.start": "开始拍照吧！",
   "camera.sticker": "添加贴纸",
   "camera.bgChange": "可以更换背景！",
   "camera.stickerPrompt": "试着添加贴纸吧！",

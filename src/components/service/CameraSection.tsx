@@ -874,10 +874,16 @@ export function CameraSection({
   const bgOptions = backgroundImages.length > 0 ? backgroundImages : FALLBACK_BACKGROUNDS;
 
   return (
-    <section className="w-full h-full flex portrait:flex-col relative z-10">
+    <section className="w-full h-full flex flex-col relative z-10">
       <video ref={videoRef} autoPlay playsInline muted className="hidden" />
 
       {flash && <div className="fixed inset-0 bg-white z-50 pointer-events-none animate-flash" />}
+
+      <h2 className="shrink-0 text-center text-3xl portrait:text-2xl font-extrabold text-white pt-5 pb-2" style={{ textShadow: "0 2px 15px rgba(0,0,0,0.5)" }}>
+        {t("camera.start")}
+      </h2>
+
+      <div className="flex-1 min-h-0 w-full flex portrait:flex-col">
 
       {/* 좌측: 배경 변경 패널 */}
       {showBgStrip && (
@@ -919,7 +925,7 @@ export function CameraSection({
       <div className="flex-1 min-w-0 flex flex-col items-center justify-center gap-4 px-6 py-4">
         <div
           className="camera-preview w-full aspect-video relative"
-          style={{ maxWidth: "calc((100vh - 240px) * 16 / 9)" }}
+          style={{ maxWidth: "calc((100vh - 300px) * 16 / 9)" }}
         >
           {/* 스티커 드래그 오버레이 */}
           <div
@@ -1052,7 +1058,7 @@ export function CameraSection({
           className="service-button w-full shrink-0 rounded-2xl font-extrabold py-6 portrait:py-4 text-3xl portrait:text-2xl"
           onClick={handleManualCapture}
           style={{
-            maxWidth: "calc((100vh - 240px) * 16 / 9)",
+            maxWidth: "calc((100vh - 300px) * 16 / 9)",
             ...(countdown !== null || photos.length >= maxPhotos ? { opacity: 0.5, pointerEvents: "none" } : {}),
           }}
         >
@@ -1139,6 +1145,7 @@ export function CameraSection({
             {t("camera.remaining", { n: String(Math.max(0, maxPhotos - photos.length)) })}
           </span>
         </div>
+      </div>
       </div>
 
       <ServiceNav onPrev={onPrev} onNext={onNext} nextDisabled={!canProceed} />
