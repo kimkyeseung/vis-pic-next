@@ -30,6 +30,16 @@ function parseRgbString(rgb: string): { r: number; g: number; b: number } {
   };
 }
 
+// 레거시 CHROMAKEY_MODE 값("0"=off, "1"=chromakey)을 셀렉트 옵션 값으로 정규화해
+// 저장된 실제 모드가 셀렉트에 올바로 표시되게 한다.
+function normalizeSelectValue(name: string, val: string | undefined): string {
+  if (name === "CHROMAKEY_MODE") {
+    if (val === "0") return "off";
+    if (val === "1") return "chromakey";
+  }
+  return val || "";
+}
+
 const FIELDS: { name: string; label: string; type?: "text" | "number" | "select" | "color"; options?: { value: string; label: string }[]; min?: number; max?: number; hint?: string; showIf?: (settings: Record<string, string>) => boolean }[] = [
   { name: "CAPTURE_SECONDS", label: "카운트다운 (초)", type: "number" },
   { name: "CAPTURE_COUNT_MODE", label: "촬영 횟수 모드", type: "select", options: [{ value: "uniform", label: "균일" }, { value: "custom", label: "커스텀" }] },
@@ -91,7 +101,7 @@ export default function CaptureSettingPage() {
               <div>
                 {field.type === "select" && field.options ? (
                   <select
-                    value={settings[field.name] || ""}
+                    value={normalizeSelectValue(field.name, settings[field.name])}
                     onChange={(e) => updateSetting(field.name, e.target.value)}
                     className="px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white text-sm focus:outline-none focus:border-blue-500"
                   >
