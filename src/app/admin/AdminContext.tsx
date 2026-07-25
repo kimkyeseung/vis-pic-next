@@ -31,10 +31,13 @@ export function AdminProvider({ children }: { children: React.ReactNode }) {
       const list: Device[] = data.devices || [];
       setDevices(list);
 
+      // 항상 하나의 지점이 선택돼 있도록: 저장된 선택 복원, 없으면 첫 장치 자동 선택
       const savedId = localStorage.getItem("admin_selected_device");
-      if (savedId) {
-        const found = list.find((d) => d.deviceId === savedId);
-        if (found) setSelectedDevice(found);
+      const found = savedId ? list.find((d) => d.deviceId === savedId) : undefined;
+      const initial = found ?? list[0];
+      if (initial) {
+        setSelectedDevice(initial);
+        localStorage.setItem("admin_selected_device", initial.deviceId);
       }
     } catch (error) {
       console.error("Failed to fetch devices:", error);

@@ -1,7 +1,9 @@
 "use client";
 
+import { useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
+import type { Device } from "@/types";
 import { useAdmin } from "../AdminContext";
 
 interface AdminSidebarProps {
@@ -13,6 +15,18 @@ export function AdminSidebar({ adminName, children }: AdminSidebarProps) {
   const router = useRouter();
   const pathname = usePathname();
   const { devices, selectedDevice, selectDevice, loading: devicesLoading } = useAdmin();
+  const [deviceMenuOpen, setDeviceMenuOpen] = useState(false);
+
+  const pathNoSlash = pathname.replace(/\/$/, "");
+
+  // 지점 전환: 항상 하나 선택 유지. 장치 관리(/admin/devices*) 경로에서만 대시보드로,
+  // 그 외(이미지·설정 등)에서는 현재 페이지를 유지한다.
+  const handleSelectDevice = (device: Device) => {
+    setDeviceMenuOpen(false);
+    if (selectedDevice?.id === device.id) return;
+    selectDevice(device);
+    if (pathNoSlash.startsWith("/admin/devices")) router.push("/admin");
+  };
 
   const handleLogout = async () => {
     await fetch("/api/admin/logout/", { method: "POST" }).catch(() => {});
@@ -30,7 +44,6 @@ export function AdminSidebar({ adminName, children }: AdminSidebarProps) {
     { href: "/admin/payment-history", label: "결제 내역", icon: "📋" },
   ];
 
-  const pathNoSlash = pathname.replace(/\/$/, "");
   const isAccountsSection = pathNoSlash.startsWith("/admin/accounts");
 
   const currentLabel = isAccountsSection
@@ -97,15 +110,7 @@ export function AdminSidebar({ adminName, children }: AdminSidebarProps) {
                     devices.map((device) => (
                       <li key={device.id}>
                         <button
-                          onClick={() => {
-                            const isSameDevice = selectedDevice?.id === device.id;
-                            selectDevice(isSameDevice ? null : device);
-                            // 다른 장치로 전환 시: 장치 관리(/admin/devices*) 페이지에 있을 때만
-                            // 대시보드로 이동하고, 이미지 관리·설정 등 장치별 페이지에서는 현재 페이지를 유지한다.
-                            if (!isSameDevice && pathNoSlash.startsWith("/admin/devices")) {
-                              router.push("/admin");
-                            }
-                          }}
+                          onClick={() => handleSelectDevice(device)}
                           className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-left text-sm transition-colors ${
                             selectedDevice?.id === device.id
                               ? "bg-blue-600 text-white"
@@ -165,9 +170,39 @@ export function AdminSidebar({ adminName, children }: AdminSidebarProps) {
       <div className="flex-1 flex flex-col overflow-hidden">
         <header className="h-16 bg-gray-800 border-b border-gray-700 flex items-center justify-between px-6">
           <div className="flex items-center gap-3 text-gray-400">
-            {selectedDevice && (
+            {!isAccountsSection && devices.length > 0 && (
               <>
-                <span className="text-white font-medium">{selectedDevice.name}</span>
+                <div className="relative">
+                  <button
+                    onClick={() => setDeviceMenuOpen((v) => !v)}
+                    className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-gray-700 hover:bg-gray-600 text-white text-sm transition-colors"
+                  >
+                    <span className={`w-2 h-2 rounded-full ${selectedDevice?.isActive ? "bg-green-400" : "bg-red-400"}`} />
+                    <span className="font-medium">{selectedDevice?.name ?? "지점 선택"}</span>
+                    <span className="text-gray-400 text-xs">▾</span>
+                  </button>
+                  {deviceMenuOpen && (
+                    <>
+                      <div className="fixed inset-0 z-10" onClick={() => setDeviceMenuOpen(false)} />
+                      <div className="absolute top-full left-0 mt-1 z-20 min-w-[220px] max-h-80 overflow-y-auto bg-gray-800 border border-gray-700 rounded-lg shadow-xl py-1">
+                        <div className="px-3 py-1.5 text-xs text-gray-500 uppercase tracking-wider">지점 선택</div>
+                        {devices.map((device) => (
+                          <button
+                            key={device.id}
+                            onClick={() => handleSelectDevice(device)}
+                            className={`w-full flex items-center gap-2 px-3 py-2 text-left text-sm transition-colors ${
+                              selectedDevice?.id === device.id ? "bg-blue-600 text-white" : "text-gray-300 hover:bg-gray-700"
+                            }`}
+                          >
+                            <span className={`w-2 h-2 rounded-full flex-shrink-0 ${device.isActive ? "bg-green-400" : "bg-red-400"}`} />
+                            <span className="truncate flex-1">{device.name}</span>
+                            {selectedDevice?.id === device.id && <span>✓</span>}
+                          </button>
+                        ))}
+                      </div>
+                    </>
+                  )}
+                </div>
                 <span className="text-gray-600">|</span>
               </>
             )}
