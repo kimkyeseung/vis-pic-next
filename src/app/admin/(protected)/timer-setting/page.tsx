@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useAdminDeviceSettings } from "@/hooks/useAdminDeviceSettings";
 
 const SECTIONS = [
   {
@@ -29,48 +29,23 @@ const SECTIONS = [
   },
 ];
 
+const FIELD_NAMES = SECTIONS.flatMap((s) => s.fields.map((f) => f.name));
+
 export default function TimerSettingPage() {
-  const [settings, setSettings] = useState<Record<string, string>>({});
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [message, setMessage] = useState("");
-
-  useEffect(() => {
-    fetch("/api/setting/")
-      .then((r) => r.json())
-      .then((d) => setSettings(d.settings || {}))
-      .catch(console.error)
-      .finally(() => setLoading(false));
-  }, []);
-
-  const updateSetting = (name: string, value: string) => {
-    setSettings((prev) => ({ ...prev, [name]: value }));
-  };
-
-  const handleSave = async () => {
-    setSaving(true);
-    setMessage("");
-    try {
-      const res = await fetch("/api/setting/", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(settings),
-      });
-      setMessage(res.ok ? "설정이 저장되었습니다." : "저장 실패");
-      if (res.ok) setTimeout(() => setMessage(""), 3000);
-    } catch {
-      setMessage("서버 연결 실패");
-    } finally {
-      setSaving(false);
-    }
-  };
+  const { selectedDevice, settings, update, save, loading, saving, message } = useAdminDeviceSettings();
 
   if (loading) return <div className="text-gray-400">로딩중...</div>;
+  if (!selectedDevice) return <div className="p-8 bg-gray-800 rounded-xl text-center text-gray-400">상단에서 지점을 선택하세요.</div>;
 
   return (
     <div className="max-w-3xl space-y-4">
       <div className="flex items-center justify-between mb-6">
-        <h2 className="text-2xl font-bold text-white">타이머 설정</h2>
+        <div>
+          <h2 className="text-2xl font-bold text-white">타이머 설정</h2>
+          <p className="mt-1 text-sm text-gray-500">
+            <span className="text-white font-medium">{selectedDevice.name}</span> 지점 설정입니다.
+          </p>
+        </div>
       </div>
 
       {SECTIONS.map((section) => (
@@ -86,7 +61,7 @@ export default function TimerSettingPage() {
                     type="number"
                     min={0}
                     value={settings[field.name] ?? ""}
-                    onChange={(e) => updateSetting(field.name, e.target.value)}
+                    onChange={(e) => update(field.name, e.target.value)}
                     className="px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white text-sm focus:outline-none focus:border-blue-500"
                     placeholder={field.placeholder}
                   />
@@ -106,7 +81,7 @@ export default function TimerSettingPage() {
 
       <div className="sticky bottom-0 py-4 bg-[#2a2a2a]">
         <button
-          onClick={handleSave}
+          onClick={() => save(FIELD_NAMES)}
           disabled={saving}
           className="px-8 py-3 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition-colors disabled:opacity-50"
         >

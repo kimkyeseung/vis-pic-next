@@ -15,7 +15,6 @@ export default function DeviceEditPage({
   const [device, setDevice] = useState<DeviceWithSettings | null>(null);
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
-  const [settings, setSettings] = useState<Record<string, string>>({});
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -30,12 +29,6 @@ export default function DeviceEditPage({
           setDevice(data.device);
           setName(data.device.name);
           setDescription(data.device.description || "");
-
-          const settingsMap: Record<string, string> = {};
-          for (const s of data.device.settings) {
-            settingsMap[s.name] = s.value;
-          }
-          setSettings(settingsMap);
         }
       } catch (error) {
         console.error("Failed to fetch device:", error);
@@ -66,15 +59,6 @@ export default function DeviceEditPage({
         return;
       }
 
-      // Update device settings
-      if (device) {
-        await fetch(`/api/device/${device.deviceId}/settings/`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(settings),
-        });
-      }
-
       router.push("/admin/devices");
     } catch {
       setError("서버 연결에 실패했습니다.");
@@ -82,42 +66,6 @@ export default function DeviceEditPage({
       setSaving(false);
     }
   };
-
-  const settingFields = [
-    {
-      name: "PAYMENT_ENABLED",
-      label: "결제 사용",
-      type: "select",
-      options: [
-        { value: "1", label: "사용" },
-        { value: "0", label: "사용 안함" },
-      ],
-    },
-    { name: "PAYMENT_AMOUNT", label: "1장당 가격 (원)", type: "number" },
-    { name: "CAPTURE_SECONDS", label: "촬영 카운트다운 (초)", type: "number" },
-    {
-      name: "CAPTURE_COUNT_MODE",
-      label: "촬영 횟수 모드",
-      type: "select",
-      options: [
-        { value: "uniform", label: "균일" },
-        { value: "custom", label: "커스텀" },
-      ],
-    },
-    {
-      name: "CHROMAKEY_MODE",
-      label: "배경 제거 모드",
-      type: "select",
-      options: [
-        { value: "mediapipe", label: "AI 배경 제거" },
-        { value: "chromakey", label: "크로마키" },
-        { value: "off", label: "비활성" },
-      ],
-    },
-    { name: "CHROMAKEY_RGB", label: "크로마키 RGB (크로마키 모드)", type: "text" },
-    { name: "CAMERA_AUTO_TIMER", label: "자동 촬영 타이머 (초, 기본 60)", type: "number" },
-    { name: "IDLE_TIMEOUT_SECONDS", label: "비활성 타임아웃 (초, 기본 30)", type: "number" },
-  ];
 
   if (loading) {
     return <div className="text-gray-400">로딩중...</div>;
@@ -177,40 +125,14 @@ export default function DeviceEditPage({
           </div>
         </div>
 
-        <div className="p-6 bg-gray-800 rounded-xl space-y-6">
-          <h3 className="text-lg font-semibold text-white border-b border-gray-700 pb-3">
-            장치 설정
+        <div className="p-6 bg-gray-800 rounded-xl">
+          <h3 className="text-lg font-semibold text-white border-b border-gray-700 pb-3 mb-3">
+            지점 설정
           </h3>
-
-          {settingFields.map((field) => (
-            <div key={field.name}>
-              <label className="block text-gray-300 mb-2">{field.label}</label>
-              {field.type === "select" ? (
-                <select
-                  value={settings[field.name] || ""}
-                  onChange={(e) =>
-                    setSettings({ ...settings, [field.name]: e.target.value })
-                  }
-                  className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-blue-500"
-                >
-                  {field.options?.map((opt) => (
-                    <option key={opt.value} value={opt.value}>
-                      {opt.label}
-                    </option>
-                  ))}
-                </select>
-              ) : (
-                <input
-                  type={field.type}
-                  value={settings[field.name] || ""}
-                  onChange={(e) =>
-                    setSettings({ ...settings, [field.name]: e.target.value })
-                  }
-                  className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-blue-500"
-                />
-              )}
-            </div>
-          ))}
+          <p className="text-sm text-gray-400">
+            결제·촬영·타이머·인화 등 지점별 설정은 상단에서 이 지점을 선택한 뒤
+            좌측 메뉴의 각 설정 페이지(결제 설정, 촬영 설정, 타이머 설정, 인화 설정)에서 관리합니다.
+          </p>
         </div>
 
         {error && (

@@ -30,6 +30,8 @@ export default function PrintSettingPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
+  // 로드 시점의 실효값(전역←지점). 저장 시 변경된 필드만 지점에 저장하는 기준.
+  const baselineRef = useRef<Record<string, string>>({});
 
   const [paperWidth, setPaperWidth] = useState("10");
   const [paperHeight, setPaperHeight] = useState("15");
@@ -96,10 +98,16 @@ export default function PrintSettingPage() {
   const loadSettings = async () => {
     setLoading(true);
     try {
-      const res = await fetch("/api/setting/");
-      if (!res.ok) return;
-      const data = await res.json();
-      const s: Record<string, string> = data.settings || {};
+      const deviceId = selectedDevice?.deviceId;
+      // 전역 기본값 ← 선택 지점 오버라이드 병합(이 지점의 실효값)
+      const [g, d] = (await Promise.all([
+        fetch("/api/setting/").then((r) => (r.ok ? r.json() : {})).catch(() => ({})),
+        deviceId
+          ? fetch(`/api/device/${deviceId}/settings/`).then((r) => (r.ok ? r.json() : {})).catch(() => ({}))
+          : Promise.resolve({}),
+      ])) as [{ settings?: Record<string, string> }, { settings?: Record<string, string> }];
+      const s: Record<string, string> = { ...(g.settings || {}), ...(d.settings || {}) };
+      baselineRef.current = s;
       setSettings(s);
 
       setPaperWidth(s.PICTURE_WIDTH || "10");
@@ -141,25 +149,39 @@ export default function PrintSettingPage() {
   }, [selectedDevice]);
 
   const handleSave = async () => {
+    const deviceId = selectedDevice?.deviceId;
+    if (!deviceId) { setMessage("먼저 상단에서 지점을 선택하세요."); return; }
     setSaving(true);
     setMessage("");
     try {
-      const updatedSettings: Record<string, string> = {
+      const intended: Record<string, string> = {
         ...settings,
         PICTURE_WIDTH: paperWidth,
         PICTURE_HEIGHT: paperHeight,
         CAPTURE_MODES: modes.join(","),
         PRINTER_NAME: printerName,
       };
+      // 변경된 필드만 이 지점 설정으로 저장(바꾸지 않은 값은 전역 기본값을 따르도록)
+      const payload: Record<string, string> = {};
+      for (const [k, v] of Object.entries(intended)) {
+        if (typeof v === "string" && v !== baselineRef.current[k]) payload[k] = v;
+      }
+      if (Object.keys(payload).length === 0) {
+        setMessage("변경사항이 없습니다.");
+        setTimeout(() => setMessage(""), 2000);
+        setSaving(false);
+        return;
+      }
 
-      const res = await fetch("/api/setting/", {
+      const res = await fetch(`/api/device/${deviceId}/settings/`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(updatedSettings),
+        body: JSON.stringify(payload),
       });
 
       if (res.ok) {
-        setSettings(updatedSettings);
+        setSettings(intended);
+        for (const k of Object.keys(payload)) baselineRef.current[k] = payload[k];
         setMessage("설정이 저장되었습니다.");
         setTimeout(() => setMessage(""), 3000);
       } else {
@@ -505,11 +527,17 @@ export default function PrintSettingPage() {
 
 
   if (loading) return <div className="text-gray-400">로딩중...</div>;
+  if (!selectedDevice) return <div className="p-8 bg-gray-800 rounded-xl text-center text-gray-400">상단에서 지점을 선택하세요.</div>;
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold text-white">인화 설정</h2>
+        <div>
+          <h2 className="text-2xl font-bold text-white">인화 설정</h2>
+          <p className="mt-1 text-sm text-gray-500">
+            <span className="text-white font-medium">{selectedDevice.name}</span> 지점 설정입니다.
+          </p>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-[1fr_400px] gap-6">

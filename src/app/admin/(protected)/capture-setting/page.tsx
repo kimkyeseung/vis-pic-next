@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { HexColorPicker } from "react-colorful";
 import { BackgroundRemovalPreviewDialog } from "@/components/admin/BackgroundRemovalPreviewDialog";
 import { parseIntSafe, clampPercent } from "@/lib/deviceConfig";
+import { useAdminDeviceSettings } from "@/hooks/useAdminDeviceSettings";
 
 /** "R,G,B" 문자열 → "#rrggbb". 파싱 실패 시 기본 그린스크린 색상으로 대체. */
 function rgbStringToHex(rgb: string): string {
@@ -59,50 +60,25 @@ const FIELDS: { name: string; label: string; type?: "text" | "number" | "select"
   },
 ];
 
+const FIELD_NAMES = FIELDS.map((f) => f.name);
+
 export default function CaptureSettingPage() {
-  const [settings, setSettings] = useState<Record<string, string>>({});
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [message, setMessage] = useState("");
+  const { selectedDevice, settings, update: updateSetting, save, loading, saving, message } = useAdminDeviceSettings();
   const [colorPickerOpen, setColorPickerOpen] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
 
-  useEffect(() => {
-    fetch("/api/setting/")
-      .then((r) => r.json())
-      .then((d) => setSettings(d.settings || {}))
-      .catch(console.error)
-      .finally(() => setLoading(false));
-  }, []);
-
-  const updateSetting = (name: string, value: string) => {
-    setSettings((prev) => ({ ...prev, [name]: value }));
-  };
-
-  const handleSave = async () => {
-    setSaving(true);
-    setMessage("");
-    try {
-      const res = await fetch("/api/setting/", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(settings),
-      });
-      setMessage(res.ok ? "설정이 저장되었습니다." : "저장 실패");
-      if (res.ok) setTimeout(() => setMessage(""), 3000);
-    } catch {
-      setMessage("서버 연결 실패");
-    } finally {
-      setSaving(false);
-    }
-  };
-
   if (loading) return <div className="text-gray-400">로딩중...</div>;
+  if (!selectedDevice) return <div className="p-8 bg-gray-800 rounded-xl text-center text-gray-400">상단에서 지점을 선택하세요.</div>;
 
   return (
     <div className="max-w-3xl space-y-4">
       <div className="flex items-center justify-between mb-6">
-        <h2 className="text-2xl font-bold text-white">촬영 설정</h2>
+        <div>
+          <h2 className="text-2xl font-bold text-white">촬영 설정</h2>
+          <p className="mt-1 text-sm text-gray-500">
+            <span className="text-white font-medium">{selectedDevice.name}</span> 지점 설정입니다.
+          </p>
+        </div>
       </div>
 
       <div className="bg-gray-800 rounded-xl border border-gray-700 overflow-hidden">
@@ -195,7 +171,7 @@ export default function CaptureSettingPage() {
 
       <div className="sticky bottom-0 py-4 bg-[#2a2a2a]">
         <button
-          onClick={handleSave}
+          onClick={() => save(FIELD_NAMES)}
           disabled={saving}
           className="px-8 py-3 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition-colors disabled:opacity-50"
         >

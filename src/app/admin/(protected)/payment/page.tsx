@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useAdminDeviceSettings } from "@/hooks/useAdminDeviceSettings";
 
 const PAYMENT_FIELDS = [
   { name: "PAYMENT_ENABLED", label: "결제 사용", type: "select" as const, options: [{ value: "1", label: "사용" }, { value: "0", label: "사용 안함" }] },
@@ -18,51 +18,22 @@ const PAYAPP_FIELDS = [
   { name: "PAYAPP_OPENPAYTYPE", label: "결제 수단 (card,phone,...)" },
 ];
 
+const FIELD_NAMES = [...PAYMENT_FIELDS, ...PAYAPP_FIELDS].map((f) => f.name);
+
 export default function PaymentPage() {
-  const [settings, setSettings] = useState<Record<string, string>>({});
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [message, setMessage] = useState("");
-
-  useEffect(() => {
-    fetch("/api/setting/")
-      .then((r) => r.json())
-      .then((d) => setSettings(d.settings || {}))
-      .catch(console.error)
-      .finally(() => setLoading(false));
-  }, []);
-
-  const update = (name: string, value: string) =>
-    setSettings((prev) => ({ ...prev, [name]: value }));
-
-  const handleSave = async () => {
-    setSaving(true);
-    setMessage("");
-    try {
-      const res = await fetch("/api/setting/", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(settings),
-      });
-      setMessage(res.ok ? "저장되었습니다." : "저장 실패");
-      if (res.ok) setTimeout(() => setMessage(""), 3000);
-    } catch {
-      setMessage("서버 연결 실패");
-    } finally {
-      setSaving(false);
-    }
-  };
+  const { selectedDevice, settings, update, save, loading, saving, message } = useAdminDeviceSettings();
 
   const paymentEnabled = settings["PAYMENT_ENABLED"] === "1";
 
   if (loading) return <div className="text-gray-400">로딩중...</div>;
+  if (!selectedDevice) return <div className="p-8 bg-gray-800 rounded-xl text-center text-gray-400">상단에서 지점을 선택하세요.</div>;
 
   return (
     <div className="max-w-2xl space-y-6">
       <div>
         <h2 className="text-2xl font-bold text-white">결제 설정</h2>
         <p className="mt-1 text-sm text-gray-500">
-          모든 장치에 공통 적용되는 전역 설정입니다. 장치별로 같은 키의 설정이 있으면 해당 장치에서는 그 값이 우선합니다.
+          <span className="text-white font-medium">{selectedDevice.name}</span> 지점 설정입니다.
         </p>
       </div>
 
@@ -129,7 +100,7 @@ export default function PaymentPage() {
 
       <div className="sticky bottom-0 py-4 bg-[#2a2a2a]">
         <button
-          onClick={handleSave}
+          onClick={() => save(FIELD_NAMES)}
           disabled={saving}
           className="px-8 py-3 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition-colors disabled:opacity-50"
         >
