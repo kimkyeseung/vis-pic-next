@@ -165,7 +165,7 @@ export function useDeviceSetup(deviceId: string) {
         signal.addEventListener("abort", () => clearTimeout(timer), { once: true });
       };
       try {
-        const res = await fetch(`/api/image/list/5/?device_id=${id}`, {
+        const res = await fetch(`/api/image/list/5/?device_id=${id}&linked=1`, {
           signal,
           cache: "no-store",
         });
@@ -188,7 +188,7 @@ export function useDeviceSetup(deviceId: string) {
         signal.addEventListener("abort", () => clearTimeout(timer), { once: true });
       };
       try {
-        const res = await fetch(`/api/image/list/${LOGO_IMAGE_TYPE}/?device_id=${id}`, {
+        const res = await fetch(`/api/image/list/${LOGO_IMAGE_TYPE}/?device_id=${id}&linked=1`, {
           signal,
           cache: "no-store",
         });

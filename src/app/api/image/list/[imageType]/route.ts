@@ -10,17 +10,23 @@ export async function GET(
     const { imageType } = await params;
     const searchParams = request.nextUrl.searchParams;
     const deviceId = searchParams.get("device_id");
+    // linked=1: "해당 디바이스에 연결된 것만"(전체 디바이스용 제외) — 지점별 전용 이미지(테마 등)에 사용
+    const linkedOnly = searchParams.get("linked") === "1";
 
     const whereClause: Record<string, unknown> = {
       imageType: parseInt(imageType),
     };
 
-    // 연결 행이 없으면(모든 디바이스) 또는 해당 디바이스에 연결된 이미지만 노출
     if (deviceId) {
-      whereClause.OR = [
-        { devices: { none: {} } },
-        { devices: { some: { deviceId } } },
-      ];
+      if (linkedOnly) {
+        whereClause.devices = { some: { deviceId } };
+      } else {
+        // 연결 행이 없으면(모든 디바이스) 또는 해당 디바이스에 연결된 이미지만 노출
+        whereClause.OR = [
+          { devices: { none: {} } },
+          { devices: { some: { deviceId } } },
+        ];
+      }
     }
 
     const images = await prisma.image.findMany({

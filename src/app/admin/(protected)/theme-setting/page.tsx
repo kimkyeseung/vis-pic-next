@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { HexColorPicker } from "react-colorful";
+import { useAdmin } from "@/app/admin/AdminContext";
 
 const WALLPAPER_TYPE = 5;
 const LOGO_TYPE = 6;
@@ -122,6 +123,8 @@ function ColorRow({
 }
 
 export default function ThemeSettingPage() {
+  const { selectedDevice } = useAdmin();
+  const deviceId = selectedDevice?.deviceId ?? null;
   const [textColor, setTextColor] = useState("#ffffff");
   const [primaryColor, setPrimaryColor] = useState("#6c6fb4");
   const [wallpaper, setWallpaper] = useState<Asset>(null);
@@ -137,36 +140,47 @@ export default function ThemeSettingPage() {
     if (!msg.includes("실패")) setTimeout(() => setMessage(""), 3000);
   };
 
+  // 선택 지점에 연결된(linked) 테마 이미지만 조회 — 지점별 전용
   const loadAsset = async (type: number): Promise<Asset> => {
-    const res = await fetch(`/api/image/list/${type}/`, { cache: "no-store" });
+    if (!deviceId) return null;
+    const res = await fetch(`/api/image/list/${type}/?device_id=${deviceId}&linked=1`, { cache: "no-store" });
     const data = await res.json();
     const first = data.images?.[0];
     return first && data.baseUrl ? { id: first.id, filename: first.filename, url: `${data.baseUrl}/${first.filename}` } : null;
   };
 
   useEffect(() => {
+    let cancelled = false;
     (async () => {
+      if (!deviceId) { setLoading(false); return; }
+      setLoading(true);
       try {
-        const [settingRes, wp, lg] = await Promise.all([
+        // 색상: 전역 기본값 ← 이 지점 오버라이드 병합
+        const [g, d, wp, lg] = await Promise.all([
           fetch("/api/setting/").then((r) => r.json()).catch(() => ({})),
+          fetch(`/api/device/${deviceId}/settings/`).then((r) => r.json()).catch(() => ({})),
           loadAsset(WALLPAPER_TYPE),
           loadAsset(LOGO_TYPE),
         ]);
-        if (settingRes?.settings?.THEME_TEXT_COLOR) setTextColor(settingRes.settings.THEME_TEXT_COLOR);
-        if (settingRes?.settings?.THEME_PRIMARY_COLOR) setPrimaryColor(settingRes.settings.THEME_PRIMARY_COLOR);
+        if (cancelled) return;
+        const s = { ...(g.settings || {}), ...(d.settings || {}) };
+        setTextColor(s.THEME_TEXT_COLOR || "#ffffff");
+        setPrimaryColor(s.THEME_PRIMARY_COLOR || "#6c6fb4");
         setWallpaper(wp);
         setLogo(lg);
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     })();
-  }, []);
+    return () => { cancelled = true; };
+  }, [deviceId]);
 
   const handleSaveColors = async () => {
+    if (!deviceId) { flash("먼저 상단에서 지점을 선택하세요."); return; }
     setSaving(true);
     setMessage("");
     try {
-      const res = await fetch("/api/setting/", {
+      const res = await fetch(`/api/device/${deviceId}/settings/`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ THEME_TEXT_COLOR: textColor, THEME_PRIMARY_COLOR: primaryColor }),
@@ -197,7 +211,7 @@ export default function ThemeSettingPage() {
       form.append("file", file);
       form.append("name", name);
       form.append("imageType", String(type));
-      form.append("deviceIds", "[]"); // 모든 디바이스
+      form.append("deviceIds", JSON.stringify(deviceId ? [deviceId] : [])); // 이 지점 전용
       const res = await fetch("/api/admin/images/upload/", { method: "POST", body: form });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
@@ -237,11 +251,15 @@ export default function ThemeSettingPage() {
   };
 
   if (loading) return <div className="text-gray-400">로딩중...</div>;
+  if (!selectedDevice) return <div className="p-8 bg-gray-800 rounded-xl text-center text-gray-400">상단에서 지점을 선택하세요.</div>;
 
   return (
     <div className="max-w-3xl space-y-4">
-      <div className="flex items-center justify-between mb-6">
+      <div className="mb-6">
         <h2 className="text-2xl font-bold text-white">테마 관리</h2>
+        <p className="mt-1 text-sm text-gray-500">
+          <span className="text-white font-medium">{selectedDevice.name}</span> 지점 테마입니다. (배경화면·로고·색상)
+        </p>
       </div>
 
       <AssetUploader
