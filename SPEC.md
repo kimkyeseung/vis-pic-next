@@ -30,7 +30,7 @@
 22. [빌드 시스템](#22-빌드-시스템)
 23. [관리자 패널](#23-관리자-패널)
 24. [다국어 (i18n)](#24-다국어-i18n)
-25. [테마 관리 (배경화면 / 글자색)](#25-테마-관리-배경화면--글자색)
+25. [테마 관리 (배경화면 / 로고 / 색상) — 지점별](#25-테마-관리-배경화면--로고--색상--지점별)
 26. [손바닥 제스처 촬영](#26-손바닥-제스처-촬영)
 
 ---
@@ -168,7 +168,7 @@
 | `/admin/devices/[id]` | `src/app/admin/(protected)/devices/[id]/page.tsx` | 디바이스 편집 |
 | `/admin/images` | `src/app/admin/(protected)/images/page.tsx` | 배경/프레임/스티커 이미지 관리 |
 | `/admin/images/upload` | `src/app/admin/(protected)/images/upload/page.tsx` | 이미지 업로드 |
-| `/admin/theme-setting` | `src/app/admin/(protected)/theme-setting/page.tsx` | 테마 관리 — 서비스 화면 배경화면(wallpaper)·글자색 (§25 참고) |
+| `/admin/theme-setting` | `src/app/admin/(protected)/theme-setting/page.tsx` | 테마 관리(지점별) — 배경화면·로고·글자색·강조색 (§25 참고) |
 | `/admin/print-setting` | `src/app/admin/(protected)/print-setting/page.tsx` | 인쇄 레이아웃 치수 설정 |
 | `/admin/capture-setting` | `src/app/admin/(protected)/capture-setting/page.tsx` | 촬영/배경 제거 설정 (§12, §23 참고) |
 | `/admin/timer-setting` | `src/app/admin/(protected)/timer-setting/page.tsx` | 유휴·촬영·인화 타이머 설정 |
@@ -222,8 +222,8 @@
 ### Step 2: PAYMENT (조건부)
 
 - `config.paymentEnabled === false`이면 자동 스킵
-- **인쇄 매수 선택**: `PAYMENT_QUANTITY_OPTIONS`(예: 1,2,4) 카드 중 선택 →
-  **총액 = `PAYMENT_AMOUNT`(장당 금액) × 선택 수량**, 하단에 선택 총액 실시간 표시.
+- **인쇄 매수 선택**: **1장/2장/4장 고정** 카드 중 선택 →
+  **총액 = `PAYMENT_AMOUNT`(1장당 가격) × 선택 매수**, 하단에 선택 총액 실시간 표시.
   선택한 매수는 `usePhotoFlow.printQuantity`에 저장되어 인화 단계에서 그 수만큼 출력된다(§16).
 - **언어 선택**: 언어 버튼이 이 화면에 있다(결제 비활성 시에는 시작 화면에 표시 — §24).
 - **Manual 모드**: 결제하기 → 결제 완료로 간주하고 진행
@@ -245,7 +245,9 @@
 
 ### Step 4: BACKGROUND SELECT
 
-- 업로드된 배경 이미지 (type=1) 표시
+- **지점별 배경 뱅크**: 서비스 화면엔 관리자가 이 지점에 선택·정렬한 배경(type=1, 최대 6개)만 순서대로 표시
+  (뱅크 모델 — 업로드는 공용 뱅크, 지점마다 `ImageDevice`로 노출 배경 선택·`sortOrder`로 순서 지정. §23·관리자 이미지 관리 참고)
+  - `useDeviceSetup`은 `GET /api/device/[deviceId]/backgrounds`로 이 지점 선택분만 로드
 - MP4/WebM 영상 배경 자동 재생 미리보기
 - 그라디언트 폴백 지원 (6종) — 목록 로드 실패 시 재시도 후에도 실패하면 표시 (§20)
 - **랜덤 자동 선택**: 페이지 진입 시 `selectedBackground`가 `null`이면 배경 풀에서 랜덤으로 하나를 자동 선택
@@ -375,17 +377,19 @@ useSceneSyncReceiver → BroadcastChannel.onmessage(state)   ※ 레거시
 | 메서드 | 경로 | 설명 |
 |--------|------|------|
 | GET | `/api/device/[deviceId]/settings` | 디바이스 설정 조회 |
-| POST | `/api/device/[deviceId]/settings` | 디바이스 설정 업데이트 |
-| GET | `/api/setting` | 전역 설정 조회 |
+| POST | `/api/device/[deviceId]/settings` | 디바이스 설정 업데이트 (지점별 오버라이드) |
+| GET | `/api/device/[deviceId]/backgrounds` | 이 지점에 선택된 배경(순서대로, 최대 6) — 뱅크 모델(§5 Step 4) |
+| PUT | `/api/device/[deviceId]/backgrounds` | 이 지점 노출 배경 선택·순서 교체 (`{ imageIds }`) |
+| GET | `/api/setting` | 전역 설정 조회 (기본값/폴백) |
 | POST | `/api/setting` | 전역 설정 업데이트 |
 
 ### 이미지 & 배경
 
 | 메서드 | 경로 | 설명 |
 |--------|------|------|
-| GET | `/api/image/list/[imageType]` | 이미지 목록 (1=촬영 배경, 2=프레임/인쇄 배경, 3=스티커, 5=배경화면/테마) |
+| GET | `/api/image/list/[imageType]` | 이미지 목록 (1=촬영 배경, 2=프레임/인쇄 배경, 3=스티커, 5=배경화면, 6=로고). `?device_id=X` 필터, `&linked=1`=해당 지점 연결분만 |
 | GET | `/api/images/url` | 이미지 베이스 URL (Supabase Storage) |
-| POST | `/api/admin/images/upload` | 이미지 업로드 (최대 50MB) |
+| POST | `/api/admin/images/upload` | 이미지 업로드 (최대 50MB, `deviceIds`로 지점 연결) |
 | DELETE | `/api/admin/images/[id]` | 이미지 삭제 |
 
 ### 관리자
@@ -861,8 +865,8 @@ open_camera_window(x, y, width, height)
 
 ## 17. 결제 시스템 (PayApp)
 
-> 결제 금액은 고정이 아니라 **`PAYMENT_AMOUNT`(장당 금액) × 결제 화면에서 고른 매수**로 계산된다(§5 Step 2).
-> 선택 매수는 인화 단계에서 실제 출력 매수로 쓰인다(§16).
+> 결제 금액은 **`PAYMENT_AMOUNT`(1장당 가격) × 결제 화면에서 고른 매수(1/2/4장 고정)**로 계산된다(§5 Step 2).
+> 선택 매수는 인화 단계에서 실제 출력 매수로 쓰인다(§16). `PAYMENT_AMOUNT`는 지점별로 다르게 설정 가능(§20).
 
 ### 결제 흐름
 
@@ -1006,6 +1010,11 @@ MediaPipe WASM 4종 + 모델 1종
 전역과 디바이스 설정을 병렬 조회 후 `{...global, ...device}`로 합쳐
 `config`(파싱된 값)와 `printSettings`(원시 키-값)를 구성한다.
 
+**관리자 설정 편집은 "선택한 지점" 기준**: 결제·촬영·타이머·인화·테마 설정 페이지는
+상단 헤더에서 선택한 지점의 실효값(전역←지점 병합)을 보여주고, **변경한 필드만 해당
+지점(DeviceSetting)에 저장**한다(`useAdminDeviceSettings`). 전역 설정은 새 지점의
+기본값/폴백으로만 남는다. 지점 미선택 시 안내를 표시한다.
+
 **로드 실패 재시도**: 설정과 배경 목록 조회가 모두 실패하면(서버 기동
 직후 등) 3초 간격으로 최대 5회 재시도한다. 재시도가 없으면 배경은 폴백
 그라디언트, 설정은 하드코딩 기본값(결제 비활성 등)으로 영영 남는다.
@@ -1021,8 +1030,7 @@ MediaPipe WASM 4종 + 모델 1종
 | `CHROMAKEY_MODE` | "mediapipe" | 배경 제거 모드 |
 | `CHROMAKEY_RGB` | "0,255,0" | 크로마키 색상 |
 | `PAYMENT_ENABLED` | "0" | 결제 활성화 |
-| `PAYMENT_AMOUNT` | "1000" | 장당(1장) 금액 (원) — 총액 = 금액 × 선택 매수 |
-| `PAYMENT_QUANTITY_OPTIONS` | "1,2,4" | 결제 화면 인쇄 매수 옵션 (쉼표 구분). 미설정 시 코드 기본 1,2,4 |
+| `PAYMENT_AMOUNT` | "1000" | **1장당 가격**(원). 결제 화면 매수는 1/2/4장 고정, 총액 = 가격 × 매수 |
 | `PAYMENT_TERMINAL_MODE` | "manual" | 결제 모드 |
 | `IDLE_TIMEOUT_SECONDS` | "30" | 자동 진행 타임아웃 |
 | `CAMERA_AUTO_TIMER` | "60" | 자동 촬영 타이머 (초) |
@@ -1030,7 +1038,8 @@ MediaPipe WASM 4종 + 모델 1종
 | `PRINTER_NAME` | "" | 출력 프린터 (비우면 기본 프린터) |
 | `MODE_2_2_WIDTH` | — | 2×2 모드 사진 슬롯 너비 (cm) |
 | `MODE_2_2_HEIGHT` | — | 2×2 모드 사진 슬롯 높이 (cm) |
-| `THEME_TEXT_COLOR` | "#ffffff" | 서비스 화면 글자색 (테마 관리, §25) |
+| `THEME_TEXT_COLOR` | "#ffffff" | 서비스 화면 글자색 (테마 관리, §25). 지점별로 저장 가능 |
+| `THEME_PRIMARY_COLOR` | "#6c6fb4" | 강조(primary) 색상 — 선택 강조·주요 버튼 (테마 관리, §25). 지점별 |
 
 ---
 
@@ -1209,24 +1218,27 @@ npm run tauri:build
 
 ---
 
-## 25. 테마 관리 (배경화면 / 글자색)
+## 25. 테마 관리 (배경화면 / 로고 / 색상) — 지점별
 
-관리자 **테마 관리** 페이지(`/admin/theme-setting`)에서 서비스(키오스크) 화면의
-배경화면 이미지와 글자색을 설정한다. 관리자 UI에는 적용되지 않고 `/service`에만 적용된다.
+관리자 **테마 관리** 페이지(`/admin/theme-setting`)에서 **상단에서 선택한 지점**의 서비스
+화면 배경화면·로고 이미지와 글자색·강조(primary) 색상을 설정한다. 지점마다 다르게 적용되며,
+관리자 UI에는 적용되지 않고 `/service`에만 적용된다. 지점 전환 시 그 지점 테마가 로드된다.
 
-### 배경화면 (wallpaper)
+### 배경화면 (wallpaper, type 5) / 로고 (logo, type 6)
 
-- 이미지 타입 **id 5(wallpaper)** 로 저장 — 기존 이미지 업로드/목록/삭제 API를 그대로 재사용
-  (`/api/admin/images/upload`, `/api/image/list/5/`, `DELETE /api/admin/images/[id]`).
-- **한 장만 유지**: 새 이미지 업로드 시 기존 wallpaper를 먼저 삭제한다.
-- `deviceIds: []`(모든 디바이스)로 업로드 → 어느 디바이스에서든 노출.
-- `useDeviceSetup`이 type 5 목록의 첫 항목을 `wallpaperUrl`로 노출하고,
-  service 페이지 루트 `<div>`의 `background-image`(cover)로 적용. 미설정 시 기본 `#2a2a2a`.
+- 기존 이미지 업로드/목록/삭제 API 재사용. **업로드 시 선택 지점에 연결**(`deviceIds: [지점]`)해
+  **지점 전용**으로 저장하고, **한 장만 유지**(새 업로드 전 기존 것 삭제).
+- 조회는 **지점 연결분만**(`/api/image/list/{5|6}/?device_id=X&linked=1`) — 목록 API의 `linked=1`
+  파라미터는 "전체 디바이스용 제외, 해당 지점 연결분만"을 의미한다.
+- `useDeviceSetup`이 이 지점의 wallpaper/logo를 `wallpaperUrl`/`logoUrl`로 노출.
+  wallpaper는 service 루트 `<div>` `background-image`(cover), 로고는 대기화면 등에 표시.
+  미설정 시 기본 배경 `#2a2a2a` / 기본 로고(AR-pic 텍스트).
 
-### 글자색
+### 글자색 / 강조(primary) 색상
 
-- 전역 설정 `THEME_TEXT_COLOR`(기본 `#ffffff`)로 저장 (§20).
-- service 루트에 `service-theme` 클래스 + `--theme-text` CSS 변수를 내리고,
+- `THEME_TEXT_COLOR`(기본 `#ffffff`) / `THEME_PRIMARY_COLOR`(기본 `#6c6fb4`) 설정 — **지점별
+  저장**(전역←지점 병합, §20). primary는 선택 강조(카드 테두리·체크)와 주요 버튼에 쓰인다.
+- service 루트에 `service-theme` 클래스 + `--theme-text`·`--theme-primary` CSS 변수를 내리고,
   `globals.css`의 `.service-theme .text-white`(및 `/90`~`/30` 투명도 변형, `color-mix`로 톤 유지)
   규칙이 **본문 흰색 텍스트**를 테마색으로 치환한다 (규칙이 레이어 밖이라 Tailwind 유틸보다 우선).
 - **제외 대상(대비 안전)**: 자체 배경색을 가진 버튼 — 흰 배경·어두운 글자의 `.service-button`,
@@ -1234,9 +1246,10 @@ npm run tauri:build
 
 ### DB 준비
 
-- ImageType `id 5`와 `THEME_TEXT_COLOR` 기본값은 `prisma/seed.ts`에 포함.
+- ImageType `id 5`(wallpaper)·`id 6`(logo)와 `THEME_TEXT_COLOR`·`THEME_PRIMARY_COLOR`
+  기본값은 `prisma/seed.ts`에 포함.
 - 운영 DB에는 전체 seed(가드 `SEED_FORCE`) 대신 멱등 스크립트 사용:
-  `npm run db:add-theme` (`prisma/add-theme-wallpaper.ts`) — 이 2개 행만 안전하게 추가.
+  `npm run db:add-theme` (`prisma/add-theme-wallpaper.ts`) — 이미지 타입 5·6 + 두 색상 설정만 안전하게 추가.
 
 ---
 

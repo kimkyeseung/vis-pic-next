@@ -185,10 +185,15 @@ QR코드 다운로드를 위한 고해상도 인화 이미지를 서버에 저�
   "success": true,
   "image_id": "a1b2c3d4",
   "image_url": "/static/prints/20260624_a1b2c3d4.jpg",
-  "expiry_date": "2026년 06월 27일",
+  "expiry_date": "2026-06-27",
   "expiry_days": 3
 }
 ```
+
+> **만료일 포맷**: 서버는 `expiry_date`를 로케일 중립 **ISO(`YYYY-MM-DD`)**로 반환하고,
+> 표시할 때 클라이언트가 현재 언어에 맞춰 포맷한다(`CompleteSection`). 이전엔 한글 고정
+> 문자열(`YYYY년 MM월 DD일`)이었으나, 다국어 화면에서 날짜만 한글로 남는 문제로 변경됨.
+> (아래 예시 중 일부는 구 포맷 표기가 남아 있을 수 있음 — 실제 값은 ISO)
 
 **핵심 로직:**
 ```python
