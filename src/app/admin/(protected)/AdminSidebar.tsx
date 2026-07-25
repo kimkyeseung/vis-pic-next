@@ -25,7 +25,13 @@ export function AdminSidebar({ adminName, children }: AdminSidebarProps) {
     setDeviceMenuOpen(false);
     if (selectedDevice?.id === device.id) return;
     selectDevice(device);
-    if (pathNoSlash.startsWith("/admin/devices")) router.push("/admin");
+    // 장치 편집 페이지에서 지점 전환 → 새 지점의 편집 페이지로 이동(그 지점 설정/가격을 이어서 편집).
+    // 그 외 장치 관리 경로(목록·생성)에서는 대시보드로, 이미지·설정 등은 현재 페이지 유지.
+    if (/^\/admin\/devices\/\d+$/.test(pathNoSlash)) {
+      router.push(`/admin/devices/${device.id}`);
+    } else if (pathNoSlash.startsWith("/admin/devices")) {
+      router.push("/admin");
+    }
   };
 
   const handleLogout = async () => {
