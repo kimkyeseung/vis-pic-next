@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import OrderDialog from "./OrderDialog";
 import EditDialog from "./EditDialog";
+import BackgroundBankPanel from "./BackgroundBankPanel";
 import { useAdmin } from "@/app/admin/AdminContext";
 import { BACKGROUND_IMAGE_TYPE, MAX_ACTIVE_BACKGROUNDS, WALLPAPER_IMAGE_TYPE, LOGO_IMAGE_TYPE } from "@/constants/images";
 
@@ -256,54 +257,44 @@ export default function ImagesPage() {
             </button>
           ))}
         </div>
-        <div className="flex items-center gap-2">
-          {/* 전체 / 이 장치 이미지 보기 토글 */}
-          <div className="flex rounded-lg overflow-hidden border border-gray-600 text-sm">
+        {/* 배경 탭은 뱅크 UI(장치별 선택)를 쓰므로 전체/장치 필터·순서관리 숨김 */}
+        {!isBackgroundTab && (
+          <div className="flex items-center gap-2">
+            {/* 전체 / 이 장치 이미지 보기 토글 */}
+            <div className="flex rounded-lg overflow-hidden border border-gray-600 text-sm">
+              <button
+                onClick={() => setDeviceFilter("all")}
+                className={`px-3 py-2 transition-colors ${deviceFilter === "all" ? "bg-blue-600 text-white" : "bg-gray-700 text-gray-300 hover:bg-gray-600"}`}
+              >
+                전체
+              </button>
+              <button
+                onClick={() => setDeviceFilter("device")}
+                disabled={!currentDeviceId}
+                title={currentDeviceId ? undefined : "장치를 먼저 선택하세요"}
+                className={`px-3 py-2 transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${deviceFilter === "device" ? "bg-blue-600 text-white" : "bg-gray-700 text-gray-300 hover:bg-gray-600"}`}
+              >
+                {selectedDevice ? `${selectedDevice.name} 이미지` : "이 장치"}
+              </button>
+            </div>
             <button
-              onClick={() => setDeviceFilter("all")}
-              className={`px-3 py-2 transition-colors ${deviceFilter === "all" ? "bg-blue-600 text-white" : "bg-gray-700 text-gray-300 hover:bg-gray-600"}`}
+              onClick={() => setShowOrderDialog(true)}
+              disabled={images.length === 0}
+              className="px-4 py-2 rounded-lg bg-gray-700 text-gray-200 hover:bg-gray-600 transition-colors disabled:opacity-50"
             >
-              전체
-            </button>
-            <button
-              onClick={() => setDeviceFilter("device")}
-              disabled={!currentDeviceId}
-              title={currentDeviceId ? undefined : "장치를 먼저 선택하세요"}
-              className={`px-3 py-2 transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${deviceFilter === "device" ? "bg-blue-600 text-white" : "bg-gray-700 text-gray-300 hover:bg-gray-600"}`}
-            >
-              {selectedDevice ? `${selectedDevice.name} 이미지` : "이 장치"}
+              순서 관리
             </button>
           </div>
-          <button
-            onClick={() => setShowOrderDialog(true)}
-            disabled={images.length === 0}
-            className="px-4 py-2 rounded-lg bg-gray-700 text-gray-200 hover:bg-gray-600 transition-colors disabled:opacity-50"
-          >
-            순서 관리
-          </button>
-        </div>
+        )}
       </div>
 
-      {isBackgroundTab && (
-        <div
-          className={`px-4 py-3 rounded-lg border text-sm flex items-center justify-between gap-3 ${
-            activeBackgroundCount > MAX_ACTIVE_BACKGROUNDS
-              ? "bg-red-900/40 border-red-600 text-red-300"
-              : "bg-gray-800 border-gray-700 text-gray-300"
-          }`}
-        >
-          <span>
-            <span className="font-semibold text-white">서비스에 노출할 배경을 선택하세요</span> (최대 {MAX_ACTIVE_BACKGROUNDS}개) — 카드를 클릭해 켜고 끕니다.
-            {activeBackgroundCount > MAX_ACTIVE_BACKGROUNDS &&
-              ` 현재 ${MAX_ACTIVE_BACKGROUNDS}개를 초과했습니다 — 초과분을 꺼주세요.`}
-          </span>
-          <span className={`shrink-0 font-bold ${activeBackgroundCount > MAX_ACTIVE_BACKGROUNDS ? "" : "text-white"}`}>
-            선택됨 {activeBackgroundCount} / {MAX_ACTIVE_BACKGROUNDS}
-          </span>
-        </div>
-      )}
-
-      {loading ? (
+      {isBackgroundTab ? (
+        <BackgroundBankPanel
+          deviceId={currentDeviceId}
+          deviceName={selectedDevice?.name ?? null}
+          imageBaseUrl={imageBaseUrl}
+        />
+      ) : loading ? (
         <div className="text-gray-400">로딩중...</div>
       ) : images.length === 0 ? (
         <div className="p-8 bg-gray-800 rounded-xl text-center">

@@ -124,11 +124,14 @@ model Image {
 }
 
 /// 이미지 ↔ 디바이스 다대다. 연결 행이 없으면 "모든 디바이스"에 적용된다.
+/// 배경(imageType 1)의 경우 이 연결이 "해당 지점 서비스 화면에 노출할 배경 선택"을 의미하며
+/// sortOrder로 지점별 노출 순서를 관리한다(뱅크 모델).
 model ImageDevice {
-  imageId  Int    @map("image_id")
-  deviceId String @map("device_id") @db.VarChar(64)
-  image    Image  @relation(fields: [imageId], references: [id], onDelete: Cascade)
-  device   Device @relation(fields: [deviceId], references: [deviceId], onDelete: Cascade)
+  imageId   Int    @map("image_id")
+  deviceId  String @map("device_id") @db.VarChar(64)
+  sortOrder Int    @default(0) @map("sort_order")
+  image     Image  @relation(fields: [imageId], references: [id], onDelete: Cascade)
+  device    Device @relation(fields: [deviceId], references: [deviceId], onDelete: Cascade)
 
   @@id([imageId, deviceId])
   @@index([deviceId])

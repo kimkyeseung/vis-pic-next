@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import type { DeviceConfig, BGImage } from "@/types";
 import { parseIntSafe, parseBgRemovalMode, parsePaymentTerminalMode, parseCaptureModes, parseQuantityOptions, parsePaymentTiers, clampPercent } from "@/lib/deviceConfig";
-import { MAX_ACTIVE_BACKGROUNDS, LOGO_IMAGE_TYPE } from "@/constants/images";
+import { LOGO_IMAGE_TYPE } from "@/constants/images";
 
 const DEFAULT_CONFIG: DeviceConfig = {
   deviceId: "test",
@@ -119,7 +119,8 @@ export function useDeviceSetup(deviceId: string) {
         signal.addEventListener("abort", () => clearTimeout(timer), { once: true });
       };
       try {
-        const res = await fetch(`/api/image/list/1/?device_id=${id}`, {
+        // 뱅크 모델: 이 지점에 노출되도록 선택된 배경만(순서대로, 최대 6개) 로드
+        const res = await fetch(`/api/device/${id}/backgrounds/`, {
           signal,
           cache: "no-store",
         });
@@ -128,13 +129,7 @@ export function useDeviceSetup(deviceId: string) {
           return;
         }
         const data = await res.json();
-        // 활성 배경만, 우선순위 상위 최대 6개만 서비스 화면에 노출
-        if (data.images?.length > 0) {
-          const activeBgs = data.images
-            .filter((img: { active?: boolean }) => img.active !== false)
-            .slice(0, MAX_ACTIVE_BACKGROUNDS);
-          setBackgroundImages(activeBgs);
-        }
+        if (data.images) setBackgroundImages(data.images);
         if (data.baseUrl) setImageBaseUrl(data.baseUrl);
       } catch (err) {
         if ((err as Error).name === "AbortError") return;
