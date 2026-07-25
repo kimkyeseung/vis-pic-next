@@ -28,18 +28,19 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
 
-    for (const [name, value] of Object.entries(body)) {
-      if (typeof value === "string") {
-        await prisma.setting.upsert({
-          where: { name },
-          update: { value },
-          create: { name, value },
-        });
-      } else if (value === null) {
+    // 설정을 병렬로 처리 (순차 upsert 시 원격 DB 왕복이 개수만큼 누적되어 느림)
+    await Promise.all(
+      Object.entries(body).map(([name, value]) => {
+        if (typeof value === "string") {
+          return prisma.setting.upsert({ where: { name }, update: { value }, create: { name, value } });
+        }
         // null 값은 해당 설정 삭제를 의미 (예: 인쇄 배경 제거)
-        await prisma.setting.deleteMany({ where: { name } });
-      }
-    }
+        if (value === null) {
+          return prisma.setting.deleteMany({ where: { name } });
+        }
+        return null;
+      }),
+    );
 
     return NextResponse.json({ success: true });
   } catch (error) {

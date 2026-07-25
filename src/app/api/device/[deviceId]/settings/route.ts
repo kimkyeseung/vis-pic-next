@@ -90,17 +90,17 @@ export async function POST(
       );
     }
 
-    for (const [name, value] of Object.entries(body)) {
-      if (typeof value === "string") {
-        await prisma.deviceSetting.upsert({
-          where: {
-            deviceId_name: { deviceId, name },
-          },
+    // 설정을 병렬로 upsert (순차 처리 시 원격 DB 왕복이 개수만큼 누적되어 느림)
+    await Promise.all(
+      Object.entries(body).map(([name, value]) => {
+        if (typeof value !== "string") return null;
+        return prisma.deviceSetting.upsert({
+          where: { deviceId_name: { deviceId, name } },
           update: { value },
           create: { deviceId, name, value },
         });
-      }
-    }
+      }),
+    );
 
     return NextResponse.json({ success: true });
   } catch (error) {
