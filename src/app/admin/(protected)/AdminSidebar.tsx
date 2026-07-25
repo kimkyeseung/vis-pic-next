@@ -98,10 +98,11 @@ export function AdminSidebar({ adminName, children }: AdminSidebarProps) {
                       <li key={device.id}>
                         <button
                           onClick={() => {
-                            selectDevice(
-                              selectedDevice?.id === device.id ? null : device
-                            );
-                            if (selectedDevice?.id !== device.id) {
+                            const isSameDevice = selectedDevice?.id === device.id;
+                            selectDevice(isSameDevice ? null : device);
+                            // 다른 장치로 전환 시: 장치 관리(/admin/devices*) 페이지에 있을 때만
+                            // 대시보드로 이동하고, 이미지 관리·설정 등 장치별 페이지에서는 현재 페이지를 유지한다.
+                            if (!isSameDevice && pathNoSlash.startsWith("/admin/devices")) {
                               router.push("/admin");
                             }
                           }}
