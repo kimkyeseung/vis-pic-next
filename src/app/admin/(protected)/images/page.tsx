@@ -286,19 +286,20 @@ export default function ImagesPage() {
 
       {isBackgroundTab && (
         <div
-          className={`px-4 py-3 rounded-lg border text-sm ${
+          className={`px-4 py-3 rounded-lg border text-sm flex items-center justify-between gap-3 ${
             activeBackgroundCount > MAX_ACTIVE_BACKGROUNDS
               ? "bg-red-900/40 border-red-600 text-red-300"
               : "bg-gray-800 border-gray-700 text-gray-300"
           }`}
         >
-          활성 배경{" "}
-          <span className={activeBackgroundCount > MAX_ACTIVE_BACKGROUNDS ? "font-bold" : "font-semibold text-white"}>
-            {activeBackgroundCount} / {MAX_ACTIVE_BACKGROUNDS}
+          <span>
+            <span className="font-semibold text-white">서비스에 노출할 배경을 선택하세요</span> (최대 {MAX_ACTIVE_BACKGROUNDS}개) — 카드를 클릭해 켜고 끕니다.
+            {activeBackgroundCount > MAX_ACTIVE_BACKGROUNDS &&
+              ` 현재 ${MAX_ACTIVE_BACKGROUNDS}개를 초과했습니다 — 초과분을 꺼주세요.`}
           </span>
-          {" "}— 서비스 화면에는 활성 배경만 최대 {MAX_ACTIVE_BACKGROUNDS}개까지 표시됩니다.
-          {activeBackgroundCount > MAX_ACTIVE_BACKGROUNDS &&
-            ` 현재 ${MAX_ACTIVE_BACKGROUNDS}개를 초과했습니다 — 우선순위 상위 ${MAX_ACTIVE_BACKGROUNDS}개만 노출되니 초과분을 비활성화하세요.`}
+          <span className={`shrink-0 font-bold ${activeBackgroundCount > MAX_ACTIVE_BACKGROUNDS ? "" : "text-white"}`}>
+            선택됨 {activeBackgroundCount} / {MAX_ACTIVE_BACKGROUNDS}
+          </span>
         </div>
       )}
 
@@ -324,18 +325,25 @@ export default function ImagesPage() {
               className="bg-gray-800 rounded-xl overflow-hidden"
             >
               <div
-                onClick={() => setEditingImage(image)}
+                onClick={() => (isBackgroundTab ? handleToggleActive(image) : setEditingImage(image))}
                 className={`aspect-video bg-gray-700 flex items-center justify-center cursor-pointer group relative ${
                   isBackgroundTab && !image.active ? "opacity-40" : ""
                 }`}
-                title="클릭하여 편집"
+                title={isBackgroundTab ? (image.active ? "노출 중 — 클릭하여 숨김" : "숨김 — 클릭하여 노출") : "클릭하여 편집"}
               >
-                <span className="absolute inset-0 z-10 hidden items-center justify-center bg-black/40 text-sm font-medium text-white group-hover:flex">
-                  편집
-                </span>
-                {isBackgroundTab && !image.active && (
-                  <span className="absolute top-2 left-2 z-20 bg-black/70 text-gray-200 text-xs px-2 py-0.5 rounded">
-                    비활성
+                {isBackgroundTab ? (
+                  image.active ? (
+                    <span className="absolute top-2 right-2 z-20 w-7 h-7 rounded-full bg-blue-600 text-white flex items-center justify-center text-sm font-bold shadow">
+                      ✓
+                    </span>
+                  ) : (
+                    <span className="absolute top-2 left-2 z-20 bg-black/70 text-gray-200 text-xs px-2 py-0.5 rounded">
+                      숨김
+                    </span>
+                  )
+                ) : (
+                  <span className="absolute inset-0 z-10 hidden items-center justify-center bg-black/40 text-sm font-medium text-white group-hover:flex">
+                    편집
                   </span>
                 )}
                 {isVideo(image.filename) ? (
@@ -377,18 +385,6 @@ export default function ImagesPage() {
                   </span>
                 </div>
                 <div className="mt-3 space-y-2">
-                  {isBackgroundTab && (
-                    <button
-                      onClick={() => handleToggleActive(image)}
-                      className={`w-full px-2 py-1 text-sm rounded transition-colors ${
-                        image.active
-                          ? "bg-green-600 text-white hover:bg-green-500"
-                          : "bg-gray-600 text-gray-200 hover:bg-gray-500"
-                      }`}
-                    >
-                      {image.active ? "활성 (클릭 시 비활성)" : "비활성 (클릭 시 활성)"}
-                    </button>
-                  )}
                   <button
                     onClick={() => setEditingImage(image)}
                     className="w-full px-2 py-1 bg-gray-700 text-white text-sm rounded hover:bg-gray-600 transition-colors"
