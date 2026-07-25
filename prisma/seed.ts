@@ -84,7 +84,7 @@ async function main() {
   // Create default device settings
   const defaultSettings = [
     { name: "PAYMENT_ENABLED", value: "1", description: "결제 사용 여부" },
-    { name: "PAYMENT_TIERS", value: "1:5000,2:9000,4:18000", description: "인쇄 매수별 개별 가격 (수량:가격, 쉼표 구분)" },
+    { name: "PAYMENT_AMOUNT", value: "5000", description: "1장당 가격(원). 결제 화면 1/2/4장 고정, 총액 = 가격 × 매수" },
     { name: "CAPTURE_SECONDS", value: "3", description: "촬영 카운트다운" },
     { name: "CAPTURE_COUNT_MODE", value: "uniform", description: "촬영 횟수 모드 (uniform/custom)" },
     { name: "CAPTURE_COUNT_UNIFORM", value: "4", description: "슬롯당 촬영 횟수" },

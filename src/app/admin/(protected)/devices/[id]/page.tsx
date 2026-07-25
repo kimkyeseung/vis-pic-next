@@ -93,7 +93,7 @@ export default function DeviceEditPage({
         { value: "0", label: "사용 안함" },
       ],
     },
-    { name: "PAYMENT_TIERS", label: "인쇄 매수/가격 (예: 1:5000,2:9000,4:18000)", type: "text" },
+    { name: "PAYMENT_AMOUNT", label: "1장당 가격 (원)", type: "number" },
     { name: "CAPTURE_SECONDS", label: "촬영 카운트다운 (초)", type: "number" },
     {
       name: "CAPTURE_COUNT_MODE",

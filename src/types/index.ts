@@ -39,11 +39,9 @@ export interface DeviceConfig {
   deviceId: string;
   deviceName: string;
   paymentEnabled: boolean;
-  /** 장당(1장) 금액. PAYMENT_TIERS 미설정 시 티어 가격 폴백 계산에 사용. */
+  /** 1장당 가격. 결제 화면 매수 티어 가격 = paymentAmount × 수량(1/2/4 고정). */
   paymentAmount: number;
-  /** 결제 화면에서 고를 수 있는 인쇄 매수 옵션 (예: [1, 2, 4]). PAYMENT_TIERS 폴백용. */
-  paymentQuantityOptions: number[];
-  /** 인쇄 매수별 개별 가격 티어. 결제 화면 카드 = 이 목록, 총액 = 선택 티어 가격. */
+  /** 인쇄 매수별 가격 티어(1/2/4장). 결제 화면 카드 = 이 목록, 총액 = 선택 티어 가격. */
   paymentTiers: PaymentTier[];
   paymentTerminalMode: PaymentTerminalMode;
   captureSeconds: number;

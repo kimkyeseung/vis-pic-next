@@ -1,18 +1,20 @@
 import { useState, useEffect } from "react";
 import type { DeviceConfig, BGImage } from "@/types";
-import { parseIntSafe, parseBgRemovalMode, parsePaymentTerminalMode, parseCaptureModes, parseQuantityOptions, parsePaymentTiers, clampPercent } from "@/lib/deviceConfig";
+import { parseIntSafe, parseBgRemovalMode, parsePaymentTerminalMode, parseCaptureModes, clampPercent } from "@/lib/deviceConfig";
 import { LOGO_IMAGE_TYPE } from "@/constants/images";
+
+// 결제 화면 인쇄 매수 선택지(고정). 가격 = 1장당 가격(PAYMENT_AMOUNT) × 수량.
+const PAYMENT_QUANTITIES = [1, 2, 4];
 
 const DEFAULT_CONFIG: DeviceConfig = {
   deviceId: "test",
   deviceName: "테스트 장치",
   paymentEnabled: false,
-  paymentAmount: 1000,
-  paymentQuantityOptions: [1, 2, 4],
+  paymentAmount: 5000,
   paymentTiers: [
     { qty: 1, price: 5000 },
-    { qty: 2, price: 9000 },
-    { qty: 4, price: 18000 },
+    { qty: 2, price: 10000 },
+    { qty: 4, price: 20000 },
   ],
   paymentTerminalMode: "payapp_lite",
   captureSeconds: 3,
@@ -72,13 +74,9 @@ export function useDeviceSetup(deviceId: string) {
         setPrintSettings(s);
 
         const captureCount = parseIntSafe(s.CAPTURE_COUNT_UNIFORM || "", 4) || 4;
-        // 티어별 개별가: PAYMENT_TIERS 우선, 없으면 (장당 금액 × 매수 옵션)으로 폴백(하위호환)
-        const perSheet = parseIntSafe(s.PAYMENT_AMOUNT || "", 1000);
-        const quantityOptions = parseQuantityOptions(s.PAYMENT_QUANTITY_OPTIONS || "1,2,4");
-        const tiersFromSetting = parsePaymentTiers(s.PAYMENT_TIERS || "");
-        const paymentTiers = tiersFromSetting.length > 0
-          ? tiersFromSetting
-          : quantityOptions.map((qty) => ({ qty, price: qty * perSheet }));
+        // 관리자는 "1장당 가격"(PAYMENT_AMOUNT)만 설정, 매수 선택지는 1/2/4장 고정.
+        const perSheet = parseIntSafe(s.PAYMENT_AMOUNT || "", 5000);
+        const paymentTiers = PAYMENT_QUANTITIES.map((qty) => ({ qty, price: qty * perSheet }));
         const modes = parseCaptureModes(s.CAPTURE_MODES || "1x1,2x2");
         const bgRemovalMode = parseBgRemovalMode(s.CHROMAKEY_MODE || "mediapipe");
         const paymentTerminalMode = parsePaymentTerminalMode(s.PAYMENT_TERMINAL_MODE || "payapp_lite");
@@ -88,7 +86,6 @@ export function useDeviceSetup(deviceId: string) {
           deviceName: deviceData.device?.name || id,
           paymentEnabled: s.PAYMENT_ENABLED === "1",
           paymentAmount: perSheet,
-          paymentQuantityOptions: quantityOptions,
           paymentTiers,
           paymentTerminalMode,
           captureSeconds: parseIntSafe(s.CAPTURE_SECONDS || "", 3),
