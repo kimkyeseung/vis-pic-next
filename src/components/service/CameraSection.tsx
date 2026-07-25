@@ -9,6 +9,7 @@ import { useFrameSender } from "@/hooks/useSceneSync";
 import { createSoundPlayer, type SoundPlayer } from "@/lib/sounds";
 import { CircularTimer } from "@/components/service/CircularTimer";
 import { ServiceNav } from "@/components/service/ServiceNav";
+import { suppressMediapipeLogs } from "@/lib/suppressMediapipeLogs";
 import { useLanguage } from "@/i18n/LanguageContext";
 import type { MessageKey } from "@/i18n/translations";
 
@@ -113,6 +114,10 @@ export function CameraSection({
     const [r, g, b] = config.chromakeyRgb.split(",").map(Number);
     return { r: r ?? 0, g: g ?? 255, b: b ?? 0 };
   }, [config.chromakeyRgb]);
+
+  // MediaPipe/TFLite 내부 로그(console.error로 나오는 INFO 등)가 Next dev 에러 오버레이를
+  // 띄워 화면을 가리는 것을 방지한다.
+  useEffect(() => { suppressMediapipeLogs(); }, []);
 
   useEffect(() => {
     bgSourceRef.current = null;

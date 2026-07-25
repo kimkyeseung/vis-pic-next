@@ -4,6 +4,7 @@ import { useEffect, useRef } from "react";
 import { useFrameSender } from "@/hooks/useSceneSync";
 import { fillGradientFromCSS } from "@/lib/canvas";
 import { FALLBACK_BACKGROUNDS } from "@/constants/frames";
+import { suppressMediapipeLogs } from "@/lib/suppressMediapipeLogs";
 import type { BGImage, BgRemovalMode } from "@/types";
 
 type Segmenter = {
@@ -93,6 +94,7 @@ export function CameraStreamer({
 
   // MediaPipe 세그멘터 초기화
   useEffect(() => {
+    suppressMediapipeLogs();
     if (bgRemovalMode !== "mediapipe") {
       segmenterRef.current?.close();
       segmenterRef.current = null;
