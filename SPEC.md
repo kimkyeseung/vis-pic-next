@@ -395,7 +395,8 @@ useSceneSyncReceiver → BroadcastChannel.onmessage(state)   ※ 레거시
 | GET | `/api/device/[deviceId]/backgrounds` | 이 지점에 선택된 배경(순서대로, 최대 6) — 뱅크 모델(§5 Step 4) |
 | PUT | `/api/device/[deviceId]/backgrounds` | 이 지점 노출 배경 선택·순서 교체 (`{ imageIds }`) |
 | GET | `/api/setting` | 전역 설정 조회 (기본값/폴백) |
-| POST | `/api/setting` | 전역 설정 업데이트 |
+| POST | `/api/setting` | 전역 설정 업데이트 (값 `null`이면 해당 키 삭제) |
+| GET | `/api/devices` | (공개) 초기 장치 선택용 활성 장치 목록 — 인증 없이 `deviceId`·`name`만 |
 
 ### 이미지 & 배경
 
@@ -403,7 +404,11 @@ useSceneSyncReceiver → BroadcastChannel.onmessage(state)   ※ 레거시
 |--------|------|------|
 | GET | `/api/image/list/[imageType]` | 이미지 목록 (1=촬영 배경, 2=프레임/인쇄 배경, 3=스티커, 5=배경화면, 6=로고). `?device_id=X` 필터, `&linked=1`=해당 지점 연결분만 |
 | GET | `/api/images/url` | 이미지 베이스 URL (Supabase Storage) |
-| POST | `/api/admin/images/upload` | 이미지 업로드 (최대 50MB, `deviceIds`로 지점 연결) |
+| POST | `/api/admin/images/upload` | 이미지 업로드 (최대 50MB, `deviceIds`로 지점 연결) — 서버 경유 업로드 |
+| POST | `/api/admin/images/presign` | Supabase Storage 직접 업로드용 서명 URL 발급 (미설정 시 `{mode:"local"}` 폴백) |
+| POST | `/api/admin/images/register` | presign 업로드 완료 후 DB 이미지 레코드 등록 (`deviceIds`로 지점 연결) |
+| POST | `/api/admin/images/reorder` | 이미지 순서(priority) 재정렬 (`{ ids }`, 앞일수록 상위) |
+| PATCH | `/api/admin/images/[id]` | 이미지 메타데이터 수정 (이름·활성·초점 등) |
 | DELETE | `/api/admin/images/[id]` | 이미지 삭제 |
 
 ### 관리자
@@ -411,12 +416,19 @@ useSceneSyncReceiver → BroadcastChannel.onmessage(state)   ※ 레거시
 | 메서드 | 경로 | 설명 |
 |--------|------|------|
 | POST | `/api/admin/login` | 관리자 로그인 (세션 쿠키 반환) |
+| POST | `/api/admin/logout` | 관리자 로그아웃 (세션 쿠키 만료) |
 | GET | `/api/admin/devices` | 디바이스 목록 |
 | POST | `/api/admin/devices` | 디바이스 생성 |
 | GET | `/api/admin/devices/[id]` | 디바이스 상세 |
 | POST | `/api/admin/devices/[id]` | 디바이스 수정 |
 | POST | `/api/admin/devices/clone` | 디바이스 설정 복제 |
-| GET | `/api/admin/image-types` | 이미지 타입 목록 |
+| GET | `/api/admin/image-types` | 이미지 타입 목록 (기본 3종 upsert 보장, §23) |
+| GET | `/api/admin/accounts` | 관리자 계정 목록 |
+| POST | `/api/admin/accounts` | 관리자 계정 생성 |
+| PATCH | `/api/admin/accounts/[id]` | 계정 수정 (활성 여부 등) |
+| DELETE | `/api/admin/accounts/[id]` | 계정 삭제 |
+| POST | `/api/admin/accounts/[id]/change-password` | 계정 비밀번호 변경 |
+| GET | `/api/admin/payments` | 결제 내역 조회 (페이지네이션, `status`·`deviceId` 필터) |
 
 ### 결제
 
@@ -431,6 +443,7 @@ useSceneSyncReceiver → BroadcastChannel.onmessage(state)   ※ 레거시
 | 메서드 | 경로 | 설명 |
 |--------|------|------|
 | POST | `/api/print/upload-image` | 합성 사진 업로드 (3일 만료 URL) |
+| GET | `/api/print/cleanup` | 만료(3일 경과) 사진 정리 — Supabase·로컬 모두. `CRON_SECRET` 있으면 Bearer 인증 |
 | POST | `/api/gif/create` | 단순 GIF 생성 |
 | POST | `/api/gif/create-layout` | 레이아웃 기반 GIF 생성 |
 | GET | `/api/gif/[gifId]` | GIF 메타데이터 조회 |
@@ -481,24 +494,40 @@ useSceneSyncReceiver → BroadcastChannel.onmessage(state)   ※ 레거시
 | name | String | 설정 키 |
 | value | String | 설정 값 |
 
-**`Image`** - 배경/프레임 이미지
+**`Image`** - 배경/프레임 이미지 (테이블 `pic_image`)
 
 | 필드 | 타입 | 설명 |
 |------|------|------|
 | id | Int (PK) | 자동 증가 |
-| deviceId | String? | Device 외래키 (null=전역) |
-| imageType | Int | 1=촬영 배경, 2=프레임(인쇄 배경), 3=스티커, 5=배경화면(테마) |
+| ~~deviceId~~ | String? | **deprecated** — 지점 지정은 `ImageDevice` 조인 테이블 사용, 더 이상 읽지 않음 |
+| imageType | Int | 1=촬영 배경, 2=프레임(인쇄 배경), 3=스티커, 5=배경화면(테마), 6=로고 |
+| name | String | 표시 이름 (최대 32자) |
 | filename | String | 파일명 |
 | width | Int? | 이미지 너비 (px) |
 | height | Int? | 이미지 높이 (px) |
-| priority | Int | 정렬 순서 |
+| left / top / right / bottom | Int? | 크롭/여백 좌표 (선택) |
+| priority | Int | 정렬 순서 (desc 정렬, 클수록 상위) |
+| active | Boolean | 활성 여부 — 서비스 화면엔 active=true만 노출. 배경(type 1)은 최대 6개까지만 활성 |
+| focalX / focalY | Float? | 초점 좌표 (0~1, 기본 0.5). cover 배치 시 중심 |
+| createdAt | DateTime | 생성 시각 |
+
+**`ImageDevice`** - 이미지 ↔ 디바이스 다대다 (테이블 `pic_image_device`)
+
+| 필드 | 타입 | 설명 |
+|------|------|------|
+| imageId | Int (PK) | Image 외래키 |
+| deviceId | String (PK) | Device 외래키 |
+| sortOrder | Int | 지점별 노출 순서 (배경 뱅크 모델, §5 Step 4) |
+
+> 연결 행이 **없으면** "모든 디바이스"에 적용. 배경(imageType 1)에서는 이 연결이 곧
+> "이 지점 서비스 화면에 노출할 배경 선택"을 의미하며 `sortOrder`로 순서를 관리한다.
 
 **`ImageType`** - 이미지 카테고리
 
 | 필드 | 타입 | 설명 |
 |------|------|------|
-| id | Int (PK) | 1=배경, 2=프레임, 3=스티커, 5=배경화면(wallpaper) |
-| name | String | 카테고리 이름 (background/image/sticker/wallpaper) |
+| id | Int (PK) | 1=배경, 2=프레임, 3=스티커, 5=배경화면(wallpaper), 6=로고(logo) |
+| name | String | 카테고리 이름 (background/image/sticker/wallpaper/logo) |
 
 > 과거 `print_background`(id 4)는 프레임(id 2)으로 통합됨 — 클라이언트 인쇄 배경 = 프레임(type 2).
 > 테마 배경화면은 id 4 잔재와 충돌을 피해 **id 5(wallpaper)** 를 사용한다 (§25).
@@ -508,8 +537,9 @@ useSceneSyncReceiver → BroadcastChannel.onmessage(state)   ※ 레거시
 | 필드 | 타입 | 설명 |
 |------|------|------|
 | id | Int (PK) | 자동 증가 |
-| username | String | 사용자명 |
+| username | String | 사용자명 (unique) |
 | password | String | bcrypt 해시 |
+| name | String? | 표시 이름 (선택) |
 | isActive | Boolean | 활성 여부 |
 
 **`PayappPayment`** - 결제 내역
@@ -517,16 +547,20 @@ useSceneSyncReceiver → BroadcastChannel.onmessage(state)   ※ 레거시
 | 필드 | 타입 | 설명 |
 |------|------|------|
 | id | Int (PK) | 자동 증가 |
-| orderId | String | 주문 ID |
+| orderId | String | 주문 ID (unique) |
 | deviceId | String | 기기 ID |
 | amount | Int | 결제 금액 (원) |
+| goodname | String | 상품명 |
 | status | String | pending / paid / refunded |
 | payState | String? | PayApp pay_state 코드 |
 | mulNo | String? | PayApp 거래번호 |
+| userid | String? | PayApp 판매자 ID (교차검증용) |
+| var1 / var2 | String? | PayApp 커스텀 필드 (var1=orderId 회신용) |
 | rawPayload | String? | PayApp 원시 콜백 JSON |
 | paidAt | DateTime? | 결제 완료 시각 |
 | cancelledAt | DateTime? | 취소 시각 |
 | createdAt | DateTime | 생성 시각 |
+| updatedAt | DateTime | 수정 시각 |
 
 ---
 
