@@ -37,6 +37,8 @@ export function CameraStreamer({
   imageBaseUrl = "",
   bgRemovalMode = "off",
   chromakeyRgb = "0,255,0",
+  segmentThreshold = 15,
+  segmentFeather = 35,
 }: {
   enabled: boolean;
   sendFrames?: boolean;
@@ -45,6 +47,10 @@ export function CameraStreamer({
   imageBaseUrl?: string;
   bgRemovalMode?: BgRemovalMode;
   chromakeyRgb?: string;
+  /** AI 배경제거 경계 침식 (0-100%). 메인 촬영 화면과 동일한 관리자 설정값. */
+  segmentThreshold?: number;
+  /** AI 배경제거 경계 부드러움 (0-100%). 메인 촬영 화면과 동일한 관리자 설정값. */
+  segmentFeather?: number;
 }) {
   const frameChannelRef = useFrameSender(enabled && sendFrames);
   const lastSentRef = useRef(0);
@@ -58,9 +64,14 @@ export function CameraStreamer({
   const selectedBgRef = useRef(selectedBackground);
   const bgRemovalModeRef = useRef(bgRemovalMode);
   const chromakeyRgbRef = useRef(chromakeyRgb);
+  // 관리자 설정(0-100%)을 confidence 스케일(0-1)로 변환해 보관. FEATHER는 0으로 나누기 방지를 위해 최소 1%.
+  const segmentThreshRef = useRef(segmentThreshold / 100);
+  const segmentFeatherRef = useRef(Math.max(segmentFeather, 1) / 100);
   useEffect(() => { selectedBgRef.current = selectedBackground; }, [selectedBackground]);
   useEffect(() => { bgRemovalModeRef.current = bgRemovalMode; }, [bgRemovalMode]);
   useEffect(() => { chromakeyRgbRef.current = chromakeyRgb; }, [chromakeyRgb]);
+  useEffect(() => { segmentThreshRef.current = segmentThreshold / 100; }, [segmentThreshold]);
+  useEffect(() => { segmentFeatherRef.current = Math.max(segmentFeather, 1) / 100; }, [segmentFeather]);
 
   // 배경 이미지/비디오 로드
   useEffect(() => {
@@ -268,8 +279,8 @@ export function CameraStreamer({
                 const bgMask = cached.data;
                 const maskW = cached.w;
                 const maskH = cached.h;
-                const THRESH = 0.15;
-                const FEATHER = 0.35;
+                const THRESH = segmentThreshRef.current;
+                const FEATHER = segmentFeatherRef.current;
                 if (bgMask.length === pw * ph) {
                   for (let i = 0; i < bgMask.length; i++) {
                     const alpha = Math.max(0, Math.min(1, (1 - bgMask[i] - THRESH) / FEATHER));

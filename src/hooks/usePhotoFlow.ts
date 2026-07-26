@@ -4,7 +4,7 @@ import { FRAME_INFO } from "@/constants/frames";
 
 const SESSION_KEY = "photobooth_session_v2";
 
-export function usePhotoFlow(deviceId: string, config: DeviceConfig) {
+export function usePhotoFlow(deviceId: string, config: DeviceConfig, hasPrintBgImages = false) {
   const [currentStep, setCurrentStep] = useState<Step>("start");
   const [orderId, setOrderId] = useState<string | null>(null);
   const [selectedFrame, setSelectedFrame] = useState<string | null>(null);
@@ -121,13 +121,11 @@ export function usePhotoFlow(deviceId: string, config: DeviceConfig) {
         if (selectedBackground === null) setSelectedBackground(-1);
         goToStep("camera");
         break;
-      case "select": {
-        if (selectedPhotos.length < slotsNeeded) {
-          setSelectedPhotos(photos.map((_, i) => i).slice(0, slotsNeeded));
-        }
-        goToStep("printbg");
+      case "select":
+        // 버튼(onNext)과 동일 경로로 진행: 사진 준비(업로드/합성)를 수행하고,
+        // 인쇄배경이 없으면 printbg를 건너뛰고 complete로 이동한다.
+        handleSelectNext(hasPrintBgImages);
         break;
-      }
       case "printbg":
         goToStep("complete");
         break;

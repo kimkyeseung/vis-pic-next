@@ -27,7 +27,7 @@ function ServiceContent() {
   const [preflightDone, setPreflightDone] = useState(false);
 
   const { config, backgroundImages, printBgImages, imageBaseUrl, printSettings, wallpaperUrl, logoUrl } = useDeviceSetup(deviceId);
-  const flow = usePhotoFlow(deviceId, config);
+  const flow = usePhotoFlow(deviceId, config, printBgImages.length > 0);
   const { monitors, syncEnabled, setSyncEnabled, selectedMonitorIndex, setSelectedMonitorIndex } = useTauriMonitor();
   const { idleRemaining, clearIdleTimer } = useIdleTimer(
     flow.currentStep,
@@ -129,6 +129,8 @@ function ServiceContent() {
           imageBaseUrl={imageBaseUrl}
           bgRemovalMode={config.bgRemovalMode}
           chromakeyRgb={config.chromakeyRgb}
+          segmentThreshold={config.segmentThreshold}
+          segmentFeather={config.segmentFeather}
         />
       )}
 
