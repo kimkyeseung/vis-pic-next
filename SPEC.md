@@ -186,10 +186,12 @@
 
 ```
 [1. START] → [2. PAYMENT*] → [3. FRAME] → [4. BACKGROUND]
-     → [5. CAMERA] → [6. SELECT] → [7. COMPLETE]
-                                              ↓
-                                        [1. START (리셋)]
+     → [5. CAMERA] → [6. SELECT] → [6.5 PRINTBG†] → [7. COMPLETE]
+                                                          ↓
+                                                    [1. START (리셋)]
 * 결제 비활성 시 스킵
+† 인쇄 배경(프레임, imageType 2) 이미지가 이 지점에 하나라도 있을 때만 표시.
+  없으면 SELECT → COMPLETE로 바로 건너뛴다. (유휴 타임아웃도 동일하게 분기)
 ```
 
 ### Step 0: PREFLIGHT (시스템 점검)
@@ -282,6 +284,14 @@
 - 촬영된 사진 그리드 표시 (촬영 원본 비율 그대로, 크롭 없음)
 - 사용자가 정확히 `slotsNeeded`장 선택
 
+### Step 6.5: PRINTBG (조건부)
+
+- **인쇄 배경(프레임) 선택**: 이 지점에 인쇄 배경 이미지(imageType 2)가 있을 때만
+  진입하는 단계 (`PrintBgSection`). 없으면 SELECT에서 곧장 COMPLETE로 넘어간다.
+- `FramedPreview`로 선택 프레임 위에 실제 선택 사진을 슬롯 배치한 미리보기를 보여준다.
+- 선택값은 `usePhotoFlow.selectedPrintBg`에 저장되어 COMPLETE 합성/인쇄에 쓰인다.
+- 버튼(다음)과 유휴 타임아웃 모두 `handleSelectNext`로 동일하게 분기한다.
+
 ### Step 7: COMPLETE
 
 1. 선택 사진 합성 이미지 생성 (`src/lib/printLayout.ts` 공용 레이아웃 계산 사용)
@@ -308,8 +318,11 @@
 | `BackgroundSection.tsx` | 배경 이미지/영상 선택기 |
 | `CameraSection.tsx` | 카메라 + AI 합성 + 스티커 + 촬영 로직 |
 | `SelectSection.tsx` | 사진 선택 UI |
+| `PrintBgSection.tsx` | 인쇄 배경(프레임) 선택 UI — printbg 단계. 인쇄 배경 이미지가 있을 때만 노출 |
 | `CompleteSection.tsx` | 결과 출력 + QR + 인쇄 |
-| `CircularTimer.tsx` | 원형 아이들 타임아웃 카운트다운 — frame·background·select·complete 단계에서만 표시 (start·payment·camera 제외) |
+| `FramedPreview.tsx` | 선택 프레임 위에 사진 슬롯 배치 미리보기 (CompleteSection과 동일 배경 우선순위) |
+| `ServiceNav.tsx` | 서비스 화면 공통 이전/다음 네비게이션 버튼 (모서리 절대배치) |
+| `CircularTimer.tsx` | 원형 카운트다운 — frame·background·select·printbg는 유휴 타임아웃, complete는 인화 자동복귀 타이머로 표시 (start·payment·camera 제외) |
 | `CameraStreamer.tsx` | 카메라 상시 웜업 + 서브 모니터 프레임 전송 (배경 합성 포함, §15) |
 | `FloatingElements.tsx` | 배경 데코레이션 애니메이션 |
 
@@ -344,9 +357,10 @@
 |----|------|------|
 | `useDeviceSetup` | `src/hooks/useDeviceSetup.ts` | 디바이스 설정 + 이미지 목록 + 인쇄 설정 로드 |
 | `usePhotoFlow` | `src/hooks/usePhotoFlow.ts` | 7단계 상태 머신, sessionStorage 영속성 |
-| `useIdleTimer` | `src/hooks/useIdleTimer.ts` | 비활동 타임아웃 카운트다운 (frame·background·select·complete 단계에서만 동작) |
+| `useIdleTimer` | `src/hooks/useIdleTimer.ts` | 비활동 타임아웃 카운트다운 (frame·background·select·printbg 단계에서만 동작. complete는 별도 인화 자동복귀 타이머, start·payment·camera 제외) |
 | `useTauriMonitor` | `src/hooks/useTauriMonitor.ts` | Tauri 모니터 목록 + 서브 윈도우 열기/닫기 |
 | `useSceneSync` | `src/hooks/useSceneSync.ts` | SSE 프레임 스트림 + BroadcastChannel 상태 동기화 |
+| `useAdminDeviceSettings` | `src/hooks/useAdminDeviceSettings.ts` | (관리자) 선택 지점 기준 설정 로드 + 변경 필드만 지점에 저장 (§20) |
 
 ### usePhotoFlow 상세
 
@@ -1030,7 +1044,7 @@ MediaPipe WASM 4종 + 모델 1종
 | `CHROMAKEY_MODE` | "mediapipe" | 배경 제거 모드 |
 | `CHROMAKEY_RGB` | "0,255,0" | 크로마키 색상 |
 | `PAYMENT_ENABLED` | "0" | 결제 활성화 |
-| `PAYMENT_AMOUNT` | "1000" | **1장당 가격**(원). 결제 화면 매수는 1/2/4장 고정, 총액 = 가격 × 매수 |
+| `PAYMENT_AMOUNT` | "5000" | **1장당 가격**(원). 결제 화면 매수는 1/2/4장 고정, 총액 = 가격 × 매수 |
 | `PAYMENT_TERMINAL_MODE` | "manual" | 결제 모드 |
 | `IDLE_TIMEOUT_SECONDS` | "30" | 자동 진행 타임아웃 |
 | `CAMERA_AUTO_TIMER` | "60" | 자동 촬영 타이머 (초) |
@@ -1040,6 +1054,11 @@ MediaPipe WASM 4종 + 모델 1종
 | `MODE_2_2_HEIGHT` | — | 2×2 모드 사진 슬롯 높이 (cm) |
 | `THEME_TEXT_COLOR` | "#ffffff" | 서비스 화면 글자색 (테마 관리, §25). 지점별로 저장 가능 |
 | `THEME_PRIMARY_COLOR` | "#6c6fb4" | 강조(primary) 색상 — 선택 강조·주요 버튼 (테마 관리, §25). 지점별 |
+
+> 위 표의 기본값은 **코드 하드코딩 폴백**(`useDeviceSetup.ts`, 설정 키가 없을 때 값) 기준이다.
+> `prisma/seed.ts`는 초기 DB에 일부 다른 값을 심는다 — 예: `PAYMENT_ENABLED="1"`(활성),
+> `PAYMENT_AMOUNT="5000"`, `CAPTURE_MODES="1x1,2x1,2x2"`. 따라서 갓 시드된 DB의 실효
+> 기본값은 표(폴백)와 다를 수 있다.
 
 ---
 
