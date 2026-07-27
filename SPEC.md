@@ -1004,18 +1004,28 @@ PAYAPP_RETURN_URL      # 결제 완료 후 리다이렉트 URL
 
 ## 19. 오프라인 지원 (Service Worker / PWA)
 
-### 캐시 전략
+> ⚠️ 이 서비스워커는 **배포(HTTPS) 호스트에서만** 동작한다. Tauri 키오스크(localhost)에서는
+> `layout.tsx`가 SW를 등록 해제하므로, SW의 오프라인 캐시는 사실상 **웹 배포본 전용**이다.
+
+### 캐시 전략 (`public/sw.js`, `v3`)
 
 | 리소스 유형 | 전략 | 캐시 이름 |
 |------------|------|---------|
-| 정적 자산, 페이지 | Cache-first → 네트워크 업데이트 | `arpic-static-v2` |
-| API 응답 | 네트워크-first → 캐시 폴백 | `arpic-dynamic-v2` |
-| `/api/payments/*` | 네트워크 전용 (실패 시 오류) | — |
+| HTML 네비게이션·RSC, 일반 API 응답 | **네트워크-first → 오프라인 시 캐시 폴백** | `arpic-dynamic-v3` |
+| 불변 빌드 애셋 (`/_next/static/*`, `/static/mediapipe/*`) | Cache-first | `arpic-static-v3` |
+| `/admin`, `/api/admin/*`, `/api/payments/*` | **네트워크 전용 (SW 미개입, 캐시 금지)** | — |
 
-### 사전 캐시 항목 (10개)
+- **페이지를 네트워크-first로 서빙**한다: 온라인이면 항상 최신 번들/화면을 받아 재배포 후
+  stale 화면·인증 깨짐이 발생하지 않는다. (과거 cache-first가 옛 번들·리다이렉트된 페이지를
+  서빙해 관리자 로그인 후 무한 깜빡임을 유발한 버그를 근본 해결)
+- **인증/결제 경로는 SW가 개입하지 않는다** — 캐시된 로그인/리다이렉트 응답이 남지 않는다.
+- 리다이렉트된 응답·비정상 응답·비GET·타출처 요청은 캐시하지 않는다.
 
-페이지 4종 (`/`, `/service`, `/admin`, `/output`), `manifest.json`,
-MediaPipe WASM 4종 + 모델 1종
+### 사전 캐시 항목
+
+인증 불필요 페이지만 오프라인 폴백용으로 담는다: `/`, `/service`, `/output`, `/manifest.json`.
+개별 `cache.add` + catch 라 일부가 404여도 설치가 실패하지 않는다. (런타임 다운로드되는
+mediapipe 파일은 웹 빌드에 없으므로 프리캐시하지 않고, 존재할 때 요청 시점에 캐시된다)
 
 ### PWA 매니페스트 (`public/manifest.json`)
 
