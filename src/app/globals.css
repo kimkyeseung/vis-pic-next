@@ -1,21 +1,72 @@
 @import "tailwindcss";
 @import "pretendard/dist/web/static/pretendard.css";
 
+/* ============================================================
+   DESIGN SYSTEM — 디자인 토큰 (폰트 · 컬러를 여기서 한 곳에 관리)
+
+   아래 값만 바꾸면 앱 전체 글자 크기 / 색이 일괄 반영됩니다.
+   Tailwind v4가 이 토큰들로 유틸리티를 생성합니다:
+     --color-* → bg-* / text-* / border-*   (예: bg-surface, text-brand, border-line)
+     --text-*  → text-*  (글자 크기)         (예: text-2xl)
+     --radius-*→ rounded-*                   (예: rounded-card)
+     --font-*  → font-*                      (예: font-sans)
+
+   서비스 화면(/service)은 관리자 지점별 테마(--theme-primary / --theme-text)가
+   이 토큰들보다 우선 적용됩니다(런타임 오버라이드). 토큰은 그 "기본값"입니다.
+   ============================================================ */
+@theme {
+  /* ── 글자 크기 스케일 ──────────────────────────────────
+     --type-scale 한 값으로 전체 글자 크기를 비율 조절한다.
+     1 = 기본, 1.1 = 10% 크게. (레이아웃이 넘치면 값을 낮춘다) */
+  --type-scale: 1.1;
+  --text-xs:   calc(0.75rem  * var(--type-scale));
+  --text-sm:   calc(0.875rem * var(--type-scale));
+  --text-base: calc(1rem     * var(--type-scale));
+  --text-lg:   calc(1.125rem * var(--type-scale));
+  --text-xl:   calc(1.25rem  * var(--type-scale));
+  --text-2xl:  calc(1.5rem   * var(--type-scale));
+  --text-3xl:  calc(1.875rem * var(--type-scale));
+  --text-4xl:  calc(2.25rem  * var(--type-scale));
+  --text-5xl:  calc(3rem     * var(--type-scale));
+  --text-6xl:  calc(3.75rem  * var(--type-scale));
+  --text-7xl:  calc(4.5rem   * var(--type-scale));
+  --text-8xl:  calc(6rem     * var(--type-scale));
+  --text-9xl:  calc(8rem     * var(--type-scale));
+
+  /* ── 색상 팔레트 ───────────────────────────────────── */
+  --color-brand:        #6c6fb4;  /* 강조/주요 색 (기본값 — 지점 테마가 우선) */
+  --color-brand-strong: #585b9c;
+  --color-surface:      #2a2a2a;  /* 기본 배경 */
+  --color-surface-2:    #1f1f1f;  /* 더 어두운 면 */
+  --color-ink:          #ffffff;  /* 기본 글자색 */
+  --color-ink-muted:    rgba(255, 255, 255, 0.7);
+  --color-line:         rgba(255, 255, 255, 0.15); /* 구분선/테두리 */
+  --color-success:      #4caf50;
+  --color-danger:       #ef4444;
+  --color-warning:      #f59e0b;
+
+  /* ── 폰트 · 모서리 ─────────────────────────────────── */
+  --font-sans: 'Pretendard', 'Malgun Gothic', 'Microsoft YaHei', 'PingFang SC',
+               'Yu Gothic', 'Meiryo', 'Noto Sans CJK SC', 'Arial', sans-serif;
+  --radius-card: 1rem;
+  --radius-btn: 0.875rem;
+}
+
 
 html, body {
   -webkit-user-select: none;
   -moz-user-select: none;
   -ms-user-select: none;
   user-select: none;
-  font-family: 'Pretendard', 'Malgun Gothic', 'Microsoft YaHei', 'PingFang SC', 'Yu Gothic', 'Meiryo', 'Noto Sans CJK SC', 'Arial', sans-serif;
+  font-family: var(--font-sans);
   width: 100%;
   height: 100%;
   overflow: hidden;
 }
 
 body {
-  background: #2a2a2a;
-  color: #ffffff;
+  background: var(--color-surface);
+  color: var(--color-ink);
 }
 
 /* 중국어·일본어는 Pretendard가 한자를 일부만 커버해 시스템 명조(SimSun 등)로 폴백되어
@@ -33,15 +84,15 @@ body {
    자체 배경색을 가진 요소(예: 흰 배경의 .service-button = 어두운 글자, 색 버튼의 인라인
    흰 글자)는 대상에서 제외 — text-white 유틸을 쓰는 본문 텍스트만 대상으로 한다.
    규칙이 레이어 밖(unlayered)이라 Tailwind의 레이어드 text-white 유틸보다 항상 우선한다. */
-.service-theme { color: var(--theme-text, #ffffff); }
-.service-theme .text-white { color: var(--theme-text, #ffffff); }
-.service-theme .text-white\/90 { color: color-mix(in oklab, var(--theme-text, #ffffff) 90%, transparent); }
-.service-theme .text-white\/80 { color: color-mix(in oklab, var(--theme-text, #ffffff) 80%, transparent); }
-.service-theme .text-white\/70 { color: color-mix(in oklab, var(--theme-text, #ffffff) 70%, transparent); }
-.service-theme .text-white\/60 { color: color-mix(in oklab, var(--theme-text, #ffffff) 60%, transparent); }
-.service-theme .text-white\/50 { color: color-mix(in oklab, var(--theme-text, #ffffff) 50%, transparent); }
-.service-theme .text-white\/40 { color: color-mix(in oklab, var(--theme-text, #ffffff) 40%, transparent); }
-.service-theme .text-white\/30 { color: color-mix(in oklab, var(--theme-text, #ffffff) 30%, transparent); }
+.service-theme { color: var(--theme-text, var(--color-ink)); }
+.service-theme .text-white { color: var(--theme-text, var(--color-ink)); }
+.service-theme .text-white\/90 { color: color-mix(in oklab, var(--theme-text, var(--color-ink)) 90%, transparent); }
+.service-theme .text-white\/80 { color: color-mix(in oklab, var(--theme-text, var(--color-ink)) 80%, transparent); }
+.service-theme .text-white\/70 { color: color-mix(in oklab, var(--theme-text, var(--color-ink)) 70%, transparent); }
+.service-theme .text-white\/60 { color: color-mix(in oklab, var(--theme-text, var(--color-ink)) 60%, transparent); }
+.service-theme .text-white\/50 { color: color-mix(in oklab, var(--theme-text, var(--color-ink)) 50%, transparent); }
+.service-theme .text-white\/40 { color: color-mix(in oklab, var(--theme-text, var(--color-ink)) 40%, transparent); }
+.service-theme .text-white\/30 { color: color-mix(in oklab, var(--theme-text, var(--color-ink)) 30%, transparent); }
 
 /* 스크롤바 숨기기 */
 ::-webkit-scrollbar {
@@ -205,8 +256,8 @@ body {
 
 /* 공통 버튼 스타일 */
 .service-button {
-  background: #ffffff;
-  color: #2a2a2a;
+  background: var(--color-ink);
+  color: var(--color-surface);
   border: none;
   letter-spacing: 0;
   box-shadow: 0 18px 28px rgba(80, 55, 145, 0.28), 0 7px 16px rgba(255,255,255,0.18) inset;
@@ -274,11 +325,11 @@ body {
   min-height: 110px;
   padding: 22px 72px;
   font-size: 1.7em;
-  background: var(--theme-primary, #6c6fb4);
+  background: var(--theme-primary, var(--color-brand));
   color: #ffffff;
 }
 .nav-next-lg:hover {
-  background: var(--theme-primary, #6c6fb4);
+  background: var(--theme-primary, var(--color-brand));
   filter: brightness(1.08);
 }
 @media (orientation: portrait) {
@@ -321,7 +372,7 @@ body {
 }
 
 .frame-option.selected {
-  border-color: var(--theme-primary, #ffffff);
+  border-color: var(--theme-primary, var(--color-brand));
   background: rgba(255,255,255,0.15);
   transform: translateY(-5px);
   box-shadow: 0 15px 35px rgba(0,0,0,0.4);
@@ -343,7 +394,7 @@ body {
 }
 
 .background-option.selected {
-  border-color: var(--theme-primary, #ffffff);
+  border-color: var(--theme-primary, var(--color-brand));
   transform: scale(1.02);
   box-shadow: 0 10px 25px rgba(0,0,0,0.5);
 }
@@ -381,7 +432,7 @@ body {
 }
 
 .photo-thumbnail.selected {
-  border-color: var(--theme-primary, #4CAF50);
+  border-color: var(--theme-primary, var(--color-success));
   box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
 }
 
@@ -390,7 +441,7 @@ body {
   position: absolute;
   top: 10px;
   right: 15px;
-  background: var(--theme-primary, #4CAF50);
+  background: var(--theme-primary, var(--color-success));
   color: white;
   border-radius: 50%;
   width: 30px;
