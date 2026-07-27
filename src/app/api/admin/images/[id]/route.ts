@@ -20,6 +20,10 @@ export async function PATCH(
     if (typeof body.focalX === "number") data.focalX = Math.max(0, Math.min(1, body.focalX));
     if (typeof body.focalY === "number") data.focalY = Math.max(0, Math.min(1, body.focalY));
     if (typeof body.name === "string") data.name = body.name.slice(0, 32);
+    // 타입 재분류 허용 (배경/프레임/스티커). 잘못된 타입으로 올린 이미지를 삭제·재업로드 없이 교정.
+    if (body.imageType === 1 || body.imageType === 2 || body.imageType === 3) {
+      data.imageType = body.imageType;
+    }
     if (typeof body.priority === "number" && Number.isFinite(body.priority)) {
       data.priority = Math.trunc(body.priority);
     }

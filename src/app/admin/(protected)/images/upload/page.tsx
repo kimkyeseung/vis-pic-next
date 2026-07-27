@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useState, useRef, useEffect } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 
 interface DeviceOption {
@@ -9,11 +9,17 @@ interface DeviceOption {
   name: string;
 }
 
-export default function ImageUploadPage() {
+function ImageUploadForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [name, setName] = useState("");
-  const [imageType, setImageType] = useState("1");
+  // 이미지 관리에서 넘어온 현재 탭 타입(?type=)을 기본 선택으로 사용한다.
+  // (프레임 탭에서 업로드했는데 배경으로 저장되던 문제 방지)
+  const [imageType, setImageType] = useState(() => {
+    const t = searchParams.get("type");
+    return t === "2" || t === "3" ? t : "1";
+  });
   const [devices, setDevices] = useState<DeviceOption[]>([]);
   const [selectedDeviceIds, setSelectedDeviceIds] = useState<string[]>([]);
   const [priority, setPriority] = useState("0");
@@ -303,5 +309,13 @@ export default function ImageUploadPage() {
         </div>
       </form>
     </div>
+  );
+}
+
+export default function ImageUploadPage() {
+  return (
+    <Suspense fallback={null}>
+      <ImageUploadForm />
+    </Suspense>
   );
 }

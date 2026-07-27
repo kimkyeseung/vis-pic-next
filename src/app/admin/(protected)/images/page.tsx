@@ -234,7 +234,7 @@ export default function ImagesPage() {
       <div className="flex items-center justify-between">
         <h2 className="text-2xl font-bold text-white">이미지 관리</h2>
         <Link
-          href="/admin/images/upload"
+          href={`/admin/images/upload?type=${selectedType}`}
           className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
         >
           + 이미지 업로드
@@ -302,7 +302,7 @@ export default function ImagesPage() {
             {getTypeLabel(selectedType)} 이미지가 없습니다.
           </p>
           <Link
-            href="/admin/images/upload"
+            href={`/admin/images/upload?type=${selectedType}`}
             className="text-purple-400 hover:underline"
           >
             이미지 업로드하기

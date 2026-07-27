@@ -8,6 +8,7 @@ interface Image {
   filename: string;
   priority: number;
   deviceIds: string[];
+  imageType: number;
 }
 
 interface DeviceOption {
@@ -35,6 +36,7 @@ export default function EditDialog({
 }: EditDialogProps) {
   const [name, setName] = useState(image.name);
   const [priority, setPriority] = useState(String(image.priority));
+  const [imageType, setImageType] = useState(String(image.imageType));
   const [selectedDeviceIds, setSelectedDeviceIds] = useState<string[]>(
     image.deviceIds ?? []
   );
@@ -65,6 +67,7 @@ export default function EditDialog({
         body: JSON.stringify({
           name: name.slice(0, 32),
           priority: parseInt(priority) || 0,
+          imageType: parseInt(imageType),
           deviceIds: selectedDeviceIds,
         }),
       });
@@ -130,6 +133,22 @@ export default function EditDialog({
               maxLength={32}
               className="w-full rounded-lg border border-gray-600 bg-gray-700 px-4 py-2.5 text-white focus:border-blue-500 focus:outline-none"
             />
+          </div>
+
+          <div>
+            <label className="mb-2 block text-gray-300">이미지 타입</label>
+            <select
+              value={imageType}
+              onChange={(e) => setImageType(e.target.value)}
+              className="w-full rounded-lg border border-gray-600 bg-gray-700 px-4 py-2.5 text-white focus:border-blue-500 focus:outline-none"
+            >
+              <option value="1">배경 (Background)</option>
+              <option value="2">프레임 (Frame)</option>
+              <option value="3">스티커 (Sticker)</option>
+            </select>
+            <p className="mt-1 text-sm text-gray-500">
+              잘못된 탭에 올린 이미지를 여기서 옮길 수 있습니다.
+            </p>
           </div>
 
           <div>
