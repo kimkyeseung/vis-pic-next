@@ -293,6 +293,7 @@ export default function ImagesPage() {
           deviceId={currentDeviceId}
           deviceName={selectedDevice?.name ?? null}
           imageBaseUrl={imageBaseUrl}
+          devices={devices}
         />
       ) : loading ? (
         <div className="text-gray-400">로딩중...</div>

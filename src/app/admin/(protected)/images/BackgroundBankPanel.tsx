@@ -1,12 +1,25 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { BACKGROUND_IMAGE_TYPE, MAX_ACTIVE_BACKGROUNDS } from "@/constants/images";
+import EditDialog from "./EditDialog";
 
 interface Bg {
   id: number;
   name: string;
   filename: string;
+}
+
+// 편집 다이얼로그에 넘기기 위한 확장 정보(뱅크 목록에서만 확보 가능).
+interface BankImage extends Bg {
+  priority: number;
+  deviceIds: string[];
+  imageType: number;
+}
+
+interface DeviceOption {
+  deviceId: string;
+  name: string;
 }
 
 const isVideo = (f: string) => f.endsWith(".mp4") || f.endsWith(".webm");
@@ -21,25 +34,46 @@ function Media({ bg, baseUrl }: { bg: Bg; baseUrl: string }) {
   );
 }
 
+function toBankImage(i: {
+  id: number;
+  name: string;
+  filename: string;
+  priority?: number;
+  deviceIds?: string[];
+  imageType?: number;
+}): BankImage {
+  return {
+    id: i.id,
+    name: i.name,
+    filename: i.filename,
+    priority: i.priority ?? 0,
+    deviceIds: i.deviceIds ?? [],
+    imageType: i.imageType ?? BACKGROUND_IMAGE_TYPE,
+  };
+}
+
 /**
  * 배경 뱅크 모델 관리 UI.
- * 좌: 이 지점에 노출할 배경(순서 드래그) / 우: 전체 배경 뱅크(클릭하여 추가).
+ * 좌: 이 지점에 노출할 배경(순서 드래그) / 우: 전체 배경 뱅크(클릭하여 추가, 편집 가능).
  */
 export default function BackgroundBankPanel({
   deviceId,
   deviceName,
   imageBaseUrl,
+  devices,
 }: {
   deviceId: string | null;
   deviceName: string | null;
   imageBaseUrl: string;
+  devices: DeviceOption[];
 }) {
-  const [bank, setBank] = useState<Bg[]>([]);
+  const [bank, setBank] = useState<BankImage[]>([]);
   const [selected, setSelected] = useState<Bg[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [dirty, setDirty] = useState(false);
   const [message, setMessage] = useState("");
+  const [editing, setEditing] = useState<BankImage | null>(null);
   const dragIndex = useRef<number | null>(null);
   const [overIndex, setOverIndex] = useState<number | null>(null);
 
@@ -54,7 +88,7 @@ export default function BackgroundBankPanel({
           fetch(`/api/device/${deviceId}/backgrounds/`, { cache: "no-store" }).then((r) => r.json()),
         ]);
         if (cancelled) return;
-        setBank(bankData.images || []);
+        setBank((bankData.images || []).map(toBankImage));
         setSelected(selData.images || []);
         setDirty(false);
       } catch {
@@ -65,6 +99,21 @@ export default function BackgroundBankPanel({
     })();
     return () => { cancelled = true; };
   }, [deviceId]);
+
+  // 편집(특히 타입 변경) 후: 뱅크를 다시 불러오고, 뱅크에서 빠진(=배경이 아니게 된)
+  // 이미지는 노출 목록에서도 제거한다.
+  const handleEdited = useCallback(async () => {
+    setEditing(null);
+    try {
+      const bankData = await fetch(`/api/image/list/${BACKGROUND_IMAGE_TYPE}/`, { cache: "no-store" }).then((r) => r.json());
+      const next: BankImage[] = (bankData.images || []).map(toBankImage);
+      const ids = new Set(next.map((b) => b.id));
+      setBank(next);
+      setSelected((prev) => prev.filter((s) => ids.has(s.id)));
+    } catch {
+      // ignore
+    }
+  }, []);
 
   const selectedIds = new Set(selected.map((s) => s.id));
   const full = selected.length >= MAX_ACTIVE_BACKGROUNDS;
@@ -194,26 +243,49 @@ export default function BackgroundBankPanel({
                 const isSel = selectedIds.has(bg.id);
                 const disabled = isSel || full;
                 return (
-                  <button
+                  <div
                     key={bg.id}
-                    onClick={() => add(bg)}
-                    disabled={disabled}
-                    title={isSel ? "이미 선택됨" : full ? `최대 ${MAX_ACTIVE_BACKGROUNDS}개` : "클릭하여 추가"}
                     className={`relative aspect-video rounded-lg overflow-hidden border-2 transition-all ${
-                      isSel ? "border-blue-500" : "border-transparent hover:border-white/40"
-                    } ${disabled ? "opacity-40 cursor-not-allowed" : ""}`}
+                      isSel ? "border-blue-500" : "border-transparent"
+                    }`}
                   >
-                    <Media bg={bg} baseUrl={imageBaseUrl} />
+                    <button
+                      type="button"
+                      onClick={() => add(bg)}
+                      disabled={disabled}
+                      title={isSel ? "이미 선택됨" : full ? `최대 ${MAX_ACTIVE_BACKGROUNDS}개` : "클릭하여 추가"}
+                      className={`absolute inset-0 h-full w-full ${disabled ? "opacity-40 cursor-not-allowed" : "hover:opacity-90"}`}
+                    >
+                      <Media bg={bg} baseUrl={imageBaseUrl} />
+                    </button>
                     {isSel && (
-                      <span className="absolute top-1 right-1 w-5 h-5 rounded-full bg-blue-600 text-white flex items-center justify-center text-xs font-bold">✓</span>
+                      <span className="pointer-events-none absolute top-1 right-1 w-5 h-5 rounded-full bg-blue-600 text-white flex items-center justify-center text-xs font-bold">✓</span>
                     )}
-                  </button>
+                    <button
+                      type="button"
+                      onClick={() => setEditing(bg)}
+                      title="편집 / 타입 변경"
+                      className="absolute bottom-1 right-1 z-10 rounded bg-black/60 px-2 py-0.5 text-xs text-white hover:bg-black/80"
+                    >
+                      편집
+                    </button>
+                  </div>
                 );
               })}
             </div>
           )}
         </div>
       </div>
+
+      {editing && (
+        <EditDialog
+          image={editing}
+          imageBaseUrl={imageBaseUrl}
+          devices={devices}
+          onClose={() => setEditing(null)}
+          onSaved={handleEdited}
+        />
+      )}
     </div>
   );
 }
