@@ -136,6 +136,18 @@ export function AdminSidebar({ adminName, children }: AdminSidebarProps) {
                 </ul>
               </div>
 
+              <div className="mb-3 pb-3 border-b border-gray-700">
+                <Link
+                  href="/admin/preview"
+                  className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${
+                    pathNoSlash === "/admin/preview" ? "bg-gray-600 text-white" : "text-gray-300 hover:bg-gray-700"
+                  }`}
+                >
+                  <span>🎬</span>
+                  <span>화면 미리보기</span>
+                </Link>
+              </div>
+
               {selectedDevice && (
                 <div className="mt-4 pt-4 border-t border-gray-700">
                   <div className="flex items-center justify-between mb-2">
