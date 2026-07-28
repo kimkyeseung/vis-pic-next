@@ -195,6 +195,12 @@ body {
   51%, 100% { opacity: 0.3; }
 }
 
+/* 부드러운(페이드) 깜빡임 — 하드 blink와 달리 ease-in-out으로 서서히 밝아졌다 어두워진다. */
+@keyframes softBlink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+
 @keyframes touchBounce {
   0%, 20%, 50%, 80%, 100% {
     transform: translateY(0);
@@ -235,6 +241,10 @@ body {
 
 .animate-blink {
   animation: blink 2s infinite;
+}
+
+.animate-soft-blink {
+  animation: softBlink 2s ease-in-out infinite;
 }
 
 .animate-touchBounce {

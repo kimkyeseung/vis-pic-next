@@ -43,14 +43,14 @@ export function StartSection({
             </h1>
           )}
         </div>
-        <button
-          className="service-button touch-button animate-pulse-button max-w-[85vw]"
-          style={{ animationDelay: "0.5s" }}
-          onClick={(e) => { e.stopPropagation(); onNext(); }}
+        {/* 버튼 대신 깜빡이는 안내 문구 — 화면 아무 곳이나 터치하면 시작(section onClick) */}
+        <div
+          className="flex items-center gap-4 text-white text-5xl portrait:text-4xl font-extrabold animate-soft-blink select-none max-w-[90vw] text-center"
+          style={{ textShadow: "0 2px 15px rgba(0,0,0,0.5)" }}
         >
-          <span className="animate-touchBounce inline-block mr-5 text-3xl">&#128070;</span>
+          <span className="inline-block text-4xl portrait:text-3xl">&#128070;</span>
           {t("start.touch")}
-        </button>
+        </div>
 
         {/* 언어 선택 — 결제 화면으로 이동. 결제 비활성 시에만 여기 표시. */}
         {showLanguage && (
