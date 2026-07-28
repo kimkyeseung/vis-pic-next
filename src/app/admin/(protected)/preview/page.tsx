@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import type { DeviceConfig } from "@/types";
+import type { DeviceConfig, Sticker } from "@/types";
 import { FRAME_INFO } from "@/constants/frames";
 import { LanguageProvider, useLanguage } from "@/i18n/LanguageContext";
 import { LOCALES, type Locale } from "@/i18n/translations";
@@ -10,6 +10,7 @@ import { StartSection } from "@/components/service/StartSection";
 import { PaymentSection } from "@/components/service/PaymentSection";
 import { FrameSection } from "@/components/service/FrameSection";
 import { BackgroundSection } from "@/components/service/BackgroundSection";
+import { CameraSection } from "@/components/service/CameraSection";
 import { SelectSection } from "@/components/service/SelectSection";
 import { PrintBgSection } from "@/components/service/PrintBgSection";
 import { CompleteSection } from "@/components/service/CompleteSection";
@@ -92,6 +93,7 @@ export default function PreviewPage() {
   const [selectedBackground, setSelectedBackground] = useState<number | null>(-1);
   const [selectedPrintBg, setSelectedPrintBg] = useState<number | null>(null);
   const [printQuantity, setPrintQuantity] = useState(1);
+  const [stickers, setStickers] = useState<Sticker[]>([]);
   const slots = FRAME_INFO[selectedFrame]?.count ?? 4;
   const [selectedPhotos, setSelectedPhotos] = useState<number[]>([0, 1, 2, 3]);
   // 프레임을 바꾸면 선택 사진 수도 슬롯 수에 맞춰 초기화한다.
@@ -189,7 +191,24 @@ export default function PreviewPage() {
           />
         );
       case "camera":
-        return <CameraPlaceholder />;
+        return (
+          <CameraSection
+            config={config}
+            photos={[]}
+            maxPhotos={slots * config.captureCount}
+            minPhotos={slots}
+            selectedBackground={selectedBackground}
+            backgroundImages={[]}
+            imageBaseUrl=""
+            stickers={stickers}
+            syncEnabled={false}
+            onCapture={noop}
+            onNext={noop}
+            onPrev={noop}
+            onStickersChange={setStickers}
+            onBackgroundSelect={setSelectedBackground}
+          />
+        );
       case "select":
         return (
           <SelectSection
@@ -311,7 +330,8 @@ export default function PreviewPage() {
           </button>
         </div>
         <p className="text-xs text-gray-500">
-          * 촬영 화면은 카메라·AI가 필요해 레이아웃만 보여주는 플레이스홀더입니다. 세로 방향은
+          * 촬영 화면은 실제 <code>CameraSection</code>을 그대로 렌더합니다(라이브 카메라). 카메라를
+          허용하지 않으면 중앙만 에러 박스로 표시되고 3단 레이아웃은 실제와 동일합니다. 세로 방향은
           치수만 바뀌며, <code>portrait:</code> 전용 스타일은 실제 브라우저 창이 세로일 때만 완전히 적용됩니다.
         </p>
       </div>
@@ -328,30 +348,5 @@ export default function PreviewPage() {
         </div>
       </div>
     </div>
-  );
-}
-
-// 촬영 화면 정적 플레이스홀더 (실제 CameraSection은 카메라/MediaPipe 필요)
-function CameraPlaceholder() {
-  const { t } = useLanguage();
-  return (
-    <section className="w-full h-full flex portrait:flex-col relative z-10">
-      <div className="flex-1 flex items-center justify-center p-8">
-        <div className="camera-preview w-full h-full max-h-[80vh] flex flex-col items-center justify-center bg-black/40">
-          <span className="text-8xl opacity-30">📷</span>
-          <p className="mt-4 text-white/60 text-2xl">카메라 프리뷰 (미리보기 플레이스홀더)</p>
-        </div>
-      </div>
-      <div className="w-80 shrink-0 p-6 flex flex-col gap-6 border-l border-white/10 bg-black/20 portrait:w-full portrait:border-l-0 portrait:border-t">
-        <h3 className="text-white text-2xl font-bold text-center">{t("camera.shoot")}</h3>
-        <button className="service-button nav-next-lg w-full">{t("camera.shoot")}</button>
-        <div className="grid grid-cols-3 gap-2">
-          {MOCK_PHOTOS.slice(0, 6).map((p, i) => (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img key={i} src={p} alt="" className="aspect-video w-full rounded-lg object-cover" />
-          ))}
-        </div>
-      </div>
-    </section>
   );
 }
