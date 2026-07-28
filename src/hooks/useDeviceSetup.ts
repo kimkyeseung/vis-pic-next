@@ -142,7 +142,8 @@ export function useDeviceSetup(deviceId: string) {
         signal.addEventListener("abort", () => clearTimeout(timer), { once: true });
       };
       try {
-        const res = await fetch(`/api/image/list/2/?device_id=${id}`, {
+        // 뱅크 모델: 이 지점에 노출되도록 선택된 프레임만(순서대로, 최대 6개) 로드
+        const res = await fetch(`/api/device/${id}/frames/`, {
           signal,
           cache: "no-store",
         });

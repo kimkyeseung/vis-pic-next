@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { BACKGROUND_IMAGE_TYPE, MAX_ACTIVE_BACKGROUNDS } from "@/constants/images";
 import EditDialog from "./EditDialog";
 
 interface Bg {
@@ -34,38 +33,54 @@ function Media({ bg, baseUrl }: { bg: Bg; baseUrl: string }) {
   );
 }
 
-function toBankImage(i: {
-  id: number;
-  name: string;
-  filename: string;
-  priority?: number;
-  deviceIds?: string[];
-  imageType?: number;
-}): BankImage {
+function toBankImage(
+  i: {
+    id: number;
+    name: string;
+    filename: string;
+    priority?: number;
+    deviceIds?: string[];
+    imageType?: number;
+  },
+  fallbackType: number,
+): BankImage {
   return {
     id: i.id,
     name: i.name,
     filename: i.filename,
     priority: i.priority ?? 0,
     deviceIds: i.deviceIds ?? [],
-    imageType: i.imageType ?? BACKGROUND_IMAGE_TYPE,
+    imageType: i.imageType ?? fallbackType,
   };
 }
 
 /**
- * 배경 뱅크 모델 관리 UI.
- * 좌: 이 지점에 노출할 배경(순서 드래그) / 우: 전체 배경 뱅크(클릭하여 추가, 편집 가능).
+ * 이미지 뱅크 모델 관리 UI (배경·프레임 공용).
+ * 좌: 이 지점에 노출할 이미지(순서 드래그) / 우: 전체 뱅크(클릭하여 추가, 편집 가능).
+ *
+ * @param imageType 관리 대상 이미지 타입 id (배경=1, 프레임=2)
+ * @param maxActive 지점별 최대 노출 개수
+ * @param apiSlug   지점별 선택 API 경로 슬러그 (`backgrounds` | `frames`)
+ * @param noun      UI 문구용 명사 ("배경" | "프레임")
  */
-export default function BackgroundBankPanel({
+export default function ImageBankPanel({
   deviceId,
   deviceName,
   imageBaseUrl,
   devices,
+  imageType,
+  maxActive,
+  apiSlug,
+  noun,
 }: {
   deviceId: string | null;
   deviceName: string | null;
   imageBaseUrl: string;
   devices: DeviceOption[];
+  imageType: number;
+  maxActive: number;
+  apiSlug: string;
+  noun: string;
 }) {
   const [bank, setBank] = useState<BankImage[]>([]);
   const [selected, setSelected] = useState<Bg[]>([]);
@@ -84,11 +99,11 @@ export default function BackgroundBankPanel({
       setLoading(true);
       try {
         const [bankData, selData] = await Promise.all([
-          fetch(`/api/image/list/${BACKGROUND_IMAGE_TYPE}/`, { cache: "no-store" }).then((r) => r.json()),
-          fetch(`/api/device/${deviceId}/backgrounds/`, { cache: "no-store" }).then((r) => r.json()),
+          fetch(`/api/image/list/${imageType}/`, { cache: "no-store" }).then((r) => r.json()),
+          fetch(`/api/device/${deviceId}/${apiSlug}/`, { cache: "no-store" }).then((r) => r.json()),
         ]);
         if (cancelled) return;
-        setBank((bankData.images || []).map(toBankImage));
+        setBank((bankData.images || []).map((i: Parameters<typeof toBankImage>[0]) => toBankImage(i, imageType)));
         setSelected(selData.images || []);
         setDirty(false);
       } catch {
@@ -98,25 +113,25 @@ export default function BackgroundBankPanel({
       }
     })();
     return () => { cancelled = true; };
-  }, [deviceId]);
+  }, [deviceId, imageType, apiSlug]);
 
-  // 편집(특히 타입 변경) 후: 뱅크를 다시 불러오고, 뱅크에서 빠진(=배경이 아니게 된)
+  // 편집(특히 타입 변경) 후: 뱅크를 다시 불러오고, 뱅크에서 빠진(=대상 타입이 아니게 된)
   // 이미지는 노출 목록에서도 제거한다.
   const handleEdited = useCallback(async () => {
     setEditing(null);
     try {
-      const bankData = await fetch(`/api/image/list/${BACKGROUND_IMAGE_TYPE}/`, { cache: "no-store" }).then((r) => r.json());
-      const next: BankImage[] = (bankData.images || []).map(toBankImage);
+      const bankData = await fetch(`/api/image/list/${imageType}/`, { cache: "no-store" }).then((r) => r.json());
+      const next: BankImage[] = (bankData.images || []).map((i: Parameters<typeof toBankImage>[0]) => toBankImage(i, imageType));
       const ids = new Set(next.map((b) => b.id));
       setBank(next);
       setSelected((prev) => prev.filter((s) => ids.has(s.id)));
     } catch {
       // ignore
     }
-  }, []);
+  }, [imageType]);
 
   const selectedIds = new Set(selected.map((s) => s.id));
-  const full = selected.length >= MAX_ACTIVE_BACKGROUNDS;
+  const full = selected.length >= maxActive;
 
   const add = (bg: Bg) => {
     if (full || selectedIds.has(bg.id)) return;
@@ -150,7 +165,7 @@ export default function BackgroundBankPanel({
     setSaving(true);
     setMessage("");
     try {
-      const res = await fetch(`/api/device/${deviceId}/backgrounds/`, {
+      const res = await fetch(`/api/device/${deviceId}/${apiSlug}/`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ imageIds: selected.map((s) => s.id) }),
@@ -178,7 +193,7 @@ export default function BackgroundBankPanel({
     <div>
       <div className="flex items-center justify-between mb-3 gap-3">
         <p className="text-sm text-gray-400">
-          <span className="text-white font-semibold">{deviceName ?? "이 지점"}</span> 서비스 화면에 노출할 배경을 선택하세요 (최대 {MAX_ACTIVE_BACKGROUNDS}개).
+          <span className="text-white font-semibold">{deviceName ?? "이 지점"}</span> 서비스 화면에 노출할 {noun}을 선택하세요 (최대 {maxActive}개).
         </p>
         <div className="flex items-center gap-3 shrink-0">
           {message && <span className="text-xs text-green-400">{message}</span>}
@@ -193,13 +208,13 @@ export default function BackgroundBankPanel({
       </div>
 
       <div className="grid grid-cols-2 gap-4">
-        {/* 좌: 이 지점 노출 배경 (순서) */}
+        {/* 좌: 이 지점 노출 목록 (순서) */}
         <div className="bg-gray-800 rounded-xl border border-gray-700 p-4">
           <h4 className="text-white font-semibold mb-3">
-            이 지점 노출 배경 <span className="text-gray-400 text-sm">({selected.length}/{MAX_ACTIVE_BACKGROUNDS})</span>
+            이 지점 노출 {noun} <span className="text-gray-400 text-sm">({selected.length}/{maxActive})</span>
           </h4>
           {selected.length === 0 ? (
-            <p className="text-gray-500 text-sm py-10 text-center">오른쪽 뱅크에서 배경을 클릭해 추가하세요.</p>
+            <p className="text-gray-500 text-sm py-10 text-center">오른쪽 뱅크에서 {noun}을 클릭해 추가하세요.</p>
           ) : (
             <ul className="space-y-2">
               {selected.map((bg, index) => (
@@ -230,13 +245,13 @@ export default function BackgroundBankPanel({
           )}
         </div>
 
-        {/* 우: 배경 뱅크 */}
+        {/* 우: 뱅크 */}
         <div className="bg-gray-800 rounded-xl border border-gray-700 p-4">
           <h4 className="text-white font-semibold mb-3">
-            배경 뱅크 <span className="text-gray-400 text-sm">({bank.length})</span>
+            {noun} 뱅크 <span className="text-gray-400 text-sm">({bank.length})</span>
           </h4>
           {bank.length === 0 ? (
-            <p className="text-gray-500 text-sm py-10 text-center">업로드된 배경이 없습니다. 상단 &quot;이미지 업로드&quot;로 추가하세요.</p>
+            <p className="text-gray-500 text-sm py-10 text-center">업로드된 {noun}이 없습니다. 상단 &quot;이미지 업로드&quot;로 추가하세요.</p>
           ) : (
             <div className="grid grid-cols-3 gap-3 max-h-[60vh] overflow-y-auto pr-1">
               {bank.map((bg) => {
@@ -253,7 +268,7 @@ export default function BackgroundBankPanel({
                       type="button"
                       onClick={() => add(bg)}
                       disabled={disabled}
-                      title={isSel ? "이미 선택됨" : full ? `최대 ${MAX_ACTIVE_BACKGROUNDS}개` : "클릭하여 추가"}
+                      title={isSel ? "이미 선택됨" : full ? `최대 ${maxActive}개` : "클릭하여 추가"}
                       className={`absolute inset-0 h-full w-full ${disabled ? "opacity-40 cursor-not-allowed" : "hover:opacity-90"}`}
                     >
                       <Media bg={bg} baseUrl={imageBaseUrl} />

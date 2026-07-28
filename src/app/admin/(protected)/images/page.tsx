@@ -4,9 +4,9 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import OrderDialog from "./OrderDialog";
 import EditDialog from "./EditDialog";
-import BackgroundBankPanel from "./BackgroundBankPanel";
+import ImageBankPanel from "./ImageBankPanel";
 import { useAdmin } from "@/app/admin/AdminContext";
-import { BACKGROUND_IMAGE_TYPE, MAX_ACTIVE_BACKGROUNDS, WALLPAPER_IMAGE_TYPE, LOGO_IMAGE_TYPE } from "@/constants/images";
+import { BACKGROUND_IMAGE_TYPE, MAX_ACTIVE_BACKGROUNDS, FRAME_IMAGE_TYPE, MAX_ACTIVE_FRAMES, WALLPAPER_IMAGE_TYPE, LOGO_IMAGE_TYPE } from "@/constants/images";
 
 // 테마관리에서 다루는 타입(배경화면·로고)은 이미지 관리 탭에서 숨긴다.
 const THEME_MANAGED_TYPES = new Set<number>([WALLPAPER_IMAGE_TYPE, LOGO_IMAGE_TYPE]);
@@ -184,6 +184,9 @@ export default function ImagesPage() {
   };
 
   const isBackgroundTab = selectedType === BACKGROUND_IMAGE_TYPE;
+  const isFrameTab = selectedType === FRAME_IMAGE_TYPE;
+  // 배경·프레임은 지점별 뱅크 UI(선택/순서)를 사용한다.
+  const isBankTab = isBackgroundTab || isFrameTab;
   const activeBackgroundCount = images.filter((img) => img.active).length;
 
   const handleToggleActive = async (image: Image) => {
@@ -257,8 +260,8 @@ export default function ImagesPage() {
             </button>
           ))}
         </div>
-        {/* 배경 탭은 뱅크 UI(장치별 선택)를 쓰므로 전체/장치 필터·순서관리 숨김 */}
-        {!isBackgroundTab && (
+        {/* 배경·프레임 탭은 뱅크 UI(장치별 선택)를 쓰므로 전체/장치 필터·순서관리 숨김 */}
+        {!isBankTab && (
           <div className="flex items-center gap-2">
             {/* 전체 / 이 장치 이미지 보기 토글 */}
             <div className="flex rounded-lg overflow-hidden border border-gray-600 text-sm">
@@ -288,12 +291,16 @@ export default function ImagesPage() {
         )}
       </div>
 
-      {isBackgroundTab ? (
-        <BackgroundBankPanel
+      {isBankTab ? (
+        <ImageBankPanel
           deviceId={currentDeviceId}
           deviceName={selectedDevice?.name ?? null}
           imageBaseUrl={imageBaseUrl}
           devices={devices}
+          imageType={selectedType}
+          maxActive={isFrameTab ? MAX_ACTIVE_FRAMES : MAX_ACTIVE_BACKGROUNDS}
+          apiSlug={isFrameTab ? "frames" : "backgrounds"}
+          noun={isFrameTab ? "프레임" : "배경"}
         />
       ) : loading ? (
         <div className="text-gray-400">로딩중...</div>
