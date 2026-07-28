@@ -487,7 +487,7 @@ export function CompleteSection({
 
         {(printStatus === "ready" || printStatus === "done") && compositeImage && (
           <>
-            <h2 className="text-4xl font-extrabold text-white mb-4 animate-fadeInDown" style={{ textShadow: "0 2px 15px rgba(0,0,0,0.5)" }}>
+            <h2 className="text-title font-extrabold text-white mb-4 animate-fadeInDown" style={{ textShadow: "0 2px 15px rgba(0,0,0,0.5)" }}>
               {printStatus === "done" ? t("complete.done") : t("complete.ready")}
             </h2>
 

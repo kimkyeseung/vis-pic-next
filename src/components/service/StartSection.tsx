@@ -58,7 +58,7 @@ export function StartSection({
             {LOCALES.map(({ code, label }) => (
               <button
                 key={code}
-                className={`px-6 py-3 rounded-full text-base font-semibold transition-all ${
+                className={`px-8 py-4 rounded-2xl text-2xl font-semibold transition-all ${
                   lang === code
                     ? "bg-white text-gray-900 shadow-lg"
                     : "bg-white/10 text-white/60 hover:bg-white/20 hover:text-white"

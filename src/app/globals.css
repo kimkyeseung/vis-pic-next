@@ -33,6 +33,9 @@
   --text-8xl:  calc(6rem     * var(--type-scale));
   --text-9xl:  calc(8rem     * var(--type-scale));
 
+  /* 서비스 화면 섹션 제목(h2) 전용 — text-4xl(2.25rem)의 2배. text-title 유틸 생성. */
+  --text-title: calc(4.5rem * var(--type-scale));
+
   /* ── 색상 팔레트 ───────────────────────────────────── */
   --color-brand:        #6c6fb4;  /* 강조/주요 색 (기본값 — 지점 테마가 우선) */
   --color-brand-strong: #585b9c;
@@ -319,10 +322,10 @@ body {
 
 /* 네비게이션 버튼 */
 .nav-button {
-  min-height: 95px;
-  border-radius: 14px;
-  padding: 20px 50px;
-  font-size: 1.4em;
+  min-height: 128px;
+  border-radius: 18px;
+  padding: 26px 66px;
+  font-size: 2em;
 }
 
 .nav-button.disabled {
@@ -332,9 +335,10 @@ body {
 
 /* "다음" 강조 버튼 — 우하단 크게. primary 색상 사용. */
 .nav-next-lg {
-  min-height: 110px;
-  padding: 22px 72px;
-  font-size: 1.7em;
+  min-height: 152px;
+  border-radius: 22px;
+  padding: 28px 88px;
+  font-size: 2.9em;
   background: var(--theme-primary, var(--color-brand));
   color: #ffffff;
 }
@@ -343,7 +347,8 @@ body {
   filter: brightness(1.08);
 }
 @media (orientation: portrait) {
-  .nav-next-lg { min-height: 88px; padding: 16px 44px; font-size: 1.4em; }
+  .nav-button { min-height: 104px; padding: 18px 46px; font-size: 1.6em; }
+  .nav-next-lg { min-height: 128px; padding: 22px 60px; font-size: 2.3em; }
 }
 
 /* 프레임 옵션 */

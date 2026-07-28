@@ -92,7 +92,7 @@ export function FrameSection({
 
   return (
     <section className="w-full h-full flex flex-col items-center justify-center relative z-10">
-      <h2 className="text-4xl font-extrabold text-white mb-16 portrait:mb-8 animate-fadeInDown" style={{ textShadow: "0 2px 15px rgba(0,0,0,0.5)" }}>
+      <h2 className="text-title font-extrabold text-white mb-16 portrait:mb-8 animate-fadeInDown" style={{ textShadow: "0 2px 15px rgba(0,0,0,0.5)" }}>
         {t("frame.title")}
       </h2>
 

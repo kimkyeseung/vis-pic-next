@@ -127,7 +127,7 @@ export function PaymentSection({
     <section className="w-full h-full flex flex-col items-center justify-center relative z-10 px-8">
       {status === "idle" ? (
         <div className="w-full max-w-5xl flex flex-col items-center animate-fadeInUp">
-          <h2 className="text-4xl font-extrabold text-white mb-8" style={{ textShadow: "0 2px 15px rgba(0,0,0,0.5)" }}>
+          <h2 className="text-title font-extrabold text-white mb-8" style={{ textShadow: "0 2px 15px rgba(0,0,0,0.5)" }}>
             {t("payment.selectQuantity")}
           </h2>
 
@@ -136,7 +136,7 @@ export function PaymentSection({
             {LOCALES.map(({ code, label }) => (
               <button
                 key={code}
-                className={`px-6 py-3 rounded-full text-base font-semibold transition-all ${
+                className={`px-8 py-4 rounded-2xl text-2xl font-semibold transition-all ${
                   lang === code
                     ? "bg-white text-gray-900 shadow-lg"
                     : "bg-white/10 text-white/60 hover:bg-white/20 hover:text-white"
@@ -185,12 +185,16 @@ export function PaymentSection({
             </button>
 
             <div className="text-center">
-              <div className="text-5xl font-black text-white leading-none">
+              <div className="text-8xl portrait:text-6xl font-black text-white leading-none">
                 {t("payment.amount", { amount: fmt(totalAmount) })}
               </div>
             </div>
 
-            <button className="service-button nav-button" onClick={handlePay}>
+            <button
+              className="service-button nav-button"
+              style={{ background: "var(--theme-primary, var(--color-brand))", color: "#ffffff" }}
+              onClick={handlePay}
+            >
               {t("payment.pay")}
             </button>
           </div>

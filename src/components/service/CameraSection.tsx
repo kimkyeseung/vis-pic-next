@@ -879,22 +879,31 @@ export function CameraSection({
   const bgOptions = backgroundImages.length > 0 ? backgroundImages : FALLBACK_BACKGROUNDS;
 
   return (
-    <section className="w-full h-full flex flex-col relative z-10">
+    <section
+      className="w-full h-full relative z-10 p-6 pb-52"
+      style={{
+        display: "grid",
+        gap: "1rem",
+        gridTemplateColumns: showBgStrip ? "14rem minmax(0, 1fr) 20rem" : "minmax(0, 1fr) 20rem",
+        gridTemplateRows: "auto minmax(0, 1fr)",
+        gridTemplateAreas: showBgStrip
+          ? '"bg title sticker" "bg preview sticker"'
+          : '"title sticker" "preview sticker"',
+      }}
+    >
       <video ref={videoRef} autoPlay playsInline muted className="hidden" />
 
       {flash && <div className="fixed inset-0 bg-white z-50 pointer-events-none animate-flash" />}
 
-      <h2 className="shrink-0 text-center text-3xl portrait:text-2xl font-extrabold text-white pt-5 pb-2" style={{ textShadow: "0 2px 15px rgba(0,0,0,0.5)" }}>
+      <h2 className="self-center text-center text-5xl portrait:text-4xl font-extrabold text-white" style={{ gridArea: "title", textShadow: "0 2px 15px rgba(0,0,0,0.5)" }}>
         {t("camera.start")}
       </h2>
 
-      <div className="flex-1 min-h-0 w-full flex portrait:flex-col">
-
       {/* 좌측: 배경 변경 패널 */}
       {showBgStrip && (
-        <div className="w-64 shrink-0 flex flex-col px-4 py-6 pb-32 border-r border-white/10 portrait:w-full portrait:border-r-0 portrait:border-b portrait:py-3 portrait:pb-3">
+        <div className="flex flex-col min-h-0 px-2 pr-4 border-r border-white/10 portrait:border-r-0 portrait:border-b portrait:pb-3" style={{ gridArea: "bg" }}>
           <h3 className="text-white text-xl font-bold text-center mb-4 shrink-0">{t("camera.bgChange")}</h3>
-          <div className="grid grid-cols-2 gap-3 overflow-y-auto content-start portrait:grid-cols-6">
+          <div className="flex flex-col gap-3 overflow-y-auto flex-1 min-h-0 portrait:grid portrait:grid-cols-6 portrait:content-start">
             {bgOptions.map((bg) => {
               const isSelected = selectedBackground === bg.id;
               const isDb = "filename" in bg;
@@ -902,7 +911,7 @@ export function CameraSection({
               return (
                 <button
                   key={bg.id}
-                  className={`relative aspect-video rounded-xl overflow-hidden transition-all duration-200 ${
+                  className={`relative aspect-video shrink-0 rounded-xl overflow-hidden transition-all duration-200 ${
                     isSelected
                       ? "ring-[3px] ring-[var(--theme-primary,#6c6fb4)] shadow-lg"
                       : "ring-1 ring-white/20 opacity-70 hover:opacity-100"
@@ -926,12 +935,11 @@ export function CameraSection({
         </div>
       )}
 
-      {/* 중앙: 카메라 미리보기 + 촬영하기 */}
-      <div className="flex-1 min-w-0 flex flex-col items-center justify-center gap-4 px-6 py-4">
-        <div
-          className="camera-preview w-full aspect-video relative"
-          style={{ maxWidth: "calc((100vh - 300px) * 16 / 9)" }}
-        >
+      {/* 중앙: 카메라 미리보기 (가장 큰 셀) */}
+      <div
+        className="camera-preview aspect-video max-w-full max-h-full place-self-center relative"
+        style={{ gridArea: "preview" }}
+      >
           {/* 스티커 드래그 오버레이 */}
           <div
             ref={overlayRef}
@@ -1058,25 +1066,23 @@ export function CameraSection({
           )}
         </div>
 
-        {/* 촬영하기 — 카메라 하단 중앙 큰 버튼 */}
+      {/* 촬영하기 — 하단 중앙, 이전/다음 버튼과 같은 줄에 절대배치 */}
+      <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-20 portrait:bottom-5">
         <button
-          className="service-button w-full shrink-0 rounded-2xl font-extrabold py-6 portrait:py-4 text-3xl portrait:text-2xl"
+          className="service-button tracking-widest rounded-[22px] font-extrabold text-5xl portrait:text-4xl px-28 py-8 portrait:px-16 portrait:py-6 min-w-[34rem] portrait:min-w-[24rem]"
           onClick={handleManualCapture}
-          style={{
-            maxWidth: "calc((100vh - 300px) * 16 / 9)",
-            ...(countdown !== null || photos.length >= maxPhotos ? { opacity: 0.5, pointerEvents: "none" } : {}),
-          }}
+          style={countdown !== null || photos.length >= maxPhotos ? { opacity: 0.5, pointerEvents: "none" } : {}}
         >
           &#128248; {t("camera.shoot")}
         </button>
       </div>
 
-      {/* 우측: 스티커 + 남은 촬영 횟수 패널 */}
-      <div className="w-80 shrink-0 p-6 pb-40 flex flex-col border-l border-white/10 bg-black/20 portrait:w-full portrait:border-l-0 portrait:border-t portrait:max-h-[46vh] portrait:pb-24">
-        <h3 className="text-white text-xl font-bold text-center mb-4 shrink-0">{t("camera.stickerPrompt")}</h3>
+      {/* 우측: 스티커 패널 */}
+      <div className="flex flex-col min-h-0 pl-4 border-l border-white/10 portrait:border-l-0 portrait:border-t" style={{ gridArea: "sticker" }}>
+        <h3 className="text-white text-2xl font-bold text-center mb-4 shrink-0">{t("camera.stickerPrompt")}</h3>
 
         {/* 스티커 패널 (상시 노출) */}
-        <div className="flex-1 min-h-0 flex flex-col mb-4">
+        <div className="flex flex-col min-h-0 mb-4">
           <div className="flex items-center justify-end mb-2 min-h-[22px]">
             {stickers.length > 0 && (
               <button
@@ -1100,7 +1106,7 @@ export function CameraSection({
             ))}
           </div>
 
-          <div className="flex-1 min-h-0 overflow-y-auto bg-black/20 rounded-2xl p-2">
+          <div className="max-h-[42vh] overflow-y-auto bg-black/20 rounded-2xl p-2">
             {stickerTab === "emoji" && (
               <div className="grid grid-cols-4 gap-2">
                 {AVAILABLE_STICKERS.map((def) => (
@@ -1144,13 +1150,12 @@ export function CameraSection({
           </div>
         </div>
 
-        {/* 남은 촬영 횟수 */}
-        <div className="mt-auto shrink-0 text-center border border-dashed border-white/30 rounded-xl py-3">
-          <span className="text-white font-bold text-lg">
+        {/* 남은 촬영 횟수 — 스티커 패널 맨 아래에 함께 표시 */}
+        <div className="mt-auto shrink-0 w-full text-center border border-dashed border-white/30 rounded-xl py-4">
+          <span className="text-white font-bold text-3xl">
             {t("camera.remaining", { n: String(Math.max(0, maxPhotos - photos.length)) })}
           </span>
         </div>
-      </div>
       </div>
 
       <ServiceNav onPrev={onPrev} onNext={onNext} nextDisabled={!canProceed} />
