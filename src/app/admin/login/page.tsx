@@ -26,14 +26,16 @@ export default function AdminLoginPage() {
 
       if (!res.ok) {
         setError(data.error || "로그인에 실패했습니다.");
+        setLoading(false);
         return;
       }
 
       localStorage.setItem("admin_session", JSON.stringify(data.admin));
+      // 성공 시에는 /admin으로 이동하는 중이므로 loading을 해제하지 않는다
+      // (해제하면 라우팅 완료 전에 버튼이 다시 활성화되어 중복 제출 가능).
       router.push("/admin");
     } catch {
       setError("서버 연결에 실패했습니다.");
-    } finally {
       setLoading(false);
     }
   };
