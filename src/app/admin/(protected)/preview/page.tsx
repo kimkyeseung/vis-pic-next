@@ -337,8 +337,8 @@ export default function PreviewPage() {
           <LanguageProvider>
             <LangController lang={lang} />
             <div className="service-theme relative overflow-hidden shadow-2xl" style={stageStyle}>
-              {/* 좌측 상단 로고 — 첫(대기)·촬영 화면 제외. 미리보기는 기본 AR-pic로 표시. */}
-              {step !== "start" && step !== "camera" && (
+              {/* 좌측 상단 로고 — 첫(대기) 화면 제외. 미리보기는 기본 AR-pic로 표시. */}
+              {step !== "start" && (
                 <div className="absolute top-6 left-8 z-20 pointer-events-none select-none">
                   <span
                     className="text-3xl font-extrabold tracking-wide text-white"

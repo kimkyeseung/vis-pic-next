@@ -317,7 +317,9 @@ export function CameraSection({
 
       try {
         const stream = await navigator.mediaDevices.getUserMedia({
-          video: { width: { ideal: 1920 }, height: { ideal: 1080 } },
+          // 인화 슬롯이 4:3이므로 촬영도 4:3(1440×1080)으로 요청해 좌우 잘림을 없앤다.
+          // (실제로 프린트 합성 시 슬롯 비율로 center-crop 되므로 원본이 4:3이면 잘림이 사라진다)
+          video: { width: { ideal: 1440 }, height: { ideal: 1080 }, aspectRatio: { ideal: 4 / 3 } },
         });
         cameraStreamRef.current = stream;
         if (videoRef.current) videoRef.current.srcObject = stream;
@@ -884,11 +886,14 @@ export function CameraSection({
       style={{
         display: "grid",
         gap: "1rem",
-        gridTemplateColumns: showBgStrip ? "14rem minmax(0, 1fr) 20rem" : "minmax(0, 1fr) 20rem",
-        gridTemplateRows: "auto minmax(0, 1fr)",
+        gridTemplateColumns: showBgStrip ? "24rem minmax(0, 1fr) 24rem" : "minmax(0, 1fr) 24rem",
+        // 최상단 행은 로고(좌측 상단 오버레이)와 겹치지 않도록 최소 높이를 확보한다.
+        gridTemplateRows: "minmax(4.5rem, auto) minmax(0, 1fr)",
+        // 최상단 행은 제목(중앙)만 두고 좌측 상단은 로고 자리로 비운다.
+        // 배경·스티커 패널은 둘째 행부터 시작해 헤더 높이가 좌우 대칭이 된다.
         gridTemplateAreas: showBgStrip
-          ? '"bg title sticker" "bg preview sticker"'
-          : '"title sticker" "preview sticker"',
+          ? '". title ." "bg preview sticker"'
+          : '"title ." "preview sticker"',
       }}
     >
       <video ref={videoRef} autoPlay playsInline muted className="hidden" />
@@ -903,7 +908,7 @@ export function CameraSection({
       {showBgStrip && (
         <div className="flex flex-col min-h-0 px-2 pr-4 border-r border-white/10 portrait:border-r-0 portrait:border-b portrait:pb-3" style={{ gridArea: "bg" }}>
           <h3 className="text-white text-xl font-bold text-center mb-4 shrink-0">{t("camera.bgChange")}</h3>
-          <div className="flex flex-col gap-3 overflow-y-auto flex-1 min-h-0 portrait:grid portrait:grid-cols-6 portrait:content-start">
+          <div className="grid grid-cols-2 gap-3 overflow-y-auto flex-1 min-h-0 content-start portrait:grid-cols-6">
             {bgOptions.map((bg) => {
               const isSelected = selectedBackground === bg.id;
               const isDb = "filename" in bg;
@@ -935,9 +940,9 @@ export function CameraSection({
         </div>
       )}
 
-      {/* 중앙: 카메라 미리보기 (가장 큰 셀) */}
+      {/* 중앙: 카메라 미리보기 (가장 큰 셀) — 인화 비율과 동일한 4:3 */}
       <div
-        className="camera-preview aspect-video max-w-full max-h-full place-self-center relative"
+        className="camera-preview aspect-[4/3] max-w-full max-h-full place-self-center relative"
         style={{ gridArea: "preview" }}
       >
           {/* 스티커 드래그 오버레이 */}

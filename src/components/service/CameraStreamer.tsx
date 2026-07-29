@@ -188,7 +188,8 @@ export function CameraStreamer({
       for (let attempt = 0; !cancelled; attempt++) {
         try {
           return await navigator.mediaDevices.getUserMedia({
-            video: { width: { ideal: 1280 }, height: { ideal: 720 } },
+            // 촬영(CameraSection)과 동일하게 4:3(960×720)으로 요청해 서브 모니터 미러 비율을 일치시킨다.
+            video: { width: { ideal: 960 }, height: { ideal: 720 }, aspectRatio: { ideal: 4 / 3 } },
           });
         } catch (err) {
           const e = err as DOMException;
