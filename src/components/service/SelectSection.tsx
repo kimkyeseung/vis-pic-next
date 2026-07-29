@@ -42,15 +42,16 @@ export function SelectSection({
   const canProceed = selectedPhotos.length === requiredCount;
 
   return (
-    <section className="w-full h-full flex flex-col items-center justify-center relative z-10">
-      <h2 className="text-title font-extrabold text-white mb-6 animate-fadeInDown" style={{ textShadow: "0 2px 15px rgba(0,0,0,0.5)" }}>
+    <section className="w-full h-full grid grid-rows-[auto_auto_1fr] justify-items-center relative z-10 pt-12 portrait:pt-8 pb-44 portrait:pb-40">
+      <h2 className="text-title font-extrabold text-white mb-4 animate-fadeInDown" style={{ textShadow: "0 2px 15px rgba(0,0,0,0.5)" }}>
         {t("select.title")}
       </h2>
-      <p className="text-gray-400 text-xl mb-16 portrait:mb-6 animate-fadeInDown">
+      <p className="text-gray-400 text-xl animate-fadeInDown">
         {t("select.count", { req: requiredCount, sel: selectedPhotos.length })}
       </p>
 
-      <div className="flex items-start justify-center gap-12 mb-16 max-w-6xl animate-fadeInUp portrait:flex-col portrait:items-center portrait:gap-6 portrait:mb-8">
+      <div className="min-h-0 flex items-center justify-center">
+      <div className="flex items-start justify-center gap-12 max-w-6xl animate-fadeInUp portrait:flex-col portrait:items-center portrait:gap-6">
         <div className="flex flex-wrap justify-center gap-8 max-w-5xl portrait:gap-4">
           {photos.map((photo, i) => (
             <div
@@ -76,6 +77,7 @@ export function SelectSection({
             backgroundImages={backgroundImages}
           />
         )}
+      </div>
       </div>
 
       <ServiceNav onPrev={onPrev} onNext={onNext} prevKey="select.reshoot" nextDisabled={!canProceed} />

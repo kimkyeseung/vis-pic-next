@@ -124,13 +124,15 @@ export function PaymentSection({
   const fmt = (n: number) => n.toLocaleString();
 
   return (
-    <section className="w-full h-full flex flex-col items-center justify-center relative z-10 px-8">
+    <section className="w-full h-full flex flex-col items-center relative z-10 px-8">
       {status === "idle" ? (
-        <div className="w-full max-w-5xl flex flex-col items-center animate-fadeInUp">
-          <h2 className="text-title font-extrabold text-white mb-8" style={{ textShadow: "0 2px 15px rgba(0,0,0,0.5)" }}>
+        <>
+          <h2 className="text-title font-extrabold text-white mt-20 portrait:mt-12 animate-fadeInDown" style={{ textShadow: "0 2px 15px rgba(0,0,0,0.5)" }}>
             {t("payment.selectQuantity")}
           </h2>
 
+          <div className="flex-1 w-full flex flex-col items-center justify-center">
+          <div className="w-full max-w-5xl flex flex-col items-center animate-fadeInUp">
           {/* 언어 선택 */}
           <div className="flex gap-3 mb-10 portrait:mb-8 flex-wrap justify-center">
             {LOCALES.map(({ code, label }) => (
@@ -204,9 +206,11 @@ export function PaymentSection({
               결제완료(개발)
             </button>
           )}
-        </div>
+          </div>
+          </div>
+        </>
       ) : (
-        <div className="bg-black/30 backdrop-blur-sm p-16 rounded-3xl border border-white/10 text-center animate-fadeInUp min-w-[500px]">
+        <div className="bg-black/30 backdrop-blur-sm p-16 rounded-3xl border border-white/10 text-center animate-fadeInUp min-w-[500px] my-auto">
           {status === "requesting" && (
             <div className="py-8">
               <div className="w-20 h-20 border-4 border-white/20 border-t-blue-500 rounded-full animate-spin mx-auto mb-8" />

@@ -33,12 +33,13 @@ export function PrintBgSection({
   const { t } = useLanguage();
 
   return (
-    <section className="w-full h-full flex flex-col items-center justify-center relative z-10">
-      <h2 className="text-title font-extrabold text-white mb-16 portrait:mb-8 animate-fadeInDown" style={{ textShadow: "0 2px 15px rgba(0,0,0,0.5)" }}>
+    <section className="w-full h-full grid grid-rows-[auto_1fr] justify-items-center relative z-10 pt-12 portrait:pt-8 pb-44 portrait:pb-40">
+      <h2 className="text-title font-extrabold text-white animate-fadeInDown" style={{ textShadow: "0 2px 15px rgba(0,0,0,0.5)" }}>
         {t("printbg.title")}
       </h2>
 
-      <div className="flex items-start justify-center gap-12 mb-16 animate-fadeInUp portrait:flex-col portrait:items-center portrait:gap-6 portrait:mb-8">
+      <div className="min-h-0 flex items-center justify-center">
+      <div className="flex items-start justify-center gap-12 animate-fadeInUp portrait:flex-col portrait:items-center portrait:gap-6">
         <div className="grid grid-cols-3 gap-8 portrait:grid-cols-2 portrait:gap-4">
           {printBgImages.map((bg) => (
             <div
@@ -70,6 +71,7 @@ export function PrintBgSection({
             printBgImages={printBgImages}
           />
         )}
+      </div>
       </div>
 
       <ServiceNav onPrev={onPrev} onNext={onNext} nextDisabled={selectedPrintBg === null} />

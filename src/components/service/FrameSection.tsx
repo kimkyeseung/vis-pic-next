@@ -91,12 +91,13 @@ export function FrameSection({
   const backgroundStyle = resolveFrameBackground(selectedBackground, backgroundImages, imageBaseUrl);
 
   return (
-    <section className="w-full h-full flex flex-col items-center justify-center relative z-10">
-      <h2 className="text-title font-extrabold text-white mb-16 portrait:mb-8 animate-fadeInDown" style={{ textShadow: "0 2px 15px rgba(0,0,0,0.5)" }}>
+    <section className="w-full h-full grid grid-rows-[auto_1fr] justify-items-center relative z-10 pt-12 portrait:pt-8 pb-44 portrait:pb-40">
+      <h2 className="text-title font-extrabold text-white animate-fadeInDown" style={{ textShadow: "0 2px 15px rgba(0,0,0,0.5)" }}>
         {t("frame.title")}
       </h2>
 
-      <div className="flex gap-10 mb-20 animate-fadeInUp portrait:flex-col portrait:gap-5 portrait:mb-10 portrait:w-full portrait:max-w-md portrait:items-stretch">
+      <div className="min-h-0 flex items-center justify-center">
+      <div className="flex gap-10 animate-fadeInUp portrait:flex-col portrait:gap-5 portrait:w-full portrait:max-w-md portrait:items-stretch">
         {frames.map((frame) => (
           <div
             key={frame.id}
@@ -110,6 +111,7 @@ export function FrameSection({
             <span className="text-2xl font-bold text-white">{t("frame.cut", { n: frame.count })}</span>
           </div>
         ))}
+      </div>
       </div>
 
       <ServiceNav onPrev={onPrev} onNext={onNext} nextDisabled={!selectedFrame} />
