@@ -60,6 +60,8 @@ export interface DeviceConfig {
   themeTextColor: string;
   /** 테마 강조(primary) 색상 — 선택 강조·주요 버튼. 미설정 시 #6c6fb4. */
   themePrimaryColor: string;
+  /** 테마 배경 단색 — 첫 화면을 제외한 나머지 서비스 화면 배경. 미설정 시 #2a2a2a. */
+  themeBgColor: string;
 }
 
 export interface BGImage {

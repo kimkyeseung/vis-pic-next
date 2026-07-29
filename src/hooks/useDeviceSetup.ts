@@ -29,6 +29,7 @@ const DEFAULT_CONFIG: DeviceConfig = {
   segmentFeather: 35,
   themeTextColor: "#ffffff",
   themePrimaryColor: "#6c6fb4",
+  themeBgColor: "#2a2a2a",
 };
 
 export function useDeviceSetup(deviceId: string) {
@@ -100,6 +101,7 @@ export function useDeviceSetup(deviceId: string) {
           segmentFeather: clampPercent(parseIntSafe(s.CAPTURE_SMOOTHNESS || "", 35), 1),
           themeTextColor: s.THEME_TEXT_COLOR || "#ffffff",
           themePrimaryColor: s.THEME_PRIMARY_COLOR || "#6c6fb4",
+          themeBgColor: s.THEME_BG_COLOR || "#2a2a2a",
         });
       } catch (err) {
         if ((err as Error).name === "AbortError") return;

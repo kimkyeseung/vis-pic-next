@@ -333,12 +333,8 @@ body {
   pointer-events: none;
 }
 
-/* "다음" 강조 버튼 — 우하단 크게. primary 색상 사용. */
+/* "다음" 강조 버튼 — 우하단. 크기는 "이전"(.nav-button)과 동일, primary 색상만 강조. */
 .nav-next-lg {
-  min-height: 152px;
-  border-radius: 22px;
-  padding: 28px 88px;
-  font-size: 2.9em;
   background: var(--theme-primary, var(--color-brand));
   color: #ffffff;
 }
@@ -348,7 +344,6 @@ body {
 }
 @media (orientation: portrait) {
   .nav-button { min-height: 104px; padding: 18px 46px; font-size: 1.6em; }
-  .nav-next-lg { min-height: 128px; padding: 22px 60px; font-size: 2.3em; }
 }
 
 /* 프레임 옵션 */

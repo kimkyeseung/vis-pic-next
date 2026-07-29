@@ -91,11 +91,13 @@ function ServiceContent() {
 
   // 테마관리에서 설정한 배경화면/글자색을 서비스 화면 전체에 적용 (어드민 화면에는 미적용).
   // 글자색은 --theme-text 변수로 내려 globals.css의 .service-theme 규칙이 본문 흰 텍스트를 치환한다.
-  // 배경화면 미설정 시 globals.css의 기본 배경(#2a2a2a)이 그대로 비쳐 보인다.
+  // 배경화면 이미지는 첫 화면(start)에만 깔고, 나머지 단계는 관리자가 지정한 배경 단색을 사용한다.
+  const isFirstPage = currentStep === "start";
   const themeStyle: React.CSSProperties = {
     ...(config.themeTextColor ? { ["--theme-text"]: config.themeTextColor } : {}),
     ...(config.themePrimaryColor ? { ["--theme-primary"]: config.themePrimaryColor } : {}),
-    ...(wallpaperUrl
+    backgroundColor: config.themeBgColor,
+    ...(isFirstPage && wallpaperUrl
       ? {
           backgroundImage: `url(${wallpaperUrl})`,
           backgroundSize: "cover",
@@ -120,6 +122,27 @@ function ServiceContent() {
         </div>
       )}
       <FloatingElements />
+      {/* 좌측 상단 로고 — 첫(대기)·촬영 화면을 제외한 단계에 표시. 업로드한 로고 없으면 기본 AR-pic. */}
+      {currentStep !== "start" && currentStep !== "camera" && (
+        <div className="absolute top-6 left-8 portrait:top-4 portrait:left-5 z-20 pointer-events-none select-none">
+          {logoUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={logoUrl}
+              alt="logo"
+              className="h-16 portrait:h-12 w-auto max-w-[40vw] object-contain"
+              style={{ filter: "drop-shadow(0 2px 8px rgba(0,0,0,0.4))" }}
+            />
+          ) : (
+            <span
+              className="text-3xl portrait:text-2xl font-extrabold tracking-wide text-white"
+              style={{ textShadow: "0 2px 8px rgba(0,0,0,0.4)" }}
+            >
+              AR-pic
+            </span>
+          )}
+        </div>
+      )}
       {currentStep !== "camera" && (
         <CameraStreamer
           enabled
@@ -142,7 +165,6 @@ function ServiceContent() {
         <StartSection
           onNext={flow.handleStart}
           showLanguage={!config.paymentEnabled}
-          logoUrl={logoUrl}
           monitors={monitors}
           syncEnabled={syncEnabled}
           selectedMonitorIndex={selectedMonitorIndex}

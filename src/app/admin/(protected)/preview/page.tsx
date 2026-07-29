@@ -68,6 +68,7 @@ function makeConfig(paymentEnabled: boolean): DeviceConfig {
     segmentFeather: 35,
     themeTextColor: "#ffffff",
     themePrimaryColor: "#6c6fb4",
+    themeBgColor: "#2a2a2a",
   };
 }
 
@@ -132,7 +133,8 @@ export default function PreviewPage() {
     background: "#2a2a2a",
     ["--theme-text" as string]: themeText,
     ["--theme-primary" as string]: themePrimary,
-    ...(wallpaper
+    // 배경화면은 첫(대기) 화면에만 적용된다.
+    ...(wallpaper && step === "start"
       ? {
           backgroundImage: "linear-gradient(135deg, #2b2440 0%, #46375f 50%, #6c6fb4 100%)",
         }
@@ -146,7 +148,6 @@ export default function PreviewPage() {
           <StartSection
             onNext={noop}
             showLanguage
-            logoUrl={null}
             monitors={[]}
             syncEnabled={false}
             selectedMonitorIndex={null}
@@ -342,6 +343,17 @@ export default function PreviewPage() {
           <LanguageProvider>
             <LangController lang={lang} />
             <div className="service-theme relative overflow-hidden shadow-2xl" style={stageStyle}>
+              {/* 좌측 상단 로고 — 첫(대기)·촬영 화면 제외. 미리보기는 기본 AR-pic로 표시. */}
+              {step !== "start" && step !== "camera" && (
+                <div className="absolute top-6 left-8 z-20 pointer-events-none select-none">
+                  <span
+                    className="text-3xl font-extrabold tracking-wide text-white"
+                    style={{ textShadow: "0 2px 8px rgba(0,0,0,0.4)" }}
+                  >
+                    AR-pic
+                  </span>
+                </div>
+              )}
               {renderStep()}
             </div>
           </LanguageProvider>

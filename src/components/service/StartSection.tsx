@@ -6,7 +6,6 @@ import { LOCALES } from "@/i18n/translations";
 export function StartSection({
   onNext,
   showLanguage = true,
-  logoUrl = null,
   monitors,
   syncEnabled,
   selectedMonitorIndex,
@@ -16,8 +15,6 @@ export function StartSection({
   onNext: () => void;
   // 결제 화면으로 언어 선택을 옮겼으므로, 결제 비활성(결제 화면 없음)일 때만 시작 화면에 표시한다.
   showLanguage?: boolean;
-  // 테마관리에서 업로드한 로고. 없으면 기본 텍스트 로고(AR-pic) 사용.
-  logoUrl?: string | null;
   monitors: MonitorInfo[];
   syncEnabled: boolean;
   selectedMonitorIndex: number | null;
@@ -34,14 +31,9 @@ export function StartSection({
       </div>
       <div className="main-container flex flex-col items-center max-w-[92vw]">
         <div className="logo-section text-center mb-24 portrait:mb-12 animate-fadeInDown">
-          {logoUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={logoUrl} alt="logo" className="mx-auto mb-5 max-h-40 portrait:max-h-32 w-auto max-w-[80vw] object-contain" style={{ filter: "drop-shadow(0 2px 15px rgba(0,0,0,0.5))" }} />
-          ) : (
-            <h1 className="text-7xl portrait:text-6xl font-extrabold mb-5 tracking-widest text-white" style={{ textShadow: "0 2px 15px rgba(0,0,0,0.5)" }}>
-              AR-pic
-            </h1>
-          )}
+          <h1 className="text-7xl portrait:text-6xl font-extrabold mb-5 tracking-widest text-white" style={{ textShadow: "0 2px 15px rgba(0,0,0,0.5)" }}>
+            AR-pic
+          </h1>
         </div>
         {/* 버튼 대신 깜빡이는 안내 문구 — 화면 아무 곳이나 터치하면 시작(section onClick) */}
         <div

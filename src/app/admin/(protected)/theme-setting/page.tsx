@@ -127,6 +127,7 @@ export default function ThemeSettingPage() {
   const deviceId = selectedDevice?.deviceId ?? null;
   const [textColor, setTextColor] = useState("#ffffff");
   const [primaryColor, setPrimaryColor] = useState("#6c6fb4");
+  const [bgColor, setBgColor] = useState("#2a2a2a");
   const [wallpaper, setWallpaper] = useState<Asset>(null);
   const [logo, setLogo] = useState<Asset>(null);
   const [loading, setLoading] = useState(true);
@@ -166,6 +167,7 @@ export default function ThemeSettingPage() {
         const s = { ...(g.settings || {}), ...(d.settings || {}) };
         setTextColor(s.THEME_TEXT_COLOR || "#ffffff");
         setPrimaryColor(s.THEME_PRIMARY_COLOR || "#6c6fb4");
+        setBgColor(s.THEME_BG_COLOR || "#2a2a2a");
         setWallpaper(wp);
         setLogo(lg);
       } finally {
@@ -183,7 +185,7 @@ export default function ThemeSettingPage() {
       const res = await fetch(`/api/device/${deviceId}/settings/`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ THEME_TEXT_COLOR: textColor, THEME_PRIMARY_COLOR: primaryColor }),
+        body: JSON.stringify({ THEME_TEXT_COLOR: textColor, THEME_PRIMARY_COLOR: primaryColor, THEME_BG_COLOR: bgColor }),
       });
       flash(res.ok ? "색상이 저장되었습니다." : "저장 실패");
     } catch {
@@ -263,8 +265,8 @@ export default function ThemeSettingPage() {
       </div>
 
       <AssetUploader
-        title="배경화면"
-        description="키오스크 서비스 화면 전체에 깔리는 배경 이미지입니다. 미설정 시 기본 짙은 회색이 사용됩니다. (jpg/png/webp/gif, 최대 50MB)"
+        title="배경화면 (첫 화면 전용)"
+        description="키오스크 대기(첫) 화면에만 깔리는 배경 이미지입니다. 이후 단계 화면은 아래 '배경 단색'이 사용됩니다. 미설정 시 첫 화면도 배경 단색이 사용됩니다. (jpg/png/webp/gif, 최대 50MB)"
         asset={wallpaper}
         onUpload={uploadAsset(WALLPAPER_TYPE, "wallpaper", wallpaper, setWallpaper, setWallpaperBusy)}
         onRemove={removeAsset(wallpaper, setWallpaper, setWallpaperBusy)}
@@ -276,7 +278,7 @@ export default function ThemeSettingPage() {
 
       <AssetUploader
         title="로고"
-        description="서비스 화면에 표시되는 로고입니다. 배경 위에 얹히므로 투명 배경 PNG를 권장합니다. 미설정 시 기본 로고(AR-pic)가 사용됩니다."
+        description="첫(대기) 화면을 제외한 서비스 화면 좌측 상단에 표시되는 로고입니다. 배경 위에 얹히므로 투명 배경 PNG를 권장합니다. 미설정 시 기본 로고(AR-pic)가 사용됩니다."
         asset={logo}
         onUpload={uploadAsset(LOGO_TYPE, "logo", logo, setLogo, setLogoBusy)}
         onRemove={removeAsset(logo, setLogo, setLogoBusy)}
@@ -285,6 +287,22 @@ export default function ThemeSettingPage() {
         imageFit="contain"
         emptyLabel="기본 로고 (AR-pic)"
       />
+
+      {/* 배경 단색 */}
+      <div className="bg-gray-800 rounded-xl border border-gray-700 overflow-hidden">
+        <div className="px-6 pt-5 pb-6">
+          <h3 className="text-white font-semibold text-base mb-1">배경 단색</h3>
+          <p className="text-gray-500 text-xs mb-4">
+            첫(대기) 화면을 제외한 나머지 서비스 화면 전체 배경으로 쓰이는 단색입니다. 배경화면 이미지를 설정하지 않으면 첫 화면에도 이 색이 사용됩니다.
+          </p>
+          <ColorRow color={bgColor} onChange={setBgColor}>
+            <span
+              className="w-24 h-10 rounded-lg border border-gray-600 ml-2"
+              style={{ background: bgColor }}
+            />
+          </ColorRow>
+        </div>
+      </div>
 
       {/* Primary 컬러 */}
       <div className="bg-gray-800 rounded-xl border border-gray-700 overflow-hidden">
@@ -320,7 +338,7 @@ export default function ThemeSettingPage() {
           <ColorRow color={textColor} onChange={setTextColor}>
             <div
               className="px-4 py-2 rounded-lg text-sm border border-gray-600 ml-2"
-              style={{ background: wallpaper ? "transparent" : "#2a2a2a", color: textColor }}
+              style={{ background: bgColor, color: textColor }}
             >
               미리보기 텍스트
             </div>
