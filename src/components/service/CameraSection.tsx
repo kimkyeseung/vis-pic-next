@@ -292,8 +292,25 @@ export function CameraSection({
   }, []);
 
   const drawBackground = useCallback((ctx: CanvasRenderingContext2D, w: number, h: number) => {
-    if (bgSourceRef.current) {
-      ctx.drawImage(bgSourceRef.current, 0, 0, w, h);
+    const src = bgSourceRef.current;
+    if (src) {
+      // 원본 비율을 유지한 채 캔버스를 가득 채우고(cover) 넘치는 부분만 잘라 찌그러짐을 막는다.
+      // 프린트 합성(drawImageCover)과 동일한 동작. 이미지/동영상 배경 모두 지원한다.
+      const iw = (src as HTMLVideoElement).videoWidth || (src as HTMLImageElement).naturalWidth || 0;
+      const ih = (src as HTMLVideoElement).videoHeight || (src as HTMLImageElement).naturalHeight || 0;
+      if (iw > 0 && ih > 0) {
+        const destRatio = w / h;
+        const imgRatio = iw / ih;
+        let sx: number, sy: number, sw: number, sh: number;
+        if (imgRatio > destRatio) {
+          sh = ih; sw = ih * destRatio; sx = (iw - sw) / 2; sy = 0;
+        } else {
+          sw = iw; sh = iw / destRatio; sx = 0; sy = (ih - sh) / 2;
+        }
+        ctx.drawImage(src, sx, sy, sw, sh, 0, 0, w, h);
+      } else {
+        ctx.drawImage(src, 0, 0, w, h);
+      }
     } else if (selectedBackground !== null && selectedBackground < 0) {
       const fb = FALLBACK_BACKGROUNDS.find((b) => b.id === selectedBackground);
       if (fb) fillGradientFromCSS(ctx, w, h, fb.gradient);
@@ -908,7 +925,8 @@ export function CameraSection({
       {showBgStrip && (
         <div className="flex flex-col min-h-0 px-2 pr-4 border-r border-white/10 portrait:border-r-0 portrait:border-b portrait:pb-3" style={{ gridArea: "bg" }}>
           <h3 className="text-white text-xl font-bold text-center mb-4 shrink-0">{t("camera.bgChange")}</h3>
-          <div className="grid grid-cols-2 gap-3 overflow-y-auto flex-1 min-h-0 content-start portrait:grid-cols-6">
+          {/* p-1: 선택 ring(요소 바깥 3px)이 스크롤 컨테이너 가장자리에서 잘리지 않도록 여백 확보 */}
+          <div className="grid grid-cols-2 gap-3 overflow-y-auto flex-1 min-h-0 content-start p-1 portrait:grid-cols-6">
             {bgOptions.map((bg) => {
               const isSelected = selectedBackground === bg.id;
               const isDb = "filename" in bg;

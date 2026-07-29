@@ -50,13 +50,13 @@ export function SelectSection({
         {t("select.count", { req: requiredCount, sel: selectedPhotos.length })}
       </p>
 
-      <div className="min-h-0 flex items-center justify-center">
-      <div className="flex items-start justify-center gap-12 max-w-6xl animate-fadeInUp portrait:flex-col portrait:items-center portrait:gap-6">
-        <div className="flex flex-wrap justify-center gap-8 max-w-5xl portrait:gap-4">
+      <div className="min-h-0 w-full flex items-center justify-center overflow-hidden">
+      <div className="flex items-center justify-center gap-12 max-w-6xl max-h-full animate-fadeInUp portrait:flex-col portrait:items-center portrait:gap-6">
+        <div className="flex flex-wrap justify-center gap-6 max-w-[42rem] portrait:gap-4">
           {photos.map((photo, i) => (
             <div
               key={i}
-              className={`photo-thumbnail w-[26rem] portrait:w-56 bg-black/30 relative overflow-hidden ${selectedPhotos.includes(i) ? "selected" : ""}`}
+              className={`photo-thumbnail w-80 portrait:w-56 bg-black/30 relative overflow-hidden ${selectedPhotos.includes(i) ? "selected" : ""}`}
               style={{ aspectRatio: "auto" }}
               onClick={() => togglePhoto(i)}
             >
