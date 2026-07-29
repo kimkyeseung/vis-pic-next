@@ -9,8 +9,8 @@ import {
   FRAME_BORDER_COLOR,
 } from "@/lib/printLayout";
 
-// 미리보기 축척: 1cm → 12px (FrameSection.PaperPreview와 동일 기준)
-const PREVIEW_SCALE = 12;
+// 미리보기 축척 기본값: 1cm → 12px (FrameSection.PaperPreview와 동일 기준)
+const DEFAULT_PREVIEW_SCALE = 12;
 
 const DEFAULT_GRADIENT = "linear-gradient(135deg, #667eea 0%, #764ba2 100%)";
 
@@ -36,6 +36,7 @@ export function FramedPreview({
   backgroundImages,
   selectedPrintBg,
   printBgImages,
+  scale = DEFAULT_PREVIEW_SCALE,
 }: {
   selectedFrame: string | null;
   photos: string[];
@@ -46,6 +47,8 @@ export function FramedPreview({
   backgroundImages?: BGImage[];
   selectedPrintBg?: number | null;
   printBgImages?: BGImage[];
+  /** 미리보기 축척(px/cm). 미지정 시 기본값 12. */
+  scale?: number;
 }) {
   const frame = selectedFrame ? FRAME_INFO[selectedFrame] : null;
   if (!frame) return null;
@@ -91,7 +94,7 @@ export function FramedPreview({
     <div
       data-testid="framed-preview"
       className="relative rounded-[3px] shadow-[0_10px_30px_rgba(0,0,0,0.45)] overflow-hidden"
-      style={{ width: pw * PREVIEW_SCALE, height: ph * PREVIEW_SCALE, ...backgroundStyle }}
+      style={{ width: pw * scale, height: ph * scale, ...backgroundStyle }}
     >
       {slots.map((s, i) => {
         const photoIdx = selectedPhotos[i];
@@ -105,8 +108,8 @@ export function FramedPreview({
               top: `${(s.y / ph) * 100}%`,
               width: `${(s.w / pw) * 100}%`,
               height: `${(s.h / ph) * 100}%`,
-              borderRadius: FRAME_CORNER_RADIUS_CM * PREVIEW_SCALE,
-              border: `${FRAME_BORDER_CM * PREVIEW_SCALE}px solid ${FRAME_BORDER_COLOR}`,
+              borderRadius: FRAME_CORNER_RADIUS_CM * scale,
+              border: `${FRAME_BORDER_CM * scale}px solid ${FRAME_BORDER_COLOR}`,
             }}
           >
             {photo && <img src={photo} alt={`slot-${i}`} className="w-full h-full object-cover" />}

@@ -256,12 +256,6 @@ function ServiceContent() {
           printBgImages={printBgImages}
           selectedPrintBg={selectedPrintBg}
           imageBaseUrl={imageBaseUrl}
-          selectedFrame={flow.selectedFrame}
-          photos={flow.photos}
-          selectedPhotos={flow.selectedPhotos}
-          printSettings={printSettings}
-          selectedBackground={selectedBackground}
-          backgroundImages={backgroundImages}
           onSelect={setSelectedPrintBg}
           onNext={() => flow.goToStep("complete")}
           onPrev={() => {

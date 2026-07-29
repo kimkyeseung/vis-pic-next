@@ -1,18 +1,11 @@
 import type { BGImage } from "@/types";
 import { useLanguage } from "@/i18n/LanguageContext";
-import { FramedPreview } from "./FramedPreview";
 import { ServiceNav } from "./ServiceNav";
 
 export function PrintBgSection({
   printBgImages,
   selectedPrintBg,
   imageBaseUrl,
-  selectedFrame,
-  photos,
-  selectedPhotos,
-  printSettings,
-  selectedBackground,
-  backgroundImages,
   onSelect,
   onNext,
   onPrev,
@@ -20,12 +13,6 @@ export function PrintBgSection({
   printBgImages: BGImage[];
   selectedPrintBg: number | null;
   imageBaseUrl: string;
-  selectedFrame: string | null;
-  photos: string[];
-  selectedPhotos: number[];
-  printSettings: Record<string, string>;
-  selectedBackground?: number | null;
-  backgroundImages?: BGImage[];
   onSelect: (id: number) => void;
   onNext: () => void;
   onPrev: () => void;
@@ -39,12 +26,11 @@ export function PrintBgSection({
       </h2>
 
       <div className="min-h-0 flex items-center justify-center">
-      <div className="flex items-start justify-center gap-12 animate-fadeInUp portrait:flex-col portrait:items-center portrait:gap-6">
-        <div className="grid grid-cols-3 gap-8 portrait:grid-cols-2 portrait:gap-4">
+        <div className="grid grid-cols-3 gap-10 animate-fadeInUp portrait:grid-cols-2 portrait:gap-6">
           {printBgImages.map((bg) => (
             <div
               key={bg.id}
-              className={`background-option w-52 h-32 relative ${selectedPrintBg === bg.id ? "selected" : ""}`}
+              className={`background-option w-80 h-48 portrait:w-72 portrait:h-44 relative ${selectedPrintBg === bg.id ? "selected" : ""}`}
               onClick={() => onSelect(bg.id)}
             >
               {selectedPrintBg === bg.id && <span className="check-mark">&#10003;</span>}
@@ -57,21 +43,6 @@ export function PrintBgSection({
             </div>
           ))}
         </div>
-
-        {selectedFrame && (
-          <FramedPreview
-            selectedFrame={selectedFrame}
-            photos={photos}
-            selectedPhotos={selectedPhotos}
-            printSettings={printSettings}
-            imageBaseUrl={imageBaseUrl}
-            selectedBackground={selectedBackground}
-            backgroundImages={backgroundImages}
-            selectedPrintBg={selectedPrintBg}
-            printBgImages={printBgImages}
-          />
-        )}
-      </div>
       </div>
 
       <ServiceNav onPrev={onPrev} onNext={onNext} nextDisabled={selectedPrintBg === null} />

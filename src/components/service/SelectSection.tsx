@@ -75,6 +75,7 @@ export function SelectSection({
             imageBaseUrl={imageBaseUrl}
             selectedBackground={selectedBackground}
             backgroundImages={backgroundImages}
+            scale={24}
           />
         )}
       </div>

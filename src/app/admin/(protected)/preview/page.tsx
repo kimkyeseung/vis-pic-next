@@ -232,12 +232,6 @@ export default function PreviewPage() {
             printBgImages={[]}
             selectedPrintBg={selectedPrintBg}
             imageBaseUrl=""
-            selectedFrame={selectedFrame}
-            photos={MOCK_PHOTOS.slice(0, slots)}
-            selectedPhotos={selectedPhotos}
-            printSettings={{}}
-            selectedBackground={selectedBackground}
-            backgroundImages={[]}
             onSelect={setSelectedPrintBg}
             onNext={noop}
             onPrev={noop}
