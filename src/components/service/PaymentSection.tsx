@@ -191,7 +191,7 @@ export function PaymentSection({
               style={{ background: "rgba(255,255,255,0.1)", color: "#fff" }}
               onClick={onPrev}
             >
-              {t("common.prev")}
+              &#9664; {t("common.prev")}
             </button>
 
             <div className="text-7xl portrait:text-4xl font-black text-white leading-none text-center px-2">
@@ -199,7 +199,7 @@ export function PaymentSection({
             </div>
 
             <button className="service-button nav-button nav-next-lg" onClick={handlePay}>
-              {t("payment.pay")}
+              {t("payment.pay")} &#9654;
             </button>
           </div>
         </>
