@@ -158,7 +158,7 @@ function ServiceContent() {
       <FloatingElements />
       {/* 좌측 상단 로고 — 첫(대기) 화면을 제외한 단계에 표시. 업로드한 로고 없으면 기본 AR-pic. */}
       {currentStep !== "start" && (
-        <div className="absolute top-6 left-8 portrait:top-4 portrait:left-5 z-20 pointer-events-none select-none">
+        <div className="absolute top-12 left-16 portrait:top-8 portrait:left-10 z-20 pointer-events-none select-none">
           {logoUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img

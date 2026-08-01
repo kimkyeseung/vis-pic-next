@@ -124,7 +124,7 @@ export function PaymentSection({
   const fmt = (n: number) => n.toLocaleString();
 
   return (
-    <section className="w-full h-full grid grid-rows-[auto_1fr] justify-items-center relative z-10 pt-12 portrait:pt-8 pb-44 portrait:pb-40 px-8">
+    <section className="w-full h-full grid grid-rows-[auto_1fr] justify-items-center relative z-10 pt-24 portrait:pt-16 pb-52 portrait:pb-40 px-16">
       {status === "idle" ? (
         <>
           <h2 className="text-title font-extrabold text-white animate-fadeInDown" style={{ textShadow: "0 2px 15px rgba(0,0,0,0.5)" }}>
@@ -185,7 +185,7 @@ export function PaymentSection({
           </div>
 
           {/* 하단 고정 바 — 이전(좌)/총액(중앙)/결제하기(우). 다른 페이지 ServiceNav와 동일한 코너 위치. */}
-          <div className="absolute bottom-8 left-8 right-8 z-20 flex items-center justify-between gap-4 portrait:bottom-5 portrait:left-5 portrait:right-5">
+          <div className="absolute bottom-16 left-16 right-16 z-20 flex items-center justify-between gap-4 portrait:bottom-10 portrait:left-10 portrait:right-10">
             <button
               className="service-button nav-button"
               style={{ background: "rgba(255,255,255,0.1)", color: "#fff" }}

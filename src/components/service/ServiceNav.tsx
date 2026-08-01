@@ -28,7 +28,7 @@ export function ServiceNav({
   // 버튼에 직접 Tailwind absolute를 걸면 무시된다.
   return (
     <>
-      <div className="absolute bottom-8 left-8 z-20 portrait:bottom-5 portrait:left-5">
+      <div className="absolute bottom-16 left-16 z-20 portrait:bottom-10 portrait:left-10">
         <button
           className="service-button nav-button"
           style={{ background: "rgba(255,255,255,0.1)", color: "#fff" }}
@@ -37,7 +37,7 @@ export function ServiceNav({
           &#9664; {t(prevKey)}
         </button>
       </div>
-      <div className="absolute bottom-8 right-8 z-20 portrait:bottom-5 portrait:right-5">
+      <div className="absolute bottom-16 right-16 z-20 portrait:bottom-10 portrait:right-10">
         <button
           className="service-button nav-button nav-next-lg"
           onClick={onNext}

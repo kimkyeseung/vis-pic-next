@@ -553,7 +553,7 @@ export function CompleteSection({
               <ServiceNav onPrev={onPrev} onNext={handlePrint} nextKey="complete.print" />
             )}
             {printStatus === "done" && (
-              <div className="absolute bottom-8 right-8 z-20 portrait:bottom-5 portrait:right-5">
+              <div className="absolute bottom-16 right-16 z-20 portrait:bottom-10 portrait:right-10">
                 <button className="service-button nav-button nav-next-lg" onClick={onRestart}>
                   {t("complete.restart")}
                 </button>

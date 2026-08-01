@@ -912,7 +912,7 @@ export function CameraSection({
   return (
     <section
       ref={sectionRef}
-      className="w-full h-full relative z-10 p-6 pb-52"
+      className="w-full h-full relative z-10 p-12 pb-60"
       style={{
         display: "grid",
         gap: "1rem",
@@ -1113,7 +1113,7 @@ export function CameraSection({
         </div>
 
       {/* 촬영하기 — 하단 중앙, 이전/다음 버튼과 같은 줄에 절대배치 */}
-      <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-20 portrait:bottom-5">
+      <div className="absolute bottom-16 left-1/2 -translate-x-1/2 z-20 portrait:bottom-10">
         <button
           className="service-button tracking-widest rounded-[22px] font-extrabold text-5xl portrait:text-4xl px-28 py-8 portrait:px-16 portrait:py-6 min-w-[34rem] portrait:min-w-[24rem]"
           onClick={handleManualCapture}

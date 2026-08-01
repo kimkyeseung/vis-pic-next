@@ -17,7 +17,7 @@ export function CircularTimer({ value, total, size = 108, testId }: CircularTime
 
   return (
     <div
-      className="absolute top-6 right-6 z-50 flex items-center justify-center"
+      className="absolute top-12 right-12 z-50 flex items-center justify-center"
       style={{ width: size, height: size }}
       data-testid={testId}
     >

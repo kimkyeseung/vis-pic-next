@@ -26,7 +26,7 @@ export function StartSection({
 
   return (
     <section className="w-full h-full flex flex-col items-center justify-center cursor-pointer relative z-10" onClick={onNext}>
-      <div className="absolute top-4 right-5 text-gray-500 text-xs select-none">
+      <div className="absolute top-8 right-10 text-gray-500 text-xs select-none">
         빌드 {process.env.NEXT_PUBLIC_BUILD_DATE}
       </div>
       <div className="main-container flex flex-col items-center max-w-[92vw]">
