@@ -404,9 +404,9 @@ export function CameraSection({
     };
   }, [startCamera, stopCamera]);
 
-  // DB 스티커 이미지 목록 로드
+  // DB 스티커 이미지 목록 로드 — 지점별 뱅크(선택된 스티커, 순서대로)
   useEffect(() => {
-    fetch(`/api/image/list/3/?device_id=${config.deviceId}`)
+    fetch(`/api/device/${config.deviceId}/stickers/`, { cache: "no-store" })
       .then((r) => r.json())
       .then((data) => setDbStickerImages(data.images || []))
       .catch(() => {});

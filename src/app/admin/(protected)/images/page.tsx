@@ -2,11 +2,10 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import OrderDialog from "./OrderDialog";
 import EditDialog from "./EditDialog";
 import ImageBankPanel from "./ImageBankPanel";
 import { useAdmin } from "@/app/admin/AdminContext";
-import { BACKGROUND_IMAGE_TYPE, MAX_ACTIVE_BACKGROUNDS, FRAME_IMAGE_TYPE, MAX_ACTIVE_FRAMES, WALLPAPER_IMAGE_TYPE, LOGO_IMAGE_TYPE } from "@/constants/images";
+import { BACKGROUND_IMAGE_TYPE, MAX_ACTIVE_BACKGROUNDS, FRAME_IMAGE_TYPE, MAX_ACTIVE_FRAMES, STICKER_IMAGE_TYPE, MAX_ACTIVE_STICKERS, WALLPAPER_IMAGE_TYPE, LOGO_IMAGE_TYPE } from "@/constants/images";
 
 // 테마관리에서 다루는 타입(배경화면·로고)은 이미지 관리 탭에서 숨긴다.
 const THEME_MANAGED_TYPES = new Set<number>([WALLPAPER_IMAGE_TYPE, LOGO_IMAGE_TYPE]);
@@ -51,7 +50,6 @@ export default function ImagesPage() {
   const [imageBaseUrl, setImageBaseUrl] = useState<string>("");
   const [sizes, setSizes] = useState<Record<number, number | null>>({});
   const [downloadingId, setDownloadingId] = useState<number | null>(null);
-  const [showOrderDialog, setShowOrderDialog] = useState(false);
   const [devices, setDevices] = useState<DeviceOption[]>([]);
   const [editingImage, setEditingImage] = useState<Image | null>(null);
   // 전체 이미지 vs 선택 장치에 적용되는 이미지만 보기
@@ -185,8 +183,9 @@ export default function ImagesPage() {
 
   const isBackgroundTab = selectedType === BACKGROUND_IMAGE_TYPE;
   const isFrameTab = selectedType === FRAME_IMAGE_TYPE;
-  // 배경·프레임은 지점별 뱅크 UI(선택/순서)를 사용한다.
-  const isBankTab = isBackgroundTab || isFrameTab;
+  const isStickerTab = selectedType === STICKER_IMAGE_TYPE;
+  // 배경·프레임·스티커는 지점별 뱅크 UI(선택/순서)를 사용한다.
+  const isBankTab = isBackgroundTab || isFrameTab || isStickerTab;
   const activeBackgroundCount = images.filter((img) => img.active).length;
 
   const handleToggleActive = async (image: Image) => {
@@ -280,13 +279,6 @@ export default function ImagesPage() {
                 {selectedDevice ? `${selectedDevice.name} 이미지` : "이 장치"}
               </button>
             </div>
-            <button
-              onClick={() => setShowOrderDialog(true)}
-              disabled={images.length === 0}
-              className="px-4 py-2 rounded-lg bg-gray-700 text-gray-200 hover:bg-gray-600 transition-colors disabled:opacity-50"
-            >
-              순서 관리
-            </button>
           </div>
         )}
       </div>
@@ -298,9 +290,9 @@ export default function ImagesPage() {
           imageBaseUrl={imageBaseUrl}
           devices={devices}
           imageType={selectedType}
-          maxActive={isFrameTab ? MAX_ACTIVE_FRAMES : MAX_ACTIVE_BACKGROUNDS}
-          apiSlug={isFrameTab ? "frames" : "backgrounds"}
-          noun={isFrameTab ? "프레임" : "배경"}
+          maxActive={isFrameTab ? MAX_ACTIVE_FRAMES : isStickerTab ? MAX_ACTIVE_STICKERS : MAX_ACTIVE_BACKGROUNDS}
+          apiSlug={isFrameTab ? "frames" : isStickerTab ? "stickers" : "backgrounds"}
+          noun={isFrameTab ? "프레임" : isStickerTab ? "스티커" : "배경"}
         />
       ) : loading ? (
         <div className="text-gray-400">로딩중...</div>
@@ -371,10 +363,7 @@ export default function ImagesPage() {
                 <p className="text-sm text-gray-400 truncate">
                   {image.filename}
                 </p>
-                <div className="flex items-center justify-between mt-1">
-                  <span className="text-xs text-gray-500">
-                    우선순위: {image.priority}
-                  </span>
+                <div className="flex items-center justify-end mt-1">
                   <span className="text-xs text-gray-500">
                     {sizes[image.id] === undefined
                       ? "…"
@@ -425,18 +414,6 @@ export default function ImagesPage() {
         />
       )}
 
-      {showOrderDialog && (
-        <OrderDialog
-          images={images}
-          imageBaseUrl={imageBaseUrl}
-          typeLabel={getTypeLabel(selectedType)}
-          onClose={() => setShowOrderDialog(false)}
-          onSaved={() => {
-            setShowOrderDialog(false);
-            fetchImages(selectedType);
-          }}
-        />
-      )}
     </div>
   );
 }
