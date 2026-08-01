@@ -82,6 +82,19 @@ export function CameraSection({
   const [dbStickerImages, setDbStickerImages] = useState<Array<{ id: number; filename: string; name: string }>>([]);
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [selectedStickerId, setSelectedStickerId] = useState<string | null>(null);
+  // 세로/가로에 따라 촬영 화면 그리드를 전환한다 (인라인 grid-template이라 Tailwind portrait: 로는 못 바꿈).
+  // 창(matchMedia)이 아니라 섹션 컨테이너의 실제 비율로 판단 → 관리자 미리보기(스케일된 스테이지)에서도 정확.
+  const sectionRef = useRef<HTMLElement>(null);
+  const [isPortrait, setIsPortrait] = useState(false);
+  useEffect(() => {
+    const el = sectionRef.current;
+    if (!el) return;
+    const update = () => setIsPortrait(el.clientHeight > el.clientWidth);
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
   const dragOffsetRef = useRef<{ ox: number; oy: number }>({ ox: 0, oy: 0 });
   const overlayRef = useRef<HTMLDivElement>(null);
   const stickerImgCacheRef = useRef<Map<string, HTMLImageElement>>(new Map());
@@ -899,18 +912,29 @@ export function CameraSection({
 
   return (
     <section
+      ref={sectionRef}
       className="w-full h-full relative z-10 p-6 pb-52"
       style={{
         display: "grid",
         gap: "1rem",
-        gridTemplateColumns: showBgStrip ? "24rem minmax(0, 1fr) 24rem" : "minmax(0, 1fr) 24rem",
-        // 최상단 행은 로고(좌측 상단 오버레이)와 겹치지 않도록 최소 높이를 확보한다.
-        gridTemplateRows: "minmax(4.5rem, auto) minmax(0, 1fr)",
-        // 최상단 행은 제목(중앙)만 두고 좌측 상단은 로고 자리로 비운다.
-        // 배경·스티커 패널은 둘째 행부터 시작해 헤더 높이가 좌우 대칭이 된다.
-        gridTemplateAreas: showBgStrip
-          ? '". title ." "bg preview sticker"'
-          : '"title ." "preview sticker"',
+        // 세로: 제목 / 미리보기(전체폭) / 배경·스티커(하단 2분할) 스택 (시안 0013)
+        // 가로: 좌측 상단은 로고 자리로 비우고, 배경·스티커 패널을 둘째 행부터 시작해 좌우 대칭.
+        // (최상단 행 minmax(4.5rem) — 좌측 상단 로고 오버레이와 겹치지 않도록 최소 높이 확보)
+        ...(isPortrait
+          ? {
+              gridTemplateColumns: showBgStrip ? "1fr 1fr" : "1fr",
+              gridTemplateRows: "minmax(4.5rem, auto) minmax(0, 1.1fr) minmax(0, 1fr)",
+              gridTemplateAreas: showBgStrip
+                ? '"title title" "preview preview" "bg sticker"'
+                : '"title" "preview" "sticker"',
+            }
+          : {
+              gridTemplateColumns: showBgStrip ? "24rem minmax(0, 1fr) 24rem" : "minmax(0, 1fr) 24rem",
+              gridTemplateRows: "minmax(4.5rem, auto) minmax(0, 1fr)",
+              gridTemplateAreas: showBgStrip
+                ? '". title ." "bg preview sticker"'
+                : '"title ." "preview sticker"',
+            }),
       }}
     >
       <video ref={videoRef} autoPlay playsInline muted className="hidden" />
@@ -923,10 +947,10 @@ export function CameraSection({
 
       {/* 좌측: 배경 변경 패널 */}
       {showBgStrip && (
-        <div className="flex flex-col min-h-0 px-2 pr-4 border-r border-white/10 portrait:border-r-0 portrait:border-b portrait:pb-3" style={{ gridArea: "bg" }}>
+        <div className="flex flex-col min-h-0 px-2 pr-4 border-r border-white/10" style={{ gridArea: "bg" }}>
           <h3 className="text-white text-xl font-bold text-center mb-4 shrink-0">{t("camera.bgChange")}</h3>
           {/* p-1: 선택 ring(요소 바깥 3px)이 스크롤 컨테이너 가장자리에서 잘리지 않도록 여백 확보 */}
-          <div className="grid grid-cols-2 gap-3 overflow-y-auto flex-1 min-h-0 content-start p-1 portrait:grid-cols-6">
+          <div className="grid grid-cols-2 gap-3 overflow-y-auto flex-1 min-h-0 content-start p-1">
             {bgOptions.map((bg) => {
               const isSelected = selectedBackground === bg.id;
               const isDb = "filename" in bg;
@@ -1100,8 +1124,8 @@ export function CameraSection({
         </button>
       </div>
 
-      {/* 우측: 스티커 패널 */}
-      <div className="flex flex-col min-h-0 pl-4 border-l border-white/10 portrait:border-l-0 portrait:border-t" style={{ gridArea: "sticker" }}>
+      {/* 우측(가로)·우하단(세로): 스티커 패널 */}
+      <div className="flex flex-col min-h-0 pl-4 border-l border-white/10" style={{ gridArea: "sticker" }}>
         <h3 className="text-white text-2xl font-bold text-center mb-4 shrink-0">{t("camera.stickerPrompt")}</h3>
 
         {/* 스티커 패널 (상시 노출) */}

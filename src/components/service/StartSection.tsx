@@ -30,11 +30,6 @@ export function StartSection({
         빌드 {process.env.NEXT_PUBLIC_BUILD_DATE}
       </div>
       <div className="main-container flex flex-col items-center max-w-[92vw]">
-        <div className="logo-section text-center mb-24 portrait:mb-12 animate-fadeInDown">
-          <h1 className="text-7xl portrait:text-6xl font-extrabold mb-5 tracking-widest text-white" style={{ textShadow: "0 2px 15px rgba(0,0,0,0.5)" }}>
-            AR-pic
-          </h1>
-        </div>
         {/* 버튼 대신 깜빡이는 안내 문구 — 화면 아무 곳이나 터치하면 시작(section onClick) */}
         <div
           className="flex items-center gap-4 text-white text-5xl portrait:text-4xl font-extrabold animate-soft-blink select-none max-w-[90vw] text-center"

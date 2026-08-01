@@ -124,14 +124,14 @@ export function PaymentSection({
   const fmt = (n: number) => n.toLocaleString();
 
   return (
-    <section className="w-full h-full flex flex-col items-center relative z-10 px-8">
+    <section className="w-full h-full grid grid-rows-[auto_1fr] justify-items-center relative z-10 pt-12 portrait:pt-8 pb-44 portrait:pb-40 px-8">
       {status === "idle" ? (
         <>
-          <h2 className="text-title font-extrabold text-white mt-20 portrait:mt-12 animate-fadeInDown" style={{ textShadow: "0 2px 15px rgba(0,0,0,0.5)" }}>
+          <h2 className="text-title font-extrabold text-white animate-fadeInDown" style={{ textShadow: "0 2px 15px rgba(0,0,0,0.5)" }}>
             {t("payment.selectQuantity")}
           </h2>
 
-          <div className="flex-1 w-full flex flex-col items-center justify-center">
+          <div className="min-h-0 w-full flex flex-col items-center justify-center">
           <div className="w-full max-w-5xl flex flex-col items-center animate-fadeInUp">
           {/* 언어 선택 */}
           <div className="flex gap-3 mb-10 portrait:mb-8 flex-wrap justify-center">
@@ -176,8 +176,16 @@ export function PaymentSection({
             })}
           </div>
 
-          {/* 하단: 이전 / 총액 / 결제하기 */}
-          <div className="w-full flex items-center justify-between">
+          {!isManual && (
+            <button className="text-gray-500 text-sm underline mt-6" onClick={devBypass}>
+              결제완료(개발)
+            </button>
+          )}
+          </div>
+          </div>
+
+          {/* 하단 고정 바 — 이전(좌)/총액(중앙)/결제하기(우). 다른 페이지 ServiceNav와 동일한 코너 위치. */}
+          <div className="absolute bottom-8 left-8 right-8 z-20 flex items-center justify-between gap-4 portrait:bottom-5 portrait:left-5 portrait:right-5">
             <button
               className="service-button nav-button"
               style={{ background: "rgba(255,255,255,0.1)", color: "#fff" }}
@@ -186,31 +194,17 @@ export function PaymentSection({
               {t("common.prev")}
             </button>
 
-            <div className="text-center">
-              <div className="text-8xl portrait:text-6xl font-black text-white leading-none">
-                {t("payment.amount", { amount: fmt(totalAmount) })}
-              </div>
+            <div className="text-7xl portrait:text-4xl font-black text-white leading-none text-center px-2">
+              {t("payment.amount", { amount: fmt(totalAmount) })}
             </div>
 
-            <button
-              className="service-button nav-button"
-              style={{ background: "var(--theme-primary, var(--color-brand))", color: "#ffffff" }}
-              onClick={handlePay}
-            >
+            <button className="service-button nav-button nav-next-lg" onClick={handlePay}>
               {t("payment.pay")}
             </button>
           </div>
-
-          {!isManual && (
-            <button className="text-gray-500 text-sm underline mt-6" onClick={devBypass}>
-              결제완료(개발)
-            </button>
-          )}
-          </div>
-          </div>
         </>
       ) : (
-        <div className="bg-black/30 backdrop-blur-sm p-16 rounded-3xl border border-white/10 text-center animate-fadeInUp min-w-[500px] my-auto">
+        <div className="bg-black/30 backdrop-blur-sm p-16 rounded-3xl border border-white/10 text-center animate-fadeInUp min-w-[500px] place-self-center" style={{ gridRow: "1 / -1" }}>
           {status === "requesting" && (
             <div className="py-8">
               <div className="w-20 h-20 border-4 border-white/20 border-t-blue-500 rounded-full animate-spin mx-auto mb-8" />
