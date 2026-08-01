@@ -30,14 +30,16 @@ export function PrintBgSection({
           {printBgImages.map((bg) => (
             <div
               key={bg.id}
-              className={`background-option w-80 h-48 portrait:w-72 portrait:h-44 relative ${selectedPrintBg === bg.id ? "selected" : ""}`}
+              // 타일이 프레임 이미지의 실제 비율에 딱 맞도록(빈 공간·잘림 없이) 높이는 이미지에서 결정
+              className={`background-option w-72 portrait:w-64 relative ${selectedPrintBg === bg.id ? "selected" : ""}`}
+              style={{ aspectRatio: "auto" }}
               onClick={() => onSelect(bg.id)}
             >
               {selectedPrintBg === bg.id && <span className="check-mark">&#10003;</span>}
               <img
                 src={`${imageBaseUrl}/${bg.filename}`}
                 alt={bg.name}
-                className="w-full h-full object-cover rounded-[13px]"
+                className="w-full h-auto block rounded-[13px]"
                 onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
               />
             </div>
