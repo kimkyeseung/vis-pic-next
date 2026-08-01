@@ -28,7 +28,7 @@ export function BackgroundSection({
       </h2>
 
       <div className="min-h-0 flex items-center justify-center">
-      <div className="grid grid-cols-3 gap-8 w-[92vw] max-w-[1360px] animate-fadeInUp portrait:grid-cols-2 portrait:gap-5">
+      <div className="grid grid-cols-3 gap-6 w-[92vw] max-w-[1040px] animate-fadeInUp portrait:grid-cols-2 portrait:gap-5">
         {hasDbImages
           ? backgroundImages.map((bg) => {
               const isVideo = bg.filename.endsWith(".mp4") || bg.filename.endsWith(".webm");
@@ -36,6 +36,7 @@ export function BackgroundSection({
                 <div
                   key={bg.id}
                   className={`background-option w-full relative ${selectedBackground === bg.id ? "selected" : ""}`}
+                  style={{ aspectRatio: "4 / 3" }}
                   onClick={() => onSelect(bg.id)}
                 >
                   {selectedBackground === bg.id && <span className="check-mark">&#10003;</span>}
@@ -63,7 +64,7 @@ export function BackgroundSection({
               <div
                 key={bg.id}
                 className={`background-option w-full relative ${selectedBackground === bg.id ? "selected" : ""}`}
-                style={{ background: bg.gradient }}
+                style={{ background: bg.gradient, aspectRatio: "4 / 3" }}
                 onClick={() => onSelect(bg.id)}
               >
                 {selectedBackground === bg.id && <span className="check-mark">&#10003;</span>}

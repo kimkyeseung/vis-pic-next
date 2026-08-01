@@ -4,7 +4,6 @@ import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import type { DeviceConfig, BGImage, Sticker } from "@/types";
 import { FALLBACK_BACKGROUNDS } from "@/constants/frames";
 import { fillGradientFromCSS } from "@/lib/canvas";
-import { AVAILABLE_STICKERS } from "@/constants/stickers";
 import { useFrameSender } from "@/hooks/useSceneSync";
 import { createSoundPlayer, type SoundPlayer } from "@/lib/sounds";
 import { CircularTimer } from "@/components/service/CircularTimer";
@@ -78,7 +77,6 @@ export function CameraSection({
   const [cameraDeviceDiag, setCameraDeviceDiag] = useState<string | null>(null);
   const [autoTimer, setAutoTimer] = useState<number | null>(null);
   const autoTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const [stickerTab, setStickerTab] = useState<"emoji" | "image">("emoji");
   const [dbStickerImages, setDbStickerImages] = useState<Array<{ id: number; filename: string; name: string }>>([]);
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [selectedStickerId, setSelectedStickerId] = useState<string | null>(null);
@@ -958,7 +956,7 @@ export function CameraSection({
               return (
                 <button
                   key={bg.id}
-                  className={`relative aspect-video shrink-0 rounded-xl overflow-hidden transition-all duration-200 ${
+                  className={`relative aspect-[4/3] shrink-0 rounded-xl overflow-hidden transition-all duration-200 ${
                     isSelected
                       ? "ring-[3px] ring-[var(--theme-primary,#6c6fb4)] shadow-lg"
                       : "ring-1 ring-white/20 opacity-70 hover:opacity-100"
@@ -1141,58 +1139,29 @@ export function CameraSection({
             )}
           </div>
 
-          <div className="flex gap-1 mb-2">
-            {(["emoji", "image"] as const).map((tab) => (
-              <button
-                key={tab}
-                className={`flex-1 py-1 rounded-lg text-xs font-medium transition-colors ${stickerTab === tab ? "bg-white/20 text-white" : "text-white/50 hover:text-white/70"}`}
-                onClick={() => setStickerTab(tab)}
-              >
-                {tab === "emoji" ? t("camera.stickerEmoji") : t("camera.stickerImage")}
-              </button>
-            ))}
-          </div>
-
           <div className="max-h-[42vh] overflow-y-auto bg-black/20 rounded-2xl p-2">
-            {stickerTab === "emoji" && (
+            {dbStickerImages.length === 0 ? (
+              <p className="text-center text-white/40 text-xs py-4">
+                {t("camera.noStickers")}
+              </p>
+            ) : (
               <div className="grid grid-cols-4 gap-2">
-                {AVAILABLE_STICKERS.map((def) => (
+                {dbStickerImages.map((img) => (
                   <button
-                    key={def.emoji}
-                    className="aspect-square flex items-center justify-center text-2xl rounded-xl hover:bg-white/20 transition-colors"
-                    onClick={() => addSticker({ emoji: def.emoji })}
-                    title={def.label}
+                    key={img.id}
+                    className="aspect-square rounded-xl overflow-hidden hover:ring-2 hover:ring-white/50 transition-all bg-white/5"
+                    onClick={() => addSticker({ src: `${imageBaseUrl}/${img.filename}` })}
+                    title={img.name}
                   >
-                    {def.emoji}
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={`${imageBaseUrl}/${img.filename}`}
+                      alt={img.name}
+                      className="w-full h-full object-contain"
+                    />
                   </button>
                 ))}
               </div>
-            )}
-
-            {stickerTab === "image" && (
-              dbStickerImages.length === 0 ? (
-                <p className="text-center text-white/40 text-xs py-4">
-                  {t("camera.noStickers")}
-                </p>
-              ) : (
-                <div className="grid grid-cols-4 gap-2">
-                  {dbStickerImages.map((img) => (
-                    <button
-                      key={img.id}
-                      className="aspect-square rounded-xl overflow-hidden hover:ring-2 hover:ring-white/50 transition-all bg-white/5"
-                      onClick={() => addSticker({ src: `${imageBaseUrl}/${img.filename}` })}
-                      title={img.name}
-                    >
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src={`${imageBaseUrl}/${img.filename}`}
-                        alt={img.name}
-                        className="w-full h-full object-contain"
-                      />
-                    </button>
-                  ))}
-                </div>
-              )
             )}
           </div>
         </div>
