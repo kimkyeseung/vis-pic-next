@@ -35,14 +35,42 @@ const STEPS: { id: PreviewStep; label: string }[] = [
 const PALETTE = ["#6c6fb4", "#e08aa0", "#63b0c0", "#c0a35e", "#7bb07b", "#9a7bc0"];
 function swatch(i: number): string {
   const c = PALETTE[i % PALETTE.length];
+  // 실제 촬영본과 동일한 가로 4:3 비율 목업
   const svg =
-    `<svg xmlns='http://www.w3.org/2000/svg' width='480' height='640'>` +
+    `<svg xmlns='http://www.w3.org/2000/svg' width='640' height='480'>` +
     `<rect width='100%' height='100%' fill='${c}'/>` +
     `<text x='50%' y='50%' font-size='160' fill='rgba(255,255,255,0.85)' ` +
     `text-anchor='middle' dominant-baseline='middle' font-family='sans-serif'>${i + 1}</text></svg>`;
   return `data:image/svg+xml,${encodeURIComponent(svg)}`;
 }
 const MOCK_PHOTOS = Array.from({ length: 6 }, (_, i) => swatch(i));
+
+// 프레임 선택(인쇄배경) 목업 — 가로형 프레임(테두리+중앙) 모양의 data URI
+const FRAME_COLORS = ["#6c6fb4", "#e0a020", "#3aa0d0", "#e05a5a"];
+function mockFrame(i: number) {
+  const c = FRAME_COLORS[i % FRAME_COLORS.length];
+  const svg =
+    `<svg xmlns='http://www.w3.org/2000/svg' width='640' height='480'>` +
+    `<rect width='640' height='480' fill='${c}'/>` +
+    `<rect x='36' y='36' width='568' height='408' fill='#222'/>` +
+    `<text x='598' y='240' font-size='22' fill='rgba(0,0,0,0.55)' text-anchor='middle' ` +
+    `font-family='sans-serif' transform='rotate(90 598 240)'>AR-PIC</text></svg>`;
+  return { id: 900 + i, name: `mock-frame-${i}`, filename: `data:image/svg+xml,${encodeURIComponent(svg)}` };
+}
+const MOCK_FRAMES = Array.from({ length: 4 }, (_, i) => mockFrame(i));
+
+// 완료 화면 결과물 목업 — 선택한 프레임의 인화지 방향(가로/세로)에 맞춘 비율로 생성
+function mockComposite(mode: string): string {
+  const landscape = FRAME_INFO[mode]?.orientation === "landscape";
+  const w = landscape ? 720 : 480;
+  const h = landscape ? 480 : 720;
+  const svg =
+    `<svg xmlns='http://www.w3.org/2000/svg' width='${w}' height='${h}'>` +
+    `<rect width='100%' height='100%' fill='#6c6fb4'/>` +
+    `<text x='50%' y='50%' font-size='120' fill='rgba(255,255,255,0.85)' ` +
+    `text-anchor='middle' dominant-baseline='middle' font-family='sans-serif'>${landscape ? "가로" : "세로"}</text></svg>`;
+  return `data:image/svg+xml,${encodeURIComponent(svg)}`;
+}
 
 function makeConfig(paymentEnabled: boolean): DeviceConfig {
   return {
@@ -229,7 +257,7 @@ export default function PreviewPage() {
       case "printbg":
         return (
           <PrintBgSection
-            printBgImages={[]}
+            printBgImages={MOCK_FRAMES}
             selectedPrintBg={selectedPrintBg}
             imageBaseUrl=""
             onSelect={setSelectedPrintBg}
@@ -246,7 +274,7 @@ export default function PreviewPage() {
             selectedBackground={selectedBackground}
             backgroundImages={[]}
             imageBaseUrl=""
-            compositeImage={MOCK_PHOTOS[0]}
+            compositeImage={mockComposite(selectedFrame)}
             setCompositeImage={noop}
             intermediateFrames={[]}
             printSettings={{}}
