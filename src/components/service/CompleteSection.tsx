@@ -492,7 +492,7 @@ export function CompleteSection({
             </h2>
 
             {/* 좌우 반반(12컬럼 6/6): 미리보기 | QR. 세로에선 상하 스택. */}
-            <div className="flex items-center justify-center gap-8 mb-6 w-full max-w-5xl portrait:flex-col portrait:items-center portrait:gap-5">
+            <div className="flex items-center justify-center gap-10 mb-6 w-full max-w-6xl portrait:flex-col portrait:items-center portrait:gap-5">
               <div className="flex-1 flex justify-center min-w-0 portrait:w-full">
                 <div className="rounded-2xl overflow-hidden" style={{ boxShadow: "0 20px 50px rgba(0,0,0,0.4)" }}>
                   <img src={compositeImage} alt="Composite" className="max-h-[54vh] portrait:max-h-[40vh] w-auto object-contain block" />
@@ -503,29 +503,29 @@ export function CompleteSection({
                 <div className="flex-1 flex flex-col items-center gap-6 min-w-0 portrait:w-full">
                   <div className="flex gap-6">
                     {qrPhotoUrl && (
-                      <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-5 border border-white/20 text-center">
-                        <div className="text-2xl mb-1">📷</div>
-                        <p className="text-white font-semibold mb-3">{t("complete.photoDl")}</p>
+                      <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-6 border border-white/20 text-center">
+                        <div className="text-3xl mb-2">📷</div>
+                        <p className="text-white text-xl font-semibold mb-4">{t("complete.photoDl")}</p>
                         <div
-                          className="bg-white p-3 rounded-xl cursor-pointer"
+                          className="bg-white p-4 rounded-xl cursor-pointer"
                           onDoubleClick={() => openDebugUrl(qrPhotoUrl)}
                         >
-                          <QRCodeSVG value={qrPhotoUrl} size={120} />
+                          <QRCodeSVG value={qrPhotoUrl} size={180} />
                         </div>
-                        <p className="text-gray-400 text-xs mt-2">{t("complete.qrScan")}</p>
+                        <p className="text-gray-400 text-sm mt-3">{t("complete.qrScan")}</p>
                       </div>
                     )}
                     {qrGifUrl && (
-                      <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-5 border border-white/20 text-center">
-                        <div className="text-2xl mb-1">🎬</div>
-                        <p className="text-white font-semibold mb-3">{t("complete.gifDl")}</p>
+                      <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-6 border border-white/20 text-center">
+                        <div className="text-3xl mb-2">🎬</div>
+                        <p className="text-white text-xl font-semibold mb-4">{t("complete.gifDl")}</p>
                         <div
-                          className="bg-white p-3 rounded-xl cursor-pointer"
+                          className="bg-white p-4 rounded-xl cursor-pointer"
                           onDoubleClick={() => openDebugUrl(qrGifUrl)}
                         >
-                          <QRCodeSVG value={qrGifUrl} size={120} />
+                          <QRCodeSVG value={qrGifUrl} size={180} />
                         </div>
-                        <p className="text-gray-400 text-xs mt-2">{t("complete.qrScan")}</p>
+                        <p className="text-gray-400 text-sm mt-3">{t("complete.qrScan")}</p>
                       </div>
                     )}
                   </div>
