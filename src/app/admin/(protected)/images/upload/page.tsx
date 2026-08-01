@@ -22,7 +22,6 @@ function ImageUploadForm() {
   });
   const [devices, setDevices] = useState<DeviceOption[]>([]);
   const [selectedDeviceIds, setSelectedDeviceIds] = useState<string[]>([]);
-  const [priority, setPriority] = useState("0");
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const [error, setError] = useState("");
@@ -95,7 +94,6 @@ function ImageUploadForm() {
         formData.append("file", file);
         formData.append("name", name);
         formData.append("imageType", imageType);
-        formData.append("priority", priority);
         formData.append("deviceIds", JSON.stringify(selectedDeviceIds));
 
         const res = await fetch("/api/admin/images/upload/", { method: "POST", body: formData });
@@ -122,7 +120,6 @@ function ImageUploadForm() {
             name,
             imageType,
             deviceIds: selectedDeviceIds,
-            priority,
           }),
         });
         const regData = await regRes.json();
@@ -196,7 +193,8 @@ function ImageUploadForm() {
           <input
             ref={fileInputRef}
             type="file"
-            accept="image/*,video/mp4"
+            // 프레임·스티커는 PNG/JPG만 허용
+            accept={imageType === "2" || imageType === "3" ? "image/png,image/jpeg" : "image/*,video/mp4"}
             onChange={handleFileChange}
             className="hidden"
           />
@@ -227,9 +225,9 @@ function ImageUploadForm() {
             <option value="2">프레임 (Frame)</option>
             <option value="3">스티커 (Sticker)</option>
           </select>
-          {imageType === "3" && (
+          {(imageType === "2" || imageType === "3") && (
             <p className="mt-1 text-sm text-yellow-400">
-              스티커는 PNG 파일 권장 (투명 배경 지원)
+              PNG·JPG만 업로드 가능 (투명 배경은 PNG 권장)
             </p>
           )}
         </div>
@@ -269,20 +267,6 @@ function ImageUploadForm() {
             {selectedDeviceIds.length === 0
               ? "선택하지 않으면 모든 장치에 적용됩니다."
               : `${selectedDeviceIds.length}개 장치에만 적용됩니다.`}
-          </p>
-        </div>
-
-        <div>
-          <label className="block text-gray-300 mb-2">우선순위</label>
-          <input
-            type="number"
-            value={priority}
-            onChange={(e) => setPriority(e.target.value)}
-            className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-blue-500"
-            placeholder="0"
-          />
-          <p className="mt-1 text-sm text-gray-500">
-            숫자가 클수록 먼저 표시됩니다
           </p>
         </div>
 

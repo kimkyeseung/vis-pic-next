@@ -3,8 +3,12 @@ import prisma from "@/lib/db";
 import { uploadImage, getImageBaseUrl } from "@/lib/storage";
 import { requireAdmin } from "@/lib/adminAuth";
 import { defaultActiveForNewImage } from "@/lib/imageActive";
+import { FRAME_IMAGE_TYPE, STICKER_IMAGE_TYPE } from "@/constants/images";
 
 const ALLOWED_EXTENSIONS = ["jpg", "jpeg", "png", "gif", "mp4", "webp"];
+// 프레임·스티커는 PNG/JPG만 허용 (동영상·gif 불필요, 투명 배경 지원)
+const IMAGE_ONLY_TYPES = new Set<number>([FRAME_IMAGE_TYPE, STICKER_IMAGE_TYPE]);
+const IMAGE_ONLY_EXTENSIONS = ["png", "jpg", "jpeg"];
 const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB
 
 export async function POST(request: NextRequest) {
@@ -61,6 +65,13 @@ export async function POST(request: NextRequest) {
     if (!ext || !ALLOWED_EXTENSIONS.includes(ext)) {
       return NextResponse.json(
         { error: "Invalid file type. Allowed: " + ALLOWED_EXTENSIONS.join(", ") },
+        { status: 400 }
+      );
+    }
+    // 프레임·스티커는 PNG/JPG만 허용
+    if (IMAGE_ONLY_TYPES.has(imageType) && !IMAGE_ONLY_EXTENSIONS.includes(ext)) {
+      return NextResponse.json(
+        { error: "프레임·스티커는 PNG·JPG 파일만 업로드할 수 있습니다." },
         { status: 400 }
       );
     }
