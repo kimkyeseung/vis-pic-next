@@ -454,9 +454,11 @@ export function CompleteSection({
       }
     } else {
       const style = document.createElement("style");
+      // 인쇄 용지 방향을 합성물(프레임) 방향에 맞춘다 — 4컷·1컷 등 가로 프레임은 landscape.
+      const pageOrient = (selectedFrame && FRAME_INFO[selectedFrame]?.orientation === "portrait") ? "portrait" : "landscape";
       // @page margin:0 → 브라우저가 붙이는 머리글/바닥글(날짜·제목·URL·쪽번호) 제거.
       // kiosk-printing(무음 인쇄) 모드에서도 여백 없이 이미지만 출력된다.
-      style.textContent = `@page { size: auto; margin: 0; } @media print { html, body { margin: 0 !important; padding: 0 !important; } body > * { display: none !important; } #__print_target__ { display: block !important; position: fixed; inset: 0; background: #fff; } #__print_target__ img { width: 100%; height: 100%; object-fit: contain; } }`;
+      style.textContent = `@page { size: ${pageOrient}; margin: 0; } @media print { html, body { margin: 0 !important; padding: 0 !important; } body > * { display: none !important; } #__print_target__ { display: block !important; position: fixed; inset: 0; background: #fff; } #__print_target__ img { width: 100%; height: 100%; object-fit: contain; } }`;
 
       const container = document.createElement("div");
       container.id = "__print_target__";
