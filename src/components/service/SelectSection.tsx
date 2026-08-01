@@ -60,13 +60,13 @@ export function SelectSection({
         {t("select.count", { req: requiredCount, sel: selectedPhotos.length })}
       </p>
 
-      <div className="min-h-0 w-full flex items-center justify-center overflow-hidden">
+      <div className="min-h-0 w-full flex items-center justify-center">
       <div className="flex items-center justify-center gap-12 max-w-6xl max-h-full animate-fadeInUp portrait:flex-col portrait:items-center portrait:gap-6">
         {/* 촬영본이 많으면 4장씩 페이지로 나눠 좌우 화살표로 넘긴다 */}
         <div className="flex items-center gap-3">
           {pageCount > 1 && (
             <button
-              className="shrink-0 w-14 h-14 rounded-full bg-white/10 hover:bg-white/20 text-white text-2xl flex items-center justify-center transition-colors disabled:opacity-25 disabled:pointer-events-none"
+              className="shrink-0 px-1 text-white/70 hover:text-white text-4xl leading-none transition-colors disabled:opacity-25 disabled:pointer-events-none"
               onClick={() => setPage((p) => Math.max(0, p - 1))}
               disabled={curPage === 0}
               aria-label="이전 사진"
@@ -108,7 +108,7 @@ export function SelectSection({
 
           {pageCount > 1 && (
             <button
-              className="shrink-0 w-14 h-14 rounded-full bg-white/10 hover:bg-white/20 text-white text-2xl flex items-center justify-center transition-colors disabled:opacity-25 disabled:pointer-events-none"
+              className="shrink-0 px-1 text-white/70 hover:text-white text-4xl leading-none transition-colors disabled:opacity-25 disabled:pointer-events-none"
               onClick={() => setPage((p) => Math.min(pageCount - 1, p + 1))}
               disabled={curPage >= pageCount - 1}
               aria-label="다음 사진"
