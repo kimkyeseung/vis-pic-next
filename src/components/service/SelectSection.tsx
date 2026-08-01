@@ -17,6 +17,7 @@ export function SelectSection({
   imageBaseUrl,
   selectedBackground,
   backgroundImages,
+  printBgImages,
   onNext,
   onPrev,
 }: {
@@ -29,6 +30,7 @@ export function SelectSection({
   imageBaseUrl: string;
   selectedBackground?: number | null;
   backgroundImages?: BGImage[];
+  printBgImages?: BGImage[];
   onNext: () => void;
   onPrev: () => void;
 }) {
@@ -127,6 +129,7 @@ export function SelectSection({
             imageBaseUrl={imageBaseUrl}
             selectedBackground={selectedBackground}
             backgroundImages={backgroundImages}
+            printBgImages={printBgImages}
             scale={24}
           />
         )}

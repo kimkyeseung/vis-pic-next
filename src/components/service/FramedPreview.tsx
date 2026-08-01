@@ -16,7 +16,8 @@ const DEFAULT_GRADIENT = "linear-gradient(135deg, #667eea 0%, #764ba2 100%)";
 
 function resolveImageUrl(value: string, baseUrl: string) {
   if (!value) return "";
-  if (value.startsWith("http://") || value.startsWith("https://") || value.startsWith("/")) return value;
+  // 완전한 URL·데이터 URI·blob·절대경로는 그대로 사용 (미리보기 목업 data URI 대응)
+  if (/^(https?:|data:|blob:|\/)/.test(value)) return value;
   const filename = value.split("/").pop()!;
   return `${baseUrl}/${filename}`;
 }
@@ -59,16 +60,15 @@ export function FramedPreview({
 
   const { slots } = computePrintLayout({ frame, mode: selectedFrame!, paperW: pw, paperH: ph, settings: printSettings });
 
-  let backgroundStyle: CSSProperties = { background: DEFAULT_GRADIENT };
+  // 용지 배경으로 쓸 프레임: 선택한 프레임(selectedPrintBg)이 있으면 그것, 없으면 첫 번째 프레임(대표).
+  const frameInfo = selectedPrintBg != null
+    ? (printBgImages || []).find((b) => b.id === selectedPrintBg)
+    : (printBgImages || [])[0];
+  const frameSrc = frameInfo ? resolveImageUrl(frameInfo.filename, imageBaseUrl) : null;
 
-  const printBgInfo = selectedPrintBg != null ? (printBgImages || []).find((b) => b.id === selectedPrintBg) : null;
-  if (printBgInfo) {
-    backgroundStyle = {
-      backgroundImage: `url(${imageBaseUrl}/${printBgInfo.filename})`,
-      backgroundSize: "cover",
-      backgroundPosition: "center",
-    };
-  } else if (printSettings.PRINT_BACKGROUND) {
+  // 프레임이 없을 때의 배경 폴백: PRINT_BACKGROUND 설정 > 촬영 배경 > 폴백 그라디언트
+  let backgroundStyle: CSSProperties = { background: DEFAULT_GRADIENT };
+  if (printSettings.PRINT_BACKGROUND) {
     backgroundStyle = {
       backgroundImage: `url(${resolveImageUrl(printSettings.PRINT_BACKGROUND, imageBaseUrl)})`,
       backgroundSize: "cover",
@@ -90,12 +90,30 @@ export function FramedPreview({
     }
   }
 
+  const isPortrait = frame.orientation === "portrait";
+  const wPx = pw * scale;
+  const hPx = ph * scale;
+
   return (
     <div
       data-testid="framed-preview"
       className="relative rounded-[3px] shadow-[0_10px_30px_rgba(0,0,0,0.45)] overflow-hidden"
-      style={{ width: pw * scale, height: ph * scale, ...backgroundStyle }}
+      style={{ width: wPx, height: hPx, ...backgroundStyle }}
     >
+      {/* 프레임 이미지(가로 디자인)를 용지 배경으로. 세로 인쇄 모드면 90도 회전해 맞춘다. */}
+      {frameSrc && (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={frameSrc}
+          alt=""
+          className="absolute left-1/2 top-1/2 max-w-none object-cover"
+          style={{
+            width: isPortrait ? hPx : wPx,
+            height: isPortrait ? wPx : hPx,
+            transform: `translate(-50%, -50%)${isPortrait ? " rotate(90deg)" : ""}`,
+          }}
+        />
+      )}
       {slots.map((s, i) => {
         const photoIdx = selectedPhotos[i];
         const photo = photoIdx !== undefined ? photos[photoIdx] : null;

@@ -249,6 +249,7 @@ export default function PreviewPage() {
             imageBaseUrl=""
             selectedBackground={selectedBackground}
             backgroundImages={[]}
+            printBgImages={MOCK_FRAMES}
             onNext={noop}
             onPrev={noop}
           />

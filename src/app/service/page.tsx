@@ -241,6 +241,7 @@ function ServiceContent() {
           imageBaseUrl={imageBaseUrl}
           selectedBackground={selectedBackground}
           backgroundImages={backgroundImages}
+          printBgImages={printBgImages}
           onNext={() => { clearIdleTimer(); flow.handleSelectNext(printBgImages.length > 0); }}
           onPrev={() => {
             flow.setPhotos([]);
