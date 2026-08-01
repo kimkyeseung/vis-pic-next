@@ -30,6 +30,9 @@ const DEFAULT_CONFIG: DeviceConfig = {
   themeTextColor: "#ffffff",
   themePrimaryColor: "#6c6fb4",
   themeBgColor: "#2a2a2a",
+  btnGlowEnabled: true,
+  btnGlowColor: "#6c6fb4",
+  btnGlowSize: 28,
 };
 
 export function useDeviceSetup(deviceId: string) {
@@ -102,6 +105,10 @@ export function useDeviceSetup(deviceId: string) {
           themeTextColor: s.THEME_TEXT_COLOR || "#ffffff",
           themePrimaryColor: s.THEME_PRIMARY_COLOR || "#6c6fb4",
           themeBgColor: s.THEME_BG_COLOR || "#2a2a2a",
+          // 미설정(undefined) 시 기본 켜짐. 명시적으로 "0"이면 끔.
+          btnGlowEnabled: s.THEME_BTN_GLOW_ENABLED !== "0",
+          btnGlowColor: s.THEME_BTN_GLOW_COLOR || "#6c6fb4",
+          btnGlowSize: parseIntSafe(s.THEME_BTN_GLOW_SIZE || "", 28),
         });
       } catch (err) {
         if ((err as Error).name === "AbortError") return;

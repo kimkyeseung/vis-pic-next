@@ -282,7 +282,8 @@ body {
   font-weight: 800;
   text-decoration: none;
   -webkit-tap-highlight-color: transparent;
-  transition: all 0.4s ease;
+  /* box-shadow는 탭 글로우가 즉각 반응하도록 더 빠르게 전환한다 */
+  transition: transform 0.4s ease, background 0.4s ease, box-shadow 0.15s ease;
   position: relative;
   overflow: hidden;
 }
@@ -307,8 +308,23 @@ body {
   left: 100%;
 }
 
+/* 탭/누름 시 외곽 글로우 — 색/세기는 테마관리에서 설정(--btn-glow-*). 미설정 시 글로우 없음. */
 .service-button:active {
-  box-shadow: 0 14px 24px rgba(80, 55, 145, 0.26);
+  box-shadow: 0 14px 24px rgba(80, 55, 145, 0.26), 0 0 var(--btn-glow-size, 0px) 6px var(--btn-glow-color, transparent);
+}
+
+/* 탭 후 외곽으로 퍼졌다 사라지는 글로우 펄스 — JS가 버튼 위에 잠깐 생성하는 링 요소.
+   버튼이 화면 전환으로 사라져도 끝까지 재생되도록 body에 붙는 독립 요소다. */
+.btn-glow-ripple {
+  position: fixed;
+  pointer-events: none;
+  z-index: 9999;
+  background: transparent;
+  animation: btn-glow-ripple 0.55s ease-out forwards;
+}
+@keyframes btn-glow-ripple {
+  0%   { box-shadow: 0 0 var(--btn-glow-size, 24px) 2px var(--btn-glow-color, #6c6fb4); opacity: 0.85; }
+  100% { box-shadow: 0 0 var(--btn-glow-size, 24px) 22px var(--btn-glow-color, #6c6fb4); opacity: 0; }
 }
 
 /* 터치 버튼 */

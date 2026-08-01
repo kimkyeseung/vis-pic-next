@@ -73,6 +73,36 @@ function ServiceContent() {
     if (currentStep === "start") setLang("ko");
   }, [currentStep, setLang]);
 
+  // 버튼 탭 시 외곽으로 퍼졌다 사라지는 글로우 펄스.
+  // 버튼 위에 독립 링(.btn-glow-ripple)을 잠깐 만들어 화면 전환으로 버튼이 사라져도 끝까지 재생한다.
+  useEffect(() => {
+    const spawn = (e: PointerEvent) => {
+      const btn = (e.target as HTMLElement | null)?.closest?.(".service-button") as HTMLElement | null;
+      if (!btn) return;
+      const cs = getComputedStyle(btn);
+      const glowColor = cs.getPropertyValue("--btn-glow-color").trim();
+      const glowSize = cs.getPropertyValue("--btn-glow-size").trim();
+      // 글로우 비활성(변수 미주입) 시 펄스도 없음
+      if (!glowColor || !glowSize || glowSize === "0px") return;
+      const rect = btn.getBoundingClientRect();
+      const ring = document.createElement("div");
+      ring.className = "btn-glow-ripple";
+      ring.style.left = `${rect.left}px`;
+      ring.style.top = `${rect.top}px`;
+      ring.style.width = `${rect.width}px`;
+      ring.style.height = `${rect.height}px`;
+      ring.style.borderRadius = cs.borderRadius;
+      ring.style.setProperty("--btn-glow-color", glowColor);
+      ring.style.setProperty("--btn-glow-size", glowSize);
+      document.body.appendChild(ring);
+      const done = () => ring.remove();
+      ring.addEventListener("animationend", done, { once: true });
+      window.setTimeout(done, 900);
+    };
+    window.addEventListener("pointerdown", spawn);
+    return () => window.removeEventListener("pointerdown", spawn);
+  }, []);
+
   // 배경 로드 시 랜덤 자동 선택: null이면 랜덤 선택, fallback 선택 중에 DB 이미지가 로드되면 DB 이미지로 교체
   useEffect(() => {
     const hasDbImages = backgroundImages.length > 0;
@@ -96,6 +126,10 @@ function ServiceContent() {
   const themeStyle: React.CSSProperties = {
     ...(config.themeTextColor ? { ["--theme-text"]: config.themeTextColor } : {}),
     ...(config.themePrimaryColor ? { ["--theme-primary"]: config.themePrimaryColor } : {}),
+    // 버튼 탭 글로우 (--btn-glow-*). 비활성 시 주입 안 함 → globals.css 폴백으로 글로우 없음.
+    ...(config.btnGlowEnabled
+      ? { ["--btn-glow-color"]: config.btnGlowColor, ["--btn-glow-size"]: `${config.btnGlowSize}px` }
+      : {}),
     backgroundColor: config.themeBgColor,
     ...(isFirstPage && wallpaperUrl
       ? {

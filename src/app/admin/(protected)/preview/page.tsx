@@ -97,6 +97,9 @@ function makeConfig(paymentEnabled: boolean): DeviceConfig {
     themeTextColor: "#ffffff",
     themePrimaryColor: "#6c6fb4",
     themeBgColor: "#2a2a2a",
+    btnGlowEnabled: true,
+    btnGlowColor: "#6c6fb4",
+    btnGlowSize: 28,
   };
 }
 
@@ -161,6 +164,9 @@ export default function PreviewPage() {
     background: "#2a2a2a",
     ["--theme-text" as string]: themeText,
     ["--theme-primary" as string]: themePrimary,
+    // 버튼 탭 글로우 미리보기 (강조색 사용)
+    ["--btn-glow-color" as string]: themePrimary,
+    ["--btn-glow-size" as string]: "28px",
     // 배경화면은 첫(대기) 화면에만 적용된다.
     ...(wallpaper && step === "start"
       ? {

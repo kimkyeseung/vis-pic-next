@@ -128,6 +128,9 @@ export default function ThemeSettingPage() {
   const [textColor, setTextColor] = useState("#ffffff");
   const [primaryColor, setPrimaryColor] = useState("#6c6fb4");
   const [bgColor, setBgColor] = useState("#2a2a2a");
+  const [glowEnabled, setGlowEnabled] = useState(true);
+  const [glowColor, setGlowColor] = useState("#6c6fb4");
+  const [glowSize, setGlowSize] = useState(28);
   const [wallpaper, setWallpaper] = useState<Asset>(null);
   const [logo, setLogo] = useState<Asset>(null);
   const [loading, setLoading] = useState(true);
@@ -168,6 +171,9 @@ export default function ThemeSettingPage() {
         setTextColor(s.THEME_TEXT_COLOR || "#ffffff");
         setPrimaryColor(s.THEME_PRIMARY_COLOR || "#6c6fb4");
         setBgColor(s.THEME_BG_COLOR || "#2a2a2a");
+        setGlowEnabled(s.THEME_BTN_GLOW_ENABLED !== "0");
+        setGlowColor(s.THEME_BTN_GLOW_COLOR || "#6c6fb4");
+        setGlowSize(parseInt(s.THEME_BTN_GLOW_SIZE || "", 10) || 28);
         setWallpaper(wp);
         setLogo(lg);
       } finally {
@@ -185,7 +191,14 @@ export default function ThemeSettingPage() {
       const res = await fetch(`/api/device/${deviceId}/settings/`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ THEME_TEXT_COLOR: textColor, THEME_PRIMARY_COLOR: primaryColor, THEME_BG_COLOR: bgColor }),
+        body: JSON.stringify({
+          THEME_TEXT_COLOR: textColor,
+          THEME_PRIMARY_COLOR: primaryColor,
+          THEME_BG_COLOR: bgColor,
+          THEME_BTN_GLOW_ENABLED: glowEnabled ? "1" : "0",
+          THEME_BTN_GLOW_COLOR: glowColor,
+          THEME_BTN_GLOW_SIZE: String(glowSize),
+        }),
       });
       flash(res.ok ? "색상이 저장되었습니다." : "저장 실패");
     } catch {
@@ -343,6 +356,57 @@ export default function ThemeSettingPage() {
               미리보기 텍스트
             </div>
           </ColorRow>
+        </div>
+      </div>
+
+      {/* 버튼 글로우 */}
+      <div className="bg-gray-800 rounded-xl border border-gray-700 overflow-hidden">
+        <div className="px-6 pt-5 pb-6">
+          <div className="flex items-center justify-between mb-1">
+            <h3 className="text-white font-semibold text-base">버튼 글로우</h3>
+            <label className="flex items-center gap-2 cursor-pointer">
+              <span className="text-gray-400 text-sm">{glowEnabled ? "켜짐" : "꺼짐"}</span>
+              <div
+                className={`relative w-11 h-6 rounded-full transition-colors ${glowEnabled ? "bg-blue-500" : "bg-gray-600"}`}
+                onClick={() => setGlowEnabled((v) => !v)}
+              >
+                <div className={`absolute top-1 w-4 h-4 bg-white rounded-full shadow transition-transform ${glowEnabled ? "translate-x-6" : "translate-x-1"}`} />
+              </div>
+            </label>
+          </div>
+          <p className="text-gray-500 text-xs mb-4">
+            서비스 화면 버튼을 누를 때(터치) 외곽에 나타나는 글로우 효과입니다.
+          </p>
+          {glowEnabled && (
+            <div className="space-y-4">
+              <ColorRow color={glowColor} onChange={setGlowColor}>
+                <span className="text-gray-400 text-xs ml-2">글로우 색상</span>
+              </ColorRow>
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-gray-400 text-sm">세기 (번짐)</span>
+                  <span className="text-gray-300 text-sm font-mono">{glowSize}px</span>
+                </div>
+                <input
+                  type="range"
+                  min={0}
+                  max={60}
+                  value={glowSize}
+                  onChange={(e) => setGlowSize(parseInt(e.target.value, 10) || 0)}
+                  className="w-full accent-blue-500"
+                />
+              </div>
+              <div className="flex items-center gap-3 pt-1">
+                <span className="text-gray-400 text-xs">미리보기</span>
+                <span
+                  className="px-6 py-3 rounded-xl text-white font-bold"
+                  style={{ background: primaryColor, boxShadow: `0 0 ${glowSize}px 6px ${glowColor}` }}
+                >
+                  버튼
+                </span>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 

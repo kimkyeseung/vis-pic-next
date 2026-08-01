@@ -62,6 +62,12 @@ export interface DeviceConfig {
   themePrimaryColor: string;
   /** 테마 배경 단색 — 첫 화면을 제외한 나머지 서비스 화면 배경. 미설정 시 #2a2a2a. */
   themeBgColor: string;
+  /** 버튼 탭 시 외곽 글로우 효과 사용 여부. */
+  btnGlowEnabled: boolean;
+  /** 버튼 글로우 색상. */
+  btnGlowColor: string;
+  /** 버튼 글로우 세기(번짐 px). */
+  btnGlowSize: number;
 }
 
 export interface BGImage {
