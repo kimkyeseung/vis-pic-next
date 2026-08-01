@@ -147,7 +147,8 @@ export function CameraSection({
       vid.loop = true;
       vid.playsInline = true;
       vid.src = url;
-      vid.play();
+      // play() 실패(소스 미지원 등) 시 unhandled rejection 방지
+      vid.play().catch(() => {});
       bgSourceRef.current = vid;
       return () => { vid.pause(); vid.src = ""; };
     } else {

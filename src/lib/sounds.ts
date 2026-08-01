@@ -81,7 +81,9 @@ export function createSoundPlayer(): SoundPlayer {
       if (!shutter) return;
       try {
         shutter.currentTime = 0;
-        void shutter.play();
+        // play()는 Promise 반환 — 실패(형식 미지원·자동재생 차단 등) 시 unhandled rejection이
+        // 뜨지 않도록 반드시 catch 한다.
+        shutter.play().catch(() => {});
       } catch {
         /* 무시 */
       }
