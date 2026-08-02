@@ -45,7 +45,7 @@
 
 - 실시간 AI 배경 제거 (MediaPipe selfie segmentation)
 - 6종 프레임 레이아웃 선택
-- 이모지 스티커 오버레이
+- 스티커 오버레이 (지점별 이미지 뱅크)
 - 카드 결제 (PayApp Lite)
 - 인화지 출력 (Windows 프린터)
 - QR코드 기반 디지털 사진 공유 (3일 만료 URL)
@@ -392,8 +392,9 @@ useSceneSyncReceiver → BroadcastChannel.onmessage(state)   ※ 레거시
 |--------|------|------|
 | GET | `/api/device/[deviceId]/settings` | 디바이스 설정 조회 |
 | POST | `/api/device/[deviceId]/settings` | 디바이스 설정 업데이트 (지점별 오버라이드) |
-| GET | `/api/device/[deviceId]/backgrounds` | 이 지점에 선택된 배경(순서대로, 최대 6) — 뱅크 모델(§5 Step 4) |
-| PUT | `/api/device/[deviceId]/backgrounds` | 이 지점 노출 배경 선택·순서 교체 (`{ imageIds }`) |
+| GET · PUT | `/api/device/[deviceId]/backgrounds` | 이 지점 선택 배경(순서대로, 최대 6) 조회·교체 (`{ imageIds }`) — 뱅크 모델(§5 Step 4) |
+| GET · PUT | `/api/device/[deviceId]/frames` | 이 지점 선택 프레임(순서대로) 조회·교체 — 뱅크 모델 |
+| GET · PUT | `/api/device/[deviceId]/stickers` | 이 지점 선택 스티커(순서대로, 최대 20) 조회·교체 — 뱅크 모델(§14) |
 | GET | `/api/setting` | 전역 설정 조회 (기본값/폴백) |
 | POST | `/api/setting` | 전역 설정 업데이트 (값 `null`이면 해당 키 삭제) |
 | GET | `/api/devices` | (공개) 초기 장치 선택용 활성 장치 목록 — 인증 없이 `deviceId`·`name`만 |
@@ -407,7 +408,6 @@ useSceneSyncReceiver → BroadcastChannel.onmessage(state)   ※ 레거시
 | POST | `/api/admin/images/upload` | 이미지 업로드 (최대 50MB, `deviceIds`로 지점 연결) — 서버 경유 업로드 |
 | POST | `/api/admin/images/presign` | Supabase Storage 직접 업로드용 서명 URL 발급 (미설정 시 `{mode:"local"}` 폴백) |
 | POST | `/api/admin/images/register` | presign 업로드 완료 후 DB 이미지 레코드 등록 (`deviceIds`로 지점 연결) |
-| POST | `/api/admin/images/reorder` | 이미지 순서(priority) 재정렬 (`{ ids }`, 앞일수록 상위) |
 | PATCH | `/api/admin/images/[id]` | 이미지 메타데이터 수정 (이름·활성·초점 등) |
 | DELETE | `/api/admin/images/[id]` | 이미지 삭제 |
 
@@ -506,7 +506,7 @@ useSceneSyncReceiver → BroadcastChannel.onmessage(state)   ※ 레거시
 | width | Int? | 이미지 너비 (px) |
 | height | Int? | 이미지 높이 (px) |
 | left / top / right / bottom | Int? | 크롭/여백 좌표 (선택) |
-| priority | Int | 정렬 순서 (desc 정렬, 클수록 상위) |
+| priority | Int | 전역 정렬 순서(desc). 지점별 노출 순서는 `ImageDevice.sortOrder`(뱅크)를 쓰며, 관리자 UI의 순서 편집 기능은 제거됨 |
 | active | Boolean | 활성 여부 — 서비스 화면엔 active=true만 노출. 배경(type 1)은 최대 6개까지만 활성 |
 | focalX / focalY | Float? | 초점 좌표 (0~1, 기본 0.5). cover 배치 시 중심 |
 | createdAt | DateTime | 생성 시각 |
@@ -760,30 +760,21 @@ PRINTER_NAME             # 출력 프린터 이름 (비우면 기본 프린터)
 
 ## 14. 스티커 시스템
 
-### 기본 제공 이모지 (12종)
+### 스티커 소스 — 지점별 이미지 뱅크
 
-| 이모지 | 이름 |
-|--------|------|
-| ⭐ | 별 |
-| ❤️ | 하트 |
-| ✨ | 반짝 |
-| 🎉 | 파티 |
-| 🌸 | 벚꽃 |
-| 🦋 | 나비 |
-| 🌈 | 무지개 |
-| 🎀 | 리본 |
-| 🌙 | 달 |
-| 🔥 | 불꽃 |
-| 💫 | 빛 |
-| 🎵 | 음표 |
+- 스티커는 **업로드 이미지**(ImageType `id 3`, **PNG·JPG만**)이며, 배경·프레임과 동일한
+  **뱅크 UI**로 관리한다. 관리자 이미지 관리에서 지점별로 노출할 스티커를 선택
+  (`ImageDevice` + `sortOrder`)하면, 촬영 화면 우측 패널에 그 지점 스티커 썸네일이 나열된다.
+- 촬영 화면은 `/api/device/[deviceId]/stickers/`로 **선택·정렬된 목록**을 로드
+  (`MAX_ACTIVE_STICKERS`=20). 이모지 기본 세트는 더 이상 제공하지 않는다.
 
 ### 데이터 구조
 
 ```typescript
 interface Sticker {
   id: string;
-  emoji?: string;  // 이모지 문자
-  src?: string;    // 이미지 URL (커스텀 스티커)
+  src?: string;    // 스티커 이미지 URL (주 경로 — 뱅크에서 추가)
+  emoji?: string;  // 레거시: 현재 UI 미사용, 렌더러만 하위호환
   x: number;       // 0~1 (캔버스 너비 비율)
   y: number;       // 0~1 (캔버스 높이 비율)
   scale: number;   // 크기 배율
@@ -797,7 +788,7 @@ interface Sticker {
 | 드래그 | 스티커 이동 |
 | 핀치 (두 손가락) | 스티커 크기 조절 |
 | 탭 | 선택 / 해제 |
-| 이모지 피커 | 스티커 추가 |
+| 우측 패널 썸네일 탭 | 스티커 추가 |
 
 ---
 
@@ -1098,6 +1089,10 @@ mediapipe 파일은 웹 빌드에 없으므로 프리캐시하지 않고, 존재
 | `MODE_2_2_HEIGHT` | — | 2×2 모드 사진 슬롯 높이 (cm) |
 | `THEME_TEXT_COLOR` | "#ffffff" | 서비스 화면 글자색 (테마 관리, §25). 지점별로 저장 가능 |
 | `THEME_PRIMARY_COLOR` | "#6c6fb4" | 강조(primary) 색상 — 선택 강조·주요 버튼 (테마 관리, §25). 지점별 |
+| `THEME_BG_COLOR` | "#2a2a2a" | 서비스 화면 단색 배경 — **대기화면 외 모든 단계** (테마 관리, §25). 지점별 |
+| `THEME_BTN_GLOW_ENABLED` | "1" | 버튼 탭 글로우 on/off ("0"이면 끔) |
+| `THEME_BTN_GLOW_COLOR` | "#6c6fb4" | 버튼 탭 글로우 색 |
+| `THEME_BTN_GLOW_SIZE` | "28" | 버튼 탭 글로우 번짐 크기(px) |
 
 > 위 표의 기본값은 **코드 하드코딩 폴백**(`useDeviceSetup.ts`, 설정 키가 없을 때 값) 기준이다.
 > `prisma/seed.ts`는 초기 DB에 일부 다른 값을 심는다 — 예: `PAYMENT_ENABLED="1"`(활성),
@@ -1225,7 +1220,8 @@ npm run tauri:build
 | 대시보드 | `/admin` | 요약 화면 |
 | 계정 관리 | `/admin/accounts` | 관리자 계정 추가·삭제·비밀번호 변경 (`AdminAccount` 테이블) |
 | 디바이스 관리 | `/admin/devices`, `/devices/new`, `/devices/[id]` | 생성, 편집, 복제 (활성/비활성 상태 배지 UI는 제거됨 — 필요 시 DB 직접 수정) |
-| 이미지 관리 | `/admin/images`, `/images/upload` | 배경/프레임/스티커 탭별 조회·삭제·업로드, MP4/WebM 영상 미리보기 |
+| 이미지 관리 | `/admin/images`, `/images/upload` | 배경/프레임/스티커 탭별 조회·삭제·업로드(프레임·스티커는 PNG·JPG만), MP4/WebM 영상 미리보기. 배경·프레임·스티커는 지점별 뱅크 UI로 노출 선택 |
+| 테마 관리 | `/admin/theme-setting` | 지점별 배경화면·로고, 글자색·강조(primary)색, **버튼 탭 글로우**(on/off·색·세기) 설정 (§25) |
 | 인화 설정 | `/admin/print-setting` | 인화지 크기, 모드별 사진 크기·간격·4방향 여백, 배경 이미지, 프린터 선택. 설정값 실시간 미리보기 + 용지 초과 경고 |
 | 촬영 설정 | `/admin/capture-setting` | 카운트다운, 촬영 횟수, 배경 제거 모드(AI/크로마키/off), 크로마키 색상(컬러피커), AI 배경제거 경계 침식/부드러움, 카메라 실시간 미리보기 (§12 참고) |
 | 타이머 설정 | `/admin/timer-setting` | 유휴 타임아웃, 촬영 자동 타이머, 인화 자동 복귀 타이머 |
@@ -1294,8 +1290,9 @@ npm run tauri:build
 - 조회는 **지점 연결분만**(`/api/image/list/{5|6}/?device_id=X&linked=1`) — 목록 API의 `linked=1`
   파라미터는 "전체 디바이스용 제외, 해당 지점 연결분만"을 의미한다.
 - `useDeviceSetup`이 이 지점의 wallpaper/logo를 `wallpaperUrl`/`logoUrl`로 노출.
-  wallpaper는 service 루트 `<div>` `background-image`(cover), 로고는 대기화면 등에 표시.
-  미설정 시 기본 배경 `#2a2a2a` / 기본 로고(AR-pic 텍스트).
+  **wallpaper(cover 배경)는 대기(첫) 화면에서만** 깔리고, 나머지 단계는 단색
+  `THEME_BG_COLOR`(기본 `#2a2a2a`)로 채운다. **로고는 대기 화면을 제외한 모든 단계**의
+  좌측 상단에 표시(촬영 단계 포함). 미설정 시 기본 로고는 `AR-pic` 텍스트.
 
 ### 글자색 / 강조(primary) 색상
 
@@ -1306,6 +1303,13 @@ npm run tauri:build
   규칙이 **본문 흰색 텍스트**를 테마색으로 치환한다 (규칙이 레이어 밖이라 Tailwind 유틸보다 우선).
 - **제외 대상(대비 안전)**: 자체 배경색을 가진 버튼 — 흰 배경·어두운 글자의 `.service-button`,
   색 버튼의 인라인 흰 글자는 그대로 둔다.
+
+### 단색 배경 / 버튼 탭 글로우
+
+- `THEME_BG_COLOR`(기본 `#2a2a2a`) — 대기화면을 제외한 모든 단계의 단색 배경(§20).
+- 버튼 탭 글로우: `THEME_BTN_GLOW_ENABLED`/`_COLOR`/`_SIZE`. service 루트에
+  `--btn-glow-color`·`--btn-glow-size`를 내리고, `globals.css`의 `.service-button:active`
+  글로우와 탭 직후 `.btn-glow-ripple` 펄스가 이 값을 쓴다. `_ENABLED="0"`이면 글로우 없음.
 
 ### DB 준비
 

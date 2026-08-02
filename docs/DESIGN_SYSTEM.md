@@ -58,6 +58,10 @@ Tailwind CSS v4의 토큰 기반 방식이라 별도 `tailwind.config.js`는 없
 즉 우선순위: **지점 테마(런타임) > 디자인 토큰(기본값)**. 디자인 토큰은 "기본 팔레트",
 지점 테마는 "지점별 덮어쓰기"다. 관리자 화면(`/admin`)에는 지점 테마가 적용되지 않고 토큰만 쓴다.
 
+주입되는 런타임 변수: `--theme-text`(글자색)·`--theme-primary`(강조색) 외에, 배경은 대기화면만
+wallpaper(cover)·그 외 단계는 `THEME_BG_COLOR` 단색, 버튼 탭 글로우는 `--btn-glow-color`/
+`--btn-glow-size`로 제어한다(모두 관리자 **테마 관리**에서 지점별 설정 — SPEC §25).
+
 ## 5. 기타 토큰
 
 | 토큰 | 유틸리티 |
@@ -82,5 +86,11 @@ Tailwind CSS v4의 토큰 기반 방식이라 별도 `tailwind.config.js`는 없
 
 ## 7. em 기반 큰 버튼
 
-`globals.css`의 `.touch-button`(2em)·`.nav-button`(1.4em)·`.nav-next-lg`(1.7em)는
-`em` 단위라 `--type-scale`의 영향을 받지 않는다. 이 버튼들 크기는 해당 클래스에서 직접 조절한다.
+`globals.css`의 `.touch-button`(2em)·`.nav-button`(1.4em)은 `em` 단위라 `--type-scale`의
+영향을 받지 않는다. 이 버튼들 크기는 해당 클래스에서 직접 조절한다.
+`.nav-next-lg`("다음" 강조 버튼)는 **크기는 `.nav-button`과 동일**하고 primary 색상만 입힌다
+(예전엔 1.7em로 더 컸으나 "이전"과 크기를 맞춤).
+
+> 서비스 화면 **외곽 여백**(각 섹션 상/하 패딩·네비 버튼 코너 오프셋)은 토큰이 아니라
+> 컴포넌트의 Tailwind 클래스로 관리한다 — 섹션 `pt-24 pb-52`, `ServiceNav` `bottom-16 left-16`
+> (세로 모드 `pt-16 pb-40`, `bottom-10` 등).
