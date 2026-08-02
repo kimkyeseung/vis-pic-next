@@ -182,7 +182,7 @@
 
 ## 5. 7단계 사용자 흐름 (Photo Flow)
 
-상태는 `sessionStorage` 키 `photobooth_session_v2`에 저장되어 새로고침 후에도 복원된다.
+진행 상태(단계·선택값)는 `sessionStorage` 키 `photobooth_session_v3`에 저장되어 새로고침 후에도 복원된다. 단, **촬영본(photos)·중간프레임은 저장하지 않는다**(세션당 수십 MB로 5MB 쿼터 초과 + 촬영마다 재직렬화 비용). 따라서 사진이 필요한 단계(select 이후)로 저장돼 있으면 복원 시 **촬영 단계로 되돌려** 같은 프레임/배경으로 재촬영하게 한다.
 
 ```
 [1. START] → [2. PAYMENT*] → [3. FRAME] → [4. BACKGROUND]
@@ -365,7 +365,7 @@
 ### usePhotoFlow 상세
 
 - **30+ 상태 항목** 관리 (step, selectedFrame, selectedBackground, photos, stickers, ...)
-- `sessionStorage`에 JSON 직렬화 저장 (키: `photobooth_session_v2`)
+- `sessionStorage`에 **단계·선택값만** JSON 직렬화 저장 (키: `photobooth_session_v3`, 수 KB). 사진·중간프레임은 제외
 - `advanceFromCurrentStep()` → 단계별 유효성 검사 후 다음 단계로 이동
 - 사진 업로드 (`uploadPhotos()`), GIF 생성 (`createGif()`) 포함
 

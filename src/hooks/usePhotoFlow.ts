@@ -2,7 +2,13 @@ import { useState, useEffect } from "react";
 import type { Step, DeviceConfig, Sticker } from "@/types";
 import { FRAME_INFO } from "@/constants/frames";
 
-const SESSION_KEY = "photobooth_session_v2";
+const SESSION_KEY = "photobooth_session_v3";
+
+// 사진(photos)·중간프레임(intermediateFrames)은 용량(세션당 수십 MB, sessionStorage
+// 5MB 쿼터 초과)·성능(촬영마다 전체 재직렬화) 때문에 저장하지 않는다. 따라서 사진이
+// 필요한 단계(select 이후)로는 복원할 수 없고, 아래 단계까지만 그대로 복원한다.
+// 그 밖의 단계로 저장돼 있으면 촬영 단계로 되돌려 같은 프레임/배경으로 재촬영하게 한다.
+const RESTORABLE_STEPS: Step[] = ["payment", "frame", "background", "camera"];
 
 export function usePhotoFlow(deviceId: string, config: DeviceConfig, hasPrintBgImages = false) {
   const [currentStep, setCurrentStep] = useState<Step>("start");
@@ -25,7 +31,8 @@ export function usePhotoFlow(deviceId: string, config: DeviceConfig, hasPrintBgI
   const slotsNeeded = selectedFrame ? FRAME_INFO[selectedFrame]?.count || 1 : 1;
 
   // 세션 복원 — sessionStorage는 SSR에 없으므로 하이드레이션 직후
-  // 마이크로태스크 콜백에서 복원한다 (첫 렌더는 SSR 마크업과 일치 유지)
+  // 마이크로태스크 콜백에서 복원한다 (첫 렌더는 SSR 마크업과 일치 유지).
+  // 사진은 저장하지 않으므로 단계·선택값(프레임/배경/매수 등)만 복원한다.
   useEffect(() => {
     let cancelled = false;
     Promise.resolve().then(() => {
@@ -35,14 +42,12 @@ export function usePhotoFlow(deviceId: string, config: DeviceConfig, hasPrintBgI
         if (!saved) return;
         const s = JSON.parse(saved);
         if (s.deviceId !== deviceId) return;
-        if (s.step) setCurrentStep(s.step);
+        // 사진이 필요한 단계로 저장돼 있으면 촬영 단계로 되돌려 재촬영하게 한다.
+        if (s.step) setCurrentStep(RESTORABLE_STEPS.includes(s.step) ? s.step : "camera");
         if (s.orderId) setOrderId(s.orderId);
         if (s.selectedFrame) setSelectedFrame(s.selectedFrame);
         if (s.selectedBackground !== undefined) setSelectedBackground(s.selectedBackground);
         if (s.selectedPrintBg !== undefined) setSelectedPrintBg(s.selectedPrintBg);
-        if (s.photos?.length > 0) setPhotos(s.photos);
-        if (s.intermediateFrames?.length > 0) setIntermediateFrames(s.intermediateFrames);
-        if (s.selectedPhotos?.length > 0) setSelectedPhotos(s.selectedPhotos);
         if (typeof s.printQuantity === "number" && s.printQuantity > 0) setPrintQuantity(s.printQuantity);
       } catch {
         // ignore parse errors
@@ -51,7 +56,7 @@ export function usePhotoFlow(deviceId: string, config: DeviceConfig, hasPrintBgI
     return () => { cancelled = true; };
   }, [deviceId]);
 
-  // 세션 저장
+  // 세션 저장 — 단계·선택값만(수 KB). 사진/중간프레임은 용량·성능 때문에 저장하지 않는다.
   useEffect(() => {
     if (currentStep === "start") return;
     try {
@@ -62,15 +67,12 @@ export function usePhotoFlow(deviceId: string, config: DeviceConfig, hasPrintBgI
         selectedFrame,
         selectedBackground,
         selectedPrintBg,
-        photos,
-        intermediateFrames,
-        selectedPhotos,
         printQuantity,
       }));
     } catch {
       // sessionStorage full or unavailable
     }
-  }, [currentStep, deviceId, orderId, selectedFrame, selectedBackground, selectedPrintBg, photos, intermediateFrames, selectedPhotos, printQuantity]);
+  }, [currentStep, deviceId, orderId, selectedFrame, selectedBackground, selectedPrintBg, printQuantity]);
 
   const goToStep = (step: Step) => setCurrentStep(step);
 
