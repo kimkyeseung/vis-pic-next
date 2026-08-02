@@ -2,6 +2,7 @@ import type { BGImage } from "@/types";
 import { useLanguage } from "@/i18n/LanguageContext";
 import { resolveImageSrc } from "@/lib/imageUrl";
 import { ServiceNav } from "./ServiceNav";
+import { SERVICE_SECTION_CLASS } from "./sectionLayout";
 
 export function PrintBgSection({
   printBgImages,
@@ -21,7 +22,7 @@ export function PrintBgSection({
   const { t } = useLanguage();
 
   return (
-    <section className="w-full h-full grid grid-rows-[auto_1fr] justify-items-center relative z-10 pt-24 portrait:pt-16 pb-52 portrait:pb-40">
+    <section className={`${SERVICE_SECTION_CLASS} grid-rows-[auto_1fr]`}>
       <h2 className="text-title font-extrabold text-white animate-fadeInDown" style={{ textShadow: "0 2px 15px rgba(0,0,0,0.5)" }}>
         {t("printbg.title")}
       </h2>

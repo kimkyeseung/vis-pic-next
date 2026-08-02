@@ -3,6 +3,7 @@ import type { BGImage } from "@/types";
 import { useLanguage } from "@/i18n/LanguageContext";
 import { FramedPreview } from "./FramedPreview";
 import { ServiceNav } from "./ServiceNav";
+import { SERVICE_SECTION_CLASS } from "./sectionLayout";
 
 // 한 페이지에 보여줄 촬영본 수 (2×2). 이보다 많으면 좌우 화살표로 페이지 전환.
 const PAGE_SIZE = 4;
@@ -54,7 +55,7 @@ export function SelectSection({
   const pagePhotos = photos.slice(pageStart, pageStart + PAGE_SIZE);
 
   return (
-    <section className="w-full h-full grid grid-rows-[auto_auto_1fr] justify-items-center relative z-10 pt-24 portrait:pt-16 pb-52 portrait:pb-40">
+    <section className={`${SERVICE_SECTION_CLASS} grid-rows-[auto_auto_1fr]`}>
       <h2 className="text-title font-extrabold text-white mb-4 animate-fadeInDown" style={{ textShadow: "0 2px 15px rgba(0,0,0,0.5)" }}>
         {t("select.title")}
       </h2>

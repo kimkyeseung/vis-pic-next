@@ -3,6 +3,7 @@ import { computePrintLayout } from "@/lib/printLayout";
 import { useLanguage } from "@/i18n/LanguageContext";
 import { ServiceNav } from "./ServiceNav";
 import { resolveImageSrc } from "@/lib/imageUrl";
+import { SERVICE_SECTION_CLASS } from "./sectionLayout";
 import type { BGImage, FrameInfoEntry } from "@/types";
 
 // 미리보기 축척: 1cm → 12px (인화지 10×15cm 기준 120×180px)
@@ -97,7 +98,7 @@ export function FrameSection({
   const frameSrc = resolveFrameSrc(printBgImages, imageBaseUrl);
 
   return (
-    <section className="w-full h-full grid grid-rows-[auto_1fr] justify-items-center relative z-10 pt-24 portrait:pt-16 pb-52 portrait:pb-40">
+    <section className={`${SERVICE_SECTION_CLASS} grid-rows-[auto_1fr]`}>
       <h2 className="text-title font-extrabold text-white animate-fadeInDown" style={{ textShadow: "0 2px 15px rgba(0,0,0,0.5)" }}>
         {t("frame.title")}
       </h2>

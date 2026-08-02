@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import type { DeviceConfig } from "@/types";
 import { useLanguage } from "@/i18n/LanguageContext";
 import { LOCALES, type MessageKey } from "@/i18n/translations";
+import { SERVICE_SECTION_CLASS } from "./sectionLayout";
 
 export function PaymentSection({
   config,
@@ -124,7 +125,7 @@ export function PaymentSection({
   const fmt = (n: number) => n.toLocaleString();
 
   return (
-    <section className="w-full h-full grid grid-rows-[auto_1fr] justify-items-center relative z-10 pt-24 portrait:pt-16 pb-52 portrait:pb-40 px-16">
+    <section className={`${SERVICE_SECTION_CLASS} grid-rows-[auto_1fr] px-16`}>
       {status === "idle" ? (
         <>
           <h2 className="text-title font-extrabold text-white animate-fadeInDown" style={{ textShadow: "0 2px 15px rgba(0,0,0,0.5)" }}>
