@@ -117,16 +117,18 @@ describe("clampPercent (AI 배경제거 0–100)", () => {
   });
 });
 
-describe("parsePaymentTerminalMode — 정확 일치만 허용(현재 동작 고정)", () => {
-  it("'manual'만 수동, 그 외는 payapp_lite", () => {
+describe("parsePaymentTerminalMode", () => {
+  it("'manual'은 수동, 그 외 값은 payapp_lite", () => {
     expect(parsePaymentTerminalMode("manual")).toBe("manual");
     expect(parsePaymentTerminalMode("payapp_lite")).toBe("payapp_lite");
+    expect(parsePaymentTerminalMode("")).toBe("payapp_lite");
+    expect(parsePaymentTerminalMode("other")).toBe("payapp_lite");
   });
 
-  // 알려진 함정: 공백/대문자는 수동으로 인식되지 않고 payapp_lite로 떨어진다.
-  // (운영자는 정확히 "manual"을 입력해야 함. 트림/소문자화 하드닝은 별도 논의)
-  it("공백·대문자 변형은 수동으로 인식되지 않음", () => {
-    expect(parsePaymentTerminalMode(" manual ")).toBe("payapp_lite");
-    expect(parsePaymentTerminalMode("Manual")).toBe("payapp_lite");
+  // 하드닝: 공백·대소문자 차이가 있어도 수동으로 정규화 (실카드결제로 떨어지는 함정 방지)
+  it("공백·대문자 변형도 수동으로 정규화", () => {
+    expect(parsePaymentTerminalMode(" manual ")).toBe("manual");
+    expect(parsePaymentTerminalMode("Manual")).toBe("manual");
+    expect(parsePaymentTerminalMode("  MANUAL")).toBe("manual");
   });
 });

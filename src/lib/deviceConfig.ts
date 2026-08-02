@@ -13,7 +13,8 @@ export function parseBgRemovalMode(modeRaw: string): BgRemovalMode {
 }
 
 export function parsePaymentTerminalMode(raw: string): PaymentTerminalMode {
-  return raw === "manual" ? "manual" : "payapp_lite";
+  // 공백·대소문자 차이로 운영자가 의도한 수동 모드가 실카드결제로 떨어지는 함정을 방지.
+  return raw.trim().toLowerCase() === "manual" ? "manual" : "payapp_lite";
 }
 
 export function parseCaptureModes(raw: string): string[] {
