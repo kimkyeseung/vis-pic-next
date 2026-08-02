@@ -23,7 +23,8 @@ npm run db:add-theme   # 테마용 이미지 타입·설정만 안전하게 추�
 npm run tauri:dev      # 데스크톱 앱(개발)
 npm run tauri:build    # 데스크톱 앱 빌드
 
-npm test               # 단위 테스트 (vitest)
+npm test               # 단위 테스트 (vitest, 서버 불필요)
+npm run test:integration  # 통합 테스트 (API 호출, npm run dev 필요) — __tests__/integration/README.md
 npm run test:e2e       # E2E (playwright)
 ```
 
