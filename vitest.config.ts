@@ -7,8 +7,8 @@ export default defineConfig({
     include: ["__tests__/unit/**/*.test.ts"],
     coverage: {
       provider: "v8",
-      // 전체 src를 분모로 잡아 실제(테스트 안 된 UI/API 포함) 현황을 정직하게 보여준다.
-      all: true,
+      // include로 지정한 src 전체를 분모로 잡아 실제(테스트 안 된 UI/API 포함) 현황을
+      // 정직하게 보여준다. (v4부터 include 매칭 파일은 테스트 유무와 무관하게 기본 포함)
       include: ["src/**/*.{ts,tsx}"],
       exclude: [
         "src/**/*.d.ts",
