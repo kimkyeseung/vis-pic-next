@@ -49,10 +49,10 @@ describe("decodeBase64Image", () => {
 });
 
 describe("formatExpiryDate", () => {
-  it("returns today + N days in 'YYYY년 MM월 DD일' format", () => {
+  it("returns today + N days in locale-neutral ISO (YYYY-MM-DD) format", () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date(2026, 0, 10)); // 2026-01-10
-    expect(formatExpiryDate(5)).toBe("2026년 01월 15일");
+    expect(formatExpiryDate(5)).toBe("2026-01-15");
   });
 
   it("defaults to EXPIRY_DAYS when no argument is given", () => {
@@ -64,12 +64,12 @@ describe("formatExpiryDate", () => {
   it("rolls over into the next month correctly", () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date(2026, 0, 30)); // 2026-01-30
-    expect(formatExpiryDate(3)).toBe("2026년 02월 02일");
+    expect(formatExpiryDate(3)).toBe("2026-02-02");
   });
 
   it("rolls over into the next year correctly", () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date(2026, 11, 30)); // 2026-12-30
-    expect(formatExpiryDate(3)).toBe("2027년 01월 02일");
+    expect(formatExpiryDate(3)).toBe("2027-01-02");
   });
 });
