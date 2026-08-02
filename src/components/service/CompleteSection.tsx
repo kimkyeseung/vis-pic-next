@@ -5,6 +5,7 @@ import { QRCodeSVG } from "qrcode.react";
 import type { BGImage } from "@/types";
 import { FRAME_INFO, FALLBACK_BACKGROUNDS } from "@/constants/frames";
 import { roundRect, fillGradient, fillGradientFromCSS, loadImage, resizeForGif, stripDataUriPrefix, drawImageCover } from "@/lib/canvas";
+import { resolveImageSrc } from "@/lib/imageUrl";
 import {
   computePrintLayout,
   modeSettingPrefix,
@@ -88,14 +89,6 @@ export function CompleteSection({
     window.open(url, "_blank");
   };
 
-  const resolveImageUrl = (value: string, baseUrl: string) => {
-    if (!value) return "";
-    if (value.startsWith("http://") || value.startsWith("https://")) return value;
-    if (value.startsWith("/")) return value;
-    // strip any accidental path prefix (e.g. "static/images/file.jpg")
-    const filename = value.split("/").pop()!;
-    return `${baseUrl}/${filename}`;
-  };
 
   const uploadForQR = async (dataUrl: string, bgImageData?: string | null, printBgFilename?: string | null) => {
     let photoUrl: string | null = null;
@@ -286,7 +279,7 @@ export function CompleteSection({
     // 2. Legacy single PRINT_BACKGROUND setting (fallback when no print bg images)
     if (!bgDrawn && printSettings.PRINT_BACKGROUND) {
       try {
-        const bgImg = await loadImage(resolveImageUrl(printSettings.PRINT_BACKGROUND, imageBaseUrl));
+        const bgImg = await loadImage(resolveImageSrc(printSettings.PRINT_BACKGROUND, imageBaseUrl));
         drawImageCover(ctx, bgImg, 0, 0, canvasWidth, canvasHeight);
         bgDrawn = true;
       } catch {

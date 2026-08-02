@@ -2,6 +2,7 @@ import { FRAME_INFO } from "@/constants/frames";
 import { computePrintLayout } from "@/lib/printLayout";
 import { useLanguage } from "@/i18n/LanguageContext";
 import { ServiceNav } from "./ServiceNav";
+import { resolveImageSrc } from "@/lib/imageUrl";
 import type { BGImage, FrameInfoEntry } from "@/types";
 
 // 미리보기 축척: 1cm → 12px (인화지 10×15cm 기준 120×180px)
@@ -17,8 +18,7 @@ const FRAME_PLACEHOLDER = "#3f3f46";
 function resolveFrameSrc(printBgImages: BGImage[], imageBaseUrl: string): string | null {
   const first = printBgImages[0];
   if (!first) return null;
-  // 미리보기 목업(data URI)·실제 파일명 모두 지원
-  return /^(https?:|data:|blob:)/.test(first.filename) ? first.filename : `${imageBaseUrl}/${first.filename}`;
+  return resolveImageSrc(first.filename, imageBaseUrl);
 }
 
 /** 실제 인화지 비율(10×15cm)과 공용 레이아웃 계산을 축소해 그리는 미리보기 */

@@ -1,5 +1,6 @@
 import type { BGImage } from "@/types";
 import { useLanguage } from "@/i18n/LanguageContext";
+import { resolveImageSrc } from "@/lib/imageUrl";
 import { ServiceNav } from "./ServiceNav";
 
 export function PrintBgSection({
@@ -18,9 +19,6 @@ export function PrintBgSection({
   onPrev: () => void;
 }) {
   const { t } = useLanguage();
-  // filename이 이미 완전한 URL/데이터 URI면 그대로 사용(미리보기 목업 대응), 아니면 baseUrl 붙임
-  const srcOf = (filename: string) =>
-    /^(https?:|data:|blob:)/.test(filename) ? filename : `${imageBaseUrl}/${filename}`;
 
   return (
     <section className="w-full h-full grid grid-rows-[auto_1fr] justify-items-center relative z-10 pt-24 portrait:pt-16 pb-52 portrait:pb-40">
@@ -40,7 +38,7 @@ export function PrintBgSection({
             >
               {selectedPrintBg === bg.id && <span className="check-mark">&#10003;</span>}
               <img
-                src={srcOf(bg.filename)}
+                src={resolveImageSrc(bg.filename, imageBaseUrl)}
                 alt={bg.name}
                 className="w-full h-auto block rounded-[13px]"
                 onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
