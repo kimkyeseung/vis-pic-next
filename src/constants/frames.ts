@@ -9,8 +9,6 @@ export const FRAME_INFO: Record<string, FrameInfoEntry> = {
   "4x1": { label: "4컷", cols: 1, rows: 4, count: 4, orientation: "portrait" },
 };
 
-export const ALL_MODES = Object.keys(FRAME_INFO);
-
 export const FALLBACK_BACKGROUNDS: FallbackBackground[] = [
   { id: -1, gradient: "linear-gradient(135deg, #ff6b9d 0%, #c44fd5 100%)", name: "Pink Purple" },
   { id: -2, gradient: "linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)", name: "Blue Cyan" },
