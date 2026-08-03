@@ -7,7 +7,6 @@ AR 포토부스 키오스크. 카메라 촬영 → AI 배경제거(MediaPipe) �
 
 - **[SPEC.md](SPEC.md)** — 아키텍처·사용자 흐름·API·데이터 모델 등 전체 명세
 - **[docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)** — 배포·환경 변수·설정 키
-- [docs/QR_CODE_FEATURE.md](docs/QR_CODE_FEATURE.md) · [docs/GIF_GENERATION.md](docs/GIF_GENERATION.md) — 기능별 상세
 - `docs/20260722/` — 레이아웃 V3 시안(디자인 참고)
 
 ## 개발
