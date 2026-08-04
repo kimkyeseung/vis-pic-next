@@ -6,6 +6,7 @@ import { FALLBACK_BACKGROUNDS } from "@/constants/frames";
 import { EFFECT_TRIGGER_GESTURE, DEFAULT_EFFECT_DURATION } from "@/constants/images";
 import { fillGradientFromCSS } from "@/lib/canvas";
 import { useFrameSender } from "@/hooks/useSceneSync";
+import { useAutoCaptureTimer } from "@/hooks/useAutoCaptureTimer";
 import { createSoundPlayer, type SoundPlayer } from "@/lib/sounds";
 import { CircularTimer } from "@/components/service/CircularTimer";
 import { ServiceNav } from "@/components/service/ServiceNav";
@@ -76,8 +77,6 @@ export function CameraSection({
   const [segmenterStatus, setSegmenterStatus] = useState<"idle" | "loading" | "ready" | "error">("idle");
   const [segmenterError, setSegmenterError] = useState<string | null>(null);
   const [cameraDeviceDiag, setCameraDeviceDiag] = useState<string | null>(null);
-  const [autoTimer, setAutoTimer] = useState<number | null>(null);
-  const autoTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [dbStickerImages, setDbStickerImages] = useState<Array<{ id: number; filename: string; name: string }>>([]);
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [selectedStickerId, setSelectedStickerId] = useState<string | null>(null);
@@ -790,37 +789,19 @@ export function CameraSection({
     captureTimersRef.current.push(frameTimer, interval);
   }, [countdown, photos.length, maxPhotos, config.captureSeconds, onCapture, snapshotWithStickers]);
 
-  // 자동 촬영 타이머 — setState는 전부 타이머 콜백에서 수행
-  useEffect(() => {
-    if (photos.length >= maxPhotos || countdown !== null) return;
-    const seconds = config.cameraAutoTimerSeconds;
-    if (seconds <= 0) return;
-
-    const deadline = Date.now() + seconds * 1000;
-    const init = setTimeout(() => setAutoTimer(seconds), 0);
-    autoTimerRef.current = setInterval(() => {
-      const remaining = Math.ceil((deadline - Date.now()) / 1000);
-      if (remaining <= 0) {
-        if (autoTimerRef.current) clearInterval(autoTimerRef.current);
-        autoTimerRef.current = null;
-        setAutoTimer(null);
-        capturePhoto();
-      } else {
-        setAutoTimer(remaining);
-      }
-    }, 1000);
-
-    return () => {
-      clearTimeout(init);
-      if (autoTimerRef.current) { clearInterval(autoTimerRef.current); autoTimerRef.current = null; }
-    };
-  }, [photos.length, maxPhotos, countdown, config.cameraAutoTimerSeconds, capturePhoto]);
+  // 자동 촬영 타이머 (훅으로 분리 — 회귀 방지 이유는 useAutoCaptureTimer 참고).
+  const { autoTimer, cancel: cancelAutoTimer } = useAutoCaptureTimer({
+    photosCount: photos.length,
+    maxPhotos,
+    countdown,
+    seconds: config.cameraAutoTimerSeconds,
+    onFire: capturePhoto,
+  });
 
   const handleManualCapture = useCallback(() => {
-    if (autoTimerRef.current) { clearInterval(autoTimerRef.current); autoTimerRef.current = null; }
-    setAutoTimer(null);
+    cancelAutoTimer();
     capturePhoto();
-  }, [capturePhoto]);
+  }, [cancelAutoTimer, capturePhoto]);
 
   // 제스처 감지 루프가 최신 촬영 핸들러를 참조하도록 유지 (루프 재생성 없이)
   useEffect(() => { handleManualCaptureRef.current = handleManualCapture; }, [handleManualCapture]);
