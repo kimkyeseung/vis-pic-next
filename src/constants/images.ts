@@ -20,3 +20,14 @@ export const MAX_ACTIVE_FRAMES = 6;
 
 // 지점별로 노출할 수 있는 스티커의 최대 개수.
 export const MAX_ACTIVE_STICKERS = 20;
+
+// ── 배경 이펙트 영상(동작 트리거) ──
+// 촬영 화면에서 이 제스처(MediaPipe GestureRecognizer 카테고리)를 취하면 현재 배경의
+// 이펙트 영상이 재생된다. 손바닥(Open_Palm)은 이미 촬영 트리거이므로 겹치지 않게 V사인(Victory)을 쓴다.
+export const EFFECT_TRIGGER_GESTURE = "Victory";
+// 관리자가 지속시간을 지정하지 않은 배경의 기본 최대 재생 시간(초).
+export const DEFAULT_EFFECT_DURATION = 4;
+// 관리자 설정 UI에서 허용하는 지속시간 범위(초).
+export const EFFECT_DURATION_RANGE = { min: 1, max: 30 } as const;
+// 이펙트 영상으로 허용하는 파일 확장자.
+export const EFFECT_VIDEO_EXTENSIONS = ["mp4", "webm"] as const;

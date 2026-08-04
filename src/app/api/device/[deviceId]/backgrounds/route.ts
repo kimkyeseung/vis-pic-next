@@ -26,6 +26,8 @@ export async function GET(
       filename: l.image.filename,
       focalX: l.image.focalX ?? 0.5,
       focalY: l.image.focalY ?? 0.5,
+      effectFilename: l.image.effectFilename ?? null,
+      effectDuration: l.image.effectDuration ?? null,
     }));
     return NextResponse.json(
       { images, baseUrl: getImageBaseUrl() },

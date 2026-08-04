@@ -28,6 +28,12 @@ export async function PATCH(
       data.priority = Math.trunc(body.priority);
     }
     if (typeof body.active === "boolean") data.active = body.active;
+    // 배경 이펙트 최대 재생 시간(초). null이면 기본값 사용(컬럼 비움).
+    if (body.effectDuration === null) {
+      data.effectDuration = null;
+    } else if (typeof body.effectDuration === "number" && Number.isFinite(body.effectDuration)) {
+      data.effectDuration = Math.max(1, Math.min(30, Math.trunc(body.effectDuration)));
+    }
 
     // 배경(type 1)을 활성화하려는 경우, 이미 최대치만큼 활성화돼 있으면 거부한다.
     if (data.active === true) {
@@ -92,6 +98,8 @@ export async function PATCH(
         active: updated.active,
         focalX: updated.focalX,
         focalY: updated.focalY,
+        effectFilename: updated.effectFilename,
+        effectDuration: updated.effectDuration,
         deviceIds: updated.devices.map((d) => d.deviceId),
       },
     });
@@ -124,6 +132,8 @@ export async function DELETE(
 
     // Delete file from storage (local + Supabase if configured)
     await deleteImage(image.filename);
+    // 배경 이펙트 영상이 붙어 있으면 함께 정리
+    if (image.effectFilename) await deleteImage(image.effectFilename).catch(() => {});
 
     // Delete from database
     await prisma.image.delete({

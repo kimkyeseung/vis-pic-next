@@ -116,6 +116,10 @@ model Image {
   active    Boolean   @default(true)
   focalX    Float?    @default(0.5) @map("focal_x")
   focalY    Float?    @default(0.5) @map("focal_y")
+  /// 배경(type 1) 전용: 동작(제스처) 트리거 시 촬영 화면에 스크린-블렌드로 재생되는 이펙트 영상 파일명. null이면 이펙트 없음.
+  effectFilename String? @map("effect_filename") @db.VarChar(128)
+  /// 이펙트 영상 최대 재생 시간(초). 영상이 더 짧으면 끝날 때 종료. null이면 기본값 사용.
+  effectDuration Int?    @map("effect_duration")
   createdAt DateTime  @default(now()) @map("created_at") @db.Timestamp(6)
   type      ImageType @relation(fields: [imageType], references: [id], onDelete: NoAction, onUpdate: NoAction)
   devices   ImageDevice[]

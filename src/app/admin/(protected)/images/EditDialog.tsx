@@ -1,6 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import {
+  BACKGROUND_IMAGE_TYPE,
+  DEFAULT_EFFECT_DURATION,
+  EFFECT_DURATION_RANGE,
+  EFFECT_VIDEO_EXTENSIONS,
+} from "@/constants/images";
 
 interface Image {
   id: number;
@@ -9,6 +15,8 @@ interface Image {
   priority: number;
   deviceIds: string[];
   imageType: number;
+  effectFilename?: string | null;
+  effectDuration?: number | null;
 }
 
 interface DeviceOption {
@@ -42,6 +50,51 @@ export default function EditDialog({
   );
   const [saving, setSaving] = useState(false);
 
+  // ── 배경 이펙트 영상(동작 트리거 시 재생) ──
+  const isBackground = image.imageType === BACKGROUND_IMAGE_TYPE;
+  const [effectFilename, setEffectFilename] = useState<string | null>(image.effectFilename ?? null);
+  const [effectDuration, setEffectDuration] = useState<string>(
+    String(image.effectDuration ?? DEFAULT_EFFECT_DURATION)
+  );
+  const [effectBusy, setEffectBusy] = useState(false);
+  const effectInputRef = useRef<HTMLInputElement>(null);
+
+  const handleEffectUpload = async (file: File) => {
+    setEffectBusy(true);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      fd.append("duration", effectDuration);
+      const res = await fetch(`/api/admin/images/${image.id}/effect/`, {
+        method: "POST",
+        body: fd,
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.effectFilename) throw new Error(data.error || "upload failed");
+      setEffectFilename(data.effectFilename);
+    } catch (error) {
+      console.error("Failed to upload effect video:", error);
+      alert(error instanceof Error ? error.message : "이펙트 영상 업로드에 실패했습니다.");
+    } finally {
+      setEffectBusy(false);
+      if (effectInputRef.current) effectInputRef.current.value = "";
+    }
+  };
+
+  const handleEffectRemove = async () => {
+    setEffectBusy(true);
+    try {
+      const res = await fetch(`/api/admin/images/${image.id}/effect/`, { method: "DELETE" });
+      if (!res.ok) throw new Error("remove failed");
+      setEffectFilename(null);
+    } catch (error) {
+      console.error("Failed to remove effect video:", error);
+      alert("이펙트 영상 제거에 실패했습니다.");
+    } finally {
+      setEffectBusy(false);
+    }
+  };
+
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
@@ -69,6 +122,8 @@ export default function EditDialog({
           priority: parseInt(priority) || 0,
           imageType: parseInt(imageType),
           deviceIds: selectedDeviceIds,
+          // 배경 이펙트 최대 재생 시간(초). 배경일 때만 전송.
+          ...(isBackground ? { effectDuration: parseInt(effectDuration) || DEFAULT_EFFECT_DURATION } : {}),
         }),
       });
       if (!res.ok) throw new Error("update failed");
@@ -195,6 +250,71 @@ export default function EditDialog({
                 : `${selectedDeviceIds.length}개 장치에만 적용됩니다.`}
             </p>
           </div>
+
+          {/* 배경 전용: 동작(V사인) 트리거 시 촬영 화면에 재생되는 이펙트 영상 */}
+          {isBackground && (
+            <div className="rounded-lg border border-gray-700 bg-gray-900/40 p-4">
+              <label className="mb-1 block font-medium text-gray-200">동작 트리거 이펙트 영상</label>
+              <p className="mb-3 text-sm text-gray-500">
+                촬영 화면에서 손으로 <span className="text-gray-300">V 사인(브이)</span>을 취하면
+                이 배경 위에 스크린 블렌드로 재생됩니다. ({EFFECT_VIDEO_EXTENSIONS.join(", ")})
+              </p>
+
+              {effectFilename ? (
+                <div className="mb-3 flex items-center gap-3">
+                  <video
+                    src={`${imageBaseUrl}/${effectFilename}`}
+                    className="h-20 w-32 rounded-lg bg-black object-contain"
+                    muted
+                    loop
+                    autoPlay
+                    playsInline
+                  />
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-xs text-gray-400">{effectFilename}</p>
+                    <button
+                      type="button"
+                      onClick={handleEffectRemove}
+                      disabled={effectBusy}
+                      className="mt-2 rounded bg-red-600/90 px-3 py-1 text-sm text-white hover:bg-red-500 disabled:opacity-50"
+                    >
+                      이펙트 제거
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <p className="mb-3 text-sm text-gray-500">설정된 이펙트 영상이 없습니다.</p>
+              )}
+
+              <input
+                ref={effectInputRef}
+                type="file"
+                accept={EFFECT_VIDEO_EXTENSIONS.map((e) => `.${e}`).join(",")}
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  if (f) handleEffectUpload(f);
+                }}
+                disabled={effectBusy}
+                className="block w-full text-sm text-gray-300 file:mr-3 file:rounded-lg file:border-0 file:bg-blue-600 file:px-4 file:py-2 file:text-white hover:file:bg-blue-500 disabled:opacity-50"
+              />
+              {effectBusy && <p className="mt-2 text-sm text-blue-400">처리 중…</p>}
+
+              <div className="mt-4">
+                <label className="mb-1 block text-gray-300">최대 재생 시간(초)</label>
+                <input
+                  type="number"
+                  min={EFFECT_DURATION_RANGE.min}
+                  max={EFFECT_DURATION_RANGE.max}
+                  value={effectDuration}
+                  onChange={(e) => setEffectDuration(e.target.value)}
+                  className="w-32 rounded-lg border border-gray-600 bg-gray-700 px-4 py-2.5 text-white focus:border-blue-500 focus:outline-none"
+                />
+                <p className="mt-1 text-sm text-gray-500">
+                  이 시간이 지나면 재생을 멈춥니다. 영상이 더 짧으면 끝날 때 종료됩니다. (저장 시 반영)
+                </p>
+              </div>
+            </div>
+          )}
         </div>
 
         <div className="flex justify-end gap-2 border-t border-gray-700 p-4">

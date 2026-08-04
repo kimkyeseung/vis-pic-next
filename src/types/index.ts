@@ -77,6 +77,10 @@ export interface BGImage {
   active?: boolean;
   focalX?: number;
   focalY?: number;
+  /** 배경 전용: 동작(제스처) 트리거 시 재생되는 이펙트 영상 파일명. 없으면 null/undefined. */
+  effectFilename?: string | null;
+  /** 이펙트 영상 최대 재생 시간(초). 미지정이면 기본값 사용. */
+  effectDuration?: number | null;
 }
 
 export interface FallbackBackground {

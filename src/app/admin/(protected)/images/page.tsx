@@ -18,6 +18,8 @@ interface Image {
   filename: string;
   priority: number;
   active: boolean;
+  effectFilename?: string | null;
+  effectDuration?: number | null;
 }
 
 interface ImageType {

@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import type { DeviceConfig, BGImage, Sticker } from "@/types";
 import { FALLBACK_BACKGROUNDS } from "@/constants/frames";
+import { EFFECT_TRIGGER_GESTURE, DEFAULT_EFFECT_DURATION } from "@/constants/images";
 import { fillGradientFromCSS } from "@/lib/canvas";
 import { useFrameSender } from "@/hooks/useSceneSync";
 import { createSoundPlayer, type SoundPlayer } from "@/lib/sounds";
@@ -109,6 +110,55 @@ export function CameraSection({
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const gestureRef = useRef<any>(null);
   const handleManualCaptureRef = useRef<() => void>(() => {});
+
+  // 동작 트리거(V사인) 이펙트 영상 — 현재 선택된 배경에 붙은 이펙트가 있으면 재생.
+  const backEffectRef = useRef<HTMLVideoElement>(null);
+  const effectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const effectDurationRef = useRef(0);
+  const [effectVisible, setEffectVisible] = useState(false);
+  const currentBgEffect = useMemo(() => {
+    if (selectedBackground === null || selectedBackground <= 0) return null;
+    const bg = backgroundImages.find((b) => b.id === selectedBackground);
+    if (!bg?.effectFilename) return null;
+    return {
+      src: `${imageBaseUrl}/${bg.effectFilename}`,
+      durationMs: (bg.effectDuration ?? DEFAULT_EFFECT_DURATION) * 1000,
+    };
+  }, [selectedBackground, backgroundImages, imageBaseUrl]);
+  useEffect(() => { effectDurationRef.current = currentBgEffect?.durationMs ?? 0; }, [currentBgEffect]);
+
+  const stopEffect = useCallback(() => {
+    if (effectTimerRef.current) { clearTimeout(effectTimerRef.current); effectTimerRef.current = null; }
+    const v = backEffectRef.current;
+    if (v) { v.pause(); try { v.currentTime = 0; } catch {} }
+    setEffectVisible(false);
+  }, []);
+
+  // 트리거 발동 시: 처음부터 재생 + 스크린 블렌드 표시. 지정 시간이 지나거나
+  // 영상이 그 전에 끝나면(onEnded) 종료한다.
+  const playEffect = useCallback(() => {
+    const v = backEffectRef.current;
+    const durationMs = effectDurationRef.current;
+    if (!v || durationMs <= 0) return;
+    if (effectTimerRef.current) { clearTimeout(effectTimerRef.current); effectTimerRef.current = null; }
+    setEffectVisible(true);
+    try { v.currentTime = 0; } catch {}
+    const p = v.play();
+    if (p) p.catch(() => {});
+    effectTimerRef.current = setTimeout(stopEffect, durationMs);
+  }, [stopEffect]);
+
+  // 제스처 감지 루프가 최신 재생 핸들러를 참조하도록 유지 (루프 재생성 없이)
+  const playEffectRef = useRef<() => void>(() => {});
+  useEffect(() => { playEffectRef.current = playEffect; }, [playEffect]);
+
+  // 배경이 바뀌면 재생 중이던 이펙트를 정리한다. video는 key로 remount되어 재생이 멈추므로
+  // 여기서는 대기 타이머만 정리하고, 표시 상태 리셋은 콜백으로 미룬다(effect 본문 동기 setState 회피).
+  useEffect(() => {
+    if (effectTimerRef.current) { clearTimeout(effectTimerRef.current); effectTimerRef.current = null; }
+    const t = setTimeout(() => setEffectVisible(false), 0);
+    return () => clearTimeout(t);
+  }, [currentBgEffect?.src]);
 
   type TouchGesture =
     | { mode: "drag"; stickerId: string; touchId: number; ox: number; oy: number; startX: number; startY: number; didMove: boolean }
@@ -267,7 +317,10 @@ export function CameraSection({
     const MIN_SCORE = 0.6;
     let lastInfer = 0;
     let palmSince = 0;
-    let armed = true;
+    let palmArmed = true;
+    // V사인(트리거 제스처) → 배경 이펙트 영상. 손바닥과 독립적으로 arming을 관리한다.
+    let triggerSince = 0;
+    let triggerArmed = true;
 
     const tick = () => {
       raf = requestAnimationFrame(tick);
@@ -278,24 +331,42 @@ export function CameraSection({
       if (now - lastInfer < GESTURE_INTERVAL_MS) return;
       lastInfer = now;
 
-      let isPalm = false;
+      let name: string | undefined;
+      let score = 0;
       try {
         const res = recognizer.recognizeForVideo(video, now);
         const g = res.gestures?.[0]?.[0];
-        isPalm = g?.categoryName === "Open_Palm" && g.score >= MIN_SCORE;
+        name = g?.categoryName;
+        score = g?.score ?? 0;
       } catch {
         return;
       }
 
+      const isPalm = name === "Open_Palm" && score >= MIN_SCORE;
+      const isTrigger = name === EFFECT_TRIGGER_GESTURE && score >= MIN_SCORE;
+
+      // 손바닥 → 촬영
       if (isPalm) {
         if (palmSince === 0) palmSince = now;
-        if (armed && now - palmSince >= HOLD_MS) {
-          armed = false;
+        if (palmArmed && now - palmSince >= HOLD_MS) {
+          palmArmed = false;
           handleManualCaptureRef.current();
         }
       } else {
         palmSince = 0;
-        armed = true;
+        palmArmed = true;
+      }
+
+      // V사인 → 배경 이펙트 영상 재생 (한 번 발동 후 손을 내렸다 다시 취해야 재발동)
+      if (isTrigger) {
+        if (triggerSince === 0) triggerSince = now;
+        if (triggerArmed && now - triggerSince >= HOLD_MS) {
+          triggerArmed = false;
+          playEffectRef.current();
+        }
+      } else {
+        triggerSince = 0;
+        triggerArmed = true;
       }
     };
 
@@ -660,6 +731,7 @@ export function CameraSection({
     captureTimersRef.current.forEach((t) => clearInterval(t));
     captureTimersRef.current = [];
     if (capturedPreviewTimerRef.current) clearTimeout(capturedPreviewTimerRef.current);
+    if (effectTimerRef.current) clearTimeout(effectTimerRef.current);
   }, []);
 
   // 촬영 효과음 플레이어 (브라우저 전용 — 마운트 후 생성)
@@ -1083,6 +1155,25 @@ export function CameraSection({
               {/* 스티커 전용 레이어: 메인 합성 루프와 분리되어 60fps로 부드럽게 이동 */}
               <canvas ref={stickerCanvasRef} className="camera-video absolute inset-0 pointer-events-none" />
             </>
+          )}
+          {/* 동작 트리거(V사인) 이펙트 영상 — 스크린 블렌드로 미리보기 위에 재생 */}
+          {currentBgEffect && (
+            <video
+              ref={backEffectRef}
+              key={currentBgEffect.src}
+              src={currentBgEffect.src}
+              className="absolute inset-0 w-full h-full object-cover z-20 pointer-events-none rounded-[17px]"
+              muted
+              playsInline
+              preload="auto"
+              disablePictureInPicture
+              onEnded={stopEffect}
+              style={{
+                mixBlendMode: "screen",
+                opacity: effectVisible ? 1 : 0,
+                transition: "opacity 400ms ease-in-out",
+              }}
+            />
           )}
           {/* 촬영 직후 촬영본 0.5초 프리뷰 (카메라 위에 덮어씀) */}
           {capturedPreview && (
