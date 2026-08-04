@@ -86,6 +86,7 @@ function makeConfig(paymentEnabled: boolean): DeviceConfig {
     paymentTerminalMode: "manual",
     captureSeconds: 3,
     captureCount: 4,
+    cameraResolution: "fhd",
     chromakeyRgb: "0,255,0",
     captureModes: ["1x1", "2x1", "2x2", "2x3", "2x4", "4x1"],
     bgRemovalMode: "mediapipe",

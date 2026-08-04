@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import type { DeviceConfig, BGImage, Sticker } from "@/types";
 import { FALLBACK_BACKGROUNDS } from "@/constants/frames";
 import { EFFECT_TRIGGER_GESTURE, DEFAULT_EFFECT_DURATION } from "@/constants/images";
+import { getCameraResolution } from "@/constants/camera";
 import { fillGradientFromCSS } from "@/lib/canvas";
 import { useFrameSender } from "@/hooks/useSceneSync";
 import { useAutoCaptureTimer } from "@/hooks/useAutoCaptureTimer";
@@ -415,10 +416,12 @@ export function CameraSection({
       stopCamera();
 
       try {
+        // 관리자 설정 해상도(화질)로 촬영. 모든 티어가 4:3이라 슬롯(4:3) 대비 좌우 잘림이 없다.
+        // (프린트 합성 시 슬롯 비율로 center-crop 되므로 원본이 4:3이면 잘림이 사라진다)
+        // ideal이므로 카메라가 미지원하면 가장 가까운 해상도로 대체된다.
+        const res = getCameraResolution(config.cameraResolution);
         const stream = await navigator.mediaDevices.getUserMedia({
-          // 인화 슬롯이 4:3이므로 촬영도 4:3(1440×1080)으로 요청해 좌우 잘림을 없앤다.
-          // (실제로 프린트 합성 시 슬롯 비율로 center-crop 되므로 원본이 4:3이면 잘림이 사라진다)
-          video: { width: { ideal: 1440 }, height: { ideal: 1080 }, aspectRatio: { ideal: 4 / 3 } },
+          video: { width: { ideal: res.width }, height: { ideal: res.height }, aspectRatio: { ideal: 4 / 3 } },
         });
         cameraStreamRef.current = stream;
         if (videoRef.current) videoRef.current.srcObject = stream;
@@ -457,7 +460,7 @@ export function CameraSection({
         return;
       }
     }
-  }, [stopCamera]);
+  }, [stopCamera, config.cameraResolution]);
 
   useEffect(() => {
     let active = true;

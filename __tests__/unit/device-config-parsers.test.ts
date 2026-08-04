@@ -5,6 +5,7 @@ import {
   parseIntSafe,
   clampPercent,
   parsePaymentTerminalMode,
+  parseCameraResolution,
 } from "@/lib/deviceConfig";
 
 /**
@@ -130,5 +131,26 @@ describe("parsePaymentTerminalMode", () => {
     expect(parsePaymentTerminalMode(" manual ")).toBe("manual");
     expect(parsePaymentTerminalMode("Manual")).toBe("manual");
     expect(parsePaymentTerminalMode("  MANUAL")).toBe("manual");
+  });
+});
+
+describe("parseCameraResolution (카메라 화질 티어)", () => {
+  it("유효한 티어 id는 그대로 반환", () => {
+    expect(parseCameraResolution("low")).toBe("low");
+    expect(parseCameraResolution("sd")).toBe("sd");
+    expect(parseCameraResolution("hd")).toBe("hd");
+    expect(parseCameraResolution("fhd")).toBe("fhd");
+    expect(parseCameraResolution("uhd")).toBe("uhd");
+  });
+
+  it("앞뒤 공백은 허용", () => {
+    expect(parseCameraResolution("  uhd ")).toBe("uhd");
+  });
+
+  // 미설정·오타·레거시 값은 기본(FHD)으로 — 예전 하드코딩(1440×1080)과 동일해 화질 변화가 없다.
+  it("빈 문자열·알 수 없는 값은 기본 fhd", () => {
+    expect(parseCameraResolution("")).toBe("fhd");
+    expect(parseCameraResolution("4k")).toBe("fhd");
+    expect(parseCameraResolution("garbage")).toBe("fhd");
   });
 });

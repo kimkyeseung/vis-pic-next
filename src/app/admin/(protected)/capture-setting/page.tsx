@@ -5,6 +5,7 @@ import { HexColorPicker } from "react-colorful";
 import { BackgroundRemovalPreviewDialog } from "@/components/admin/BackgroundRemovalPreviewDialog";
 import { parseIntSafe, clampPercent } from "@/lib/deviceConfig";
 import { useAdminDeviceSettings } from "@/hooks/useAdminDeviceSettings";
+import { CAMERA_RESOLUTIONS } from "@/constants/camera";
 
 /** "R,G,B" 문자열 → "#rrggbb". 파싱 실패 시 기본 그린스크린 색상으로 대체. */
 function rgbStringToHex(rgb: string): string {
@@ -43,6 +44,13 @@ function normalizeSelectValue(name: string, val: string | undefined): string {
 const FIELDS: { name: string; label: string; type?: "text" | "number" | "select" | "color"; options?: { value: string; label: string }[]; min?: number; max?: number; hint?: string; showIf?: (settings: Record<string, string>) => boolean }[] = [
   { name: "CAPTURE_SECONDS", label: "카운트다운 (초)", type: "number" },
   { name: "CAPTURE_COUNT_UNIFORM", label: "슬롯당 촬영 횟수", type: "number", hint: "각 슬롯당 촬영할 장수. 예: 2 → 4컷은 8장 촬영 후 4장 선택." },
+  {
+    name: "CAMERA_RESOLUTION",
+    label: "카메라 화질(해상도)",
+    type: "select",
+    options: CAMERA_RESOLUTIONS.map((r) => ({ value: r.id, label: r.label })),
+    hint: "촬영 카메라 해상도. 높을수록 화질이 좋지만, 실제 적용 해상도는 카메라·기기 성능에 따라 가장 가까운 값으로 조정됩니다. 기본 FHD.",
+  },
   { name: "CHROMAKEY_MODE", label: "배경 제거 모드", type: "select", options: [{ value: "mediapipe", label: "AI 배경 제거 (기본)" }, { value: "chromakey", label: "크로마키 (그린스크린)" }, { value: "off", label: "비활성" }] },
   {
     name: "CHROMAKEY_RGB",

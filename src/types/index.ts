@@ -1,3 +1,5 @@
+import type { CameraResolutionId } from "@/constants/camera";
+
 export type Orientation = "landscape" | "portrait";
 
 export interface Sticker {
@@ -46,6 +48,8 @@ export interface DeviceConfig {
   paymentTerminalMode: PaymentTerminalMode;
   captureSeconds: number;
   captureCount: number;
+  /** 촬영 카메라 해상도(화질) 티어 id. 미설정 시 "fhd". */
+  cameraResolution: CameraResolutionId;
   chromakeyRgb: string;
   captureModes: string[];
   bgRemovalMode: BgRemovalMode;

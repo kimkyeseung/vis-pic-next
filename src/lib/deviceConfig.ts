@@ -1,4 +1,5 @@
 import type { BgRemovalMode, PaymentTerminalMode, PaymentTier } from "@/types";
+import { CAMERA_RESOLUTIONS, DEFAULT_CAMERA_RESOLUTION, type CameraResolutionId } from "@/constants/camera";
 
 /** parseInt 실패(NaN) 시 기본값 반환. 0은 유효한 값으로 처리. */
 export function parseIntSafe(value: string, defaultValue: number): number {
@@ -15,6 +16,12 @@ export function parseBgRemovalMode(modeRaw: string): BgRemovalMode {
 export function parsePaymentTerminalMode(raw: string): PaymentTerminalMode {
   // 공백·대소문자 차이로 운영자가 의도한 수동 모드가 실카드결제로 떨어지는 함정을 방지.
   return raw.trim().toLowerCase() === "manual" ? "manual" : "payapp_lite";
+}
+
+/** 저장된 카메라 해상도 id를 검증. 알 수 없는 값이면 기본(FHD). */
+export function parseCameraResolution(raw: string): CameraResolutionId {
+  const v = raw.trim();
+  return CAMERA_RESOLUTIONS.some((r) => r.id === v) ? (v as CameraResolutionId) : DEFAULT_CAMERA_RESOLUTION;
 }
 
 export function parseCaptureModes(raw: string): string[] {

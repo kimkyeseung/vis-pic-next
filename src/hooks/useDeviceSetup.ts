@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import type { DeviceConfig, BGImage } from "@/types";
-import { parseIntSafe, parseBgRemovalMode, parsePaymentTerminalMode, parseCaptureModes, clampPercent } from "@/lib/deviceConfig";
+import { parseIntSafe, parseBgRemovalMode, parsePaymentTerminalMode, parseCaptureModes, parseCameraResolution, clampPercent } from "@/lib/deviceConfig";
+import { DEFAULT_CAMERA_RESOLUTION } from "@/constants/camera";
 import { LOGO_IMAGE_TYPE } from "@/constants/images";
 
 // 결제 화면 인쇄 매수 선택지(고정). 가격 = 1장당 가격(PAYMENT_AMOUNT) × 수량.
@@ -19,6 +20,7 @@ const DEFAULT_CONFIG: DeviceConfig = {
   paymentTerminalMode: "payapp_lite",
   captureSeconds: 3,
   captureCount: 4,
+  cameraResolution: DEFAULT_CAMERA_RESOLUTION,
   chromakeyRgb: "0,255,0",
   captureModes: ["1x1", "2x2"],
   bgRemovalMode: "mediapipe",
@@ -94,6 +96,7 @@ export function useDeviceSetup(deviceId: string) {
           paymentTerminalMode,
           captureSeconds: parseIntSafe(s.CAPTURE_SECONDS || "", 3),
           captureCount,
+          cameraResolution: parseCameraResolution(s.CAMERA_RESOLUTION || ""),
           chromakeyRgb: s.CHROMAKEY_RGB || "0,255,0",
           captureModes: modes,
           bgRemovalMode,
