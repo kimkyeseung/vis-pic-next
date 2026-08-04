@@ -15,6 +15,8 @@ export default function DeviceEditPage({
   const [device, setDevice] = useState<DeviceWithSettings | null>(null);
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [removePassword, setRemovePassword] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -50,7 +52,12 @@ export default function DeviceEditPage({
       const res = await fetch(`/api/admin/devices/${id}/`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, description }),
+        body: JSON.stringify({
+          name,
+          description,
+          // 비밀번호: 제거 체크 시 null(잠금 해제), 새 값 입력 시 그 값, 둘 다 아니면 미포함(유지).
+          ...(removePassword ? { password: null } : newPassword.length > 0 ? { password: newPassword } : {}),
+        }),
       });
 
       if (!res.ok) {
@@ -123,6 +130,47 @@ export default function DeviceEditPage({
               className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-blue-500"
             />
           </div>
+        </div>
+
+        <div className="p-6 bg-gray-800 rounded-xl space-y-4">
+          <h3 className="text-lg font-semibold text-white border-b border-gray-700 pb-3">
+            실행 비밀번호
+          </h3>
+          <p className="text-sm text-gray-400">
+            설정하면 서비스 실행 시 이 장치를 선택할 때 비밀번호를 입력해야 합니다.
+            비워두면 기존 값이 그대로 유지됩니다.
+          </p>
+          <div className="text-sm">
+            현재 상태:{" "}
+            {device.hasPassword ? (
+              <span className="text-green-400">설정됨 🔒</span>
+            ) : (
+              <span className="text-gray-500">설정 안 됨</span>
+            )}
+          </div>
+          <div>
+            <label className="block text-gray-300 mb-2">새 비밀번호</label>
+            <input
+              type="password"
+              value={newPassword}
+              onChange={(e) => setNewPassword(e.target.value)}
+              disabled={removePassword}
+              autoComplete="new-password"
+              placeholder="변경하지 않으려면 비워두세요"
+              className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-blue-500 disabled:opacity-50"
+            />
+          </div>
+          {device.hasPassword && (
+            <label className="flex items-center gap-2 cursor-pointer text-gray-300">
+              <input
+                type="checkbox"
+                checked={removePassword}
+                onChange={(e) => setRemovePassword(e.target.checked)}
+                className="h-4 w-4 accent-blue-500"
+              />
+              <span>비밀번호 제거(잠금 해제)</span>
+            </label>
+          )}
         </div>
 
         <div className="p-6 bg-gray-800 rounded-xl">

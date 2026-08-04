@@ -7,6 +7,7 @@ import Link from "next/link";
 interface DeviceOption {
   deviceId: string;
   name: string;
+  hasPassword?: boolean;
 }
 
 export default function Home() {
@@ -14,10 +15,20 @@ export default function Home() {
   const [showDeviceInput, setShowDeviceInput] = useState(false);
   const [devices, setDevices] = useState<DeviceOption[]>([]);
   const [deviceId, setDeviceId] = useState("");
+  const [password, setPassword] = useState("");
+  const [needPassword, setNeedPassword] = useState(false);
+  const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+
+  const resetGate = () => {
+    setPassword("");
+    setNeedPassword(false);
+    setError("");
+  };
 
   const openDevicePicker = () => {
     setShowDeviceInput(true);
+    resetGate();
     const saved = localStorage.getItem("last_device_id");
     if (saved) setDeviceId(saved);
 
@@ -28,11 +39,48 @@ export default function Home() {
       .catch(() => {});
   };
 
-  const handleStart = () => {
-    if (!deviceId.trim()) return;
-    localStorage.setItem("last_device_id", deviceId.trim());
+  const closeDevicePicker = () => {
+    setShowDeviceInput(false);
+    resetGate();
+  };
+
+  // 목록에서 장치를 고르면 잠금 여부에 따라 비밀번호 입력칸을 미리 노출한다.
+  const selectDevice = (dev: DeviceOption) => {
+    setDeviceId(dev.deviceId);
+    setPassword("");
+    setError("");
+    setNeedPassword(!!dev.hasPassword);
+  };
+
+  const handleStart = async () => {
+    const id = deviceId.trim();
+    if (!id) return;
     setLoading(true);
-    router.push(`/service?device=${encodeURIComponent(deviceId.trim())}`);
+    setError("");
+    try {
+      // 실행 잠금 검증 — 비밀번호 미설정 장치는 그대로 통과, 설정된 장치는 일치해야 진입.
+      const res = await fetch(`/api/devices/${encodeURIComponent(id)}/verify/`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (data.ok) {
+        localStorage.setItem("last_device_id", id);
+        router.push(`/service?device=${encodeURIComponent(id)}`);
+        return;
+      }
+      if (data.required) {
+        setNeedPassword(true);
+        setError(password ? "비밀번호가 올바르지 않습니다." : "이 장치는 비밀번호가 필요합니다.");
+      } else {
+        setError("장치를 찾을 수 없거나 비활성 상태입니다.");
+      }
+    } catch {
+      setError("서버 연결에 실패했습니다.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -99,7 +147,7 @@ export default function Home() {
       {showDeviceInput && (
         <div
           className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50"
-          onClick={() => setShowDeviceInput(false)}
+          onClick={closeDevicePicker}
         >
           <div
             className="bg-gray-800 rounded-2xl p-8 w-full max-w-md border border-gray-700 shadow-2xl"
@@ -114,14 +162,17 @@ export default function Home() {
                   {devices.map((dev) => (
                     <button
                       key={dev.deviceId}
-                      onClick={() => setDeviceId(dev.deviceId)}
+                      onClick={() => selectDevice(dev)}
                       className={`text-left px-4 py-3 rounded-lg transition-colors ${
                         deviceId === dev.deviceId
                           ? "bg-blue-600 text-white"
                           : "bg-gray-700 text-gray-300 hover:bg-gray-600"
                       }`}
                     >
-                      <div className="font-semibold">{dev.name}</div>
+                      <div className="font-semibold flex items-center gap-2">
+                        {dev.name}
+                        {dev.hasPassword && <span title="비밀번호 필요">🔒</span>}
+                      </div>
                       <div className="text-sm opacity-70">{dev.deviceId}</div>
                     </button>
                   ))}
@@ -129,14 +180,14 @@ export default function Home() {
               </div>
             )}
 
-            <div className="mb-6">
+            <div className="mb-4">
               <label className="block text-gray-400 text-sm mb-2">
                 {devices.length > 0 ? "또는 직접 입력" : "장치 ID"}
               </label>
               <input
                 type="text"
                 value={deviceId}
-                onChange={(e) => setDeviceId(e.target.value)}
+                onChange={(e) => { setDeviceId(e.target.value); setError(""); }}
                 onKeyDown={(e) => e.key === "Enter" && handleStart()}
                 placeholder="장치 ID를 입력하세요"
                 className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-blue-500"
@@ -144,9 +195,29 @@ export default function Home() {
               />
             </div>
 
+            {needPassword && (
+              <div className="mb-4">
+                <label className="block text-gray-400 text-sm mb-2">비밀번호</label>
+                <input
+                  type="password"
+                  value={password}
+                  onChange={(e) => { setPassword(e.target.value); setError(""); }}
+                  onKeyDown={(e) => e.key === "Enter" && handleStart()}
+                  placeholder="장치 비밀번호를 입력하세요"
+                  autoComplete="off"
+                  className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-blue-500"
+                  autoFocus
+                />
+              </div>
+            )}
+
+            {error && (
+              <p className="mb-4 text-sm text-red-400">{error}</p>
+            )}
+
             <div className="flex gap-3">
               <button
-                onClick={() => setShowDeviceInput(false)}
+                onClick={closeDevicePicker}
                 className="flex-1 py-3 bg-gray-700 text-gray-300 rounded-lg font-semibold hover:bg-gray-600 transition-colors"
               >
                 취소
@@ -156,7 +227,7 @@ export default function Home() {
                 disabled={!deviceId.trim() || loading}
                 className="flex-1 py-3 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition-colors disabled:opacity-50"
               >
-                {loading ? "이동 중..." : "시작"}
+                {loading ? "확인 중..." : "시작"}
               </button>
             </div>
           </div>

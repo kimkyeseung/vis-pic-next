@@ -7,10 +7,12 @@ export async function GET() {
   try {
     const devices = await prisma.device.findMany({
       where: { isActive: true },
-      select: { deviceId: true, name: true },
+      // password 자체는 내보내지 않고, 잠금 여부만 hasPassword로 노출한다(선택 화면이 비밀번호 입력을 띄울지 판단용).
+      select: { deviceId: true, name: true, password: true },
       orderBy: { name: "asc" },
     });
-    return NextResponse.json({ devices });
+    const safe = devices.map((d) => ({ deviceId: d.deviceId, name: d.name, hasPassword: !!d.password }));
+    return NextResponse.json({ devices: safe });
   } catch (error) {
     console.error("Error fetching devices:", error);
     return NextResponse.json(

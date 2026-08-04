@@ -99,6 +99,8 @@ export interface Device {
   name: string;
   description: string | null;
   isActive: boolean;
+  /** 이 장치에 실행 비밀번호가 설정돼 있는지 여부. 해시 자체는 클라이언트로 내려보내지 않는다. */
+  hasPassword?: boolean;
   createdAt: string;
 }
 

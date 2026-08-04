@@ -128,7 +128,12 @@ export default function DevicesPage() {
                       {device.deviceId}
                     </code>
                   </td>
-                  <td className="px-6 py-4 text-white">{device.name}</td>
+                  <td className="px-6 py-4 text-white">
+                    <span className="inline-flex items-center gap-2">
+                      {device.name}
+                      {device.hasPassword && <span title="실행 비밀번호 설정됨">🔒</span>}
+                    </span>
+                  </td>
                   <td className="px-6 py-4 text-gray-400">
                     {device.description || "-"}
                   </td>

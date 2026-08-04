@@ -11,7 +11,10 @@ export async function GET() {
       orderBy: { createdAt: "desc" },
     });
 
-    return NextResponse.json({ devices });
+    // 비밀번호 해시는 절대 클라이언트로 내보내지 않고, 설정 여부만 hasPassword로 노출한다.
+    // (password: undefined는 JSON 직렬화 시 제외된다)
+    const safe = devices.map((d) => ({ ...d, password: undefined, hasPassword: !!d.password }));
+    return NextResponse.json({ devices: safe });
   } catch (error) {
     console.error("Error fetching devices:", error);
     return NextResponse.json(

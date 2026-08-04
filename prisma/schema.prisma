@@ -158,6 +158,8 @@ model Device {
   name        String          @db.VarChar(128)
   description String?         @db.VarChar(255)
   isActive    Boolean         @default(true) @map("is_active")
+  /// 실행 시 이 장치를 선택하려면 맞춰야 하는 비밀번호(bcrypt 해시). null/빈값이면 잠금 없음.
+  password    String?         @db.VarChar(255)
   createdAt   DateTime        @default(now()) @map("created_at") @db.Timestamp(6)
   settings    DeviceSetting[]
   payments    PayappPayment[]
