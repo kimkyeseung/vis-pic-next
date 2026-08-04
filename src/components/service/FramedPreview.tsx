@@ -31,6 +31,8 @@ export function FramedPreview({
   selectedPrintBg,
   printBgImages,
   scale = DEFAULT_PREVIEW_SCALE,
+  activeSlot,
+  onSlotClick,
 }: {
   selectedFrame: string | null;
   photos: string[];
@@ -43,6 +45,10 @@ export function FramedPreview({
   printBgImages?: BGImage[];
   /** 미리보기 축척(px/cm). 미지정 시 기본값 12. */
   scale?: number;
+  /** 현재 active(선택) 슬롯 인덱스. 지정 시 해당 슬롯을 강조 표시한다. */
+  activeSlot?: number;
+  /** 슬롯 클릭 핸들러. 지정 시 슬롯이 클릭 가능해지고 사진 배치 대상 슬롯을 고를 수 있다. */
+  onSlotClick?: (slotIndex: number) => void;
 }) {
   const frame = selectedFrame ? FRAME_INFO[selectedFrame] : null;
   if (!frame) return null;
@@ -109,11 +115,14 @@ export function FramedPreview({
       )}
       {slots.map((s, i) => {
         const photoIdx = selectedPhotos[i];
-        const photo = photoIdx !== undefined ? photos[photoIdx] : null;
+        const photo = photoIdx !== undefined && photoIdx >= 0 ? photos[photoIdx] : null;
+        const interactive = !!onSlotClick;
+        const isActive = activeSlot === i;
         return (
           <div
             key={i}
-            className="absolute overflow-hidden flex items-center justify-center bg-white/10"
+            onClick={onSlotClick ? () => onSlotClick(i) : undefined}
+            className={`absolute overflow-hidden flex items-center justify-center bg-white/10 ${interactive ? "cursor-pointer" : ""}`}
             style={{
               left: `${(s.x / pw) * 100}%`,
               top: `${(s.y / ph) * 100}%`,
@@ -121,9 +130,21 @@ export function FramedPreview({
               height: `${(s.h / ph) * 100}%`,
               borderRadius: FRAME_CORNER_RADIUS_CM * scale,
               border: `${FRAME_BORDER_CM * scale}px solid ${FRAME_BORDER_COLOR}`,
+              // active 슬롯은 안쪽 링으로 강조 (부모 overflow-hidden에 잘리지 않도록 inset)
+              boxShadow: isActive ? `inset 0 0 0 ${Math.max(2, Math.round(scale * 0.18))}px var(--theme-primary, #6c6fb4)` : undefined,
             }}
           >
-            {photo && <img src={photo} alt={`slot-${i}`} className="w-full h-full object-cover" />}
+            {photo ? (
+              <img src={photo} alt={`slot-${i}`} className="w-full h-full object-cover" />
+            ) : interactive ? (
+              // 빈 슬롯: 순번을 보여줘 어떤 순서로 채워지는지 알 수 있게 한다.
+              <span
+                className="font-bold select-none"
+                style={{ color: isActive ? "var(--theme-primary, #6c6fb4)" : "rgba(255,255,255,0.5)", fontSize: Math.max(12, scale * 0.9) }}
+              >
+                {i + 1}
+              </span>
+            ) : null}
           </div>
         );
       })}

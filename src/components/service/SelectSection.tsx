@@ -4,6 +4,7 @@ import { useLanguage } from "@/i18n/LanguageContext";
 import { FramedPreview } from "./FramedPreview";
 import { ServiceNav } from "./ServiceNav";
 import { SERVICE_SECTION_CLASS } from "./sectionLayout";
+import { normalizeSlots, firstEmptySlot, tapPhoto } from "@/lib/slotSelection";
 
 // 한 페이지에 보여줄 촬영본 수 (2×2). 이보다 많으면 좌우 화살표로 페이지 전환.
 const PAGE_SIZE = 4;
@@ -36,17 +37,26 @@ export function SelectSection({
   onPrev: () => void;
 }) {
   const { t } = useLanguage();
-  const togglePhoto = (index: number) => {
-    setSelectedPhotos(
-      selectedPhotos.includes(index)
-        ? selectedPhotos.filter((i) => i !== index)
-        : selectedPhotos.length < requiredCount
-          ? [...selectedPhotos, index]
-          : selectedPhotos
-    );
-  };
 
-  const canProceed = selectedPhotos.length === requiredCount;
+  // 슬롯-인덱스 표현: 길이 requiredCount, 각 칸은 사진 index 또는 -1(빈칸).
+  // (다운스트림 FramedPreview·CompleteSection도 슬롯 i ← selectedPhotos[i]로 읽는다)
+  const slots = normalizeSlots(selectedPhotos, requiredCount);
+
+  // 사진 index → 배치된 슬롯 index (한 사진은 한 슬롯만)
+  const photoToSlot = new Map<number, number>();
+  slots.forEach((p, s) => { if (p >= 0) photoToSlot.set(p, s); });
+
+  // 아무 슬롯도 안 고르면 첫 빈 슬롯이 active로 시작하고, 사진을 넣을 때마다 다음 순번으로 이동한다.
+  const [activeSlot, setActiveSlot] = useState(() => firstEmptySlot(slots));
+
+  const filledCount = slots.filter((v) => v >= 0).length;
+  const canProceed = filledCount === requiredCount;
+
+  const handlePhotoTap = (photoIndex: number) => {
+    const result = tapPhoto(slots, activeSlot, photoIndex);
+    setSelectedPhotos(result.slots);
+    setActiveSlot(result.activeSlot);
+  };
 
   const [page, setPage] = useState(0);
   const pageCount = Math.max(1, Math.ceil(photos.length / PAGE_SIZE));
@@ -60,7 +70,7 @@ export function SelectSection({
         {t("select.title")}
       </h2>
       <p className="text-gray-400 text-xl animate-fadeInDown">
-        {t("select.count", { req: requiredCount, sel: selectedPhotos.length })}
+        {t("select.count", { req: requiredCount, sel: filledCount })}
       </p>
 
       <div className="min-h-0 w-full flex items-center justify-center">
@@ -82,14 +92,25 @@ export function SelectSection({
             <div className="grid grid-cols-2 gap-6 portrait:gap-4">
               {pagePhotos.map((photo, li) => {
                 const i = pageStart + li;
+                const slotOf = photoToSlot.get(i);
+                const isSelected = slotOf !== undefined;
                 return (
                   <div
                     key={i}
-                    className={`photo-thumbnail w-80 portrait:w-56 bg-black/30 relative overflow-hidden ${selectedPhotos.includes(i) ? "selected" : ""}`}
+                    className={`photo-thumbnail w-80 portrait:w-56 bg-black/30 relative overflow-hidden ${isSelected ? "selected" : ""}`}
                     style={{ aspectRatio: "auto" }}
-                    onClick={() => togglePhoto(i)}
+                    onClick={() => handlePhotoTap(i)}
                   >
-                    {selectedPhotos.includes(i) && <span className="check-mark">&#10003;</span>}
+                    {isSelected && (
+                      // 배치된 슬롯 번호를 배지로 보여준다.
+                      <span
+                        className="absolute top-2 left-2 z-10 w-8 h-8 rounded-full flex items-center justify-center text-white font-bold text-lg shadow"
+                        style={{ background: "var(--theme-primary, #6c6fb4)" }}
+                      >
+                        {slotOf! + 1}
+                      </span>
+                    )}
+                    {isSelected && <span className="check-mark">&#10003;</span>}
                     <img src={photo} alt={`Photo ${i + 1}`} className="w-full h-auto block" />
                   </div>
                 );
@@ -132,6 +153,8 @@ export function SelectSection({
             backgroundImages={backgroundImages}
             printBgImages={printBgImages}
             scale={24}
+            activeSlot={activeSlot}
+            onSlotClick={setActiveSlot}
           />
         )}
       </div>

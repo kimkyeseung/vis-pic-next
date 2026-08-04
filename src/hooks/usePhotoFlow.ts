@@ -179,7 +179,12 @@ export function usePhotoFlow(deviceId: string, config: DeviceConfig, hasPrintBgI
   };
 
   const handleSelectNext = async (hasPrintBgImages = false) => {
-    const selected = selectedPhotos.length === slotsNeeded
+    // selectedPhotos는 슬롯 인덱스 배열(빈칸은 -1). 모든 슬롯이 유효하게 채워졌을 때만 그대로 쓰고,
+    // (idle 자동 진행 등으로) 미완성이면 예전과 동일하게 앞에서부터 슬롯 수만큼 자동 채운다.
+    const complete =
+      selectedPhotos.length === slotsNeeded &&
+      selectedPhotos.every((v) => typeof v === "number" && v >= 0);
+    const selected = complete
       ? selectedPhotos
       : photos.map((_, i) => i).slice(0, slotsNeeded);
     setSelectedPhotos(selected);
