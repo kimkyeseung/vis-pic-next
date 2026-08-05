@@ -259,6 +259,21 @@ export function CompleteSection({
     canvas.height = canvasHeight;
     const ctx = canvas.getContext("2d")!;
 
+    // 프레임(인쇄 배경) 디자인은 가로(landscape) 기준으로 제작되므로, 세로 용지 모드
+    // (2컷 등 orientation="portrait")에서는 90° 회전해 용지 방향에 맞춘다. 슬롯 좌표는
+    // 이미 용지 방향 기준으로 계산되므로 프레임 이미지만 회전한다(FramedPreview와 동일 규칙).
+    const drawFrameCover = (img: HTMLImageElement, focalX = 0.5, focalY = 0.5) => {
+      if (frame.orientation === "portrait") {
+        ctx.save();
+        ctx.translate(canvasWidth / 2, canvasHeight / 2);
+        ctx.rotate(Math.PI / 2);
+        drawImageCover(ctx, img, -canvasHeight / 2, -canvasWidth / 2, canvasHeight, canvasWidth, focalX, focalY);
+        ctx.restore();
+      } else {
+        drawImageCover(ctx, img, 0, 0, canvasWidth, canvasHeight, focalX, focalY);
+      }
+    };
+
     // Background priority: user-selected print bg > PRINT_BACKGROUND setting > user AR bg > fallback gradient
     let bgDrawn = false;
 
@@ -269,7 +284,7 @@ export function CompleteSection({
     if (printBgInfo) {
       try {
         const bgImg = await loadImage(`${imageBaseUrl}/${printBgInfo.filename}`);
-        drawImageCover(ctx, bgImg, 0, 0, canvasWidth, canvasHeight, printBgInfo.focalX ?? 0.5, printBgInfo.focalY ?? 0.5);
+        drawFrameCover(bgImg, printBgInfo.focalX ?? 0.5, printBgInfo.focalY ?? 0.5);
         bgDrawn = true;
       } catch {
         // fall through
@@ -280,7 +295,7 @@ export function CompleteSection({
     if (!bgDrawn && printSettings.PRINT_BACKGROUND) {
       try {
         const bgImg = await loadImage(resolveImageSrc(printSettings.PRINT_BACKGROUND, imageBaseUrl));
-        drawImageCover(ctx, bgImg, 0, 0, canvasWidth, canvasHeight);
+        drawFrameCover(bgImg);
         bgDrawn = true;
       } catch {
         // fall through
