@@ -20,6 +20,8 @@ import { CameraStreamer } from "@/components/service/CameraStreamer";
 import { SelectSection } from "@/components/service/SelectSection";
 import { PrintBgSection } from "@/components/service/PrintBgSection";
 import { CompleteSection } from "@/components/service/CompleteSection";
+import { DebugProvider, useDebug, useSecretTap } from "@/components/service/DebugContext";
+import { DebugOverlay } from "@/components/service/DebugOverlay";
 
 function ServiceContent() {
   const searchParams = useSearchParams();
@@ -44,8 +46,9 @@ function ServiceContent() {
   useEffect(() => {
     if (flow.currentStep !== "complete" || config.printAutoTimerSeconds <= 0) {
       if (printTimerRef.current) { clearInterval(printTimerRef.current); printTimerRef.current = null; }
-      setPrintRemaining(null);
-      return;
+      // 타이머 표시 초기화는 콜백으로 미룬다(effect 본문 동기 setState 회피).
+      const t = setTimeout(() => setPrintRemaining(null), 0);
+      return () => clearTimeout(t);
     }
     const deadline = Date.now() + config.printAutoTimerSeconds * 1000;
     const init = setTimeout(() => setPrintRemaining(config.printAutoTimerSeconds), 0);
@@ -67,6 +70,8 @@ function ServiceContent() {
 
   const { currentStep, slotsNeeded, selectedBackground, setSelectedBackground, selectedPrintBg, setSelectedPrintBg } = flow;
   const { setLang, t } = useLanguage();
+  const { debug, toggle: toggleDebug } = useDebug();
+  const handleLogoSecretTap = useSecretTap(toggleDebug);
 
   // 대기 화면으로 돌아오면 다음 손님을 위해 언어를 한국어로 초기화
   useEffect(() => {
@@ -119,6 +124,30 @@ function ServiceContent() {
   const maxCaptures = slotsNeeded * config.captureCount;
   const showTimer = currentStep !== "start" && currentStep !== "camera" && currentStep !== "payment" && currentStep !== "complete" && idleRemaining !== null && config.idleTimeoutSeconds > 0;
 
+  // 디버그 오버레이에 표시할 진단값(비민감). 필요 시 항목을 추가/제거하면 된다.
+  const debugData: Record<string, unknown> = {
+    deviceId,
+    device: config.deviceName,
+    step: currentStep,
+    frame: flow.selectedFrame,
+    slots: slotsNeeded,
+    "photos": `${flow.photos.length}/${maxCaptures}`,
+    selectedPhotos: flow.selectedPhotos,
+    background: selectedBackground,
+    printBg: selectedPrintBg,
+    bgRemoval: config.bgRemovalMode,
+    cameraRes: config.cameraResolution,
+    "capture(s/n)": `${config.captureSeconds}s x${config.captureCount}`,
+    "seg(th/feather)": `${config.segmentThreshold}/${config.segmentFeather}`,
+    chromakey: config.chromakeyRgb,
+    payment: config.paymentEnabled ? `on ₩${config.paymentAmount}` : "off",
+    sync: `${syncEnabled} (mon ${selectedMonitorIndex ?? "-"}/${monitors.length})`,
+    bgImages: backgroundImages.length,
+    printBgImages: printBgImages.length,
+    idleRemaining,
+    build: process.env.NEXT_PUBLIC_BUILD_DATE,
+  };
+
   // 테마관리에서 설정한 배경화면/글자색을 서비스 화면 전체에 적용 (어드민 화면에는 미적용).
   // 글자색은 --theme-text 변수로 내려 globals.css의 .service-theme 규칙이 본문 흰 텍스트를 치환한다.
   // 배경화면 이미지는 첫 화면(start)에만 깔고, 나머지 단계는 관리자가 지정한 배경 단색을 사용한다.
@@ -142,7 +171,7 @@ function ServiceContent() {
   } as React.CSSProperties;
 
   return (
-    <div className="service-theme w-full h-screen overflow-hidden relative" style={themeStyle}>
+    <div className={`service-theme w-full h-screen overflow-hidden relative ${debug ? "debug-grid" : ""}`} style={themeStyle}>
       {showTimer && (
         <CircularTimer value={idleRemaining!} total={config.idleTimeoutSeconds} testId="page-idle-timer" />
       )}
@@ -158,7 +187,12 @@ function ServiceContent() {
       <FloatingElements />
       {/* 좌측 상단 로고 — 첫(대기) 화면을 제외한 단계에 표시. 업로드한 로고 없으면 기본 AR-pic. */}
       {currentStep !== "start" && (
-        <div className="absolute top-12 left-16 portrait:top-8 portrait:left-10 z-20 pointer-events-none select-none">
+        // 로고 5회 연속 탭(2초 내) → 디버그 모드 토글 (손님에겐 티 안 나는 운영자용).
+        <div
+          className="absolute top-12 left-16 portrait:top-8 portrait:left-10 z-20 select-none"
+          style={{ cursor: "default" }}
+          onClick={handleLogoSecretTap}
+        >
           {logoUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
@@ -320,6 +354,8 @@ function ServiceContent() {
           onRestart={flow.resetAll}
         />
       )}
+
+      <DebugOverlay data={debugData} />
     </div>
   );
 }
@@ -328,7 +364,9 @@ export default function ServicePage() {
   return (
     <Suspense fallback={<div className="w-full h-screen bg-[#2a2a2a]" />}>
       <LanguageProvider>
-        <ServiceContent />
+        <DebugProvider>
+          <ServiceContent />
+        </DebugProvider>
       </LanguageProvider>
     </Suspense>
   );
