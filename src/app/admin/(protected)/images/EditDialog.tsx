@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import {
   BACKGROUND_IMAGE_TYPE,
+  FRAME_IMAGE_TYPE,
   DEFAULT_EFFECT_DURATION,
   EFFECT_DURATION_RANGE,
   EFFECT_VIDEO_EXTENSIONS,
@@ -17,6 +18,8 @@ interface Image {
   imageType: number;
   effectFilename?: string | null;
   effectDuration?: number | null;
+  focalX?: number;
+  focalY?: number;
 }
 
 interface DeviceOption {
@@ -49,6 +52,26 @@ export default function EditDialog({
     image.deviceIds ?? []
   );
   const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+
+  // ── 프레임(인쇄 배경) 전용: 포컬(인화지 배치 기준점) ──
+  const isFrame = image.imageType === FRAME_IMAGE_TYPE;
+  const [focalX, setFocalX] = useState(typeof image.focalX === "number" ? image.focalX : 0.5);
+  const [focalY, setFocalY] = useState(typeof image.focalY === "number" ? image.focalY : 0.5);
+
+  const handleDelete = async () => {
+    if (!confirm("이 이미지를 삭제하시겠습니까? 되돌릴 수 없습니다.")) return;
+    setDeleting(true);
+    try {
+      const res = await fetch(`/api/admin/images/${image.id}/`, { method: "DELETE" });
+      if (!res.ok) throw new Error("delete failed");
+      onSaved(); // 목록 새로고침 + 닫힘
+    } catch (error) {
+      console.error("Failed to delete image:", error);
+      alert("삭제에 실패했습니다.");
+      setDeleting(false);
+    }
+  };
 
   // ── 배경 이펙트 영상(동작 트리거 시 재생) ──
   const isBackground = image.imageType === BACKGROUND_IMAGE_TYPE;
@@ -124,6 +147,8 @@ export default function EditDialog({
           deviceIds: selectedDeviceIds,
           // 배경 이펙트 최대 재생 시간(초). 배경일 때만 전송.
           ...(isBackground ? { effectDuration: parseInt(effectDuration) || DEFAULT_EFFECT_DURATION } : {}),
+          // 프레임 포컬(인화지 배치 기준점). 프레임일 때만 전송.
+          ...(isFrame ? { focalX, focalY } : {}),
         }),
       });
       if (!res.ok) throw new Error("update failed");
@@ -251,6 +276,46 @@ export default function EditDialog({
             </p>
           </div>
 
+          {/* 프레임(인쇄 배경) 전용: 인화지에 꽉 차게 잘릴 때의 기준점(포컬) */}
+          {isFrame && (
+            <div className="space-y-3 rounded-lg border border-gray-700 bg-gray-900/40 p-4">
+              <label className="block font-medium text-gray-200">인화지 배치 위치(포컬)</label>
+              <p className="text-sm text-gray-500">
+                이미지가 인화지 비율에 맞게 꽉 차게 잘릴 때의 기준점입니다.
+              </p>
+              <div className="h-28 w-full overflow-hidden rounded bg-gray-700">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={`${imageBaseUrl}/${image.filename}`}
+                  alt="focal preview"
+                  className="h-full w-full object-cover"
+                  style={{ objectPosition: `${focalX * 100}% ${focalY * 100}%` }}
+                />
+              </div>
+              <div className="flex items-center gap-3">
+                <span className="w-16 shrink-0 text-xs text-gray-500">가로 위치</span>
+                <input
+                  type="range" min={0} max={100} step={1}
+                  value={Math.round(focalX * 100)}
+                  onChange={(e) => setFocalX(parseInt(e.target.value) / 100)}
+                  className="flex-1 accent-blue-500"
+                />
+                <span className="w-9 text-right text-xs text-gray-400">{Math.round(focalX * 100)}%</span>
+              </div>
+              <div className="flex items-center gap-3">
+                <span className="w-16 shrink-0 text-xs text-gray-500">세로 위치</span>
+                <input
+                  type="range" min={0} max={100} step={1}
+                  value={Math.round(focalY * 100)}
+                  onChange={(e) => setFocalY(parseInt(e.target.value) / 100)}
+                  className="flex-1 accent-blue-500"
+                />
+                <span className="w-9 text-right text-xs text-gray-400">{Math.round(focalY * 100)}%</span>
+              </div>
+              <p className="text-xs text-gray-500">저장 시 반영됩니다.</p>
+            </div>
+          )}
+
           {/* 배경 전용: 동작(V사인) 트리거 시 촬영 화면에 재생되는 이펙트 영상 */}
           {isBackground && (
             <div className="rounded-lg border border-gray-700 bg-gray-900/40 p-4">
@@ -317,21 +382,34 @@ export default function EditDialog({
           )}
         </div>
 
-        <div className="flex justify-end gap-2 border-t border-gray-700 p-4">
-          <button
-            onClick={onClose}
-            disabled={saving}
-            className="rounded-lg bg-gray-700 px-4 py-2 text-gray-200 hover:bg-gray-600 disabled:opacity-50"
-          >
-            취소
-          </button>
-          <button
-            onClick={handleSave}
-            disabled={saving}
-            className="rounded-lg bg-blue-600 px-4 py-2 text-white hover:bg-blue-500 disabled:opacity-50"
-          >
-            {saving ? "저장중…" : "저장"}
-          </button>
+        <div className="flex items-center justify-between gap-2 border-t border-gray-700 p-4">
+          <div>
+            {isFrame && (
+              <button
+                onClick={handleDelete}
+                disabled={saving || deleting}
+                className="rounded-lg bg-red-700/80 px-4 py-2 text-white hover:bg-red-600 disabled:opacity-50"
+              >
+                {deleting ? "삭제중…" : "이미지 삭제"}
+              </button>
+            )}
+          </div>
+          <div className="flex gap-2">
+            <button
+              onClick={onClose}
+              disabled={saving || deleting}
+              className="rounded-lg bg-gray-700 px-4 py-2 text-gray-200 hover:bg-gray-600 disabled:opacity-50"
+            >
+              취소
+            </button>
+            <button
+              onClick={handleSave}
+              disabled={saving || deleting}
+              className="rounded-lg bg-blue-600 px-4 py-2 text-white hover:bg-blue-500 disabled:opacity-50"
+            >
+              {saving ? "저장중…" : "저장"}
+            </button>
+          </div>
         </div>
       </div>
     </div>

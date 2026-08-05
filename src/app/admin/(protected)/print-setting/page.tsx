@@ -51,10 +51,9 @@ export default function PrintSettingPage() {
   const [printerName, setPrinterName] = useState("");
   const [printerList, setPrinterList] = useState<string[]>([]);
 
-  // 프레임(인쇄 배경) 이미지 (imageType=2) — 구 print_background(4)와 통합됨
+  // 프레임(인쇄 배경) 이미지 (imageType=2) — 미리보기 표시에만 사용.
+  // 업로드/삭제/포컬 등 관리는 [이미지 관리 → 프레임] 탭으로 일원화되었다.
   const [printBgImages, setPrintBgImages] = useState<PrintBgImage[]>([]);
-  const [bgUploading, setBgUploading] = useState(false);
-  const [bgUploadError, setBgUploadError] = useState("");
 
   const loadImageBaseUrl = async () => {
     try {
@@ -80,18 +79,6 @@ export default function PrintSettingPage() {
       setPrintBgImages(imgs);
     } catch {
       // ignore
-    }
-  };
-
-  const saveFocal = async (id: number, focalX: number, focalY: number) => {
-    try {
-      await fetch(`/api/admin/images/${id}/`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ focalX, focalY }),
-      });
-    } catch {
-      // silent
     }
   };
 
@@ -239,69 +226,6 @@ export default function PrintSettingPage() {
         delete updated[mode];
         return updated;
       });
-    }
-  };
-
-  const handleBgUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    e.target.value = "";
-    if (!file) return;
-
-    setBgUploading(true);
-    setBgUploadError("");
-
-    try {
-      // Try presigned upload first (Vercel / large files)
-      const presignRes = await fetch("/api/admin/images/presign/", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ filename: file.name, contentType: file.type }),
-      });
-
-      if (presignRes.ok) {
-        const { signedUrl, filename: storedFilename } = await presignRes.json();
-        await fetch(signedUrl, { method: "PUT", body: file, headers: { "Content-Type": file.type } });
-        const regRes = await fetch("/api/admin/images/register/", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ filename: storedFilename, name: file.name, imageType: 2, priority: 0 }),
-        });
-        if (regRes.ok) {
-          await loadPrintBgImages();
-          return;
-        }
-      }
-
-      // Fallback: direct upload
-      const formData = new FormData();
-      formData.append("file", file);
-      formData.append("name", file.name);
-      formData.append("imageType", "2");
-      formData.append("priority", "0");
-      const uploadRes = await fetch("/api/admin/images/upload/", { method: "POST", body: formData });
-      if (uploadRes.ok) {
-        await loadPrintBgImages();
-      } else {
-        setBgUploadError("업로드에 실패했습니다.");
-      }
-    } catch {
-      setBgUploadError("업로드 중 오류가 발생했습니다.");
-    } finally {
-      setBgUploading(false);
-    }
-  };
-
-  const handleBgDelete = async (id: number) => {
-    if (!confirm("이 배경 이미지를 삭제하시겠습니까?")) return;
-    try {
-      const res = await fetch(`/api/admin/images/${id}/`, { method: "DELETE" });
-      if (res.ok) {
-        setPrintBgImages((prev) => prev.filter((img) => img.id !== id));
-      } else {
-        alert("삭제에 실패했습니다.");
-      }
-    } catch {
-      alert("삭제 중 오류가 발생했습니다.");
     }
   };
 
@@ -744,97 +668,19 @@ export default function PrintSettingPage() {
             })()}
           </div>
 
-          {/* Print Background Images */}
+          {/* Print Background Images — 관리는 이미지 탭으로 일원화 */}
           <div className="p-6 bg-gray-800 rounded-xl border border-gray-700">
-            <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+            <h3 className="text-lg font-semibold text-white mb-2 flex items-center gap-2">
               <span className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center text-sm">3</span>
-              인쇄 배경 이미지
+              인쇄 배경(프레임) 이미지
             </h3>
-            <p className="text-gray-500 text-xs mb-4">
-              사용자가 인화 직전에 선택할 배경 이미지 목록입니다. 여러 장 등록 가능하며, 이미지가 없으면 선택 단계를 건너뜁니다.
+            <p className="text-gray-400 text-sm">
+              프레임 이미지 추가·삭제·배치 위치(포컬)·지점별 노출은{" "}
+              <span className="text-blue-400 font-medium">이미지 관리 → 프레임</span> 탭에서 관리합니다.
+              {printBgImages.length > 0
+                ? ` (현재 ${printBgImages.length}장 등록됨 — 아래 미리보기에 첫 이미지가 표시됩니다)`
+                : " 등록된 이미지가 없으면 인화 직전 선택 단계를 건너뜁니다."}
             </p>
-
-            {/* Upload button */}
-            <label className={`inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm rounded-lg cursor-pointer hover:bg-blue-700 transition-colors mb-4 ${bgUploading ? "opacity-50 pointer-events-none" : ""}`}>
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-              </svg>
-              {bgUploading ? "업로드 중..." : "이미지 추가"}
-              <input
-                type="file"
-                accept="image/*"
-                onChange={handleBgUpload}
-                disabled={bgUploading}
-                className="hidden"
-              />
-            </label>
-
-            {bgUploadError && (
-              <p className="text-red-400 text-sm mb-3">{bgUploadError}</p>
-            )}
-
-            {printBgImages.length === 0 ? (
-              <div className="py-8 text-center text-gray-500 text-sm border border-dashed border-gray-600 rounded-lg">
-                등록된 인쇄 배경 이미지가 없습니다
-              </div>
-            ) : (
-              <div className="space-y-4">
-                {printBgImages.map((img) => (
-                  <div key={img.id} className="rounded-lg border border-gray-600 overflow-hidden">
-                    {/* 썸네일 + 삭제 */}
-                    <div className="relative group">
-                      <img
-                        src={resolveUrl(img.filename)}
-                        alt={img.name}
-                        className="w-full h-36 object-cover"
-                        style={{ objectPosition: `${img.focalX * 100}% ${img.focalY * 100}%` }}
-                        onError={(e) => { (e.target as HTMLImageElement).style.opacity = "0.3"; }}
-                      />
-                      <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <button
-                          onClick={() => handleBgDelete(img.id)}
-                          className="px-3 py-1.5 bg-red-600 text-white text-xs rounded-lg hover:bg-red-500 transition-colors"
-                        >
-                          삭제
-                        </button>
-                      </div>
-                      <p className="absolute bottom-0 left-0 right-0 text-gray-300 text-xs truncate px-2 py-1 bg-gray-900/70">{img.name}</p>
-                    </div>
-                    {/* focal 슬라이더 */}
-                    <div className="px-3 py-3 bg-gray-900/60 space-y-2">
-                      <div className="flex items-center gap-3">
-                        <label className="text-gray-500 text-xs w-16 flex-shrink-0">가로 위치</label>
-                        <input
-                          type="range" min="0" max="100" step="1"
-                          value={Math.round(img.focalX * 100)}
-                          onChange={(e) => {
-                            const fx = parseInt(e.target.value) / 100;
-                            setPrintBgImages((prev) => prev.map((p) => p.id === img.id ? { ...p, focalX: fx } : p));
-                            saveFocal(img.id, fx, img.focalY);
-                          }}
-                          className="flex-1 accent-blue-500"
-                        />
-                        <span className="text-gray-400 text-xs w-8 text-right">{Math.round(img.focalX * 100)}%</span>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <label className="text-gray-500 text-xs w-16 flex-shrink-0">세로 위치</label>
-                        <input
-                          type="range" min="0" max="100" step="1"
-                          value={Math.round(img.focalY * 100)}
-                          onChange={(e) => {
-                            const fy = parseInt(e.target.value) / 100;
-                            setPrintBgImages((prev) => prev.map((p) => p.id === img.id ? { ...p, focalY: fy } : p));
-                            saveFocal(img.id, img.focalX, fy);
-                          }}
-                          className="flex-1 accent-blue-500"
-                        />
-                        <span className="text-gray-400 text-xs w-8 text-right">{Math.round(img.focalY * 100)}%</span>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
           </div>
 
           {/* Printer */}

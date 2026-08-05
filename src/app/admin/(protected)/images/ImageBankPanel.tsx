@@ -2,19 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import EditDialog from "./EditDialog";
-
-interface Bg {
-  id: number;
-  name: string;
-  filename: string;
-}
-
-// 편집 다이얼로그에 넘기기 위한 확장 정보(뱅크 목록에서만 확보 가능).
-interface BankImage extends Bg {
-  priority: number;
-  deviceIds: string[];
-  imageType: number;
-}
+import { toBankImage, type Bg, type BankImage } from "@/lib/bankImage";
 
 interface DeviceOption {
   deviceId: string;
@@ -31,27 +19,6 @@ function Media({ bg, baseUrl }: { bg: Bg; baseUrl: string }) {
     // eslint-disable-next-line @next/next/no-img-element
     <img src={src} alt={bg.name} className="w-full h-full object-cover" />
   );
-}
-
-function toBankImage(
-  i: {
-    id: number;
-    name: string;
-    filename: string;
-    priority?: number;
-    deviceIds?: string[];
-    imageType?: number;
-  },
-  fallbackType: number,
-): BankImage {
-  return {
-    id: i.id,
-    name: i.name,
-    filename: i.filename,
-    priority: i.priority ?? 0,
-    deviceIds: i.deviceIds ?? [],
-    imageType: i.imageType ?? fallbackType,
-  };
 }
 
 /**
