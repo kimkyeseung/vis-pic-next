@@ -137,48 +137,7 @@ export function usePhotoFlow(deviceId: string, config: DeviceConfig, hasPrintBgI
     }
   };
 
-  const toFullUrl = (url: string) => {
-    if (url.startsWith("http")) return url;
-    const origin = typeof window !== "undefined" ? window.location.origin : "";
-    return origin + url;
-  };
-
-  const uploadPreparedPhoto = async (dataUrl: string, frames: string[]) => {
-    const res = await fetch("/api/print/upload-image/", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ image_data: dataUrl, image_type: "photo" }),
-    });
-    const data = await res.json();
-    if (!res.ok || !data.success || !data.image_url) {
-      throw new Error(data.error || "Failed to upload photo");
-    }
-    const fullUrl = toFullUrl(data.image_url);
-    setPreparedPhotoUrl(fullUrl);
-    setPreparedExpiryDate(data.expiry_date || null);
-
-    const gifSources = frames.length >= 2 ? frames : [];
-    if (gifSources.length < 2) { setPreparedGifUrl(null); return; }
-
-    try {
-      const gifRes = await fetch("/api/gif/create/", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ images: gifSources, duration: 100 }),
-      });
-      const gifData = await gifRes.json();
-      if (gifRes.ok && gifData.success && gifData.gif_url) {
-        setPreparedGifUrl(toFullUrl(gifData.gif_url));
-        setPreparedExpiryDate(gifData.expiry_date || data.expiry_date || null);
-      } else {
-        setPreparedGifUrl(null);
-      }
-    } catch {
-      setPreparedGifUrl(null);
-    }
-  };
-
-  const handleSelectNext = async (hasPrintBgImages = false) => {
+  const handleSelectNext = (hasPrintBgImages = false) => {
     // selectedPhotos는 슬롯 인덱스 배열(빈칸은 -1). 모든 슬롯이 유효하게 채워졌을 때만 그대로 쓰고,
     // (idle 자동 진행 등으로) 미완성이면 예전과 동일하게 앞에서부터 슬롯 수만큼 자동 채운다.
     const complete =
@@ -193,21 +152,10 @@ export function usePhotoFlow(deviceId: string, config: DeviceConfig, hasPrintBgI
     setPreparedExpiryDate(null);
     setCompositeImage(null);
 
-    const nextStep: Step = hasPrintBgImages ? "printbg" : "complete";
-    const selectedPhoto = slotsNeeded === 1 ? photos[selected[0]] : null;
-    if (!selectedPhoto) { goToStep(nextStep); return; }
-
-    setIsPreparingComplete(true);
-    try {
-      setCompositeImage(selectedPhoto);
-      await uploadPreparedPhoto(selectedPhoto, intermediateFrames[selected[0]] || []);
-      goToStep(nextStep);
-    } catch (error) {
-      console.error("Failed to prepare selected photo:", error);
-      goToStep(nextStep);
-    } finally {
-      setIsPreparingComplete(false);
-    }
+    // 1컷·다컷 모두 완료화면(CompleteSection.createComposite)에서 프레임·슬롯을 합성하고
+    // QR 업로드/GIF도 거기서 처리한다. 예전엔 1컷만 원본 사진을 미리 준비(업로드)해
+    // hasPreparedImage=true가 되며 createComposite가 스킵돼 프레임이 빠졌다.
+    goToStep(hasPrintBgImages ? "printbg" : "complete");
   };
 
   return {
