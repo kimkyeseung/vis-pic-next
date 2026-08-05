@@ -32,6 +32,7 @@
 24. [다국어 (i18n)](#24-다국어-i18n)
 25. [테마 관리 (배경화면 / 로고 / 색상) — 지점별](#25-테마-관리-배경화면--로고--색상--지점별)
 26. [손바닥 제스처 촬영](#26-손바닥-제스처-촬영)
+27. [디버그 모드 (서비스 화면)](#27-디버그-모드-서비스-화면)
 
 ---
 
@@ -258,10 +259,11 @@
   - 세션 리셋 후 재시작 시에도 재선택
 - 배경 선택 단계 진입 시 자동 선택된 항목이 활성(체크마크) 표시됨
 - 선택된 배경이 카메라 합성 및 서브 모니터 미리보기에 사용됨
+- **배경별 동작 트리거 이펙트 영상**(선택): 관리자가 배경마다 이펙트 영상(mp4/webm)을 붙일 수 있고, 촬영 화면에서 **V사인 제스처** 시 재생된다 (§26)
 
 ### Step 5: CAMERA CAPTURE (메인 루프)
 
-- WebRTC `getUserMedia`로 카메라 스트림 획득
+- WebRTC `getUserMedia`로 카메라 스트림 획득 — **해상도는 관리자 설정 `CAMERA_RESOLUTION`**(가장 낮음 320×240 ~ 4K 2880×2160, 모두 4:3, 미설정 시 FHD). ideal 제약이라 카메라 미지원 시 가장 가까운 값으로 대체 (§11)
 - 레이아웃: 좌측 프리뷰(화면 높이 기준 최대 크기) + 우측 고정폭(320px) 컨트롤 패널
 - **프리뷰 하단 배경 썸네일 스트립**: 촬영 중 배경 즉시 변경 가능
   (`onBackgroundSelect` → flow의 `selectedBackground` 갱신 → 프리뷰·서브 모니터 실시간 반영,
@@ -272,6 +274,8 @@
   3. 스티커 오버레이
   4. 서브 모니터 동기화 (활성 시 `/api/camera-frame` POST)
   5. 카운트다운 타이머 표시
+- **동작 트리거 이펙트 영상**: 현재 배경에 이펙트 영상이 설정돼 있으면 **V사인(Victory) 제스처** 시 프리뷰 위에 스크린 블렌드로 재생(지정 시간 or 영상 종료까지). 촬영 트리거(손바닥)와 별개 제스처 (§26)
+- 자동 촬영 타이머는 `useAutoCaptureTimer` 훅으로 분리 — 배경 변경·스티커 적용 등 리렌더에도 리셋되지 않는다
 - **촬영 시퀀스**:
   - 자동 타이머 경과, 사용자 클릭, 또는 **손바닥 제스처**(§26) 중 하나로 시작
   - 카운트다운 (`captureSeconds`초) — 매 초 비프음(Web Audio 합성), 촬영 순간 셔터음(`shutter.wav`) 재생 (`src/lib/sounds.ts`)
@@ -282,7 +286,8 @@
 ### Step 6: SELECT
 
 - 촬영된 사진 그리드 표시 (촬영 원본 비율 그대로, 크롭 없음)
-- 사용자가 정확히 `slotsNeeded`장 선택
+- **슬롯 지정 방식**(`src/lib/slotSelection.ts`): 프레임 미리보기의 슬롯을 탭해 active로 만들고 사진을 탭하면 그 슬롯에 배치. 슬롯을 안 골라도 **active가 순번대로 자동 이동**하며 채워진다. 슬롯이 다 차 있어도 active는 유지되어 다른 사진 탭 시 해당 슬롯 교체. **한 사진은 한 슬롯만**(다른 슬롯에 있던 사진은 이동). `selectedPhotos`는 슬롯 인덱스 배열(빈칸 -1)
+- 사용자가 모든 슬롯을 채우면(정확히 `slotsNeeded`장) 진행 가능
 
 ### Step 6.5: PRINTBG (조건부)
 
@@ -294,7 +299,7 @@
 
 ### Step 7: COMPLETE
 
-1. 선택 사진 합성 이미지 생성 (`src/lib/printLayout.ts` 공용 레이아웃 계산 사용)
+1. 선택 사진 합성 이미지 생성 (`src/lib/printLayout.ts` 공용 레이아웃 계산 사용) — **모든 컷(1컷 포함) 동일 경로**로 프레임·슬롯 합성. 세로 용지 모드(2컷 등)는 프레임(인쇄 배경) 이미지를 **90° 회전**해 용지 방향에 맞춘다 (§13)
 2. `POST /api/print/upload-image` → 3일 만료 URL
 3. `POST /api/gif/create-layout` → 애니메이션 GIF URL
 4. QR 코드 표시 (사진 URL + GIF URL)
@@ -325,6 +330,7 @@
 | `CircularTimer.tsx` | 원형 카운트다운 — frame·background·select·printbg는 유휴 타임아웃, complete는 인화 자동복귀 타이머로 표시 (start·payment·camera 제외) |
 | `CameraStreamer.tsx` | 카메라 상시 웜업 + 서브 모니터 프레임 전송 (배경 합성 포함, §15) |
 | `FloatingElements.tsx` | 배경 데코레이션 애니메이션 |
+| `DebugContext.tsx` / `DebugOverlay.tsx` / `DebugGridOverlay.tsx` | 숨겨진 디버그 모드 — 토글·진단 패널·그리드 시각화 (§27) |
 
 ### 전역 컴포넌트 (`src/components/`)
 
@@ -361,13 +367,14 @@
 | `useTauriMonitor` | `src/hooks/useTauriMonitor.ts` | Tauri 모니터 목록 + 서브 윈도우 열기/닫기 |
 | `useSceneSync` | `src/hooks/useSceneSync.ts` | SSE 프레임 스트림 + BroadcastChannel 상태 동기화 |
 | `useAdminDeviceSettings` | `src/hooks/useAdminDeviceSettings.ts` | (관리자) 선택 지점 기준 설정 로드 + 변경 필드만 지점에 저장 (§20) |
+| `useAutoCaptureTimer` | `src/hooks/useAutoCaptureTimer.ts` | 촬영 자동 카운트다운 타이머 — 촬영 콜백을 ref로 참조해 배경/스티커 변경 리렌더에도 리셋 안 됨 (§5 Step 5) |
 
 ### usePhotoFlow 상세
 
 - **30+ 상태 항목** 관리 (step, selectedFrame, selectedBackground, photos, stickers, ...)
 - `sessionStorage`에 **단계·선택값만** JSON 직렬화 저장 (키: `photobooth_session_v3`, 수 KB). 사진·중간프레임은 제외
 - `advanceFromCurrentStep()` → 단계별 유효성 검사 후 다음 단계로 이동
-- 사진 업로드 (`uploadPhotos()`), GIF 생성 (`createGif()`) 포함
+- 최종 합성·업로드·GIF는 **완료 화면(`CompleteSection.createComposite`/`uploadForQR`)** 이 담당 — 1컷 포함 모든 컷 동일 경로(§5 Step 6·7)
 
 ### useSceneSync 상세
 
@@ -397,7 +404,8 @@ useSceneSyncReceiver → BroadcastChannel.onmessage(state)   ※ 레거시
 | GET · PUT | `/api/device/[deviceId]/stickers` | 이 지점 선택 스티커(순서대로, 최대 20) 조회·교체 — 뱅크 모델(§14) |
 | GET | `/api/setting` | 전역 설정 조회 (기본값/폴백) |
 | POST | `/api/setting` | 전역 설정 업데이트 (값 `null`이면 해당 키 삭제) |
-| GET | `/api/devices` | (공개) 초기 장치 선택용 활성 장치 목록 — 인증 없이 `deviceId`·`name`만 |
+| GET | `/api/devices` | (공개) 초기 장치 선택용 활성 장치 목록 — 인증 없이 `deviceId`·`name`·`hasPassword`만 |
+| POST | `/api/devices/[deviceId]/verify` | (공개) 실행 잠금 검증. `{ password }` → `{ok:true}`(미설정 or 일치) / `{ok:false, required:true}`(불일치) / `{ok:false, required:false}`(장치 없음). 해시는 미노출 (§23) |
 
 ### 이미지 & 배경
 
@@ -408,15 +416,16 @@ useSceneSyncReceiver → BroadcastChannel.onmessage(state)   ※ 레거시
 | POST | `/api/admin/images/upload` | 이미지 업로드 (최대 50MB, `deviceIds`로 지점 연결) — 서버 경유 업로드 |
 | POST | `/api/admin/images/presign` | Supabase Storage 직접 업로드용 서명 URL 발급 (미설정 시 `{mode:"local"}` 폴백) |
 | POST | `/api/admin/images/register` | presign 업로드 완료 후 DB 이미지 레코드 등록 (`deviceIds`로 지점 연결) |
-| PATCH | `/api/admin/images/[id]` | 이미지 메타데이터 수정 (이름·활성·초점 등) |
-| DELETE | `/api/admin/images/[id]` | 이미지 삭제 |
+| PATCH | `/api/admin/images/[id]` | 이미지 메타데이터 수정 (이름·활성·초점·이펙트 지속시간 등) |
+| DELETE | `/api/admin/images/[id]` | 이미지 삭제 (연결된 이펙트 영상 파일도 함께 정리) |
+| POST · DELETE | `/api/admin/images/[id]/effect` | 배경(type 1)의 동작 트리거 **이펙트 영상** 업로드/교체·제거 (mp4·webm, §26) |
 
 ### 관리자
 
 | 메서드 | 경로 | 설명 |
 |--------|------|------|
-| POST | `/api/admin/login` | 관리자 로그인 (세션 쿠키 반환) |
-| POST | `/api/admin/logout` | 관리자 로그아웃 (세션 쿠키 만료) |
+| POST | `/api/admin/login` | 관리자 로그인 (iron-session 봉인 세션 쿠키 발급, §23) |
+| POST | `/api/admin/logout` | 관리자 로그아웃 (세션 쿠키 삭제) |
 | GET | `/api/admin/devices` | 디바이스 목록 |
 | POST | `/api/admin/devices` | 디바이스 생성 |
 | GET | `/api/admin/devices/[id]` | 디바이스 상세 |
@@ -476,6 +485,7 @@ useSceneSyncReceiver → BroadcastChannel.onmessage(state)   ※ 레거시
 | name | String | 기기 이름 |
 | description | String? | 설명 |
 | isActive | Boolean | 활성 여부 |
+| password | String? | 실행 시 이 장치를 선택하려면 맞춰야 하는 **실행 잠금 비밀번호**(bcrypt 해시). null/빈값=잠금 없음 (§23) |
 
 **`DeviceSetting`** - 기기별 설정
 
@@ -509,6 +519,8 @@ useSceneSyncReceiver → BroadcastChannel.onmessage(state)   ※ 레거시
 | priority | Int | 전역 정렬 순서(desc). 지점별 노출 순서는 `ImageDevice.sortOrder`(뱅크)를 쓰며, 관리자 UI의 순서 편집 기능은 제거됨 |
 | active | Boolean | 활성 여부 — 서비스 화면엔 active=true만 노출. 배경(type 1)은 최대 6개까지만 활성 |
 | focalX / focalY | Float? | 초점 좌표 (0~1, 기본 0.5). cover 배치 시 중심 |
+| effectFilename | String? | **배경(type 1) 전용** — 동작(제스처) 트리거 시 촬영 화면에 스크린 블렌드로 재생되는 이펙트 영상 파일명. null=없음 (§26) |
+| effectDuration | Int? | 이펙트 영상 최대 재생 시간(초). 영상이 더 짧으면 종료. null이면 기본값(4초) |
 | createdAt | DateTime | 생성 시각 |
 
 **`ImageDevice`** - 이미지 ↔ 디바이스 다대다 (테이블 `pic_image_device`)
@@ -623,6 +635,9 @@ useSceneSyncReceiver → BroadcastChannel.onmessage(state)   ※ 레거시
 ```typescript
 navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } })
 ```
+
+- **촬영 해상도**는 관리자 설정 `CAMERA_RESOLUTION`(§20) 티어로 결정 — `low`/`sd`/`hd`/`fhd`/`uhd`(4K), 모두 4:3(인화 슬롯 4:3과 맞춰 좌우 잘림 방지). `ideal` 제약이라 카메라가 미지원하면 가장 가까운 값으로 대체. 상수: `src/constants/camera.ts`(`CAMERA_RESOLUTIONS`).
+- 서브 모니터 미러(`CameraStreamer`)는 성능을 위해 별도 저해상도(960×720) 유지.
 
 - WebView2: `PermissionRequested` 이벤트 핸들러가 localhost URL에 대해 자동 허용
 - 브라우저 직접 실행: 표준 브라우저 권한 다이얼로그
@@ -748,6 +763,8 @@ PRINTER_NAME             # 출력 프린터 이름 (비우면 기본 프린터)
 - 빈 문자열·NaN·음수 값은 "미설정"으로 취급 (`parseCm`)
 - `WIDTH`/`HEIGHT` 미설정 시 4:3 비율 자동 배치 폴백
 - 슬롯이 인화지를 벗어나면 `overflow` 플래그 → 미리보기에 빨간 슬롯 + 경고 배너 표시
+- **사진 배치는 cover(슬롯 비율에 맞춰 center-crop)** — 사진의 보이는 비율 = 슬롯 비율(`MODE_{ID}_WIDTH:HEIGHT`). 슬롯이 4:3이 아니면 4:3 카메라 사진이 상하/좌우로 잘린다
+- **프레임(인쇄 배경) 이미지 회전**: 프레임 디자인은 가로 기준이며, 세로 용지 모드(`orientation:"portrait"` — 2x1·2x4·4x1)에서는 합성·미리보기(`FramedPreview`) 모두 프레임 이미지를 **90° 회전**해 용지 방향에 맞춘다(슬롯 좌표는 이미 용지 방향 기준이라 프레임 이미지만 회전)
 
 ### 중간 프레임 (Intermediate Frames)
 
@@ -1083,6 +1100,7 @@ mediapipe 파일은 웹 빌드에 없으므로 프리캐시하지 않고, 존재
 | `PAYMENT_TERMINAL_MODE` | "manual" | 결제 모드 |
 | `IDLE_TIMEOUT_SECONDS` | "30" | 자동 진행 타임아웃 |
 | `CAMERA_AUTO_TIMER` | "60" | 자동 촬영 타이머 (초) |
+| `CAMERA_RESOLUTION` | "fhd" | 카메라 촬영 해상도 티어 — `low`(320×240)/`sd`(640×480)/`hd`(960×720)/`fhd`(1440×1080)/`uhd`(4K 2880×2160). 모두 4:3 (§11) |
 | `PICTURE_WIDTH` / `PICTURE_HEIGHT` | "10" / "15" | 인화지 크기 (cm) |
 | `PRINTER_NAME` | "" | 출력 프린터 (비우면 기본 프린터) |
 | `MODE_2_2_WIDTH` | — | 2×2 모드 사진 슬롯 너비 (cm) |
@@ -1132,6 +1150,8 @@ PAYAPP_RETURN_URL=https://[도메인]/payment/return
 
 ```env
 CRON_SECRET=[웹훅 시크릿]
+SESSION_PASSWORD=[관리자 세션 봉인 키 — 32자 이상 임의 문자열]   # iron-session, 미설정 시 관리자 로그인/인증 실패(fail-loud). §23
+COOKIE_SECURE=[true일 때만 세션 쿠키에 Secure 부여 — HTTPS 서빙 시. Tauri 로컬 HTTP에선 미설정]
 ```
 
 ---
@@ -1233,11 +1253,18 @@ npm run tauri:build
 - 인화 설정의 여백 입력은 상/하 또는 좌/우를 동시에 설정할 수 없다
   (한쪽 입력 시 반대쪽 비활성화, 비우면 자동 중앙 정렬 — §13 참고).
 
-### 인증
+### 인증 (관리자 세션 — iron-session)
 
-- `POST /api/admin/login` → bcrypt 비밀번호 검증 → 세션 쿠키 발급
-- 미들웨어 또는 각 페이지에서 세션 쿠키 확인
-- `AdminAccount` 테이블 기반 (isActive 체크)
+- `POST /api/admin/login` → bcrypt 비밀번호 검증 → **iron-session으로 봉인(암호화·서명)한 세션 쿠키** 발급(`admin_session`, httpOnly, 24h).
+  예전엔 쿠키 값이 관리자 id 원문이라 위조 가능했으나, 이제 `SESSION_PASSWORD`(§21) 없이는 유효 세션 생성 불가.
+- **`proxy.ts`**(Next 16에서 middleware가 proxy로 개명)가 `/admin/*`에서 봉인 세션을 **열어 검증**(존재만 확인 아님) → 위조 쿠키는 미인증 처리. `requireAdmin`/보호 레이아웃도 봉인 세션 기반(`src/lib/session.ts`, `adminAuth.ts`).
+- 로그인 성공 시 소프트 라우팅 대신 **하드 내비게이션**(`window.location.assign`)으로 이동 — 소프트 라우팅이 방금 설정한 쿠키를 proxy가 못 봐 로그인 화면에 머무는 문제 방지.
+
+### 장치 실행 잠금 (Device Password)
+
+- 관리자 장치 편집에서 장치마다 **실행 비밀번호**(bcrypt 해시, `Device.password`) 설정/제거 가능. 목록·상세·응답에 해시는 미노출(hasPassword만).
+- 실행 시 홈(`/`) **장치 선택 → "시작"** 에서 `POST /api/devices/[deviceId]/verify`로 검증(§8). 미설정 장치는 통과, 설정 장치는 일치해야 진입.
+- 초기 상태는 모든 장치 **잠금 없음**(password=null). 관리자가 설정하기 전까지 프롬프트 없이 실행.
 
 ---
 
@@ -1337,6 +1364,25 @@ npm run tauri:build
 - **튜닝 상수**(`CameraSection.tsx` 감지 루프): `HOLD_MS`, `MIN_SCORE`, `GESTURE_INTERVAL_MS`.
 - **성능**: `mediapipe` 배경 모드에서는 세그멘터+제스처 추론이 함께 돌아 부하가 증가하므로
   프레임 드롭 시 `GESTURE_INTERVAL_MS`를 올린다.
+
+### V사인(Victory) → 배경 이펙트 영상
+
+- 같은 감지 루프에서 **V사인(Victory)** 도 함께 인식한다(손바닥=촬영과 별개, 독립 arming).
+- 현재 선택된 배경에 이펙트 영상(`Image.effectFilename`, §9)이 설정돼 있으면, V사인 홀드 시 프리뷰 위에
+  **`<video>` 스크린 블렌드 오버레이**로 1회 재생한다. `effectDuration`(초) 경과 또는 영상 종료 중 먼저 도달하면 정지.
+- 관리자: 이미지 관리 → 배경 편집(EditDialog)에서 이펙트 영상 업로드/제거 + 최대 재생시간 지정
+  (`POST/DELETE /api/admin/images/[id]/effect`, §8). 상수는 `EFFECT_TRIGGER_GESTURE`(=Victory)·`DEFAULT_EFFECT_DURATION`(`src/constants/images.ts`).
+
+---
+
+## 27. 디버그 모드 (서비스 화면)
+
+손님에겐 보이지 않는 운영자용 디버그 토글. 상태는 `sessionStorage`로 단계 전환에도 유지.
+
+- **토글**: 좌상단 로고 **5회 연속 탭**(2초 내) 또는 **`Ctrl+Shift+D`**. 대기화면엔 로고가 없어 키보드 사용.
+- **진단 패널**(`DebugOverlay`): 좌하단에 deviceId·단계·프레임/슬롯·선택 사진·배경/인쇄배경·배경제거 모드·카메라 해상도·촬영 설정·서브모니터 등 표시(민감정보 제외). **축소/펼치기·끄기** 버튼.
+- **그리드 시각화**(`DebugGridOverlay`): `getComputedStyle`로 `grid-template-rows`를 실측해 각 **행=초록 박스**(r1·r2 라벨), **셀(그리드 아이템)=빨간 박스**를 절대배치 오버레이로 그린다. Tailwind `.grid`와 인라인 `grid-template`(촬영 화면) 모두 대상. `pointer-events-none`이라 터치를 막지 않음(완료 화면은 flex라 그릴 그리드 없음).
+- 구현: `src/components/service/DebugContext.tsx`(컨텍스트+`useSecretTap`), `DebugOverlay.tsx`, `DebugGridOverlay.tsx`.
 
 ---
 

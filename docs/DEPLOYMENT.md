@@ -25,6 +25,17 @@ DIRECT_URL="postgresql://postgres.[REF]:[PW]@aws-1-ap-northeast-1.pooler.supabas
 ```env
 NEXT_PUBLIC_SUPABASE_URL=https://[REF].supabase.co
 NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=sb_publishable__xxxxx
+SUPABASE_SERVICE_ROLE_KEY=[service-role-key]
+```
+
+### 보안 / 세션 (필수)
+
+```env
+# 관리자 세션 봉인 키(iron-session). 32자 이상 임의 문자열. 미설정 시 관리자 로그인/인증 실패(fail-loud).
+# 생성 예: node -e "console.log(require('crypto').randomBytes(36).toString('base64url'))"
+SESSION_PASSWORD=[32자 이상 임의 문자열]
+# HTTPS로 서빙할 때만 true → 세션 쿠키에 Secure 부여. Tauri 로컬 HTTP(localhost:3001)에선 설정하지 않는다.
+COOKIE_SECURE=false
 ```
 
 ### PayApp 결제 (선택)
@@ -171,6 +182,7 @@ npm run tauri:dev
 |----|--------|------|
 | `IDLE_TIMEOUT_SECONDS` | 30 | 유휴 타임아웃 (프레임·배경·선택·인화배경 단계) |
 | `CAMERA_AUTO_TIMER` | 60 | 촬영 단계 자동 촬영 타이머 (0이면 비활성) |
+| `CAMERA_RESOLUTION` | `fhd` | 카메라 촬영 해상도 티어 — `low`(320×240)/`sd`(640×480)/`hd`(960×720)/`fhd`(1440×1080)/`uhd`(4K 2880×2160). 모두 4:3. 관리자 촬영 설정 페이지에서 선택 |
 | `PRINT_AUTO_TIMER` | 30 | 완료 화면 자동 복귀 타이머 (0이면 비활성) |
 | `CAPTURE_SECONDS` | 3 | 촬영 카운트다운 (초) |
 | `CAPTURE_MODES` | `1x1,2x2` | 사용 가능한 촬영 모드. 콤마로 구분된 `NxM` 문자열 목록. **주의**: 관리자 인화 설정 페이지의 미리보기는 목록에 없는 임의의 `NxM` 값도 정규식으로 인식해 보여주지만, 실제 서비스 화면(`src/constants/frames.ts`의 `FRAME_INFO`)은 정적으로 등록된 모드만 표시한다. 새 모드를 추가하려면 `FRAME_INFO`에도 코드로 추가해야 하며, 그렇지 않으면 관리자 화면엔 보여도 고객 화면에선 조용히 빠진다 (실제로 `1x2`가 이 문제로 한 번 발생함 — 세로 셀이 되어 의도적으로 제외된 이력도 있으니 추가 전 §12 참고) |
@@ -202,6 +214,9 @@ npm run tauri:dev
 
 운영 환경에서는 반드시 비밀번호를 변경하세요.
 계정 추가·삭제·비밀번호 변경은 `/admin/accounts` 페이지에서 관리합니다.
+
+- **세션**: 관리자 세션은 iron-session으로 봉인(암호화·서명)된 쿠키다. `SESSION_PASSWORD`(§1)가 있어야 로그인/인증이 동작한다. 스키마·`SESSION_PASSWORD` 변경 후에는 기존 로그인 세션이 무효화되어 재로그인이 필요하다.
+- **장치 실행 잠금**: 장치마다 실행 비밀번호(bcrypt)를 설정하면(장치 편집), 서비스 실행 시 홈에서 그 장치를 선택할 때 비밀번호를 입력해야 한다. 미설정이면 잠금 없이 실행.
 
 ---
 
