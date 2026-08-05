@@ -478,15 +478,3 @@ body {
   font-size: 16px;
   font-weight: bold;
 }
-
-/* ── 디버그 모드: 그리드 레이아웃 셀 시각화 ──
-   루트에 .debug-grid가 붙으면 그리드 컨테이너의 각 셀(그리드 아이템)에 빨간 테두리를 씌운다.
-   Tailwind의 `grid` 클래스 그리드와, 인라인 grid-template-areas 그리드(촬영 화면) 모두 커버. */
-.debug-grid .grid {
-  outline: 1px dashed rgba(255, 0, 0, 0.45);
-}
-.debug-grid .grid > *,
-.debug-grid [style*="grid-template-areas"] > * {
-  outline: 1.5px solid red;
-  outline-offset: -1.5px;
-}

@@ -22,6 +22,7 @@ import { PrintBgSection } from "@/components/service/PrintBgSection";
 import { CompleteSection } from "@/components/service/CompleteSection";
 import { DebugProvider, useDebug, useSecretTap } from "@/components/service/DebugContext";
 import { DebugOverlay } from "@/components/service/DebugOverlay";
+import { DebugGridOverlay } from "@/components/service/DebugGridOverlay";
 
 function ServiceContent() {
   const searchParams = useSearchParams();
@@ -70,7 +71,7 @@ function ServiceContent() {
 
   const { currentStep, slotsNeeded, selectedBackground, setSelectedBackground, selectedPrintBg, setSelectedPrintBg } = flow;
   const { setLang, t } = useLanguage();
-  const { debug, toggle: toggleDebug } = useDebug();
+  const { toggle: toggleDebug } = useDebug();
   const handleLogoSecretTap = useSecretTap(toggleDebug);
 
   // 대기 화면으로 돌아오면 다음 손님을 위해 언어를 한국어로 초기화
@@ -171,7 +172,7 @@ function ServiceContent() {
   } as React.CSSProperties;
 
   return (
-    <div className={`service-theme w-full h-screen overflow-hidden relative ${debug ? "debug-grid" : ""}`} style={themeStyle}>
+    <div className="service-theme w-full h-screen overflow-hidden relative" style={themeStyle}>
       {showTimer && (
         <CircularTimer value={idleRemaining!} total={config.idleTimeoutSeconds} testId="page-idle-timer" />
       )}
@@ -355,6 +356,7 @@ function ServiceContent() {
         />
       )}
 
+      <DebugGridOverlay />
       <DebugOverlay data={debugData} />
     </div>
   );
