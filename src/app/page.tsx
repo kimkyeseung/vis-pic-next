@@ -64,6 +64,12 @@ export default function Home() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ password }),
       });
+      // 정상 판정(찾음/못찾음/비번필요)은 200, 실제 오류만 비-200 → 서버 오류를
+      // "장치 없음"으로 잘못 안내하지 않도록 구분한다.
+      if (!res.ok) {
+        setError("서버 오류가 발생했습니다. 잠시 후 다시 시도해주세요.");
+        return;
+      }
       const data = await res.json().catch(() => ({}));
       if (data.ok) {
         localStorage.setItem("last_device_id", id);
