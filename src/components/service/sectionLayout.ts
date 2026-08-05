@@ -7,4 +7,4 @@
  * 외곽 여백을 조정할 땐 여기 한 곳만 고치면 모든 섹션에 반영된다.
  */
 export const SERVICE_SECTION_CLASS =
-  "w-full h-full grid justify-items-center relative z-10 pt-24 portrait:pt-16 pb-52 portrait:pb-40";
+  "w-full h-full grid justify-items-center relative z-10 pt-14 portrait:pt-10 pb-52 portrait:pb-40";
