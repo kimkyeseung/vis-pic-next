@@ -1,30 +1,27 @@
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import prisma from "@/lib/db";
+import { SESSION_COOKIE, readSealedSession, type AdminSession } from "@/lib/session";
+
+/** 현재 요청의 봉인 세션을 읽는다(서버 컴포넌트·라우트 핸들러용). */
+export async function getServerAdminSession(): Promise<AdminSession | null> {
+  const cookieStore = await cookies();
+  return readSealedSession(cookieStore.get(SESSION_COOKIE)?.value);
+}
 
 export async function getAdminId(): Promise<number | null> {
-  const cookieStore = await cookies();
-  const sessionVal = cookieStore.get("admin_session")?.value;
-  if (!sessionVal) return null;
-  const id = parseInt(sessionVal, 10);
-  return isNaN(id) ? null : id;
+  const session = await getServerAdminSession();
+  return session?.adminId ?? null;
 }
 
 export async function requireAdmin(): Promise<NextResponse | null> {
-  const cookieStore = await cookies();
-  const sessionVal = cookieStore.get("admin_session")?.value;
-
-  if (!sessionVal) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
-  const id = parseInt(sessionVal, 10);
-  if (isNaN(id)) {
+  const session = await getServerAdminSession();
+  if (!session) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   try {
-    const admin = await prisma.adminAccount.findUnique({ where: { id } });
+    const admin = await prisma.adminAccount.findUnique({ where: { id: session.adminId } });
     if (!admin || !admin.isActive) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }

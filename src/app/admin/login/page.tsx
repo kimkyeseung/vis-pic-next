@@ -1,10 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 
 export default function AdminLoginPage() {
-  const router = useRouter();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -30,10 +28,12 @@ export default function AdminLoginPage() {
         return;
       }
 
-      localStorage.setItem("admin_session", JSON.stringify(data.admin));
-      // 성공 시에는 /admin으로 이동하는 중이므로 loading을 해제하지 않는다
-      // (해제하면 라우팅 완료 전에 버튼이 다시 활성화되어 중복 제출 가능).
-      router.push("/admin");
+      // 하드 내비게이션으로 이동한다. 소프트 라우팅(router.push)은 클라이언트 Router
+      // Cache/prefetch 때문에 방금 설정된 세션 쿠키를 proxy가 못 보고 로그인 페이지에
+      // 머무는(무한 "로그인 중...") 문제가 있었다. 전체 문서 이동이면 쿠키가 실린 새
+      // 요청으로 proxy가 세션을 확인해 /admin을 바로 서빙한다.
+      // 성공 시엔 loading을 풀지 않는다(리로드로 페이지가 교체되며 중복 제출 방지).
+      window.location.assign("/admin");
     } catch {
       setError("서버 연결에 실패했습니다.");
       setLoading(false);
