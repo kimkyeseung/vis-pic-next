@@ -694,9 +694,8 @@ sticker 오버레이 (canvas.drawImage / fillText)
 
 ### Chromakey (`bgRemovalMode: "chromakey"`)
 
-- 설정: `CHROMAKEY_RGB` (기본: "0,255,0", 녹색) — 관리자 촬영 설정 페이지에서 컬러피커(react-colorful)로 조정
-- RGB 색상거리 기반 제거: `distSq = dr²+dg²+db²`, `HARD = 50²`(완전 투명), `SOFT = 100²`(그 사이 부드럽게 페이드) — 코드에 고정값, 조정 UI 없음
-- ~~similarity/smoothness 슬라이더~~ 는 존재하지 않음 (과거 문서 오기)
+- 설정: `CHROMAKEY_RGB`(키 색상, 기본 "0,255,0") + `CHROMAKEY_SIMILARITY`(감도, 1-100, 기본 50) — 관리자 촬영 설정 페이지·미리보기에서 조정
+- RGB 색상거리 기반 제거: `distSq = dr²+dg²+db²`. 임계값은 **감도에서 파생** — `HARD = 감도²`(완전 투명), `SOFT = (감도×2)²`(그 사이 부드럽게 페이드). 감도 기본 50 → 예전 고정값(50²/100²)과 동일, 높일수록 넓게 제거
 
 ### 없음 (`bgRemovalMode: "off"`)
 
@@ -708,6 +707,7 @@ sticker 오버레이 (canvas.drawImage / fillText)
   `CHROMAKEY_MODE`에 맞는 처리(AI 또는 크로마키)를 실시간으로 보여주며, 다이얼로그 내
   슬라이더/컬러피커로 값을 조정하면 미리보기와 뒤쪽 설정 폼에 동시 반영되어 바로 저장 가능
 - 제거되는 영역은 체커보드 패턴으로 표시
+- **크로마키 스포이드**: "스포이드" 버튼 → 미리보기 클릭 지점의 **원본 카메라 색**을 키 색상(`CHROMAKEY_RGB`)으로 추출(표시 미러 보정, 제거된 영역을 찍어도 원본 색). 한 번 추출 후 자동 해제
 - `CameraSection.tsx`와 동일한 마스크/색상거리 알고리즘을 재사용해 실제 서비스 화면과 결과가 일치함
 
 ---

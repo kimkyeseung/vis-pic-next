@@ -81,8 +81,34 @@ export function BackgroundRemovalPreviewDialog({
   useEffect(() => { featherRef.current = feather; }, [feather]);
 
   const [colorPickerOpen, setColorPickerOpen] = useState(false);
+  const [eyedropper, setEyedropper] = useState(false);
   const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
   const [errorMessage, setErrorMessage] = useState("");
+
+  // 스포이드: 미리보기 클릭 지점의 원본 카메라 색을 추출해 키 색상으로 설정.
+  // 표시 캔버스는 미러+제거(체커보드 합성)이므로 그게 아니라 원본 video에서 샘플하고 좌우 미러를 보정한다.
+  const handleEyedrop = (e: React.MouseEvent) => {
+    if (!eyedropper) return;
+    const canvas = canvasRef.current;
+    const video = videoRef.current;
+    if (!canvas || !video || !video.videoWidth) return;
+    const rect = canvas.getBoundingClientRect();
+    const nx = (e.clientX - rect.left) / rect.width;
+    const ny = (e.clientY - rect.top) / rect.height;
+    if (nx < 0 || nx > 1 || ny < 0 || ny > 1) return;
+    const vw = video.videoWidth;
+    const vh = video.videoHeight;
+    const sx = Math.min(vw - 1, Math.max(0, Math.round((1 - nx) * vw))); // 표시 미러 보정
+    const sy = Math.min(vh - 1, Math.max(0, Math.round(ny * vh)));
+    const s = document.createElement("canvas");
+    s.width = 1;
+    s.height = 1;
+    const sctx = s.getContext("2d")!;
+    sctx.drawImage(video, sx, sy, 1, 1, 0, 0, 1, 1);
+    const [r, g, b] = sctx.getImageData(0, 0, 1, 1).data;
+    onChromaColorChange(`${r},${g},${b}`);
+    setEyedropper(false); // 한 번 추출 후 자동 해제
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -262,7 +288,18 @@ export function BackgroundRemovalPreviewDialog({
 
         <div className="relative w-full aspect-video bg-black rounded-lg overflow-hidden">
           <video ref={videoRef} className="hidden" playsInline muted />
-          <canvas ref={canvasRef} className="w-full h-full object-contain" />
+          <canvas
+            ref={canvasRef}
+            className="w-full h-full object-contain"
+            style={{ cursor: eyedropper ? "crosshair" : "default" }}
+            onClick={handleEyedrop}
+          />
+
+          {eyedropper && status === "ready" && (
+            <div className="absolute top-2 left-1/2 -translate-x-1/2 bg-black/70 text-white text-xs px-3 py-1 rounded-full pointer-events-none">
+              화면을 클릭해 색을 추출하세요
+            </div>
+          )}
 
           {status === "loading" && (
             <div className="absolute inset-0 flex items-center justify-center text-gray-300 text-sm">
@@ -294,6 +331,18 @@ export function BackgroundRemovalPreviewDialog({
               <span className="text-gray-400 text-sm font-mono">
                 {chromaColor.r},{chromaColor.g},{chromaColor.b}
               </span>
+              <button
+                type="button"
+                onClick={() => setEyedropper((v) => !v)}
+                title="화면을 클릭해 색 추출"
+                className={`ml-auto shrink-0 rounded-lg border px-3 py-1.5 text-sm transition-colors ${
+                  eyedropper
+                    ? "border-blue-500 bg-blue-600 text-white"
+                    : "border-gray-600 bg-gray-700 text-gray-200 hover:bg-gray-600"
+                }`}
+              >
+                &#128167; 스포이드
+              </button>
 
               {colorPickerOpen && (
                 <>
