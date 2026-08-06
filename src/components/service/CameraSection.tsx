@@ -559,8 +559,11 @@ export function CameraSection({
 
   useEffect(() => {
     const offscreen = document.createElement("canvas");
-    const HARD = 50 * 50;
-    const SOFT = 100 * 100;
+    // 크로마키 감도(색상 허용 거리). 높을수록 키 색과 더 먼 색까지 제거한다.
+    // hardDist=감도(완전 제거) / softDist=감도×2(경계 페더). 기본 50 → 예전 하드코딩(50/100)과 동일.
+    const simDist = Math.max(1, config.chromakeySimilarity);
+    const HARD = simDist * simDist;
+    const SOFT = (simDist * 2) * (simDist * 2);
     // 배경제거(마스크 계산 + getImageData/putImageData) 처리 해상도를 낮춰 프레임 드롭을 줄인다.
     // 최종 표시/캡처는 여전히 네이티브 해상도(display 캔버스)로 업스케일되므로 화질 손실은
     // 가장자리 마스크 정밀도 정도로 미미하고, 기존 FEATHER 블렌딩이 이를 더 가려준다.
@@ -685,7 +688,7 @@ export function CameraSection({
           if (distSq < HARD) {
             data[i + 3] = 0;
           } else if (distSq < SOFT) {
-            data[i + 3] = Math.round(((Math.sqrt(distSq) - 50) / 50) * 255);
+            data[i + 3] = Math.round(((Math.sqrt(distSq) - simDist) / simDist) * 255);
           }
         }
         offCtx.putImageData(imageData, 0, 0);
@@ -724,7 +727,7 @@ export function CameraSection({
 
     animFrameRef.current = requestAnimationFrame(processFrame);
     return () => cancelAnimationFrame(animFrameRef.current);
-  }, [selectedBackground, chromaKey, bgRemovalMode, segmentThresh, segmentFeather, drawBackground, frameChannelRef, snapshotWithStickers]);
+  }, [selectedBackground, chromaKey, config.chromakeySimilarity, bgRemovalMode, segmentThresh, segmentFeather, drawBackground, frameChannelRef, snapshotWithStickers]);
 
   // 카운트다운 도중 언마운트(이전/다음 이동 등) 시 타이머가 살아남아
   // onCapture가 화면 전환 후에 실행되는 것을 막는다.

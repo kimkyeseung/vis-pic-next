@@ -1095,6 +1095,7 @@ mediapipe 파일은 웹 빌드에 없으므로 프리캐시하지 않고, 존재
 | `CAPTURE_MODES` | "1x1,2x2" | 활성 프레임 모드 |
 | `CHROMAKEY_MODE` | "mediapipe" | 배경 제거 모드 |
 | `CHROMAKEY_RGB` | "0,255,0" | 크로마키 색상 |
+| `CHROMAKEY_SIMILARITY` | "50" | 크로마키 감도(색상 허용 거리, 1-100). 높을수록 키 색과 더 먼 색까지 제거. hardDist=값, softDist=값×2 (기본 50=예전 하드코딩 50/100) |
 | `PAYMENT_ENABLED` | "0" | 결제 활성화 |
 | `PAYMENT_AMOUNT` | "5000" | **1장당 가격**(원). 결제 화면 매수는 1/2/4장 고정, 총액 = 가격 × 매수 |
 | `PAYMENT_TERMINAL_MODE` | "manual" | 결제 모드 |

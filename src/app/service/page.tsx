@@ -221,6 +221,7 @@ function ServiceContent() {
           imageBaseUrl={imageBaseUrl}
           bgRemovalMode={config.bgRemovalMode}
           chromakeyRgb={config.chromakeyRgb}
+          chromakeySimilarity={config.chromakeySimilarity}
           segmentThreshold={config.segmentThreshold}
           segmentFeather={config.segmentFeather}
         />

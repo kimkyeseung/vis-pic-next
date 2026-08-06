@@ -14,8 +14,6 @@ type Segmenter = {
   close: () => void;
 };
 
-const HARD = 50 * 50;
-const SOFT = 100 * 100;
 // 배경제거 처리 해상도를 낮춰 서브 화면 송출 루프의 부하를 줄인다 (CameraSection.tsx와 동일한 이유).
 const PROCESS_SCALE = 0.5;
 // mediapipe 추론은 화면 갱신보다 훨씬 무거우므로 이 간격으로만 실행하고 재사용한다.
@@ -37,6 +35,7 @@ export function CameraStreamer({
   imageBaseUrl = "",
   bgRemovalMode = "off",
   chromakeyRgb = "0,255,0",
+  chromakeySimilarity = 50,
   segmentThreshold = 15,
   segmentFeather = 35,
 }: {
@@ -47,6 +46,8 @@ export function CameraStreamer({
   imageBaseUrl?: string;
   bgRemovalMode?: BgRemovalMode;
   chromakeyRgb?: string;
+  /** 크로마키 감도(색상 허용 거리, 1-100). 메인 촬영 화면과 동일한 관리자 설정값. */
+  chromakeySimilarity?: number;
   /** AI 배경제거 경계 침식 (0-100%). 메인 촬영 화면과 동일한 관리자 설정값. */
   segmentThreshold?: number;
   /** AI 배경제거 경계 부드러움 (0-100%). 메인 촬영 화면과 동일한 관리자 설정값. */
@@ -64,12 +65,14 @@ export function CameraStreamer({
   const selectedBgRef = useRef(selectedBackground);
   const bgRemovalModeRef = useRef(bgRemovalMode);
   const chromakeyRgbRef = useRef(chromakeyRgb);
+  const chromakeySimilarityRef = useRef(chromakeySimilarity);
   // 관리자 설정(0-100%)을 confidence 스케일(0-1)로 변환해 보관. FEATHER는 0으로 나누기 방지를 위해 최소 1%.
   const segmentThreshRef = useRef(segmentThreshold / 100);
   const segmentFeatherRef = useRef(Math.max(segmentFeather, 1) / 100);
   useEffect(() => { selectedBgRef.current = selectedBackground; }, [selectedBackground]);
   useEffect(() => { bgRemovalModeRef.current = bgRemovalMode; }, [bgRemovalMode]);
   useEffect(() => { chromakeyRgbRef.current = chromakeyRgb; }, [chromakeyRgb]);
+  useEffect(() => { chromakeySimilarityRef.current = chromakeySimilarity; }, [chromakeySimilarity]);
   useEffect(() => { segmentThreshRef.current = segmentThreshold / 100; }, [segmentThreshold]);
   useEffect(() => { segmentFeatherRef.current = Math.max(segmentFeather, 1) / 100; }, [segmentFeather]);
 
@@ -240,13 +243,16 @@ export function CameraStreamer({
             const imgData = offCtx.getImageData(0, 0, pw, ph);
             const d = imgData.data;
             const [kr, kg, kb] = chromakeyRgbRef.current.split(",").map(Number);
+            const simDist = Math.max(1, chromakeySimilarityRef.current);
+            const HARD = simDist * simDist;
+            const SOFT = (simDist * 2) * (simDist * 2);
             for (let i = 0; i < d.length; i += 4) {
               const dr = d[i] - (kr ?? 0);
               const dg = d[i + 1] - (kg ?? 255);
               const db = d[i + 2] - (kb ?? 0);
               const distSq = dr * dr + dg * dg + db * db;
               if (distSq < HARD) d[i + 3] = 0;
-              else if (distSq < SOFT) d[i + 3] = Math.round(((Math.sqrt(distSq) - 50) / 50) * 255);
+              else if (distSq < SOFT) d[i + 3] = Math.round(((Math.sqrt(distSq) - simDist) / simDist) * 255);
             }
             offCtx.putImageData(imgData, 0, 0);
             drawBg(w, h);

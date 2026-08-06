@@ -59,6 +59,15 @@ const FIELDS: { name: string; label: string; type?: "text" | "number" | "select"
     showIf: (s) => s.CHROMAKEY_MODE === "chromakey",
   },
   {
+    name: "CHROMAKEY_SIMILARITY",
+    label: "크로마키 감도",
+    type: "number",
+    min: 1,
+    max: 100,
+    hint: "높일수록 키 색과 더 먼 색까지 제거됩니다. 기본값 50.",
+    showIf: (s) => s.CHROMAKEY_MODE === "chromakey",
+  },
+  {
     name: "CAPTURE_THRESHOLD",
     label: "AI 배경제거 경계 침식 (%)",
     type: "number",
@@ -200,6 +209,8 @@ export default function CaptureSettingPage() {
           mode={(settings.CHROMAKEY_MODE || "mediapipe") === "chromakey" ? "chromakey" : "mediapipe"}
           chromaColor={parseRgbString(settings.CHROMAKEY_RGB || "0,255,0")}
           onChromaColorChange={(rgb) => updateSetting("CHROMAKEY_RGB", rgb)}
+          similarity={clampPercent(parseIntSafe(settings.CHROMAKEY_SIMILARITY || "", 50), 1)}
+          onSimilarityChange={(n) => updateSetting("CHROMAKEY_SIMILARITY", String(n))}
           threshold={clampPercent(parseIntSafe(settings.CAPTURE_THRESHOLD || "", 15))}
           onThresholdChange={(n) => updateSetting("CAPTURE_THRESHOLD", String(n))}
           feather={clampPercent(parseIntSafe(settings.CAPTURE_SMOOTHNESS || "", 35), 1)}

@@ -189,6 +189,7 @@ npm run tauri:dev
 | `CAPTURE_COUNT_UNIFORM` | 4 | 슬롯당 촬영 횟수 |
 | `CHROMAKEY_MODE` | `mediapipe` | 배경 제거 모드 (mediapipe/chromakey/off) |
 | `CHROMAKEY_RGB` | `0,255,0` | 크로마키 색상 (R,G,B). 관리자 촬영 설정 페이지에서 컬러피커로 조정 (크로마키 모드일 때만 노출) |
+| `CHROMAKEY_SIMILARITY` | 50 | 크로마키 감도 (색상 허용 거리, 1-100). 높일수록 키 색과 더 먼 색까지 제거. 촬영 설정 페이지·미리보기 슬라이더로 조정 (크로마키 모드일 때만) |
 | `CAPTURE_THRESHOLD` | 15 | AI 배경제거 경계 침식 정도 (0-100%). 높일수록 인물 가장자리를 안쪽으로 더 깎아 배경과의 경계가 또렷해짐 |
 | `CAPTURE_SMOOTHNESS` | 35 | AI 배경제거 경계 부드러움 (0-100%, 최소 1). 낮을수록 경계가 딱딱하게 잘림 |
 | `THEME_TEXT_COLOR` | `#ffffff` | 서비스 화면 글자색 (지점별). 테마 관리 페이지에서 조정 |

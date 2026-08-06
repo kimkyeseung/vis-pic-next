@@ -51,6 +51,8 @@ export interface DeviceConfig {
   /** 촬영 카메라 해상도(화질) 티어 id. 미설정 시 "fhd". */
   cameraResolution: CameraResolutionId;
   chromakeyRgb: string;
+  /** 크로마키 감도(색상 허용 거리, 1-100). 높을수록 키 색과 더 먼 색까지 제거. 기본 50. */
+  chromakeySimilarity: number;
   captureModes: string[];
   bgRemovalMode: BgRemovalMode;
   idleTimeoutSeconds: number;

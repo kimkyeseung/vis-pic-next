@@ -3,9 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { HexColorPicker } from "react-colorful";
 
-// CameraSection.tsx의 크로마키 제거 로직과 동일한 거리 임계값
-const HARD = 50 * 50;
-const SOFT = 100 * 100;
+// 크로마키 임계값은 감도(similarity)에서 파생한다 — CameraSection.tsx와 동일 규칙.
 // 배경제거 처리 해상도를 낮춰 프레임 드롭을 줄인다 (CameraSection.tsx와 동일한 이유).
 const PROCESS_SCALE = 0.5;
 // mediapipe 추론은 화면 갱신보다 훨씬 무거우므로 이 간격으로만 실행하고 재사용한다.
@@ -43,6 +41,8 @@ export function BackgroundRemovalPreviewDialog({
   mode,
   chromaColor,
   onChromaColorChange,
+  similarity,
+  onSimilarityChange,
   threshold,
   onThresholdChange,
   feather,
@@ -52,6 +52,8 @@ export function BackgroundRemovalPreviewDialog({
   mode: "mediapipe" | "chromakey";
   chromaColor: { r: number; g: number; b: number };
   onChromaColorChange: (rgb: string) => void;
+  similarity: number;
+  onSimilarityChange: (n: number) => void;
   threshold: number;
   onThresholdChange: (n: number) => void;
   feather: number;
@@ -70,9 +72,11 @@ export function BackgroundRemovalPreviewDialog({
 
   // rAF 루프가 최신 값을 읽도록 ref로 미러링 (슬라이더 조작마다 이펙트/루프를 재시작하지 않기 위함)
   const chromaColorRef = useRef(chromaColor);
+  const similarityRef = useRef(similarity);
   const thresholdRef = useRef(threshold);
   const featherRef = useRef(feather);
   useEffect(() => { chromaColorRef.current = chromaColor; }, [chromaColor]);
+  useEffect(() => { similarityRef.current = similarity; }, [similarity]);
   useEffect(() => { thresholdRef.current = threshold; }, [threshold]);
   useEffect(() => { featherRef.current = feather; }, [feather]);
 
@@ -183,6 +187,9 @@ export function BackgroundRemovalPreviewDialog({
             const imageData = offCtx.getImageData(0, 0, pw, ph);
             const data = imageData.data;
             const { r: kr, g: kg, b: kb } = chromaColorRef.current;
+            const simDist = Math.max(1, similarityRef.current);
+            const HARD = simDist * simDist;
+            const SOFT = (simDist * 2) * (simDist * 2);
             for (let i = 0; i < data.length; i += 4) {
               const dr = data[i] - kr;
               const dg = data[i + 1] - kg;
@@ -191,7 +198,7 @@ export function BackgroundRemovalPreviewDialog({
               if (distSq < HARD) {
                 data[i + 3] = 0;
               } else if (distSq < SOFT) {
-                data[i + 3] = Math.round(((Math.sqrt(distSq) - 50) / 50) * 255);
+                data[i + 3] = Math.round(((Math.sqrt(distSq) - simDist) / simDist) * 255);
               }
             }
             offCtx.putImageData(imageData, 0, 0);
@@ -274,29 +281,44 @@ export function BackgroundRemovalPreviewDialog({
         </p>
 
         {mode === "chromakey" ? (
-          <div className="relative flex items-center gap-3">
-            <button
-              type="button"
-              onClick={() => setColorPickerOpen((v) => !v)}
-              className="w-10 h-10 rounded-lg border border-gray-600 shrink-0 cursor-pointer"
-              style={{ backgroundColor: `rgb(${chromaColor.r},${chromaColor.g},${chromaColor.b})` }}
-              aria-label="색상 선택"
-            />
-            <span className="text-gray-400 text-sm font-mono">
-              {chromaColor.r},{chromaColor.g},{chromaColor.b}
-            </span>
+          <div className="space-y-3">
+            <div className="relative flex items-center gap-3">
+              <label className="text-gray-400 text-sm w-40 shrink-0">키 색상</label>
+              <button
+                type="button"
+                onClick={() => setColorPickerOpen((v) => !v)}
+                className="w-10 h-10 rounded-lg border border-gray-600 shrink-0 cursor-pointer"
+                style={{ backgroundColor: `rgb(${chromaColor.r},${chromaColor.g},${chromaColor.b})` }}
+                aria-label="색상 선택"
+              />
+              <span className="text-gray-400 text-sm font-mono">
+                {chromaColor.r},{chromaColor.g},{chromaColor.b}
+              </span>
 
-            {colorPickerOpen && (
-              <>
-                <div className="fixed inset-0 z-10" onClick={() => setColorPickerOpen(false)} />
-                <div className="absolute bottom-full left-0 mb-2 z-20 p-3 bg-gray-800 border border-gray-600 rounded-xl shadow-xl">
-                  <HexColorPicker
-                    color={rgbStringToHex(`${chromaColor.r},${chromaColor.g},${chromaColor.b}`)}
-                    onChange={(hex) => onChromaColorChange(hexToRgbString(hex))}
-                  />
-                </div>
-              </>
-            )}
+              {colorPickerOpen && (
+                <>
+                  <div className="fixed inset-0 z-10" onClick={() => setColorPickerOpen(false)} />
+                  <div className="absolute bottom-full left-0 mb-2 z-20 p-3 bg-gray-800 border border-gray-600 rounded-xl shadow-xl">
+                    <HexColorPicker
+                      color={rgbStringToHex(`${chromaColor.r},${chromaColor.g},${chromaColor.b}`)}
+                      onChange={(hex) => onChromaColorChange(hexToRgbString(hex))}
+                    />
+                  </div>
+                </>
+              )}
+            </div>
+            <div className="flex items-center gap-3">
+              <label className="text-gray-400 text-sm w-40 shrink-0">감도 ({similarity})</label>
+              <input
+                type="range"
+                min={1}
+                max={100}
+                value={similarity}
+                onChange={(e) => onSimilarityChange(Number(e.target.value))}
+                className="flex-1"
+              />
+            </div>
+            <p className="text-gray-500 text-xs">감도가 높을수록 키 색과 더 먼 색까지 제거됩니다.</p>
           </div>
         ) : (
           <div className="space-y-3">
