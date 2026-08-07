@@ -62,10 +62,24 @@ describe("tapPhoto", () => {
     expect(res.slots.includes(3)).toBe(false);
   });
 
-  it("찬 active 슬롯을 교체하면 그 슬롯에 머문다(순번 이동 안 함)", () => {
+  it("찬 슬롯을 교체해도 active는 다음 빈 슬롯으로 이동한다", () => {
+    // active=1(사진3)에서 새 사진 9 탭 → 슬롯1=9, 다음 빈 슬롯(슬롯3)으로 이동
     const res = tapPhoto([7, 3, 5, -1], 1, 9);
     expect(res.slots).toEqual([7, 9, 5, -1]);
+    expect(res.activeSlot).toBe(3);
+  });
+
+  it("빈 슬롯이 없으면(모두 채워짐) 교체 후 그 슬롯에 머문다", () => {
+    const res = tapPhoto([0, 1, 2, 3], 1, 9);
+    expect(res.slots).toEqual([0, 9, 2, 3]);
     expect(res.activeSlot).toBe(1);
+  });
+
+  it("다음 빈 슬롯 탐색은 순환한다(현재 이후에 없으면 앞쪽 빈칸)", () => {
+    // active=2 채움, 이후(슬롯3)는 찬 상태 → 앞으로 순환해 슬롯0(빈칸)로
+    const res = tapPhoto([-1, 1, -1, 3], 2, 9);
+    expect(res.slots).toEqual([-1, 1, 9, 3]);
+    expect(res.activeSlot).toBe(0);
   });
 
   it("슬롯이 1개면 사진을 클릭할 때마다 슬롯 내용이 바로 교체된다(해제 불필요)", () => {
@@ -81,10 +95,11 @@ describe("tapPhoto", () => {
   });
 
   it("한 사진은 한 슬롯만 — 다른 슬롯에 있던 사진을 active로 넣으면 옛 슬롯이 비워진다(이동)", () => {
-    // 사진 5는 슬롯 2에 있음. active=0(사진 7)에서 5 탭 → 슬롯0=5, 슬롯2 비움, 7은 교체로 빠짐
+    // 사진 5는 슬롯 2에 있음. active=0(사진 7)에서 5 탭 → 슬롯0=5, 슬롯2 비움, 7은 교체로 빠짐.
+    // 배치 후 다음 빈 슬롯(슬롯2)으로 이동.
     const res = tapPhoto([7, 3, 5, -1], 0, 5);
     expect(res.slots).toEqual([5, 3, -1, -1]);
-    expect(res.activeSlot).toBe(0);
+    expect(res.activeSlot).toBe(2);
     expect(res.slots.filter((v) => v === 5).length).toBe(1);
   });
 });
