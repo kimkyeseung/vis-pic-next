@@ -681,8 +681,13 @@ pub fn run() {
                     if let Some(window) = app_handle.get_webview_window("main") {
                         let _ = window.show();
                         let _ = window.set_focus();
-                        // 서버 준비 전 webview가 ERR_CONNECTION_REFUSED를 로드했을 수 있으므로 리로드
-                        let _ = window.reload();
+                        // 서버 준비 전 초기 내비게이션이 ERR_CONNECTION_REFUSED로 실패했을 수 있는데,
+                        // reload()는 실패한(문서 없는) 상태를 복구하지 못해 흰 화면이 남는다.
+                        // 준비된 서버 URL로 명시적으로 새 내비게이션을 수행한다(reload는 폴백).
+                        match "http://127.0.0.1:3001/".parse() {
+                            Ok(url) => { let _ = window.navigate(url); }
+                            Err(_) => { let _ = window.reload(); }
+                        }
                     }
                 });
             }
