@@ -107,8 +107,16 @@ export function BackgroundRemovalPreviewDialog({
     sctx.drawImage(video, sx, sy, 1, 1, 0, 0, 1, 1);
     const [r, g, b] = sctx.getImageData(0, 0, 1, 1).data;
     onChromaColorChange(`${r},${g},${b}`);
-    setEyedropper(false); // 한 번 추출 후 자동 해제
+    // 스포이드 모드는 유지 — 여러 번 찍어볼 수 있게 한다. 해제는 버튼 재클릭 or Esc.
   };
+
+  // 스포이드 활성 중 Esc로 해제.
+  useEffect(() => {
+    if (!eyedropper) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setEyedropper(false); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [eyedropper]);
 
   useEffect(() => {
     let cancelled = false;
@@ -297,7 +305,7 @@ export function BackgroundRemovalPreviewDialog({
 
           {eyedropper && status === "ready" && (
             <div className="absolute top-2 left-1/2 -translate-x-1/2 bg-black/70 text-white text-xs px-3 py-1 rounded-full pointer-events-none">
-              화면을 클릭해 색을 추출하세요
+              화면을 클릭해 색 추출 · 해제: 스포이드 버튼 or Esc
             </div>
           )}
 
