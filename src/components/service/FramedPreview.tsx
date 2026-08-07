@@ -130,8 +130,6 @@ export function FramedPreview({
               height: `${(s.h / ph) * 100}%`,
               borderRadius: FRAME_CORNER_RADIUS_CM * scale,
               border: `${FRAME_BORDER_CM * scale}px solid ${FRAME_BORDER_COLOR}`,
-              // active 슬롯은 안쪽 링으로 강조 (부모 overflow-hidden에 잘리지 않도록 inset)
-              boxShadow: isActive ? `inset 0 0 0 ${Math.max(2, Math.round(scale * 0.18))}px var(--theme-primary, #6c6fb4)` : undefined,
             }}
           >
             {photo ? (
@@ -145,6 +143,17 @@ export function FramedPreview({
                 {i + 1}
               </span>
             ) : null}
+            {/* active 슬롯 강조 링 — 사진 위에 그려지도록 오버레이(사진이 있어도 보임) */}
+            {isActive && (
+              <span
+                aria-hidden
+                className="pointer-events-none absolute inset-0"
+                style={{
+                  borderRadius: FRAME_CORNER_RADIUS_CM * scale,
+                  boxShadow: `inset 0 0 0 ${Math.max(2, Math.round(scale * 0.18))}px var(--theme-primary, #6c6fb4)`,
+                }}
+              />
+            )}
           </div>
         );
       })}
