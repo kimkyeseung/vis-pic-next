@@ -69,7 +69,8 @@ export function SelectSection({
       <h2 className="text-title font-extrabold text-white mb-4 animate-fadeInDown" style={{ textShadow: "0 2px 15px rgba(0,0,0,0.5)" }}>
         {t("select.title")}
       </h2>
-      <p className="text-gray-400 text-xl animate-fadeInDown">
+      {/* 사진 영역(1fr)이 위로 넘쳐 문구와 겹치지 않도록 하단 여백으로 간격 확보. */}
+      <p className="text-gray-400 text-xl mb-12 portrait:mb-8 animate-fadeInDown">
         {t("select.count", { req: requiredCount, sel: filledCount })}
       </p>
 
