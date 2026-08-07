@@ -13,6 +13,9 @@ export interface BankImage extends Bg {
   imageType: number;
   focalX: number;
   focalY: number;
+  effectFilename: string | null;
+  effectDuration: number | null;
+  effectGesture: string | null;
 }
 
 export type BankImageInput = {
@@ -24,6 +27,9 @@ export type BankImageInput = {
   imageType?: number;
   focalX?: number;
   focalY?: number;
+  effectFilename?: string | null;
+  effectDuration?: number | null;
+  effectGesture?: string | null;
 };
 
 /**
@@ -42,5 +48,8 @@ export function toBankImage(i: BankImageInput, fallbackType: number): BankImage 
     imageType: i.imageType ?? fallbackType,
     focalX: typeof i.focalX === "number" ? i.focalX : 0.5,
     focalY: typeof i.focalY === "number" ? i.focalY : 0.5,
+    effectFilename: i.effectFilename ?? null,
+    effectDuration: typeof i.effectDuration === "number" ? i.effectDuration : null,
+    effectGesture: i.effectGesture ?? null,
   };
 }

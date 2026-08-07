@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/db";
 import { deleteImage } from "@/lib/storage";
 import { requireAdmin } from "@/lib/adminAuth";
-import { BACKGROUND_IMAGE_TYPE, MAX_ACTIVE_BACKGROUNDS } from "@/constants/images";
+import { BACKGROUND_IMAGE_TYPE, MAX_ACTIVE_BACKGROUNDS, normalizeEffectGesture } from "@/constants/images";
 
 export async function PATCH(
   request: NextRequest,
@@ -33,6 +33,12 @@ export async function PATCH(
       data.effectDuration = null;
     } else if (typeof body.effectDuration === "number" && Number.isFinite(body.effectDuration)) {
       data.effectDuration = Math.max(1, Math.min(30, Math.trunc(body.effectDuration)));
+    }
+    // 이펙트 발동 제스처. null이면 기본값 사용(컬럼 비움), 문자열이면 허용 목록으로 정규화.
+    if (body.effectGesture === null) {
+      data.effectGesture = null;
+    } else if (typeof body.effectGesture === "string") {
+      data.effectGesture = normalizeEffectGesture(body.effectGesture);
     }
 
     // 배경(type 1)을 활성화하려는 경우, 이미 최대치만큼 활성화돼 있으면 거부한다.

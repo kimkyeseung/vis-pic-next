@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import type { DeviceConfig, BGImage, Sticker } from "@/types";
 import { FALLBACK_BACKGROUNDS } from "@/constants/frames";
-import { EFFECT_TRIGGER_GESTURE, DEFAULT_EFFECT_DURATION } from "@/constants/images";
+import { DEFAULT_EFFECT_GESTURE, DEFAULT_EFFECT_DURATION } from "@/constants/images";
 import { getCameraResolution } from "@/constants/camera";
 import { fillGradientFromCSS } from "@/lib/canvas";
 import { useFrameSender } from "@/hooks/useSceneSync";
@@ -123,9 +123,13 @@ export function CameraSection({
     return {
       src: `${imageBaseUrl}/${bg.effectFilename}`,
       durationMs: (bg.effectDuration ?? DEFAULT_EFFECT_DURATION) * 1000,
+      gesture: bg.effectGesture || DEFAULT_EFFECT_GESTURE,
     };
   }, [selectedBackground, backgroundImages, imageBaseUrl]);
   useEffect(() => { effectDurationRef.current = currentBgEffect?.durationMs ?? 0; }, [currentBgEffect]);
+  // 감지 루프(무-deps)가 최신 트리거 제스처를 읽도록 ref로 보관.
+  const effectGestureRef = useRef<string>(DEFAULT_EFFECT_GESTURE);
+  useEffect(() => { effectGestureRef.current = currentBgEffect?.gesture ?? DEFAULT_EFFECT_GESTURE; }, [currentBgEffect]);
 
   const stopEffect = useCallback(() => {
     if (effectTimerRef.current) { clearTimeout(effectTimerRef.current); effectTimerRef.current = null; }
@@ -343,7 +347,7 @@ export function CameraSection({
       }
 
       const isPalm = name === "Open_Palm" && score >= MIN_SCORE;
-      const isTrigger = name === EFFECT_TRIGGER_GESTURE && score >= MIN_SCORE;
+      const isTrigger = !!name && name === effectGestureRef.current && score >= MIN_SCORE;
 
       // 손바닥 → 촬영
       if (isPalm) {

@@ -53,6 +53,7 @@ export async function GET(
       focalY: img.focalY ?? 0.5,
       effectFilename: img.effectFilename ?? null,
       effectDuration: img.effectDuration ?? null,
+      effectGesture: img.effectGesture ?? null,
     }));
 
     const baseUrl = getImageBaseUrl();

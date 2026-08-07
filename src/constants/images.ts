@@ -22,9 +22,21 @@ export const MAX_ACTIVE_FRAMES = 6;
 export const MAX_ACTIVE_STICKERS = 20;
 
 // ── 배경 이펙트 영상(동작 트리거) ──
-// 촬영 화면에서 이 제스처(MediaPipe GestureRecognizer 카테고리)를 취하면 현재 배경의
-// 이펙트 영상이 재생된다. 손바닥(Open_Palm)은 이미 촬영 트리거이므로 겹치지 않게 V사인(Victory)을 쓴다.
-export const EFFECT_TRIGGER_GESTURE = "Victory";
+// 촬영 화면에서 배경별로 지정한 제스처(MediaPipe GestureRecognizer 카테고리)를 취하면
+// 현재 배경의 이펙트 영상이 재생된다. 손바닥(Open_Palm)은 촬영 트리거라 옵션에서 제외한다.
+export const EFFECT_TRIGGER_GESTURES = [
+  { value: "Victory", label: "브이 ✌️" },
+  { value: "Thumb_Up", label: "엄지 척 👍" },
+  { value: "Thumb_Down", label: "엄지 아래 👎" },
+  { value: "Pointing_Up", label: "검지 위로 ☝️" },
+  { value: "ILoveYou", label: "러브 사인 🤟" },
+  { value: "Closed_Fist", label: "주먹 ✊" },
+] as const;
+export const DEFAULT_EFFECT_GESTURE = "Victory";
+/** 저장된 제스처 값이 허용 목록에 있는지 검증. 아니면 기본값. */
+export function normalizeEffectGesture(v: string | null | undefined): string {
+  return EFFECT_TRIGGER_GESTURES.some((g) => g.value === v) ? (v as string) : DEFAULT_EFFECT_GESTURE;
+}
 // 관리자가 지속시간을 지정하지 않은 배경의 기본 최대 재생 시간(초).
 export const DEFAULT_EFFECT_DURATION = 4;
 // 관리자 설정 UI에서 허용하는 지속시간 범위(초).

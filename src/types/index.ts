@@ -87,6 +87,8 @@ export interface BGImage {
   effectFilename?: string | null;
   /** 이펙트 영상 최대 재생 시간(초). 미지정이면 기본값 사용. */
   effectDuration?: number | null;
+  /** 이펙트를 발동시키는 제스처(MediaPipe 카테고리). 미지정이면 기본값(Victory). */
+  effectGesture?: string | null;
 }
 
 export interface FallbackBackground {

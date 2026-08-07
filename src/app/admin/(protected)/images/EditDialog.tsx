@@ -7,6 +7,8 @@ import {
   DEFAULT_EFFECT_DURATION,
   EFFECT_DURATION_RANGE,
   EFFECT_VIDEO_EXTENSIONS,
+  EFFECT_TRIGGER_GESTURES,
+  DEFAULT_EFFECT_GESTURE,
 } from "@/constants/images";
 
 interface Image {
@@ -18,6 +20,7 @@ interface Image {
   imageType: number;
   effectFilename?: string | null;
   effectDuration?: number | null;
+  effectGesture?: string | null;
   focalX?: number;
   focalY?: number;
 }
@@ -79,6 +82,7 @@ export default function EditDialog({
   const [effectDuration, setEffectDuration] = useState<string>(
     String(image.effectDuration ?? DEFAULT_EFFECT_DURATION)
   );
+  const [effectGesture, setEffectGesture] = useState<string>(image.effectGesture || DEFAULT_EFFECT_GESTURE);
   const [effectBusy, setEffectBusy] = useState(false);
   const effectInputRef = useRef<HTMLInputElement>(null);
 
@@ -145,8 +149,8 @@ export default function EditDialog({
           priority: parseInt(priority) || 0,
           imageType: parseInt(imageType),
           deviceIds: selectedDeviceIds,
-          // 배경 이펙트 최대 재생 시간(초). 배경일 때만 전송.
-          ...(isBackground ? { effectDuration: parseInt(effectDuration) || DEFAULT_EFFECT_DURATION } : {}),
+          // 배경 이펙트 최대 재생 시간(초)·트리거 제스처. 배경일 때만 전송.
+          ...(isBackground ? { effectDuration: parseInt(effectDuration) || DEFAULT_EFFECT_DURATION, effectGesture } : {}),
           // 프레임 포컬(인화지 배치 기준점). 프레임일 때만 전송.
           ...(isFrame ? { focalX, focalY } : {}),
         }),
@@ -321,7 +325,7 @@ export default function EditDialog({
             <div className="rounded-lg border border-gray-700 bg-gray-900/40 p-4">
               <label className="mb-1 block font-medium text-gray-200">동작 트리거 이펙트 영상</label>
               <p className="mb-3 text-sm text-gray-500">
-                촬영 화면에서 손으로 <span className="text-gray-300">V 사인(브이)</span>을 취하면
+                촬영 화면에서 아래에서 지정한 <span className="text-gray-300">제스처</span>를 취하면
                 이 배경 위에 스크린 블렌드로 재생됩니다. ({EFFECT_VIDEO_EXTENSIONS.join(", ")})
               </p>
 
@@ -363,6 +367,22 @@ export default function EditDialog({
                 className="block w-full text-sm text-gray-300 file:mr-3 file:rounded-lg file:border-0 file:bg-blue-600 file:px-4 file:py-2 file:text-white hover:file:bg-blue-500 disabled:opacity-50"
               />
               {effectBusy && <p className="mt-2 text-sm text-blue-400">처리 중…</p>}
+
+              <div className="mt-4">
+                <label className="mb-1 block text-gray-300">트리거 제스처</label>
+                <select
+                  value={effectGesture}
+                  onChange={(e) => setEffectGesture(e.target.value)}
+                  className="w-full rounded-lg border border-gray-600 bg-gray-700 px-4 py-2.5 text-white focus:border-blue-500 focus:outline-none"
+                >
+                  {EFFECT_TRIGGER_GESTURES.map((g) => (
+                    <option key={g.value} value={g.value}>{g.label}</option>
+                  ))}
+                </select>
+                <p className="mt-1 text-sm text-gray-500">
+                  이 제스처를 취하면 영상이 재생됩니다. (손바닥은 촬영 트리거라 제외)
+                </p>
+              </div>
 
               <div className="mt-4">
                 <label className="mb-1 block text-gray-300">최대 재생 시간(초)</label>

@@ -259,7 +259,7 @@
   - 세션 리셋 후 재시작 시에도 재선택
 - 배경 선택 단계 진입 시 자동 선택된 항목이 활성(체크마크) 표시됨
 - 선택된 배경이 카메라 합성 및 서브 모니터 미리보기에 사용됨
-- **배경별 동작 트리거 이펙트 영상**(선택): 관리자가 배경마다 이펙트 영상(mp4/webm)을 붙일 수 있고, 촬영 화면에서 **V사인 제스처** 시 재생된다 (§26)
+- **배경별 동작 트리거 이펙트 영상**(선택): 관리자가 배경마다 이펙트 영상(mp4/webm)과 **트리거 제스처**를 지정할 수 있고, 촬영 화면에서 그 제스처(기본 V사인) 시 재생된다 (§26)
 
 ### Step 5: CAMERA CAPTURE (메인 루프)
 
@@ -274,7 +274,7 @@
   3. 스티커 오버레이
   4. 서브 모니터 동기화 (활성 시 `/api/camera-frame` POST)
   5. 카운트다운 타이머 표시
-- **동작 트리거 이펙트 영상**: 현재 배경에 이펙트 영상이 설정돼 있으면 **V사인(Victory) 제스처** 시 프리뷰 위에 스크린 블렌드로 재생(지정 시간 or 영상 종료까지). 촬영 트리거(손바닥)와 별개 제스처 (§26)
+- **동작 트리거 이펙트 영상**: 현재 배경에 이펙트 영상이 설정돼 있으면 **배경별로 지정한 제스처**(기본 Victory) 시 프리뷰 위에 스크린 블렌드로 재생(지정 시간 or 영상 종료까지). 촬영 트리거(손바닥)와 별개 제스처 (§26)
 - 자동 촬영 타이머는 `useAutoCaptureTimer` 훅으로 분리 — 배경 변경·스티커 적용 등 리렌더에도 리셋되지 않는다
 - **촬영 시퀀스**:
   - 자동 타이머 경과, 사용자 클릭, 또는 **손바닥 제스처**(§26) 중 하나로 시작
@@ -521,6 +521,7 @@ useSceneSyncReceiver → BroadcastChannel.onmessage(state)   ※ 레거시
 | focalX / focalY | Float? | 초점 좌표 (0~1, 기본 0.5). cover 배치 시 중심 |
 | effectFilename | String? | **배경(type 1) 전용** — 동작(제스처) 트리거 시 촬영 화면에 스크린 블렌드로 재생되는 이펙트 영상 파일명. null=없음 (§26) |
 | effectDuration | Int? | 이펙트 영상 최대 재생 시간(초). 영상이 더 짧으면 종료. null이면 기본값(4초) |
+| effectGesture | String? | 이펙트를 발동시키는 제스처(MediaPipe 카테고리, 예: Victory). null이면 기본값(Victory). 관리자 배경 편집에서 select (§26) |
 | createdAt | DateTime | 생성 시각 |
 
 **`ImageDevice`** - 이미지 ↔ 디바이스 다대다 (테이블 `pic_image_device`)
@@ -1366,13 +1367,14 @@ npm run tauri:build
 - **성능**: `mediapipe` 배경 모드에서는 세그멘터+제스처 추론이 함께 돌아 부하가 증가하므로
   프레임 드롭 시 `GESTURE_INTERVAL_MS`를 올린다.
 
-### V사인(Victory) → 배경 이펙트 영상
+### 제스처 → 배경 이펙트 영상
 
-- 같은 감지 루프에서 **V사인(Victory)** 도 함께 인식한다(손바닥=촬영과 별개, 독립 arming).
-- 현재 선택된 배경에 이펙트 영상(`Image.effectFilename`, §9)이 설정돼 있으면, V사인 홀드 시 프리뷰 위에
+- 같은 감지 루프에서 **배경별로 지정한 제스처**(`Image.effectGesture`, 기본 Victory)를 손바닥(촬영)과 별개로 인식한다(독립 arming).
+- 현재 선택된 배경에 이펙트 영상(`Image.effectFilename`, §9)이 설정돼 있으면, 그 제스처 홀드 시 프리뷰 위에
   **`<video>` 스크린 블렌드 오버레이**로 1회 재생한다. `effectDuration`(초) 경과 또는 영상 종료 중 먼저 도달하면 정지.
-- 관리자: 이미지 관리 → 배경 편집(EditDialog)에서 이펙트 영상 업로드/제거 + 최대 재생시간 지정
-  (`POST/DELETE /api/admin/images/[id]/effect`, §8). 상수는 `EFFECT_TRIGGER_GESTURE`(=Victory)·`DEFAULT_EFFECT_DURATION`(`src/constants/images.ts`).
+- 관리자: 이미지 관리 → 배경 편집(EditDialog)에서 이펙트 영상 업로드/제거 + **트리거 제스처(select)** + 최대 재생시간 지정
+  (`POST/DELETE /api/admin/images/[id]/effect`, PATCH로 제스처·시간 저장, §8).
+- 제스처 옵션은 `EFFECT_TRIGGER_GESTURES`(Victory·Thumb_Up·Thumb_Down·Pointing_Up·ILoveYou·Closed_Fist — 손바닥은 촬영 트리거라 제외), 기본 `DEFAULT_EFFECT_GESTURE`(`src/constants/images.ts`).
 
 ---
 

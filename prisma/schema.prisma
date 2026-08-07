@@ -120,6 +120,8 @@ model Image {
   effectFilename String? @map("effect_filename") @db.VarChar(128)
   /// 이펙트 영상 최대 재생 시간(초). 영상이 더 짧으면 끝날 때 종료. null이면 기본값 사용.
   effectDuration Int?    @map("effect_duration")
+  /// 이펙트 영상을 발동시키는 제스처(MediaPipe 카테고리, 예: Victory). null이면 기본값(Victory).
+  effectGesture  String? @map("effect_gesture") @db.VarChar(32)
   createdAt DateTime  @default(now()) @map("created_at") @db.Timestamp(6)
   type      ImageType @relation(fields: [imageType], references: [id], onDelete: NoAction, onUpdate: NoAction)
   devices   ImageDevice[]
