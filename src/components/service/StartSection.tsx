@@ -32,10 +32,10 @@ export function StartSection({
       <div className="main-container flex flex-col items-center max-w-[92vw]">
         {/* 버튼 대신 깜빡이는 안내 문구 — 화면 아무 곳이나 터치하면 시작(section onClick) */}
         <div
-          className="flex items-center gap-4 text-white text-5xl portrait:text-4xl font-extrabold animate-soft-blink select-none max-w-[90vw] text-center"
+          className="flex items-center gap-4 text-white text-6xl portrait:text-7xl font-extrabold animate-soft-blink select-none max-w-[90vw] text-center"
           style={{ textShadow: "0 2px 15px rgba(0,0,0,0.5)" }}
         >
-          <span className="inline-block text-4xl portrait:text-3xl">&#128070;</span>
+          <span className="inline-block text-5xl portrait:text-6xl">&#128070;</span>
           {t("start.touch")}
         </div>
 
@@ -45,7 +45,7 @@ export function StartSection({
             {LOCALES.map(({ code, label }) => (
               <button
                 key={code}
-                className={`px-8 py-4 rounded-2xl text-2xl font-semibold transition-all ${
+                className={`px-10 py-5 rounded-2xl text-3xl font-semibold transition-all ${
                   lang === code
                     ? "bg-white text-gray-900 shadow-lg"
                     : "bg-white/10 text-white/60 hover:bg-white/20 hover:text-white"
@@ -60,7 +60,7 @@ export function StartSection({
         <img src="/static/viswave_logo.png" className="mt-24 portrait:mt-12 opacity-80 max-w-[50vw]" style={{ width: "200px" }} alt="Viswave" onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
       </div>
 
-      <div className="absolute bottom-16 text-center text-gray-500 animate-fadeInUp" style={{ animationDelay: "1s" }}>
+      <div className="absolute bottom-16 text-center text-gray-500 text-xl animate-fadeInUp" style={{ animationDelay: "1s" }}>
         <p className="mb-2">{t("start.hint")}</p>
         <p className="animate-blink">{t("start.waiting")}</p>
       </div>
