@@ -20,7 +20,6 @@ export async function POST(request: NextRequest) {
     const file = formData.get("file") as File | null;
     const name = formData.get("name") as string;
     const imageType = parseInt(formData.get("imageType") as string) || 1;
-    const priority = parseInt(formData.get("priority") as string) || 0;
 
     // deviceIds: JSON 배열 문자열. 비어 있으면 모든 디바이스에 적용된다.
     let targetDeviceIds: string[] = [];
@@ -89,7 +88,6 @@ export async function POST(request: NextRequest) {
         name: name.slice(0, 32),
         filename,
         imageType,
-        priority,
         active: await defaultActiveForNewImage(imageType),
         devices: {
           create: targetDeviceIds.map((deviceId) => ({ deviceId })),

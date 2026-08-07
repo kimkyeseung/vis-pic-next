@@ -9,7 +9,7 @@ export async function POST(request: NextRequest) {
   if (authError) return authError;
 
   try {
-    const { filename, name, imageType, deviceIds, priority } = await request.json();
+    const { filename, name, imageType, deviceIds } = await request.json();
 
     if (!filename || !name) {
       return NextResponse.json({ error: "filename and name are required" }, { status: 400 });
@@ -28,7 +28,6 @@ export async function POST(request: NextRequest) {
         name: truncatedName,
         filename,
         imageType: resolvedType,
-        priority: parseInt(priority) || 0,
         active: await defaultActiveForNewImage(resolvedType),
         devices: {
           create: targetDeviceIds.map((deviceId) => ({ deviceId })),

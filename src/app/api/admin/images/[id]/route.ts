@@ -24,9 +24,6 @@ export async function PATCH(
     if (body.imageType === 1 || body.imageType === 2 || body.imageType === 3) {
       data.imageType = body.imageType;
     }
-    if (typeof body.priority === "number" && Number.isFinite(body.priority)) {
-      data.priority = Math.trunc(body.priority);
-    }
     if (typeof body.active === "boolean") data.active = body.active;
     // 배경 이펙트 최대 재생 시간(초). null이면 기본값 사용(컬럼 비움).
     if (body.effectDuration === null) {
@@ -100,7 +97,6 @@ export async function PATCH(
       image: updated && {
         id: updated.id,
         name: updated.name,
-        priority: updated.priority,
         active: updated.active,
         focalX: updated.focalX,
         focalY: updated.focalY,

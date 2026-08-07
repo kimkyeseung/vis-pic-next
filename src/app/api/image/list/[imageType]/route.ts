@@ -31,7 +31,7 @@ export async function GET(
 
     const images = await prisma.image.findMany({
       where: whereClause,
-      orderBy: { priority: "desc" },
+      orderBy: { createdAt: "desc" },
       include: { devices: { select: { deviceId: true } } },
     });
 
@@ -47,7 +47,6 @@ export async function GET(
       top: img.top,
       right: img.right,
       bottom: img.bottom,
-      priority: img.priority,
       active: img.active,
       focalX: img.focalX ?? 0.5,
       focalY: img.focalY ?? 0.5,

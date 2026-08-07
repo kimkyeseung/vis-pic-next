@@ -171,7 +171,7 @@ export function useDeviceSetup(deviceId: string) {
     }
 
     // 테마 배경화면(wallpaper, imageType 5) — 서비스 화면 전체 배경.
-    // 여러 장 있으면 priority 최상위(목록 첫 항목) 한 장만 사용한다.
+    // 여러 장 있으면 목록 첫 항목(최신순) 한 장만 사용한다.
     async function loadWallpaper(id: string, attempt = 0) {
       const MAX_RETRIES = 5;
       const retry = () => {

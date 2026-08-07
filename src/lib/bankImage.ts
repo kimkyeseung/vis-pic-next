@@ -8,7 +8,6 @@ export interface Bg {
 
 /** 편집 다이얼로그에 넘기기 위한 확장 정보. */
 export interface BankImage extends Bg {
-  priority: number;
   deviceIds: string[];
   imageType: number;
   focalX: number;
@@ -22,7 +21,6 @@ export type BankImageInput = {
   id: number;
   name: string;
   filename: string;
-  priority?: number;
   deviceIds?: string[];
   imageType?: number;
   focalX?: number;
@@ -43,7 +41,6 @@ export function toBankImage(i: BankImageInput, fallbackType: number): BankImage 
     id: i.id,
     name: i.name,
     filename: i.filename,
-    priority: i.priority ?? 0,
     deviceIds: i.deviceIds ?? [],
     imageType: i.imageType ?? fallbackType,
     focalX: typeof i.focalX === "number" ? i.focalX : 0.5,

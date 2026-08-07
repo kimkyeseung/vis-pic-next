@@ -25,14 +25,13 @@ describe("toBankImage", () => {
     expect(toBankImage(bad, 2)).toMatchObject({ focalX: 0.5, focalY: 0.5 });
   });
 
-  it("priority/deviceIds/imageType 기본값과 전달값", () => {
+  it("deviceIds/imageType 기본값과 전달값", () => {
     expect(toBankImage({ id: 5, name: "n", filename: "x" }, 2)).toMatchObject({
-      priority: 0,
       deviceIds: [],
       imageType: 2, // fallbackType 사용
     });
     expect(
-      toBankImage({ id: 5, name: "n", filename: "x", priority: 3, deviceIds: ["d1"], imageType: 1 }, 2),
-    ).toMatchObject({ priority: 3, deviceIds: ["d1"], imageType: 1 });
+      toBankImage({ id: 5, name: "n", filename: "x", deviceIds: ["d1"], imageType: 1 }, 2),
+    ).toMatchObject({ deviceIds: ["d1"], imageType: 1 });
   });
 });

@@ -15,7 +15,6 @@ interface Image {
   id: number;
   name: string;
   filename: string;
-  priority: number;
   deviceIds: string[];
   imageType: number;
   effectFilename?: string | null;
@@ -49,7 +48,6 @@ export default function EditDialog({
   onSaved,
 }: EditDialogProps) {
   const [name, setName] = useState(image.name);
-  const [priority, setPriority] = useState(String(image.priority));
   const [imageType, setImageType] = useState(String(image.imageType));
   const [selectedDeviceIds, setSelectedDeviceIds] = useState<string[]>(
     image.deviceIds ?? []
@@ -146,7 +144,6 @@ export default function EditDialog({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name: name.slice(0, 32),
-          priority: parseInt(priority) || 0,
           imageType: parseInt(imageType),
           deviceIds: selectedDeviceIds,
           // 배경 이펙트 최대 재생 시간(초)·트리거 제스처. 배경일 때만 전송.
@@ -233,17 +230,6 @@ export default function EditDialog({
             <p className="mt-1 text-sm text-gray-500">
               잘못된 탭에 올린 이미지를 여기서 옮길 수 있습니다.
             </p>
-          </div>
-
-          <div>
-            <label className="mb-2 block text-gray-300">우선순위</label>
-            <input
-              type="number"
-              value={priority}
-              onChange={(e) => setPriority(e.target.value)}
-              className="w-full rounded-lg border border-gray-600 bg-gray-700 px-4 py-2.5 text-white focus:border-blue-500 focus:outline-none"
-            />
-            <p className="mt-1 text-sm text-gray-500">숫자가 클수록 먼저 표시됩니다.</p>
           </div>
 
           <div>

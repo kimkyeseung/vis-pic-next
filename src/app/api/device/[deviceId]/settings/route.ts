@@ -35,7 +35,7 @@ export async function GET(
           { devices: { some: { deviceId } } },
         ],
       },
-      orderBy: { priority: "desc" },
+      orderBy: { createdAt: "desc" },
       include: { devices: { select: { deviceId: true } } },
     });
 
@@ -56,7 +56,6 @@ export async function GET(
         filename: img.filename,
         width: img.width,
         height: img.height,
-        priority: img.priority,
       })),
     });
   } catch (error) {
