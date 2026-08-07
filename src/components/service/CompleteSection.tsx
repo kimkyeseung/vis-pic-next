@@ -79,6 +79,54 @@ export function CompleteSection({
   const [qrExpiryDate, setQrExpiryDate] = useState<string | null>(preparedExpiryDate ?? null);
   const compositeRef = useRef(false);
 
+  // 가로 결과물(1컷·4컷 등 landscape)일 때, QR 카드 영역의 상·하단을 결과물 프레임과
+  // 정확히 일치시키기 위해 프레임 높이를 측정해 카드 블록에 강제한다(세로 결과물은 제외).
+  const isLandscapeResult = (FRAME_INFO[selectedFrame]?.orientation ?? "landscape") !== "portrait";
+  const previewBoxRef = useRef<HTMLDivElement>(null);
+  const [previewH, setPreviewH] = useState<number | null>(null);
+  // 뷰포트가 세로면 좌우가 아닌 상하 스택 레이아웃이므로 높이 일치를 적용하지 않는다.
+  const [stacked, setStacked] = useState(false);
+
+  useEffect(() => {
+    const el = previewBoxRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(() => setPreviewH(el.getBoundingClientRect().height));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [compositeImage, printStatus]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const mq = window.matchMedia("(orientation: portrait)");
+    const update = () => setStacked(mq.matches);
+    update();
+    mq.addEventListener("change", update);
+    return () => mq.removeEventListener("change", update);
+  }, []);
+
+  const matchHeight = isLandscapeResult && !stacked && previewH != null;
+
+  // QR 다운로드 카드 1개 렌더. matchHeight면 카드가 프레임 높이에 stretch되고 QR이 남은
+  // 세로 공간에 맞춰 반응형으로 축소된다(라벨은 고정, QR 박스만 flex-1로 늘고 줆).
+  const renderQRCard = (url: string, emoji: string, label: string) => (
+    <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-6 border border-white/20 text-center flex flex-col items-center min-w-0">
+      <div className="text-3xl mb-2 shrink-0">{emoji}</div>
+      <p className="text-white text-xl font-semibold mb-4 shrink-0">{label}</p>
+      <div
+        className={`bg-white p-4 rounded-xl cursor-pointer ${matchHeight ? "flex-1 min-h-0 w-full flex items-center justify-center" : ""}`}
+        onDoubleClick={() => openDebugUrl(url)}
+      >
+        {matchHeight ? (
+          // 남은 세로 공간에 맞춰 축소(라벨은 고정). 과대·가로 오버플로 방지로 상한 200px.
+          <QRCodeSVG value={url} size={180} className="h-full w-auto max-h-[200px] max-w-full" style={{ aspectRatio: "1 / 1" }} />
+        ) : (
+          <QRCodeSVG value={url} size={180} />
+        )}
+      </div>
+      <p className="text-gray-400 text-sm mt-3 shrink-0">{t("complete.qrScan")}</p>
+    </div>
+  );
+
   const toFullUrl = (url: string) =>
     url.startsWith("http") ? url : window.location.origin + url;
 
@@ -501,43 +549,21 @@ export function CompleteSection({
               {printStatus === "done" ? t("complete.done") : t("complete.ready")}
             </h2>
 
-            {/* 좌우 반반(12컬럼 6/6): 미리보기 | QR. 세로에선 상하 스택. */}
-            <div className="flex items-center justify-center gap-10 mb-6 w-full max-w-6xl portrait:flex-col portrait:items-center portrait:gap-5">
+            {/* 좌우 반반(12컬럼 6/6): 미리보기 | QR. 세로에선 상하 스택.
+                가로 결과물(matchHeight)에선 QR 카드 상·하단을 프레임에 맞추려 상단 정렬. */}
+            <div className={`flex justify-center gap-10 mb-6 w-full max-w-6xl portrait:flex-col portrait:items-center portrait:gap-5 ${matchHeight ? "items-start" : "items-center"}`}>
               <div className="flex-1 flex justify-center min-w-0 portrait:w-full">
-                <div className="rounded-2xl overflow-hidden" style={{ boxShadow: "0 20px 50px rgba(0,0,0,0.4)" }}>
+                <div ref={previewBoxRef} className="rounded-2xl overflow-hidden" style={{ boxShadow: "0 20px 50px rgba(0,0,0,0.4)" }}>
                   <img src={compositeImage} alt="Composite" className="max-h-[54vh] portrait:max-h-[40vh] w-auto object-contain block" />
                 </div>
               </div>
 
               {(qrPhotoUrl || qrGifUrl) && (
                 <div className="flex-1 flex flex-col items-center gap-6 min-w-0 portrait:w-full">
-                  <div className="flex gap-6">
-                    {qrPhotoUrl && (
-                      <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-6 border border-white/20 text-center">
-                        <div className="text-3xl mb-2">📷</div>
-                        <p className="text-white text-xl font-semibold mb-4">{t("complete.photoDl")}</p>
-                        <div
-                          className="bg-white p-4 rounded-xl cursor-pointer"
-                          onDoubleClick={() => openDebugUrl(qrPhotoUrl)}
-                        >
-                          <QRCodeSVG value={qrPhotoUrl} size={180} />
-                        </div>
-                        <p className="text-gray-400 text-sm mt-3">{t("complete.qrScan")}</p>
-                      </div>
-                    )}
-                    {qrGifUrl && (
-                      <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-6 border border-white/20 text-center">
-                        <div className="text-3xl mb-2">🎬</div>
-                        <p className="text-white text-xl font-semibold mb-4">{t("complete.gifDl")}</p>
-                        <div
-                          className="bg-white p-4 rounded-xl cursor-pointer"
-                          onDoubleClick={() => openDebugUrl(qrGifUrl)}
-                        >
-                          <QRCodeSVG value={qrGifUrl} size={180} />
-                        </div>
-                        <p className="text-gray-400 text-sm mt-3">{t("complete.qrScan")}</p>
-                      </div>
-                    )}
+                  {/* matchHeight면 카드 블록 높이를 프레임 높이로 고정 → 카드가 stretch되어 상·하단 일치 */}
+                  <div className="flex gap-6 max-w-full" style={matchHeight ? { height: previewH ?? undefined } : undefined}>
+                    {qrPhotoUrl && renderQRCard(qrPhotoUrl, "📷", t("complete.photoDl"))}
+                    {qrGifUrl && renderQRCard(qrGifUrl, "🎬", t("complete.gifDl"))}
                   </div>
 
                   {qrExpiryDate && (
