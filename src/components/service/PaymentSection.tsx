@@ -159,17 +159,17 @@ export function PaymentSection({
                 <button
                   key={tier.qty}
                   onClick={() => selectQty(tier.qty)}
-                  className={`w-56 h-56 portrait:w-full portrait:h-32 rounded-2xl flex flex-col items-center justify-center gap-2 transition-all duration-200 border-2 ${
+                  className={`w-56 h-56 portrait:w-full portrait:h-72 rounded-2xl flex flex-col items-center justify-center gap-2 portrait:gap-4 transition-all duration-200 border-2 ${
                     selected
                       ? "bg-white border-white scale-[1.04] shadow-2xl"
                       : "border-white/20 hover:border-white/40"
                   }`}
                   style={selected ? {} : { background: "var(--theme-primary, #6c6fb4)" }}
                 >
-                  <span className={`text-5xl portrait:text-4xl font-extrabold ${selected ? "text-[#4a4e8c]" : "text-white"}`}>
+                  <span className={`text-5xl portrait:text-6xl font-extrabold ${selected ? "text-[#4a4e8c]" : "text-white"}`}>
                     {t("payment.sheets", { count: String(tier.qty) })}
                   </span>
-                  <span className={`text-2xl portrait:text-xl font-bold ${selected ? "text-[#4a4e8c]" : "text-white/90"}`}>
+                  <span className={`text-2xl portrait:text-3xl font-bold ${selected ? "text-[#4a4e8c]" : "text-white/90"}`}>
                     {t("payment.amount", { amount: fmt(tier.price) })}
                   </span>
                 </button>
