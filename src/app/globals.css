@@ -1,6 +1,18 @@
 @import "tailwindcss";
 @import "pretendard/dist/web/static/pretendard.css";
 
+/* portrait: 유틸리티를 "실제 세로 뷰포트" 또는 ".force-portrait" 조상에서 적용되도록 재정의.
+   관리자 미리보기는 가로 창 안에서 세로 스테이지를 축소해 흉내내므로 뷰포트 미디어쿼리가
+   맞지 않는다. 스테이지에 .force-portrait를 부여하면 실제 세로 화면과 동일하게 렌더된다. */
+@custom-variant portrait {
+  @media (orientation: portrait) {
+    @slot;
+  }
+  &:where(.force-portrait, .force-portrait *) {
+    @slot;
+  }
+}
+
 /* ============================================================
    DESIGN SYSTEM — 디자인 토큰 (폰트 · 컬러를 여기서 한 곳에 관리)
 
@@ -361,6 +373,8 @@ body {
 @media (orientation: portrait) {
   .nav-button { min-height: 104px; padding: 18px 46px; font-size: 1.6em; }
 }
+/* 미리보기(.force-portrait)에서도 동일 적용 — 위 미디어쿼리는 실제 세로 뷰포트에서만 맞음 */
+.force-portrait .nav-button { min-height: 104px; padding: 18px 46px; font-size: 1.6em; }
 
 /* 프레임 옵션 */
 .frame-option {

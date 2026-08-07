@@ -341,6 +341,16 @@ export default function PreviewPage() {
               {orientation === "landscape" ? "가로 1920×1080" : "세로 1080×1920"}
             </button>
           </div>
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-semibold text-gray-500 uppercase">결과물</span>
+            {/* 결과물(프레임) 방향 토글: 세로 2컷(2x1) ↔ 가로 4컷(2x2). 프레임/선택/완료 미리보기에 반영 */}
+            <button
+              onClick={() => selectFrame(FRAME_INFO[selectedFrame]?.orientation === "portrait" ? "2x2" : "2x1")}
+              className="px-3 py-1 rounded bg-gray-700 text-gray-200 text-sm hover:bg-gray-600"
+            >
+              {FRAME_INFO[selectedFrame]?.orientation === "portrait" ? "세로 2컷" : "가로 4컷"}
+            </button>
+          </div>
           <label className="flex items-center gap-2 text-sm text-gray-300">
             글자색
             <input type="color" value={themeText} onChange={(e) => setThemeText(e.target.value)} className="h-7 w-9 rounded bg-transparent" />
@@ -363,7 +373,8 @@ export default function PreviewPage() {
         <p className="text-xs text-gray-500">
           * 촬영 화면은 실제 <code>CameraSection</code>을 그대로 렌더합니다(라이브 카메라). 카메라를
           허용하지 않으면 중앙만 에러 박스로 표시되고 3단 레이아웃은 실제와 동일합니다. 세로 방향은
-          치수만 바뀌며, <code>portrait:</code> 전용 스타일은 실제 브라우저 창이 세로일 때만 완전히 적용됩니다.
+          스테이지에 <code>.force-portrait</code>를 부여해 <code>portrait:</code> 전용 스타일을 실제
+          세로 화면과 동일하게 적용합니다.
         </p>
       </div>
 
@@ -372,7 +383,7 @@ export default function PreviewPage() {
         <div style={{ width: stageW * scale, height: stageH * scale }}>
           <LanguageProvider>
             <LangController lang={lang} />
-            <div className="service-theme relative overflow-hidden shadow-2xl" style={stageStyle}>
+            <div className={`service-theme relative overflow-hidden shadow-2xl ${orientation === "portrait" ? "force-portrait" : ""}`} style={stageStyle}>
               {/* 좌측 상단 로고 — 첫(대기) 화면 제외. 미리보기는 기본 AR-pic로 표시. */}
               {step !== "start" && (
                 <div className="absolute top-6 left-8 z-20 pointer-events-none select-none">
