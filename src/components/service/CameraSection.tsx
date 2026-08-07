@@ -971,6 +971,10 @@ export function CameraSection({
   const canProceed = photos.length >= minPhotos;
   const showBgStrip = bgRemovalMode !== "off";
   const bgOptions = backgroundImages.length > 0 ? backgroundImages : FALLBACK_BACKGROUNDS;
+  // 프리뷰 컨테이너는 place-self-center로 내부 canvas의 intrinsic 크기에 맞춰 커진다.
+  // 카메라 실행 시엔 canvas가 영상 해상도(4:3)로 커지지만, 실행 전엔 canvas 기본값(300×150)이라
+  // 컨테이너가 작게 나온다. 실행 전에도 같은 크기가 되도록 초기 canvas 크기를 촬영 해상도로 지정한다.
+  const previewRes = getCameraResolution(config.cameraResolution);
 
   return (
     <section
@@ -1142,7 +1146,7 @@ export function CameraSection({
             </div>
           ) : (
             <>
-              <canvas ref={displayCanvasRef} className="camera-video" />
+              <canvas ref={displayCanvasRef} className="camera-video" width={previewRes.width} height={previewRes.height} />
               {/* 스티커 전용 레이어: 메인 합성 루프와 분리되어 60fps로 부드럽게 이동 */}
               <canvas ref={stickerCanvasRef} className="camera-video absolute inset-0 pointer-events-none" />
             </>
