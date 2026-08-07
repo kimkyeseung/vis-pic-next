@@ -107,7 +107,7 @@ export function FrameSection({
       </h2>
 
       <div className="min-h-0 flex items-center justify-center">
-      <div className={`flex gap-10 animate-fadeInUp ${usePortraitGrid ? "portrait:grid portrait:grid-cols-3 portrait:gap-5 portrait:w-full portrait:max-w-3xl portrait:items-stretch" : "portrait:gap-6"}`}>
+      <div className={`flex gap-10 animate-fadeInUp ${usePortraitGrid ? "portrait:grid portrait:grid-cols-3 portrait:gap-6 portrait:w-full portrait:max-w-5xl portrait:items-stretch" : "portrait:gap-6"}`}>
         {frames.map((frame) => (
           <div
             key={frame.id}
@@ -115,10 +115,10 @@ export function FrameSection({
             onClick={() => onSelect(frame.id)}
           >
             {selectedFrame === frame.id && <span className="check-mark">&#10003;</span>}
-            <div className="h-48 portrait:h-36 flex items-center justify-center mb-5">
+            <div className="h-48 portrait:h-52 flex items-center justify-center mb-5">
               <PaperPreview mode={frame.id} frame={frame} frameSrc={frameSrc} />
             </div>
-            <span className="text-2xl font-bold text-white">{t("frame.cut", { n: frame.count })}</span>
+            <span className="text-2xl portrait:text-3xl font-bold text-white">{t("frame.cut", { n: frame.count })}</span>
           </div>
         ))}
       </div>
