@@ -28,12 +28,13 @@ export function PrintBgSection({
       </h2>
 
       <div className="min-h-0 flex items-center justify-center">
-        <div className="grid grid-cols-3 gap-10 animate-fadeInUp portrait:grid-cols-2 portrait:gap-6">
+        {/* 세로: 2열 그리드(6개 → 2×3). 프레임을 크게 보이도록 셀을 꽉 채우고 폭을 넓힌다. */}
+        <div className="grid grid-cols-3 gap-10 animate-fadeInUp portrait:grid-cols-2 portrait:gap-6 portrait:w-full portrait:max-w-4xl">
           {printBgImages.map((bg) => (
             <div
               key={bg.id}
               // 타일이 프레임 이미지의 실제 비율에 딱 맞도록(빈 공간·잘림 없이) 높이는 이미지에서 결정
-              className={`background-option w-72 portrait:w-64 relative ${selectedPrintBg === bg.id ? "selected" : ""}`}
+              className={`background-option w-72 portrait:w-full relative ${selectedPrintBg === bg.id ? "selected" : ""}`}
               style={{ aspectRatio: "auto" }}
               onClick={() => onSelect(bg.id)}
             >
