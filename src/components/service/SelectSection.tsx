@@ -98,7 +98,7 @@ export function SelectSection({
                 return (
                   <div
                     key={i}
-                    className={`photo-thumbnail w-80 portrait:w-56 bg-black/30 relative overflow-hidden ${isSelected ? "selected" : ""}`}
+                    className={`photo-thumbnail w-80 portrait:w-[420px] bg-black/30 relative overflow-hidden ${isSelected ? "selected" : ""}`}
                     style={{ aspectRatio: "auto" }}
                     onClick={() => handlePhotoTap(i)}
                   >
