@@ -1249,8 +1249,21 @@ export function CameraSection({
           </div>
         </div>
 
+        {/* 손바닥 촬영 안내 — 스티커와 남은 촬영 횟수 사이 여백에 강조 표시 */}
+        <div className="flex-1 flex items-center justify-center px-2 min-h-0">
+          <div
+            className="text-center rounded-2xl px-6 py-7 border border-[var(--theme-primary,#6c6fb4)]/50 bg-[var(--theme-primary,#6c6fb4)]/10"
+            style={{ boxShadow: "0 0 34px -10px var(--theme-primary, #6c6fb4)" }}
+          >
+            <div className="text-6xl mb-3 animate-soft-blink select-none" aria-hidden>✋</div>
+            <p className="text-white font-extrabold text-2xl leading-snug break-keep">
+              {t("camera.palmHint")}
+            </p>
+          </div>
+        </div>
+
         {/* 남은 촬영 횟수 — 스티커 패널 맨 아래에 함께 표시 */}
-        <div className="mt-auto shrink-0 w-full text-center border border-dashed border-white/30 rounded-xl py-4">
+        <div className="shrink-0 w-full text-center border border-dashed border-white/30 rounded-xl py-4">
           <span className="text-white font-bold text-3xl">
             {t("camera.remaining", { n: String(Math.max(0, maxPhotos - photos.length)) })}
           </span>
