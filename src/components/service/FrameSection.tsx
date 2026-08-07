@@ -101,12 +101,13 @@ export function FrameSection({
   const usePortraitGrid = frames.length > 3;
 
   return (
-    <section className={`${SERVICE_SECTION_CLASS} grid-rows-[auto_1fr]`}>
+    <section className={`${SERVICE_SECTION_CLASS} grid-rows-[auto_1fr] px-16`}>
       <h2 className="text-title font-extrabold text-white animate-fadeInDown" style={{ textShadow: "0 2px 15px rgba(0,0,0,0.5)" }}>
         {t("frame.title")}
       </h2>
 
-      <div className="min-h-0 flex items-center justify-center">
+      {/* 결제 단계와 동일하게 w-full 래퍼로 폭을 채워 좌우 여백을 맞춘다(세로 3열 그리드가 넓게 퍼지도록). */}
+      <div className="min-h-0 w-full flex items-center justify-center">
       <div className={`flex gap-10 animate-fadeInUp ${usePortraitGrid ? "portrait:grid portrait:grid-cols-3 portrait:gap-6 portrait:w-full portrait:max-w-5xl portrait:items-stretch" : "portrait:gap-6"}`}>
         {frames.map((frame) => (
           <div
