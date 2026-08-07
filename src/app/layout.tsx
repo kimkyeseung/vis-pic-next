@@ -26,7 +26,7 @@ export default function RootLayout({
         </MediapipeLoader>
         <script
           dangerouslySetInnerHTML={{
-            __html: `if("serviceWorker"in navigator){if(location.hostname==="localhost"){navigator.serviceWorker.getRegistrations().then(function(r){r.forEach(function(s){s.unregister()})})}else{navigator.serviceWorker.register("/sw.js")}}`,
+            __html: `if("serviceWorker"in navigator){var h=location.hostname;if(h==="localhost"||h==="127.0.0.1"||h==="[::1]"||h==="::1"){navigator.serviceWorker.getRegistrations().then(function(r){r.forEach(function(s){s.unregister()})})}else{navigator.serviceWorker.register("/sw.js")}}`,
           }}
         />
       </body>
