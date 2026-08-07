@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect, useState, useRef, Suspense } from "react";
+import { useEffect, useState, Suspense } from "react";
 import { FALLBACK_BACKGROUNDS } from "@/constants/frames";
 import { useSearchParams } from "next/navigation";
 import { LanguageProvider, useLanguage } from "@/i18n/LanguageContext";
 import { useDeviceSetup } from "@/hooks/useDeviceSetup";
 import { usePhotoFlow } from "@/hooks/usePhotoFlow";
 import { useIdleTimer } from "@/hooks/useIdleTimer";
+import { useCountdown } from "@/hooks/useCountdown";
 import { useTauriMonitor } from "@/hooks/useTauriMonitor";
 import { FloatingElements } from "@/components/service/FloatingElements";
 import { PreflightSection } from "@/components/service/PreflightSection";
@@ -32,42 +33,19 @@ function ServiceContent() {
   const { config, backgroundImages, printBgImages, imageBaseUrl, printSettings, wallpaperUrl, logoUrl } = useDeviceSetup(deviceId);
   const flow = usePhotoFlow(deviceId, config, printBgImages.length > 0);
   const { monitors, syncEnabled, setSyncEnabled, selectedMonitorIndex, setSelectedMonitorIndex } = useTauriMonitor();
-  const { idleRemaining, clearIdleTimer } = useIdleTimer(
+  const { idleRemaining, clearIdleTimer, paused: idlePaused, togglePause: toggleIdlePause } = useIdleTimer(
     flow.currentStep,
     config.idleTimeoutSeconds,
     flow.advanceFromCurrentStep,
   );
 
-  // 인화 단계 전용 타이머 (complete step)
-  const [printRemaining, setPrintRemaining] = useState<number | null>(null);
-  const printTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const resetAllRef = useRef(flow.resetAll);
-  useEffect(() => { resetAllRef.current = flow.resetAll; }, [flow.resetAll]);
-
-  useEffect(() => {
-    if (flow.currentStep !== "complete" || config.printAutoTimerSeconds <= 0) {
-      if (printTimerRef.current) { clearInterval(printTimerRef.current); printTimerRef.current = null; }
-      // 타이머 표시 초기화는 콜백으로 미룬다(effect 본문 동기 setState 회피).
-      const t = setTimeout(() => setPrintRemaining(null), 0);
-      return () => clearTimeout(t);
-    }
-    const deadline = Date.now() + config.printAutoTimerSeconds * 1000;
-    const init = setTimeout(() => setPrintRemaining(config.printAutoTimerSeconds), 0);
-    printTimerRef.current = setInterval(() => {
-      const remaining = Math.ceil((deadline - Date.now()) / 1000);
-      if (remaining <= 0) {
-        if (printTimerRef.current) { clearInterval(printTimerRef.current); printTimerRef.current = null; }
-        setPrintRemaining(null);
-        resetAllRef.current();
-      } else {
-        setPrintRemaining(remaining);
-      }
-    }, 1000);
-    return () => {
-      clearTimeout(init);
-      if (printTimerRef.current) { clearInterval(printTimerRef.current); printTimerRef.current = null; }
-    };
-  }, [flow.currentStep, config.printAutoTimerSeconds]);
+  // 인화 단계 전용 타이머 (complete step). 유휴 타이머와 같은 useCountdown을 재사용 →
+  // 롱프레스 일시정지/재개(멈춘 지점부터) 동일 지원. 0에 도달하면 처음으로 리셋.
+  const { remaining: printRemaining, paused: printPaused, togglePause: togglePrintPause } = useCountdown(
+    flow.currentStep === "complete",
+    config.printAutoTimerSeconds,
+    flow.resetAll,
+  );
 
   const { currentStep, slotsNeeded, selectedBackground, setSelectedBackground, selectedPrintBg, setSelectedPrintBg } = flow;
   const { setLang, t } = useLanguage();
@@ -174,10 +152,10 @@ function ServiceContent() {
   return (
     <div className="service-theme w-full h-screen overflow-hidden relative" style={themeStyle}>
       {showTimer && (
-        <CircularTimer value={idleRemaining!} total={config.idleTimeoutSeconds} testId="page-idle-timer" />
+        <CircularTimer value={idleRemaining!} total={config.idleTimeoutSeconds} testId="page-idle-timer" onLongPress={toggleIdlePause} paused={idlePaused} />
       )}
       {currentStep === "complete" && printRemaining !== null && config.printAutoTimerSeconds > 0 && (
-        <CircularTimer value={printRemaining} total={config.printAutoTimerSeconds} testId="page-print-timer" />
+        <CircularTimer value={printRemaining} total={config.printAutoTimerSeconds} testId="page-print-timer" onLongPress={togglePrintPause} paused={printPaused} />
       )}
       {flow.isPreparingComplete && (
         <div className="absolute inset-0 z-[100] bg-black/70 backdrop-blur-sm flex flex-col items-center justify-center">

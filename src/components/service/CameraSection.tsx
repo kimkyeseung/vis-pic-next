@@ -1183,7 +1183,7 @@ export function CameraSection({
             </div>
           )}
           {autoTimer !== null && countdown === null && photos.length < maxPhotos && (
-            <CircularTimer value={autoTimer} total={config.cameraAutoTimerSeconds} size={72} />
+            <CircularTimer value={autoTimer} total={config.cameraAutoTimerSeconds} size={72} positionClass="top-4 right-4" />
           )}
           {countdown !== null && (
             <div className="absolute inset-0 flex items-center justify-center pointer-events-none">

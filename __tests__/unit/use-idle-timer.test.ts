@@ -140,4 +140,57 @@ describe("useIdleTimer", () => {
     act(() => { vi.advanceTimersByTime(0); });
     expect(result.current.idleRemaining).toBe(10);
   });
+
+  it("togglePause로 일시정지하면 카운트다운이 멈추고 onTimeout이 발동하지 않는다", () => {
+    const onTimeout = vi.fn();
+    const { result } = renderHook(() => useIdleTimer("frame", 10, onTimeout));
+
+    act(() => { vi.advanceTimersByTime(0); });
+    act(() => { vi.advanceTimersByTime(4000); });
+    expect(result.current.idleRemaining).toBe(6);
+
+    act(() => { result.current.togglePause(); });
+    expect(result.current.paused).toBe(true);
+
+    act(() => { vi.advanceTimersByTime(20000); }); // 정지 중엔 흐르지 않음
+    expect(onTimeout).not.toHaveBeenCalled();
+    expect(result.current.idleRemaining).toBe(6); // 프리즈
+  });
+
+  it("재개하면 멈춘 지점에서 이어서 카운트되고 그만큼 뒤에 onTimeout이 발동한다", () => {
+    const onTimeout = vi.fn();
+    const { result } = renderHook(() => useIdleTimer("frame", 10, onTimeout));
+
+    act(() => { vi.advanceTimersByTime(0); });
+    act(() => { vi.advanceTimersByTime(4000); }); // 남은 6
+    act(() => { result.current.togglePause(); });  // 일시정지
+    act(() => { vi.advanceTimersByTime(30000); });
+    act(() => { result.current.togglePause(); });  // 재개
+    act(() => { vi.advanceTimersByTime(0); });
+    expect(result.current.paused).toBe(false);
+    expect(result.current.idleRemaining).toBe(6);  // 이어서
+
+    act(() => { vi.advanceTimersByTime(5000); });
+    expect(result.current.idleRemaining).toBe(1);
+    expect(onTimeout).not.toHaveBeenCalled();
+    act(() => { vi.advanceTimersByTime(1000); });  // 재개 후 총 6초
+    expect(onTimeout).toHaveBeenCalledTimes(1);
+  });
+
+  it("단계가 바뀌면 일시정지가 해제되고 새 화면은 처음부터 카운트된다", () => {
+    const onTimeout = vi.fn();
+    const { result, rerender } = renderHook(
+      ({ step }: { step: Step }) => useIdleTimer(step, 10, onTimeout),
+      { initialProps: { step: "frame" as Step } },
+    );
+
+    act(() => { vi.advanceTimersByTime(0); });
+    act(() => { result.current.togglePause(); });
+    expect(result.current.paused).toBe(true);
+
+    rerender({ step: "background" });
+    act(() => { vi.advanceTimersByTime(0); }); // 지연된 setPaused(false) 발화
+    expect(result.current.paused).toBe(false);
+    expect(result.current.idleRemaining).toBe(10);
+  });
 });
