@@ -70,6 +70,9 @@ export function CameraSection({
   const lastMaskRef = useRef<{ data: Float32Array; w: number; h: number } | null>(null);
   const lastInferenceTimeRef = useRef(0);
   const [countdown, setCountdown] = useState<number | null>(null);
+  // 제스처 루프(deps [])가 촬영 진행 여부를 알 수 있도록 countdown을 ref로도 유지.
+  const countdownRef = useRef<number | null>(null);
+  useEffect(() => { countdownRef.current = countdown; }, [countdown]);
   const [cameraError, setCameraError] = useState<{ key: MessageKey; reason?: string } | null>(null);
   const [flash, setFlash] = useState(false);
   // 촬영 직후 촬영본을 1초간 프리뷰로 보여준다.
@@ -312,16 +315,21 @@ export function CameraSection({
   // 손바닥을 펼쳐 보이면 "촬영하기" 버튼 클릭과 동일하게 촬영을 트리거한다.
   // - 세그멘터와 동시 구동 부하를 줄이려 추론은 스로틀링.
   // - HOLD_MS 이상 유지돼야 발동(순간 오탐 방지).
-  // - 한 번 촬영하면 손을 내렸다(비-손바닥 프레임) 다시 펴야 재발동(연속 오발 방지).
+  // - 재발동(re-arm): (1) 손을 내리면(비-손바닥 프레임) 즉시, 또는 (2) 촬영이 끝난 뒤
+  //   REARM_COOLDOWN_MS가 지나면 손바닥을 계속 든 상태에서도 자동으로. 포토부스 사용자가
+  //   손을 든 채 연속 촬영할 수 있게 하되, 촬영 직후 즉시 재발동되진 않도록 쿨다운을 둔다.
   //   촬영 중(countdown)에는 capturePhoto 내부 가드가 재트리거를 막는다.
   useEffect(() => {
     let raf = 0;
     const GESTURE_INTERVAL_MS = 200;
     const HOLD_MS = 500;
+    const REARM_COOLDOWN_MS = 1200; // 촬영 완료 후 손바닥 유지 시 자동 재발동까지의 간격
     const MIN_SCORE = 0.6;
     let lastInfer = 0;
     let palmSince = 0;
     let palmArmed = true;
+    let rearmAt = 0;          // >0: 이 시각 이후 손바닥 유지 상태에서 자동 재무장
+    let prevCapturing = false; // 직전 틱의 촬영(countdown) 진행 여부
     // V사인(트리거 제스처) → 배경 이펙트 영상. 손바닥과 독립적으로 arming을 관리한다.
     let triggerSince = 0;
     let triggerArmed = true;
@@ -349,16 +357,30 @@ export function CameraSection({
       const isPalm = name === "Open_Palm" && score >= MIN_SCORE;
       const isTrigger = !!name && name === effectGestureRef.current && score >= MIN_SCORE;
 
+      // 촬영이 끝나는 순간(진행중 true→false)에 쿨다운 시작 → 이후 손바닥 유지 시 자동 재무장.
+      const capturing = countdownRef.current !== null;
+      if (prevCapturing && !capturing) rearmAt = now + REARM_COOLDOWN_MS;
+      prevCapturing = capturing;
+
       // 손바닥 → 촬영
       if (isPalm) {
         if (palmSince === 0) palmSince = now;
+        // 손을 든 채로도 촬영 완료 + 쿨다운 경과 시 자동 재무장(포토부스 연속 촬영).
+        if (!palmArmed && !capturing && rearmAt > 0 && now >= rearmAt) {
+          palmArmed = true;
+          palmSince = now;
+          rearmAt = 0;
+        }
         if (palmArmed && now - palmSince >= HOLD_MS) {
           palmArmed = false;
+          rearmAt = 0;
           handleManualCaptureRef.current();
         }
       } else {
+        // 손을 내리면 즉시 재무장.
         palmSince = 0;
         palmArmed = true;
+        rearmAt = 0;
       }
 
       // V사인 → 배경 이펙트 영상 재생 (한 번 발동 후 손을 내렸다 다시 취해야 재발동)
