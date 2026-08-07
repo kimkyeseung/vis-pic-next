@@ -96,6 +96,9 @@ export function FrameSection({
     .map((mode) => ({ id: mode, ...FRAME_INFO[mode] }))
     .filter((f) => f.label);
   const frameSrc = resolveFrameSrc(printBgImages, imageBaseUrl);
+  // 세로 화면 배치: 옵션이 3개 이하면 가로 한 줄, 4개 이상이면 3열 그리드(예: 6개 → 2×3).
+  // (가로 화면은 항상 한 줄) 세로 1열은 너무 길어져 스크롤이 생기므로 3열로 접는다.
+  const usePortraitGrid = frames.length > 3;
 
   return (
     <section className={`${SERVICE_SECTION_CLASS} grid-rows-[auto_1fr]`}>
@@ -104,11 +107,11 @@ export function FrameSection({
       </h2>
 
       <div className="min-h-0 flex items-center justify-center">
-      <div className="flex gap-10 animate-fadeInUp portrait:flex-col portrait:gap-5 portrait:w-full portrait:max-w-md portrait:items-stretch">
+      <div className={`flex gap-10 animate-fadeInUp ${usePortraitGrid ? "portrait:grid portrait:grid-cols-3 portrait:gap-5 portrait:w-full portrait:max-w-3xl portrait:items-stretch" : "portrait:gap-6"}`}>
         {frames.map((frame) => (
           <div
             key={frame.id}
-            className={`frame-option w-64 portrait:w-full text-center ${selectedFrame === frame.id ? "selected" : ""}`}
+            className={`frame-option w-64 text-center ${usePortraitGrid ? "portrait:w-full" : ""} ${selectedFrame === frame.id ? "selected" : ""}`}
             onClick={() => onSelect(frame.id)}
           >
             {selectedFrame === frame.id && <span className="check-mark">&#10003;</span>}
