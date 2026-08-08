@@ -67,7 +67,10 @@ export function CameraSection({
   const animFrameRef = useRef<number>(0);
   // mediapipe 추론(segmentForVideo)은 무거우므로 매 프레임 돌리지 않고 스로틀링해서
   // 재사용한다 — 화면 갱신(최대 60fps)과 AI 추론(간격은 INFERENCE_INTERVAL_MS)을 분리해 끊김을 줄인다.
-  const lastMaskRef = useRef<{ data: Float32Array; w: number; h: number } | null>(null);
+  // 추론(200ms 간격)마다 alpha 마스크를 이 캔버스에 한 번만 굽고, 매 프레임에는
+  // GPU 합성(destination-in)으로만 적용한다 — per-frame getImageData/픽셀 루프 제거.
+  const maskCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const maskReadyRef = useRef(false);
   const lastInferenceTimeRef = useRef(0);
   const [countdown, setCountdown] = useState<number | null>(null);
   // 제스처 루프(deps [])가 촬영 진행 여부를 알 수 있도록 countdown을 ref로도 유지.
@@ -273,7 +276,7 @@ export function CameraSection({
       cancelled = true;
       segmenterRef.current?.close();
       segmenterRef.current = null;
-      lastMaskRef.current = null;
+      maskReadyRef.current = false;
       lastInferenceTimeRef.current = 0;
     };
   }, [bgRemovalMode]);
@@ -651,52 +654,50 @@ export function CameraSection({
       if (bgRemovalMode === "mediapipe" && segmenterRef.current) {
         try {
           const now = performance.now();
-          if (now - lastInferenceTimeRef.current >= INFERENCE_INTERVAL_MS || !lastMaskRef.current) {
+          // 추론(무거운 WASM 호출)은 INFERENCE_INTERVAL_MS 간격으로만 실행하고, 그때
+          // soft alpha 마스크를 별도 캔버스에 한 번만 굽는다. 기존엔 매 프레임 getImageData
+          // + 픽셀 루프 + putImageData를 돌려 프레임이 뚝뚝 끊겼다.
+          if (now - lastInferenceTimeRef.current >= INFERENCE_INTERVAL_MS || !maskReadyRef.current) {
             // 다운스케일된 offscreen을 입력으로 넘겨 마스크 자체를 더 작게 받는다
             // (video를 그대로 넘기면 마스크가 네이티브 해상도로 나와 다운스케일 효과가 없어짐)
             const result = segmenterRef.current.segmentForVideo(offscreen, now);
             const masks = result.confidenceMasks as ConfidenceMask[] | undefined;
             if (masks && masks.length > 0) {
-              // WASM 힙 위의 뷰일 수 있으므로 다음 segmentForVideo 호출 전까지만
-              // 안전하다고 가정하지 않고 복사해서 다음 추론 전까지 여러 프레임에서 재사용한다.
-              lastMaskRef.current = {
-                data: masks[0].getAsFloat32Array().slice(),
-                w: masks[0].width ?? pw,
-                h: masks[0].height ?? ph,
-              };
+              const mask = masks[0];
+              const arr = mask.getAsFloat32Array();
+              const mw = mask.width ?? pw;
+              const mh = mask.height ?? ph;
+              let mc = maskCanvasRef.current;
+              if (!mc) { mc = document.createElement("canvas"); maskCanvasRef.current = mc; }
+              if (mc.width !== mw) mc.width = mw;
+              if (mc.height !== mh) mc.height = mh;
+              const mctx = mc.getContext("2d")!;
+              // multiclass model: masks[0]=background → foreground = 1 - background (어두운 옷 보존)
+              // rgb는 흰색으로 채우고 alpha에만 soft mask를 굽는다(합성 시 alpha만 사용).
+              const mImg = mctx.createImageData(mw, mh);
+              const md = mImg.data;
+              const THRESH = segmentThresh;
+              const FEATHER = segmentFeather;
+              for (let i = 0; i < arr.length; i++) {
+                const fgConf = 1 - arr[i];
+                const softAlpha = Math.max(0, Math.min(1, (fgConf - THRESH) / FEATHER));
+                md[i * 4] = 255; md[i * 4 + 1] = 255; md[i * 4 + 2] = 255;
+                md[i * 4 + 3] = Math.round(softAlpha * 255);
+              }
+              mctx.putImageData(mImg, 0, 0);
               lastInferenceTimeRef.current = now;
+              maskReadyRef.current = true;
             }
           }
 
-          const cached = lastMaskRef.current;
-          if (cached) {
-            const imageData = offCtx.getImageData(0, 0, pw, ph);
-            const data = imageData.data;
-            // multiclass model: masks[0]=background, masks[1..N]=hair/skin/face/clothes/other
-            // foreground confidence = 1 - background confidence → preserves dark clothing
-            const bgMask = cached.data;
-            const maskW = cached.w;
-            const maskH = cached.h;
-            const THRESH = segmentThresh;
-            const FEATHER = segmentFeather;
-            if (bgMask.length === pw * ph) {
-              for (let i = 0; i < bgMask.length; i++) {
-                const fgConf = 1 - bgMask[i];
-                const softAlpha = Math.max(0, Math.min(1, (fgConf - THRESH) / FEATHER));
-                data[i * 4 + 3] = Math.round(softAlpha * 255);
-              }
-            } else {
-              for (let y = 0; y < ph; y++) {
-                const maskY = Math.min(maskH - 1, Math.floor((y / ph) * maskH));
-                for (let x = 0; x < pw; x++) {
-                  const maskX = Math.min(maskW - 1, Math.floor((x / pw) * maskW));
-                  const fgConf = 1 - (bgMask[maskY * maskW + maskX] ?? 0);
-                  const softAlpha = Math.max(0, Math.min(1, (fgConf - THRESH) / FEATHER));
-                  data[(y * pw + x) * 4 + 3] = Math.round(softAlpha * 255);
-                }
-              }
-            }
-            offCtx.putImageData(imageData, 0, 0);
+          // 매 프레임: 준비된 마스크를 GPU 합성(destination-in)으로만 적용 → 픽셀 루프 없음.
+          // 마스크를 pw×ph로 확대할 때 생기는 bilinear 보간이 경계를 더 부드럽게 해준다.
+          const mc = maskCanvasRef.current;
+          if (maskReadyRef.current && mc) {
+            offCtx.save();
+            offCtx.globalCompositeOperation = "destination-in";
+            offCtx.drawImage(mc, 0, 0, pw, ph);
+            offCtx.restore();
             processed = true;
           }
         } catch (err) {
