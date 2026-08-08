@@ -617,16 +617,23 @@ export function CameraSection({
       // 화질 손실은 가장자리 마스크 정밀도 정도로 미미하고 FEATHER 블렌딩이 이를 가려준다.
       const PROCESS_SCALE = w >= 2560 ? 0.25 : 0.5;
 
-      if (display.width !== w) display.width = w;
-      if (display.height !== h) display.height = h;
+      // 프리뷰 캔버스는 최대 1440px로 제한 — 캔버스 렌더링·GPU 전송 비용을 줄인다.
+      // 촬영 캡처(snapshotWithStickers)도 이 크기로 출력되며, 포토부스 인화 품질에 충분하다.
+      const MAX_PREVIEW_W = 1440;
+      const previewScale = Math.min(1, MAX_PREVIEW_W / w);
+      const dw = Math.round(w * previewScale);
+      const dh = Math.round(h * previewScale);
+
+      if (display.width !== dw) display.width = dw;
+      if (display.height !== dh) display.height = dh;
 
       const ctx = display.getContext("2d")!;
 
       if (bgRemovalMode === "off") {
         ctx.save();
-        ctx.translate(w, 0);
+        ctx.translate(dw, 0);
         ctx.scale(-1, 1);
-        ctx.drawImage(video, 0, 0, w, h);
+        ctx.drawImage(video, 0, 0, dw, dh);
         ctx.restore();
 
         if (frameChannelRef.current) {
@@ -724,17 +731,17 @@ export function CameraSection({
       }
 
       if (processed) {
-        drawBackground(ctx, w, h);
+        drawBackground(ctx, dw, dh);
         ctx.save();
-        ctx.translate(w, 0);
+        ctx.translate(dw, 0);
         ctx.scale(-1, 1);
-        ctx.drawImage(offscreen, 0, 0, w, h);
+        ctx.drawImage(offscreen, 0, 0, dw, dh);
         ctx.restore();
       } else {
         ctx.save();
-        ctx.translate(w, 0);
+        ctx.translate(dw, 0);
         ctx.scale(-1, 1);
-        ctx.drawImage(video, 0, 0, w, h);
+        ctx.drawImage(video, 0, 0, dw, dh);
         ctx.restore();
       }
 
