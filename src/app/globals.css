@@ -371,10 +371,10 @@ body {
   filter: brightness(1.08);
 }
 @media (orientation: portrait) {
-  .nav-button { min-height: 104px; padding: 18px 46px; font-size: 1.6em; }
+  .nav-button { min-height: 150px; padding: 32px 72px; font-size: 2.1em; }
 }
 /* 미리보기(.force-portrait)에서도 동일 적용 — 위 미디어쿼리는 실제 세로 뷰포트에서만 맞음 */
-.force-portrait .nav-button { min-height: 104px; padding: 18px 46px; font-size: 1.6em; }
+.force-portrait .nav-button { min-height: 150px; padding: 32px 72px; font-size: 2.1em; }
 
 /* 프레임 옵션 */
 .frame-option {

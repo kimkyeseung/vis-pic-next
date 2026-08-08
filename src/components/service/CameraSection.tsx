@@ -1001,7 +1001,7 @@ export function CameraSection({
   return (
     <section
       ref={sectionRef}
-      className="w-full h-full relative z-10 p-12 pb-60"
+      className="w-full h-full relative z-10 p-12 pb-60 portrait:pb-[22rem]"
       style={{
         display: "grid",
         gap: "1rem",
@@ -1220,10 +1220,11 @@ export function CameraSection({
           )}
         </div>
 
-      {/* 촬영하기 — 하단 중앙, 이전/다음 버튼과 같은 줄에 절대배치 */}
-      <div className="absolute bottom-16 left-1/2 -translate-x-1/2 z-20 portrait:bottom-10">
+      {/* 촬영하기 — 하단 중앙. 세로에선 이전/다음보다 한 줄 위(bottom-52)에 배치해
+          커진 이전/다음 버튼과 겹치지 않게 한다. */}
+      <div className="absolute bottom-16 left-1/2 -translate-x-1/2 z-20 portrait:bottom-52">
         <button
-          className="service-button tracking-widest rounded-[22px] font-extrabold text-5xl portrait:text-4xl px-28 py-8 portrait:px-16 portrait:py-6 min-w-[34rem] portrait:min-w-[24rem]"
+          className="service-button tracking-widest rounded-[22px] font-extrabold text-5xl portrait:text-5xl px-28 py-8 portrait:px-20 portrait:py-12 min-w-[34rem] portrait:min-w-[46rem]"
           onClick={handleManualCapture}
           style={countdown !== null || photos.length >= maxPhotos ? { opacity: 0.5, pointerEvents: "none" } : {}}
         >
@@ -1288,8 +1289,8 @@ export function CameraSection({
           </div>
         </div>
 
-        {/* 남은 촬영 횟수 — 스티커 패널 맨 아래에 함께 표시 */}
-        <div className="shrink-0 w-full text-center border border-dashed border-white/30 rounded-xl py-4">
+        {/* 남은 촬영 횟수 — 세로에선 좌측 배경 선택 패널 하단과 줄이 맞도록 위로 더 올린다. */}
+        <div className="shrink-0 w-full text-center border border-dashed border-white/30 rounded-xl py-4 portrait:mb-28">
           <span className="text-white font-bold text-3xl">
             {t("camera.remaining", { n: String(Math.max(0, maxPhotos - photos.length)) })}
           </span>
