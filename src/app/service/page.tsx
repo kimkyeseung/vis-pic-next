@@ -29,8 +29,18 @@ function ServiceContent() {
   const searchParams = useSearchParams();
   const deviceId = searchParams.get("device") || "test";
   const [preflightDone, setPreflightDone] = useState(false);
+  // 첫 화면 배경화면(가로/세로)을 실제 화면 방향에 맞춰 고르기 위한 방향 감지.
+  const [isPortrait, setIsPortrait] = useState(false);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const mq = window.matchMedia("(orientation: portrait)");
+    const update = () => setIsPortrait(mq.matches);
+    update();
+    mq.addEventListener("change", update);
+    return () => mq.removeEventListener("change", update);
+  }, []);
 
-  const { config, backgroundImages, printBgImages, imageBaseUrl, printSettings, wallpaperUrl, logoUrl } = useDeviceSetup(deviceId);
+  const { config, backgroundImages, printBgImages, imageBaseUrl, printSettings, wallpaperUrl, wallpaperPortraitUrl, logoUrl } = useDeviceSetup(deviceId);
   const flow = usePhotoFlow(deviceId, config, printBgImages.length > 0);
   const { monitors, syncEnabled, setSyncEnabled, selectedMonitorIndex, setSelectedMonitorIndex } = useTauriMonitor();
   const { idleRemaining, clearIdleTimer, paused: idlePaused, togglePause: toggleIdlePause } = useIdleTimer(
@@ -131,6 +141,10 @@ function ServiceContent() {
   // 글자색은 --theme-text 변수로 내려 globals.css의 .service-theme 규칙이 본문 흰 텍스트를 치환한다.
   // 배경화면 이미지는 첫 화면(start)에만 깔고, 나머지 단계는 관리자가 지정한 배경 단색을 사용한다.
   const isFirstPage = currentStep === "start";
+  // 화면 방향에 맞는 배경화면 선택. 해당 방향 이미지가 없으면 반대 방향 이미지로 폴백(하위호환).
+  const activeWallpaper = isPortrait
+    ? (wallpaperPortraitUrl ?? wallpaperUrl)
+    : (wallpaperUrl ?? wallpaperPortraitUrl);
   const themeStyle: React.CSSProperties = {
     ...(config.themeTextColor ? { ["--theme-text"]: config.themeTextColor } : {}),
     ...(config.themePrimaryColor ? { ["--theme-primary"]: config.themePrimaryColor } : {}),
@@ -139,9 +153,9 @@ function ServiceContent() {
       ? { ["--btn-glow-color"]: config.btnGlowColor, ["--btn-glow-size"]: `${config.btnGlowSize}px` }
       : {}),
     backgroundColor: config.themeBgColor,
-    ...(isFirstPage && wallpaperUrl
+    ...(isFirstPage && activeWallpaper
       ? {
-          backgroundImage: `url(${wallpaperUrl})`,
+          backgroundImage: `url(${activeWallpaper})`,
           backgroundSize: "cover",
           backgroundPosition: "center",
           backgroundRepeat: "no-repeat",

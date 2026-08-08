@@ -11,6 +11,12 @@ export const STICKER_IMAGE_TYPE = 3;
 export const WALLPAPER_IMAGE_TYPE = 5;
 export const LOGO_IMAGE_TYPE = 6;
 
+// 첫(대기) 화면 배경화면은 가로/세로 두 장을 따로 업로드한다.
+// 같은 imageType(5) 안에서 name으로 구분한다. 기존 단일 배경화면은 name "wallpaper"였으므로
+// 이를 가로용으로 유지해 하위호환한다(세로 미설정 시 서비스는 가로 이미지로 폴백).
+export const WALLPAPER_NAME_LANDSCAPE = "wallpaper";
+export const WALLPAPER_NAME_PORTRAIT = "wallpaper_portrait";
+
 // 서비스 화면에 노출할 수 있는 활성 배경의 최대 개수.
 // 이 수를 초과해 활성화하려 하면 관리자에서 거부(invalid)된다.
 export const MAX_ACTIVE_BACKGROUNDS = 6;

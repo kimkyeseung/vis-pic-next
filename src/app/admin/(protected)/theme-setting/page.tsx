@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { HexColorPicker } from "react-colorful";
 import { useAdmin } from "@/app/admin/AdminContext";
+import { WALLPAPER_NAME_LANDSCAPE, WALLPAPER_NAME_PORTRAIT } from "@/constants/images";
 
 const WALLPAPER_TYPE = 5;
 const LOGO_TYPE = 6;
@@ -131,11 +132,13 @@ export default function ThemeSettingPage() {
   const [glowEnabled, setGlowEnabled] = useState(true);
   const [glowColor, setGlowColor] = useState("#6c6fb4");
   const [glowSize, setGlowSize] = useState(28);
-  const [wallpaper, setWallpaper] = useState<Asset>(null);
+  const [wallpaperLs, setWallpaperLs] = useState<Asset>(null);
+  const [wallpaperPt, setWallpaperPt] = useState<Asset>(null);
   const [logo, setLogo] = useState<Asset>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [wallpaperBusy, setWallpaperBusy] = useState(false);
+  const [wallpaperLsBusy, setWallpaperLsBusy] = useState(false);
+  const [wallpaperPtBusy, setWallpaperPtBusy] = useState(false);
   const [logoBusy, setLogoBusy] = useState(false);
   const [message, setMessage] = useState("");
 
@@ -144,12 +147,14 @@ export default function ThemeSettingPage() {
     if (!msg.includes("실패")) setTimeout(() => setMessage(""), 3000);
   };
 
-  // 선택 지점에 연결된(linked) 테마 이미지만 조회 — 지점별 전용
-  const loadAsset = async (type: number): Promise<Asset> => {
+  // 선택 지점에 연결된(linked) 테마 이미지만 조회 — 지점별 전용.
+  // name 지정 시 같은 타입 안에서 해당 이름의 이미지만 고른다(배경화면 가로/세로 슬롯 구분).
+  const loadAsset = async (type: number, name?: string): Promise<Asset> => {
     if (!deviceId) return null;
     const res = await fetch(`/api/image/list/${type}/?device_id=${deviceId}&linked=1`, { cache: "no-store" });
     const data = await res.json();
-    const first = data.images?.[0];
+    const list: Array<{ id: number; name: string; filename: string }> = data.images ?? [];
+    const first = name ? list.find((i) => i.name === name) : list[0];
     return first && data.baseUrl ? { id: first.id, filename: first.filename, url: `${data.baseUrl}/${first.filename}` } : null;
   };
 
@@ -160,10 +165,11 @@ export default function ThemeSettingPage() {
       setLoading(true);
       try {
         // 색상: 전역 기본값 ← 이 지점 오버라이드 병합
-        const [g, d, wp, lg] = await Promise.all([
+        const [g, d, wpLs, wpPt, lg] = await Promise.all([
           fetch("/api/setting/").then((r) => r.json()).catch(() => ({})),
           fetch(`/api/device/${deviceId}/settings/`).then((r) => r.json()).catch(() => ({})),
-          loadAsset(WALLPAPER_TYPE),
+          loadAsset(WALLPAPER_TYPE, WALLPAPER_NAME_LANDSCAPE),
+          loadAsset(WALLPAPER_TYPE, WALLPAPER_NAME_PORTRAIT),
           loadAsset(LOGO_TYPE),
         ]);
         if (cancelled) return;
@@ -174,7 +180,8 @@ export default function ThemeSettingPage() {
         setGlowEnabled(s.THEME_BTN_GLOW_ENABLED !== "0");
         setGlowColor(s.THEME_BTN_GLOW_COLOR || "#6c6fb4");
         setGlowSize(parseInt(s.THEME_BTN_GLOW_SIZE || "", 10) || 28);
-        setWallpaper(wp);
+        setWallpaperLs(wpLs);
+        setWallpaperPt(wpPt);
         setLogo(lg);
       } finally {
         if (!cancelled) setLoading(false);
@@ -233,7 +240,7 @@ export default function ThemeSettingPage() {
         flash(`업로드 실패: ${err.error || res.status}`);
         return;
       }
-      setCurrent(await loadAsset(type));
+      setCurrent(await loadAsset(type, name));
       flash("업로드되었습니다.");
     } catch {
       flash("업로드 실패: 서버 연결 오류");
@@ -278,13 +285,25 @@ export default function ThemeSettingPage() {
       </div>
 
       <AssetUploader
-        title="배경화면 (첫 화면 전용)"
-        description="키오스크 대기(첫) 화면에만 깔리는 배경 이미지입니다. 이후 단계 화면은 아래 '배경 단색'이 사용됩니다. 미설정 시 첫 화면도 배경 단색이 사용됩니다. (jpg/png/webp/gif, 최대 50MB)"
-        asset={wallpaper}
-        onUpload={uploadAsset(WALLPAPER_TYPE, "wallpaper", wallpaper, setWallpaper, setWallpaperBusy)}
-        onRemove={removeAsset(wallpaper, setWallpaper, setWallpaperBusy)}
-        busy={wallpaperBusy}
+        title="배경화면 · 가로 화면용 (첫 화면 전용)"
+        description="가로(landscape) 키오스크의 대기(첫) 화면에만 깔리는 배경입니다. 이후 단계 화면은 아래 '배경 단색'이 사용됩니다. 미설정 시 세로용 이미지가 있으면 그걸, 없으면 배경 단색이 사용됩니다. (jpg/png/webp/gif, 최대 50MB)"
+        asset={wallpaperLs}
+        onUpload={uploadAsset(WALLPAPER_TYPE, WALLPAPER_NAME_LANDSCAPE, wallpaperLs, setWallpaperLs, setWallpaperLsBusy)}
+        onRemove={removeAsset(wallpaperLs, setWallpaperLs, setWallpaperLsBusy)}
+        busy={wallpaperLsBusy}
         previewClass="w-64 aspect-video"
+        imageFit="cover"
+        emptyLabel="기본 배경 (#2a2a2a)"
+      />
+
+      <AssetUploader
+        title="배경화면 · 세로 화면용 (첫 화면 전용)"
+        description="세로(portrait) 키오스크의 대기(첫) 화면에만 깔리는 배경입니다. 화면 방향에 맞춰 가로/세로 이미지가 자동으로 선택됩니다. 미설정 시 가로용 이미지가 있으면 그걸, 없으면 배경 단색이 사용됩니다. (jpg/png/webp/gif, 최대 50MB)"
+        asset={wallpaperPt}
+        onUpload={uploadAsset(WALLPAPER_TYPE, WALLPAPER_NAME_PORTRAIT, wallpaperPt, setWallpaperPt, setWallpaperPtBusy)}
+        onRemove={removeAsset(wallpaperPt, setWallpaperPt, setWallpaperPtBusy)}
+        busy={wallpaperPtBusy}
+        previewClass="w-40 aspect-[9/16]"
         imageFit="cover"
         emptyLabel="기본 배경 (#2a2a2a)"
       />

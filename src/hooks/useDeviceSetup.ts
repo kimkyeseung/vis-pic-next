@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import type { DeviceConfig, BGImage } from "@/types";
 import { parseIntSafe, parseBgRemovalMode, parsePaymentTerminalMode, parseCaptureModes, parseCameraResolution, clampPercent } from "@/lib/deviceConfig";
 import { DEFAULT_CAMERA_RESOLUTION } from "@/constants/camera";
-import { LOGO_IMAGE_TYPE } from "@/constants/images";
+import { LOGO_IMAGE_TYPE, WALLPAPER_IMAGE_TYPE, WALLPAPER_NAME_LANDSCAPE, WALLPAPER_NAME_PORTRAIT } from "@/constants/images";
 
 // 결제 화면 인쇄 매수 선택지(고정). 가격 = 1장당 가격(PAYMENT_AMOUNT) × 수량.
 const PAYMENT_QUANTITIES = [1, 2, 4];
@@ -45,6 +45,7 @@ export function useDeviceSetup(deviceId: string) {
   const [imageBaseUrl, setImageBaseUrl] = useState<string>("");
   const [printSettings, setPrintSettings] = useState<Record<string, string>>({});
   const [wallpaperUrl, setWallpaperUrl] = useState<string | null>(null);
+  const [wallpaperPortraitUrl, setWallpaperPortraitUrl] = useState<string | null>(null);
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
 
   useEffect(() => {
@@ -170,8 +171,8 @@ export function useDeviceSetup(deviceId: string) {
       }
     }
 
-    // 테마 배경화면(wallpaper, imageType 5) — 서비스 화면 전체 배경.
-    // 여러 장 있으면 목록 첫 항목(최신순) 한 장만 사용한다.
+    // 테마 배경화면(wallpaper, imageType 5) — 첫(대기) 화면 배경.
+    // 같은 타입 안에서 name으로 가로/세로 슬롯을 구분해 각각 노출한다(화면 방향에 맞춰 서비스에서 선택).
     async function loadWallpaper(id: string, attempt = 0) {
       const MAX_RETRIES = 5;
       const retry = () => {
@@ -180,14 +181,19 @@ export function useDeviceSetup(deviceId: string) {
         signal.addEventListener("abort", () => clearTimeout(timer), { once: true });
       };
       try {
-        const res = await fetch(`/api/image/list/5/?device_id=${id}&linked=1`, {
+        const res = await fetch(`/api/image/list/${WALLPAPER_IMAGE_TYPE}/?device_id=${id}&linked=1`, {
           signal,
           cache: "no-store",
         });
         if (!res.ok) { retry(); return; }
         const data = await res.json();
-        const first = data.images?.[0];
-        setWallpaperUrl(first && data.baseUrl ? `${data.baseUrl}/${first.filename}` : null);
+        const list: Array<{ name: string; filename: string }> = data.images ?? [];
+        const pick = (name: string) => {
+          const img = list.find((i) => i.name === name);
+          return img && data.baseUrl ? `${data.baseUrl}/${img.filename}` : null;
+        };
+        setWallpaperUrl(pick(WALLPAPER_NAME_LANDSCAPE));
+        setWallpaperPortraitUrl(pick(WALLPAPER_NAME_PORTRAIT));
       } catch (err) {
         if ((err as Error).name === "AbortError") return;
         retry();
@@ -226,5 +232,5 @@ export function useDeviceSetup(deviceId: string) {
     return () => controller.abort();
   }, [deviceId]);
 
-  return { config, backgroundImages, printBgImages, imageBaseUrl, printSettings, wallpaperUrl, logoUrl };
+  return { config, backgroundImages, printBgImages, imageBaseUrl, printSettings, wallpaperUrl, wallpaperPortraitUrl, logoUrl };
 }
