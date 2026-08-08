@@ -14,8 +14,6 @@ type Segmenter = {
   close: () => void;
 };
 
-// 배경제거 처리 해상도를 낮춰 서브 화면 송출 루프의 부하를 줄인다 (CameraSection.tsx와 동일한 이유).
-const PROCESS_SCALE = 0.5;
 // mediapipe 추론은 화면 갱신보다 훨씬 무거우므로 이 간격으로만 실행하고 재사용한다.
 const INFERENCE_INTERVAL_MS = 200;
 
@@ -225,8 +223,15 @@ export function CameraStreamer({
 
           const w = video.videoWidth;
           const h = video.videoHeight;
-          if (canvas.width !== w) canvas.width = w;
-          if (canvas.height !== h) canvas.height = h;
+          // 4K(2560+)에서 배경제거 처리 해상도를 0.25로 낮춰 픽셀 연산량을 ~75% 감소.
+          const PROCESS_SCALE = w >= 2560 ? 0.25 : 0.5;
+          // 송출 전용 캔버스는 최대 1280px로 캡 — toDataURL 인코딩 비용 대폭 감소.
+          const MAX_STREAM_W = 1280;
+          const cScale = Math.min(1, MAX_STREAM_W / w);
+          const cw = Math.round(w * cScale);
+          const ch = Math.round(h * cScale);
+          if (canvas.width !== cw) canvas.width = cw;
+          if (canvas.height !== ch) canvas.height = ch;
           const pw = Math.max(1, Math.round(w * PROCESS_SCALE));
           const ph = Math.max(1, Math.round(h * PROCESS_SCALE));
           if (offscreen.width !== pw) offscreen.width = pw;
@@ -237,7 +242,7 @@ export function CameraStreamer({
           const hasBg = sbg !== null;
 
           if (!hasBg || mode === "off") {
-            drawRaw(w, h);
+            drawRaw(cw, ch);
           } else if (mode === "chromakey") {
             offCtx.drawImage(video, 0, 0, pw, ph);
             const imgData = offCtx.getImageData(0, 0, pw, ph);
@@ -255,11 +260,11 @@ export function CameraStreamer({
               else if (distSq < SOFT) d[i + 3] = Math.round(((Math.sqrt(distSq) - simDist) / simDist) * 255);
             }
             offCtx.putImageData(imgData, 0, 0);
-            drawBg(w, h);
+            drawBg(cw, ch);
             ctx.save();
-            ctx.translate(w, 0);
+            ctx.translate(cw, 0);
             ctx.scale(-1, 1);
-            ctx.drawImage(offscreen, 0, 0, w, h);
+            ctx.drawImage(offscreen, 0, 0, cw, ch);
             ctx.restore();
           } else if (mode === "mediapipe" && segmenterRef.current) {
             try {
@@ -305,21 +310,21 @@ export function CameraStreamer({
                   }
                 }
                 offCtx.putImageData(imgData, 0, 0);
-                drawBg(w, h);
+                drawBg(cw, ch);
                 ctx.save();
-                ctx.translate(w, 0);
+                ctx.translate(cw, 0);
                 ctx.scale(-1, 1);
-                ctx.drawImage(offscreen, 0, 0, w, h);
+                ctx.drawImage(offscreen, 0, 0, cw, ch);
                 ctx.restore();
               } else {
-                drawRaw(w, h);
+                drawRaw(cw, ch);
               }
             } catch {
-              drawRaw(w, h);
+              drawRaw(cw, ch);
             }
           } else {
             // MediaPipe 아직 로딩 중 → raw 카메라로 폴백
-            drawRaw(w, h);
+            drawRaw(cw, ch);
           }
 
           const now = performance.now();
