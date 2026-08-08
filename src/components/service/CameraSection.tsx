@@ -632,7 +632,7 @@ export function CameraSection({
           const now = performance.now();
           if (now - lastFrameSentRef.current > 100) {
             lastFrameSentRef.current = now;
-            const dataUrl = snapshotWithStickers(0.5);
+            const dataUrl = snapshotWithStickers(0.5, 1280);
             if (dataUrl) frameChannelRef.current.postMessage({ type: "frame", dataUrl });
           }
         }
@@ -744,7 +744,7 @@ export function CameraSection({
         const now = performance.now();
         if (now - lastFrameSentRef.current > 100) {
           lastFrameSentRef.current = now;
-          const dataUrl = snapshotWithStickers(0.5);
+          const dataUrl = snapshotWithStickers(0.5, 1280);
           if (dataUrl) frameChannelRef.current?.postMessage({ type: "frame", dataUrl });
         }
       }
