@@ -593,10 +593,6 @@ export function CameraSection({
     const simDist = Math.max(1, config.chromakeySimilarity);
     const HARD = simDist * simDist;
     const SOFT = (simDist * 2) * (simDist * 2);
-    // 배경제거(마스크 계산 + getImageData/putImageData) 처리 해상도를 낮춰 프레임 드롭을 줄인다.
-    // 최종 표시/캡처는 여전히 네이티브 해상도(display 캔버스)로 업스케일되므로 화질 손실은
-    // 가장자리 마스크 정밀도 정도로 미미하고, 기존 FEATHER 블렌딩이 이를 더 가려준다.
-    const PROCESS_SCALE = 0.5;
     // mediapipe 추론(segmentForVideo)은 화면 갱신보다 훨씬 무거우므로 초당 최대 이 간격으로만
     // 실행하고, 그 사이 프레임은 직전 마스크를 재사용한다 (사람 실루엣은 프레임 간 급변하지 않음).
     const INFERENCE_INTERVAL_MS = 200;
@@ -615,6 +611,11 @@ export function CameraSection({
         animFrameRef.current = requestAnimationFrame(processFrame);
         return;
       }
+
+      // 배경제거 처리 해상도를 낮춰 프레임 드롭을 줄인다. 4K(2880+)에서는 0.25로 더 줄여
+      // 처리 픽셀 수를 1/16로 낮춘다. 최종 표시는 네이티브 해상도로 업스케일되므로
+      // 화질 손실은 가장자리 마스크 정밀도 정도로 미미하고 FEATHER 블렌딩이 이를 가려준다.
+      const PROCESS_SCALE = w >= 2560 ? 0.25 : 0.5;
 
       if (display.width !== w) display.width = w;
       if (display.height !== h) display.height = h;
