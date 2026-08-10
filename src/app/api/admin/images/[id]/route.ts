@@ -2,7 +2,16 @@ import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/db";
 import { deleteImage } from "@/lib/storage";
 import { requireAdmin } from "@/lib/adminAuth";
-import { BACKGROUND_IMAGE_TYPE, MAX_ACTIVE_BACKGROUNDS, normalizeEffectGesture } from "@/constants/images";
+import {
+  BACKGROUND_IMAGE_TYPE,
+  MAX_ACTIVE_BACKGROUNDS,
+  normalizeEffectGesture,
+  normalizeEffectMode,
+  normalizeEffectBlendMode,
+  normalizeEffectTransition,
+  normalizeRgbString,
+  EFFECT_TRANSITION_MS_RANGE,
+} from "@/constants/images";
 
 export async function PATCH(
   request: NextRequest,
@@ -36,6 +45,45 @@ export async function PATCH(
       data.effectGesture = null;
     } else if (typeof body.effectGesture === "string") {
       data.effectGesture = normalizeEffectGesture(body.effectGesture);
+    }
+    // 이펙트 재생 모드 및 모드별 파라미터. null이면 컬럼 비움(기본값 사용), 값이면 정규화/클램프.
+    if (body.effectMode === null) {
+      data.effectMode = null;
+    } else if (typeof body.effectMode === "string") {
+      data.effectMode = normalizeEffectMode(body.effectMode);
+    }
+    if (body.effectBlendMode === null) {
+      data.effectBlendMode = null;
+    } else if (typeof body.effectBlendMode === "string") {
+      data.effectBlendMode = normalizeEffectBlendMode(body.effectBlendMode);
+    }
+    if (body.effectTransition === null) {
+      data.effectTransition = null;
+    } else if (typeof body.effectTransition === "string") {
+      data.effectTransition = normalizeEffectTransition(body.effectTransition);
+    }
+    if (body.effectTransitionMs === null) {
+      data.effectTransitionMs = null;
+    } else if (typeof body.effectTransitionMs === "number" && Number.isFinite(body.effectTransitionMs)) {
+      data.effectTransitionMs = Math.max(
+        EFFECT_TRANSITION_MS_RANGE.min,
+        Math.min(EFFECT_TRANSITION_MS_RANGE.max, Math.trunc(body.effectTransitionMs)),
+      );
+    }
+    if (body.effectChromaColor === null) {
+      data.effectChromaColor = null;
+    } else if (typeof body.effectChromaColor === "string") {
+      data.effectChromaColor = normalizeRgbString(body.effectChromaColor);
+    }
+    if (body.effectChromaSimilarity === null) {
+      data.effectChromaSimilarity = null;
+    } else if (typeof body.effectChromaSimilarity === "number" && Number.isFinite(body.effectChromaSimilarity)) {
+      data.effectChromaSimilarity = Math.max(1, Math.min(100, Math.trunc(body.effectChromaSimilarity)));
+    }
+    if (body.effectChromaSmoothness === null) {
+      data.effectChromaSmoothness = null;
+    } else if (typeof body.effectChromaSmoothness === "number" && Number.isFinite(body.effectChromaSmoothness)) {
+      data.effectChromaSmoothness = Math.max(0, Math.min(100, Math.trunc(body.effectChromaSmoothness)));
     }
 
     // 배경(type 1)을 활성화하려는 경우, 이미 최대치만큼 활성화돼 있으면 거부한다.

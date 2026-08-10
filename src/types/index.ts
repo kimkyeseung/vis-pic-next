@@ -91,6 +91,20 @@ export interface BGImage {
   effectDuration?: number | null;
   /** 이펙트를 발동시키는 제스처(MediaPipe 카테고리). 미지정이면 기본값(Victory). */
   effectGesture?: string | null;
+  /** 이펙트 재생 모드(dissolve|transition|chromakey). 미지정이면 dissolve. */
+  effectMode?: string | null;
+  /** dissolve 모드 블렌드 방식(CSS mix-blend-mode). 미지정이면 screen. */
+  effectBlendMode?: string | null;
+  /** transition 모드 전환 효과(fade|cut). 미지정이면 fade. */
+  effectTransition?: string | null;
+  /** transition 모드 크로스페이드 지속 시간(ms). 미지정이면 기본값. */
+  effectTransitionMs?: number | null;
+  /** chromakey 모드 키 색상(R,G,B). 미지정이면 "0,255,0". */
+  effectChromaColor?: string | null;
+  /** chromakey 모드 감도(1-100). 미지정이면 50. */
+  effectChromaSimilarity?: number | null;
+  /** chromakey 모드 경계 부드러움(0-100). 미지정이면 50. */
+  effectChromaSmoothness?: number | null;
 }
 
 export interface FallbackBackground {

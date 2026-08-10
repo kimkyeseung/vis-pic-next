@@ -53,6 +53,13 @@ export async function GET(
       effectFilename: img.effectFilename ?? null,
       effectDuration: img.effectDuration ?? null,
       effectGesture: img.effectGesture ?? null,
+      effectMode: img.effectMode ?? null,
+      effectBlendMode: img.effectBlendMode ?? null,
+      effectTransition: img.effectTransition ?? null,
+      effectTransitionMs: img.effectTransitionMs ?? null,
+      effectChromaColor: img.effectChromaColor ?? null,
+      effectChromaSimilarity: img.effectChromaSimilarity ?? null,
+      effectChromaSmoothness: img.effectChromaSmoothness ?? null,
     }));
 
     const baseUrl = getImageBaseUrl();

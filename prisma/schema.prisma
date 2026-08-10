@@ -121,6 +121,20 @@ model Image {
   effectDuration Int?    @map("effect_duration")
   /// 이펙트 영상을 발동시키는 제스처(MediaPipe 카테고리, 예: Victory). null이면 기본값(Victory).
   effectGesture  String? @map("effect_gesture") @db.VarChar(32)
+  /// 이펙트 재생 모드: dissolve(블렌드 오버레이)|transition(배경 토글 전환)|chromakey(키색 제거 오버레이). null=dissolve.
+  effectMode             String? @map("effect_mode") @db.VarChar(16)
+  /// dissolve 모드 블렌드 방식(screen/lighten/overlay/hard-light/multiply/normal). null=screen.
+  effectBlendMode        String? @map("effect_blend_mode") @db.VarChar(16)
+  /// transition 모드 전환 효과(fade/cut). null=fade.
+  effectTransition       String? @map("effect_transition") @db.VarChar(16)
+  /// transition 모드 크로스페이드 지속 시간(ms). null=기본값.
+  effectTransitionMs     Int?    @map("effect_transition_ms")
+  /// chromakey 모드 키 색상(R,G,B). null=기본 "0,255,0".
+  effectChromaColor      String? @map("effect_chroma_color") @db.VarChar(16)
+  /// chromakey 모드 감도(1-100). null=기본 50.
+  effectChromaSimilarity Int?    @map("effect_chroma_similarity")
+  /// chromakey 모드 경계 부드러움(0-100). null=기본 50.
+  effectChromaSmoothness Int?    @map("effect_chroma_smoothness")
   createdAt DateTime  @default(now()) @map("created_at") @db.Timestamp(6)
   type      ImageType @relation(fields: [imageType], references: [id], onDelete: NoAction, onUpdate: NoAction)
   devices   ImageDevice[]

@@ -29,6 +29,13 @@ export async function GET(
       effectFilename: l.image.effectFilename ?? null,
       effectDuration: l.image.effectDuration ?? null,
       effectGesture: l.image.effectGesture ?? null,
+      effectMode: l.image.effectMode ?? null,
+      effectBlendMode: l.image.effectBlendMode ?? null,
+      effectTransition: l.image.effectTransition ?? null,
+      effectTransitionMs: l.image.effectTransitionMs ?? null,
+      effectChromaColor: l.image.effectChromaColor ?? null,
+      effectChromaSimilarity: l.image.effectChromaSimilarity ?? null,
+      effectChromaSmoothness: l.image.effectChromaSmoothness ?? null,
     }));
     return NextResponse.json(
       { images, baseUrl: getImageBaseUrl() },

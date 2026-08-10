@@ -15,6 +15,13 @@ export interface BankImage extends Bg {
   effectFilename: string | null;
   effectDuration: number | null;
   effectGesture: string | null;
+  effectMode: string | null;
+  effectBlendMode: string | null;
+  effectTransition: string | null;
+  effectTransitionMs: number | null;
+  effectChromaColor: string | null;
+  effectChromaSimilarity: number | null;
+  effectChromaSmoothness: number | null;
 }
 
 export type BankImageInput = {
@@ -28,6 +35,13 @@ export type BankImageInput = {
   effectFilename?: string | null;
   effectDuration?: number | null;
   effectGesture?: string | null;
+  effectMode?: string | null;
+  effectBlendMode?: string | null;
+  effectTransition?: string | null;
+  effectTransitionMs?: number | null;
+  effectChromaColor?: string | null;
+  effectChromaSimilarity?: number | null;
+  effectChromaSmoothness?: number | null;
 };
 
 /**
@@ -48,5 +62,12 @@ export function toBankImage(i: BankImageInput, fallbackType: number): BankImage 
     effectFilename: i.effectFilename ?? null,
     effectDuration: typeof i.effectDuration === "number" ? i.effectDuration : null,
     effectGesture: i.effectGesture ?? null,
+    effectMode: i.effectMode ?? null,
+    effectBlendMode: i.effectBlendMode ?? null,
+    effectTransition: i.effectTransition ?? null,
+    effectTransitionMs: typeof i.effectTransitionMs === "number" ? i.effectTransitionMs : null,
+    effectChromaColor: i.effectChromaColor ?? null,
+    effectChromaSimilarity: typeof i.effectChromaSimilarity === "number" ? i.effectChromaSimilarity : null,
+    effectChromaSmoothness: typeof i.effectChromaSmoothness === "number" ? i.effectChromaSmoothness : null,
   };
 }

@@ -519,9 +519,16 @@ useSceneSyncReceiver → BroadcastChannel.onmessage(state)   ※ 레거시
 | priority | Int | 전역 정렬 순서(desc). 지점별 노출 순서는 `ImageDevice.sortOrder`(뱅크)를 쓰며, 관리자 UI의 순서 편집 기능은 제거됨 |
 | active | Boolean | 활성 여부 — 서비스 화면엔 active=true만 노출. 배경(type 1)은 최대 6개까지만 활성 |
 | focalX / focalY | Float? | 초점 좌표 (0~1, 기본 0.5). cover 배치 시 중심 |
-| effectFilename | String? | **배경(type 1) 전용** — 동작(제스처) 트리거 시 촬영 화면에 스크린 블렌드로 재생되는 이펙트 영상 파일명. null=없음 (§26) |
-| effectDuration | Int? | 이펙트 영상 최대 재생 시간(초). 영상이 더 짧으면 종료. null이면 기본값(4초) |
+| effectFilename | String? | **배경(type 1) 전용** — 동작(제스처) 트리거 시 촬영 화면에 반영되는 이펙트 영상 파일명. null=없음 (§26) |
+| effectDuration | Int? | 이펙트 영상 최대 재생 시간(초). dissolve/chromakey에만 적용(transition은 제스처 토글이라 무시). null이면 기본값(4초) |
 | effectGesture | String? | 이펙트를 발동시키는 제스처(MediaPipe 카테고리, 예: Victory). null이면 기본값(Victory). 관리자 배경 편집에서 select (§26) |
+| effectMode | String? | 재생 모드: `dissolve`(블렌드 오버레이)·`transition`(배경 토글 전환)·`chromakey`(키색 제거 오버레이). null=dissolve |
+| effectBlendMode | String? | dissolve 모드 블렌드 방식(CSS mix-blend-mode: screen/lighten/overlay/hard-light/multiply/normal). null=screen |
+| effectTransition | String? | transition 모드 전환 효과(`fade` 크로스페이드 / `cut` 즉시). null=fade |
+| effectTransitionMs | Int? | transition 모드 크로스페이드 지속 시간(ms, 0~3000). null=기본값(600) |
+| effectChromaColor | String? | chromakey 모드 키 색상 "R,G,B". null=기본 "0,255,0" |
+| effectChromaSimilarity | Int? | chromakey 모드 감도(1~100). null=기본 50 |
+| effectChromaSmoothness | Int? | chromakey 모드 경계 부드러움(0~100). null=기본 50 |
 | createdAt | DateTime | 생성 시각 |
 
 **`ImageDevice`** - 이미지 ↔ 디바이스 다대다 (테이블 `pic_image_device`)
@@ -1370,10 +1377,13 @@ npm run tauri:build
 ### 제스처 → 배경 이펙트 영상
 
 - 같은 감지 루프에서 **배경별로 지정한 제스처**(`Image.effectGesture`, 기본 Victory)를 손바닥(촬영)과 별개로 인식한다(독립 arming).
-- 현재 선택된 배경에 이펙트 영상(`Image.effectFilename`, §9)이 설정돼 있으면, 그 제스처 홀드 시 프리뷰 위에
-  **`<video>` 스크린 블렌드 오버레이**로 1회 재생한다. `effectDuration`(초) 경과 또는 영상 종료 중 먼저 도달하면 정지.
-- 관리자: 이미지 관리 → 배경 편집(EditDialog)에서 이펙트 영상 업로드/제거 + **트리거 제스처(select)** + 최대 재생시간 지정
-  (`POST/DELETE /api/admin/images/[id]/effect`, PATCH로 제스처·시간 저장, §8).
+- 현재 선택된 배경에 이펙트 영상(`Image.effectFilename`, §9)이 설정돼 있으면, 그 제스처 홀드 시 **재생 모드**(`Image.effectMode`)에 따라 반영한다. 한 번 발동 후 손을 내렸다 다시 취해야 재발동(독립 arming).
+- **재생 모드(3종)** — 관리자 배경 편집에서 선택(`EFFECT_MODES`):
+  - **dissolve**(기본): 프리뷰 위에 `<video>`를 CSS `mix-blend-mode`(`effectBlendMode`, 기본 screen)로 겹쳐 1회 재생. `effectDuration`(초) 경과 또는 영상 종료 시 정지. **촬영본에는 포함되지 않는 프리뷰 전용 연출.**
+  - **transition**: 트리거 시 배경이 이펙트 영상으로 전환되고, **다시 트리거하면 원배경으로 복귀**(제스처 토글, `effectDuration` 무시). 전환 효과 `effectTransition`(`fade` 크로스페이드 / `cut` 즉시), 페이드 시간 `effectTransitionMs`. 배경 소스 자체를 바꾸므로 **촬영본에도 반영**된다(`drawBackground`의 크로스페이드 합성).
+  - **chromakey**: dissolve처럼 오버레이하되 키 색상(`effectChromaColor`)을 제거하고 남은 부분만 캔버스로 그려 겹친다. 감도·부드러움(`effectChromaSimilarity`/`effectChromaSmoothness`)은 메인 크로마키(§Chromakey)와 동일한 파생식(`softDist=감도×(1+부드러움/50)`). 프리뷰 전용.
+- 관리자: 이미지 관리 → 배경 편집(EditDialog)에서 이펙트 영상 업로드/제거 + **트리거 제스처(select)** + **재생 방식(모드)** + 모드별 파라미터 지정
+  (`POST/DELETE /api/admin/images/[id]/effect`로 파일, PATCH로 제스처·시간·모드·모드별 값 저장, §8).
 - 제스처 옵션은 `EFFECT_TRIGGER_GESTURES`(Victory·Thumb_Up·Thumb_Down·Pointing_Up·ILoveYou·Closed_Fist — 손바닥은 촬영 트리거라 제외), 기본 `DEFAULT_EFFECT_GESTURE`(`src/constants/images.ts`).
 
 ---

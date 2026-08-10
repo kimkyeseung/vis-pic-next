@@ -9,6 +9,17 @@ import {
   EFFECT_VIDEO_EXTENSIONS,
   EFFECT_TRIGGER_GESTURES,
   DEFAULT_EFFECT_GESTURE,
+  EFFECT_MODES,
+  DEFAULT_EFFECT_MODE,
+  EFFECT_BLEND_MODES,
+  DEFAULT_EFFECT_BLEND_MODE,
+  EFFECT_TRANSITIONS,
+  DEFAULT_EFFECT_TRANSITION,
+  EFFECT_TRANSITION_MS_RANGE,
+  DEFAULT_EFFECT_TRANSITION_MS,
+  DEFAULT_EFFECT_CHROMA_COLOR,
+  DEFAULT_EFFECT_CHROMA_SIMILARITY,
+  DEFAULT_EFFECT_CHROMA_SMOOTHNESS,
 } from "@/constants/images";
 
 interface Image {
@@ -20,6 +31,13 @@ interface Image {
   effectFilename?: string | null;
   effectDuration?: number | null;
   effectGesture?: string | null;
+  effectMode?: string | null;
+  effectBlendMode?: string | null;
+  effectTransition?: string | null;
+  effectTransitionMs?: number | null;
+  effectChromaColor?: string | null;
+  effectChromaSimilarity?: number | null;
+  effectChromaSmoothness?: number | null;
   focalX?: number;
   focalY?: number;
 }
@@ -39,6 +57,19 @@ interface EditDialogProps {
 
 const isVideo = (filename: string) =>
   filename.endsWith(".mp4") || filename.endsWith(".webm");
+
+/** "R,G,B" → "#rrggbb" (color input 표시용). 형식이 어긋나면 초록. */
+function rgbStringToHex(rgb: string): string {
+  const parts = rgb.split(",").map((n) => parseInt(n.trim(), 10));
+  if (parts.length !== 3 || parts.some((n) => !Number.isFinite(n))) return "#00ff00";
+  return `#${parts.map((n) => Math.min(255, Math.max(0, n)).toString(16).padStart(2, "0")).join("")}`;
+}
+/** "#rrggbb" → "R,G,B". 형식이 어긋나면 초록(0,255,0). */
+function hexToRgbString(hex: string): string {
+  const m = /^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(hex);
+  if (!m) return "0,255,0";
+  return [m[1], m[2], m[3]].map((h) => parseInt(h, 16)).join(",");
+}
 
 export default function EditDialog({
   image,
@@ -81,6 +112,19 @@ export default function EditDialog({
     String(image.effectDuration ?? DEFAULT_EFFECT_DURATION)
   );
   const [effectGesture, setEffectGesture] = useState<string>(image.effectGesture || DEFAULT_EFFECT_GESTURE);
+  const [effectMode, setEffectMode] = useState<string>(image.effectMode || DEFAULT_EFFECT_MODE);
+  const [effectBlendMode, setEffectBlendMode] = useState<string>(image.effectBlendMode || DEFAULT_EFFECT_BLEND_MODE);
+  const [effectTransition, setEffectTransition] = useState<string>(image.effectTransition || DEFAULT_EFFECT_TRANSITION);
+  const [effectTransitionMs, setEffectTransitionMs] = useState<string>(
+    String(image.effectTransitionMs ?? DEFAULT_EFFECT_TRANSITION_MS)
+  );
+  const [effectChromaColor, setEffectChromaColor] = useState<string>(image.effectChromaColor || DEFAULT_EFFECT_CHROMA_COLOR);
+  const [effectChromaSimilarity, setEffectChromaSimilarity] = useState<number>(
+    image.effectChromaSimilarity ?? DEFAULT_EFFECT_CHROMA_SIMILARITY
+  );
+  const [effectChromaSmoothness, setEffectChromaSmoothness] = useState<number>(
+    image.effectChromaSmoothness ?? DEFAULT_EFFECT_CHROMA_SMOOTHNESS
+  );
   const [effectBusy, setEffectBusy] = useState(false);
   const effectInputRef = useRef<HTMLInputElement>(null);
 
@@ -146,8 +190,20 @@ export default function EditDialog({
           name: name.slice(0, 32),
           imageType: parseInt(imageType),
           deviceIds: selectedDeviceIds,
-          // 배경 이펙트 최대 재생 시간(초)·트리거 제스처. 배경일 때만 전송.
-          ...(isBackground ? { effectDuration: parseInt(effectDuration) || DEFAULT_EFFECT_DURATION, effectGesture } : {}),
+          // 배경 이펙트 설정(재생시간·제스처·모드·모드별 파라미터). 배경일 때만 전송.
+          ...(isBackground
+            ? {
+                effectDuration: parseInt(effectDuration) || DEFAULT_EFFECT_DURATION,
+                effectGesture,
+                effectMode,
+                effectBlendMode,
+                effectTransition,
+                effectTransitionMs: parseInt(effectTransitionMs) || 0,
+                effectChromaColor,
+                effectChromaSimilarity,
+                effectChromaSmoothness,
+              }
+            : {}),
           // 프레임 포컬(인화지 배치 기준점). 프레임일 때만 전송.
           ...(isFrame ? { focalX, focalY } : {}),
         }),
@@ -311,8 +367,8 @@ export default function EditDialog({
             <div className="rounded-lg border border-gray-700 bg-gray-900/40 p-4">
               <label className="mb-1 block font-medium text-gray-200">동작 트리거 이펙트 영상</label>
               <p className="mb-3 text-sm text-gray-500">
-                촬영 화면에서 아래에서 지정한 <span className="text-gray-300">제스처</span>를 취하면
-                이 배경 위에 스크린 블렌드로 재생됩니다. ({EFFECT_VIDEO_EXTENSIONS.join(", ")})
+                촬영 화면에서 지정한 <span className="text-gray-300">제스처</span>를 취하면
+                아래 <span className="text-gray-300">재생 방식</span>에 따라 이 배경에 반영됩니다. ({EFFECT_VIDEO_EXTENSIONS.join(", ")})
               </p>
 
               {effectFilename ? (
@@ -371,19 +427,127 @@ export default function EditDialog({
               </div>
 
               <div className="mt-4">
-                <label className="mb-1 block text-gray-300">최대 재생 시간(초)</label>
-                <input
-                  type="number"
-                  min={EFFECT_DURATION_RANGE.min}
-                  max={EFFECT_DURATION_RANGE.max}
-                  value={effectDuration}
-                  onChange={(e) => setEffectDuration(e.target.value)}
-                  className="w-32 rounded-lg border border-gray-600 bg-gray-700 px-4 py-2.5 text-white focus:border-blue-500 focus:outline-none"
-                />
-                <p className="mt-1 text-sm text-gray-500">
-                  이 시간이 지나면 재생을 멈춥니다. 영상이 더 짧으면 끝날 때 종료됩니다. (저장 시 반영)
-                </p>
+                <label className="mb-1 block text-gray-300">재생 방식(모드)</label>
+                <select
+                  value={effectMode}
+                  onChange={(e) => setEffectMode(e.target.value)}
+                  className="w-full rounded-lg border border-gray-600 bg-gray-700 px-4 py-2.5 text-white focus:border-blue-500 focus:outline-none"
+                >
+                  {EFFECT_MODES.map((m) => (
+                    <option key={m.value} value={m.value}>{m.label}</option>
+                  ))}
+                </select>
               </div>
+
+              {/* 디졸브: 블렌드 방식 선택 */}
+              {effectMode === "dissolve" && (
+                <div className="mt-4">
+                  <label className="mb-1 block text-gray-300">블렌드 방식</label>
+                  <select
+                    value={effectBlendMode}
+                    onChange={(e) => setEffectBlendMode(e.target.value)}
+                    className="w-full rounded-lg border border-gray-600 bg-gray-700 px-4 py-2.5 text-white focus:border-blue-500 focus:outline-none"
+                  >
+                    {EFFECT_BLEND_MODES.map((b) => (
+                      <option key={b.value} value={b.value}>{b.label}</option>
+                    ))}
+                  </select>
+                  <p className="mt-1 text-sm text-gray-500">
+                    영상을 프리뷰 위에 이 방식으로 겹쳐 재생합니다. (촬영본에는 포함되지 않음)
+                  </p>
+                </div>
+              )}
+
+              {/* 트랜지션: 전환 효과 + (페이드일 때) 전환 지속 시간 */}
+              {effectMode === "transition" && (
+                <>
+                  <div className="mt-4">
+                    <label className="mb-1 block text-gray-300">전환 효과</label>
+                    <select
+                      value={effectTransition}
+                      onChange={(e) => setEffectTransition(e.target.value)}
+                      className="w-full rounded-lg border border-gray-600 bg-gray-700 px-4 py-2.5 text-white focus:border-blue-500 focus:outline-none"
+                    >
+                      {EFFECT_TRANSITIONS.map((tr) => (
+                        <option key={tr.value} value={tr.value}>{tr.label}</option>
+                      ))}
+                    </select>
+                    <p className="mt-1 text-sm text-gray-500">
+                      제스처를 취하면 배경이 이 영상으로 전환되고, 다시 취하면 원래 배경으로 돌아옵니다.
+                    </p>
+                  </div>
+                  {effectTransition === "fade" && (
+                    <div className="mt-4">
+                      <label className="mb-1 block text-gray-300">전환 지속 시간(ms)</label>
+                      <input
+                        type="number"
+                        min={EFFECT_TRANSITION_MS_RANGE.min}
+                        max={EFFECT_TRANSITION_MS_RANGE.max}
+                        step={100}
+                        value={effectTransitionMs}
+                        onChange={(e) => setEffectTransitionMs(e.target.value)}
+                        className="w-32 rounded-lg border border-gray-600 bg-gray-700 px-4 py-2.5 text-white focus:border-blue-500 focus:outline-none"
+                      />
+                      <p className="mt-1 text-sm text-gray-500">크로스페이드에 걸리는 시간. 0이면 즉시 전환됩니다.</p>
+                    </div>
+                  )}
+                </>
+              )}
+
+              {/* 크로마키: 키 색상 + 감도 + 부드러움 */}
+              {effectMode === "chromakey" && (
+                <div className="mt-4 space-y-3">
+                  <div className="flex items-center gap-3">
+                    <label className="w-28 shrink-0 text-gray-300">키 색상</label>
+                    <input
+                      type="color"
+                      value={rgbStringToHex(effectChromaColor)}
+                      onChange={(e) => setEffectChromaColor(hexToRgbString(e.target.value))}
+                      className="h-9 w-16 cursor-pointer rounded border border-gray-600 bg-gray-700"
+                    />
+                    <span className="text-xs text-gray-400">{effectChromaColor}</span>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <label className="w-28 shrink-0 text-gray-300">감도 ({effectChromaSimilarity})</label>
+                    <input
+                      type="range" min={1} max={100}
+                      value={effectChromaSimilarity}
+                      onChange={(e) => setEffectChromaSimilarity(Number(e.target.value))}
+                      className="flex-1 accent-blue-500"
+                    />
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <label className="w-28 shrink-0 text-gray-300">경계 부드러움 ({effectChromaSmoothness})</label>
+                    <input
+                      type="range" min={0} max={100}
+                      value={effectChromaSmoothness}
+                      onChange={(e) => setEffectChromaSmoothness(Number(e.target.value))}
+                      className="flex-1 accent-blue-500"
+                    />
+                  </div>
+                  <p className="text-sm text-gray-500">
+                    영상에서 이 색을 제거하고 남은 부분만 프리뷰 위에 겹칩니다. (촬영본에는 포함되지 않음)
+                  </p>
+                </div>
+              )}
+
+              {/* 최대 재생 시간: 디졸브·크로마키(1회 재생)에만 적용. 트랜지션은 제스처 토글이라 제외. */}
+              {effectMode !== "transition" && (
+                <div className="mt-4">
+                  <label className="mb-1 block text-gray-300">최대 재생 시간(초)</label>
+                  <input
+                    type="number"
+                    min={EFFECT_DURATION_RANGE.min}
+                    max={EFFECT_DURATION_RANGE.max}
+                    value={effectDuration}
+                    onChange={(e) => setEffectDuration(e.target.value)}
+                    className="w-32 rounded-lg border border-gray-600 bg-gray-700 px-4 py-2.5 text-white focus:border-blue-500 focus:outline-none"
+                  />
+                  <p className="mt-1 text-sm text-gray-500">
+                    이 시간이 지나면 재생을 멈춥니다. 영상이 더 짧으면 끝날 때 종료됩니다. (저장 시 반영)
+                  </p>
+                </div>
+              )}
             </div>
           )}
         </div>
