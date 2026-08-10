@@ -20,7 +20,6 @@ import { useFrameSender } from "@/hooks/useSceneSync";
 import { useAutoCaptureTimer } from "@/hooks/useAutoCaptureTimer";
 import { createSoundPlayer, type SoundPlayer } from "@/lib/sounds";
 import { CircularTimer } from "@/components/service/CircularTimer";
-import { ServiceNav } from "@/components/service/ServiceNav";
 import { suppressMediapipeLogs } from "@/lib/suppressMediapipeLogs";
 import { useLanguage } from "@/i18n/LanguageContext";
 import type { MessageKey } from "@/i18n/translations";
@@ -71,7 +70,6 @@ export function CameraSection({
   config,
   photos,
   maxPhotos,
-  minPhotos,
   selectedBackground,
   backgroundImages,
   imageBaseUrl,
@@ -79,7 +77,6 @@ export function CameraSection({
   syncEnabled = false,
   onCapture,
   onNext,
-  onPrev,
   onStickersChange,
   onBackgroundSelect,
 }: {
@@ -1172,7 +1169,6 @@ export function CameraSection({
     }
   }, [stickers]);
 
-  const canProceed = photos.length >= minPhotos;
   const showBgStrip = bgRemovalMode !== "off";
   const bgOptions = backgroundImages.length > 0 ? backgroundImages : FALLBACK_BACKGROUNDS;
   // 프리뷰 컨테이너는 place-self-center로 내부 canvas의 intrinsic 크기에 맞춰 커진다.
@@ -1475,7 +1471,6 @@ export function CameraSection({
         </div>
       </div>
 
-      <ServiceNav onPrev={onPrev} onNext={onNext} nextDisabled={!canProceed} />
     </section>
   );
 }

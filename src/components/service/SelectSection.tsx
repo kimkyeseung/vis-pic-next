@@ -161,7 +161,7 @@ export function SelectSection({
       </div>
       </div>
 
-      <ServiceNav onPrev={onPrev} onNext={onNext} prevKey="select.reshoot" nextDisabled={!canProceed} />
+      <ServiceNav onPrev={onPrev} onNext={onNext} nextDisabled={!canProceed} />
     </section>
   );
 }

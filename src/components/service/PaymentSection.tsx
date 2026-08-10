@@ -169,7 +169,7 @@ export function PaymentSection({
                   <span className={`text-5xl portrait:text-6xl font-extrabold ${selected ? "text-[#4a4e8c]" : "text-white"}`}>
                     {t("payment.sheets", { count: String(tier.qty) })}
                   </span>
-                  <span className={`text-2xl portrait:text-3xl font-bold ${selected ? "text-[#4a4e8c]" : "text-white/90"}`}>
+                  <span className={`text-3xl portrait:text-4xl font-bold ${selected ? "text-[#4a4e8c]" : "text-white/90"}`}>
                     {t("payment.amount", { amount: fmt(tier.price) })}
                   </span>
                 </button>
@@ -185,20 +185,8 @@ export function PaymentSection({
           </div>
           </div>
 
-          {/* 하단 고정 바 — 이전(좌)/총액(중앙)/결제하기(우). 다른 페이지 ServiceNav와 동일한 코너 위치. */}
-          <div className="absolute bottom-16 left-16 right-16 z-20 flex items-center justify-between gap-4 portrait:bottom-10 portrait:left-10 portrait:right-10">
-            <button
-              className="service-button nav-button"
-              style={{ background: "rgba(255,255,255,0.1)", color: "#fff" }}
-              onClick={onPrev}
-            >
-              &#9664; {t("common.prev")}
-            </button>
-
-            <div className="text-7xl portrait:text-4xl font-black text-white leading-none text-center px-2">
-              {t("payment.amount", { amount: fmt(totalAmount) })}
-            </div>
-
+          {/* 하단 고정 바 — 결제하기 버튼만 중앙에 배치(총액·이전 버튼 제거). */}
+          <div className="absolute bottom-16 left-1/2 -translate-x-1/2 z-20 flex items-center justify-center portrait:bottom-10">
             <button className="service-button nav-button nav-next-lg" onClick={handlePay}>
               {t("payment.pay")} &#9654;
             </button>
