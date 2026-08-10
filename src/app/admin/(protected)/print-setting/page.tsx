@@ -20,6 +20,28 @@ interface PrintBgImage {
   focalY: number;
 }
 
+function gcd(a: number, b: number): number {
+  return b === 0 ? a : gcd(b, a % b);
+}
+
+/**
+ * 사진 가로/세로(cm 문자열)로 가로:세로 비율 문자열을 만든다.
+ * 정수로 깔끔히 약분되면 "3:2"처럼, 아니면 소수 비율 "1.50 : 1"로 표기. 값이 유효하지 않으면 null.
+ */
+function formatAspectRatio(wStr: string | undefined, hStr: string | undefined): string | null {
+  const w = parseFloat(wStr ?? "");
+  const h = parseFloat(hStr ?? "");
+  if (!Number.isFinite(w) || !Number.isFinite(h) || w <= 0 || h <= 0) return null;
+  const wi = Math.round(w * 100);
+  const hi = Math.round(h * 100);
+  const g = gcd(wi, hi) || 1;
+  const a = wi / g;
+  const b = hi / g;
+  if (a <= 50 && b <= 50) return `${a}:${b}`;
+  const r = w / h;
+  return r >= 1 ? `${r.toFixed(2)} : 1` : `1 : ${(1 / r).toFixed(2)}`;
+}
+
 export default function PrintSettingPage() {
   const { selectedDevice } = useAdmin();
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -627,6 +649,14 @@ export default function PrintSettingPage() {
                       );
                     })}
                   </div>
+                  {(() => {
+                    const ratio = formatAspectRatio(settings[prefix + "WIDTH"], settings[prefix + "HEIGHT"]);
+                    return ratio ? (
+                      <p className="text-xs text-gray-400 mt-2">
+                        사진 가로:세로 비율 = <span className="font-semibold text-blue-300">{ratio}</span>
+                      </p>
+                    ) : null;
+                  })()}
 
                   <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mt-5 mb-1">
                     여백 설정
