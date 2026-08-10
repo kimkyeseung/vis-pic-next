@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback, useMemo, type CSSProperties } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import type { DeviceConfig, BGImage, Sticker } from "@/types";
 import { FALLBACK_BACKGROUNDS } from "@/constants/frames";
 import {
@@ -158,18 +158,23 @@ export function CameraSection({
   const handleManualCaptureRef = useRef<() => void>(() => {});
 
   // 동작 트리거 이펙트 영상 — 현재 선택된 배경에 붙은 이펙트가 있으면 모드에 따라 반영.
-  //  · dissolve  : 프리뷰 위에 블렌드 오버레이로 1회 재생(<video> + CSS mix-blend-mode)
-  //  · chromakey : 키 색상을 제거한 프레임을 캔버스로 그려 오버레이로 1회 재생
+  // 레이어 순서는 항상 배경 → 이펙트 → 사람(카메라). 즉 이펙트는 사람 뒤에서 합성된다.
+  //  · dissolve  : 배경 위에 블렌드(globalCompositeOperation)로 1회 재생
+  //  · chromakey : 키 색상을 제거한 프레임을 배경 위에 1회 재생
   //  · transition: 트리거 시 배경↔영상 토글(크로스페이드). 다시 트리거하면 원배경 복귀.
-  const backEffectRef = useRef<HTMLVideoElement>(null);          // dissolve/chromakey 프레임 소스
-  const effectCanvasRef = useRef<HTMLCanvasElement>(null);       // chromakey 오버레이 출력 캔버스
+  const backEffectRef = useRef<HTMLVideoElement>(null);          // dissolve/chromakey 프레임 소스(숨김 <video>)
+  const effectCanvasRef = useRef<HTMLCanvasElement | null>(null); // chromakey 키잉 결과(오프스크린)
   const effectBgVideoRef = useRef<HTMLVideoElement | null>(null); // transition 배경용 이펙트 영상(루프)
   const effectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const effectDurationRef = useRef(0);
+  // 합성 루프(무-deps)가 최신 표시 상태를 읽도록 ref로 보관 + 페이드용 현재 알파(0~1).
+  const effectVisibleRef = useRef(false);
+  const effectAlphaRef = useRef(0);
   // transition 토글 상태: active=배경이 이펙트 영상으로 전환됨. startedAt=현재 전환 시작 시각(크로스페이드 진행 계산).
   const transitionActiveRef = useRef(false);
   const transitionStartRef = useRef(0);
   const [effectVisible, setEffectVisible] = useState(false);
+  useEffect(() => { effectVisibleRef.current = effectVisible; }, [effectVisible]);
   const currentBgEffect = useMemo(() => {
     if (selectedBackground === null || selectedBackground <= 0) return null;
     const bg = backgroundImages.find((b) => b.id === selectedBackground);
@@ -199,9 +204,10 @@ export function CameraSection({
   // 프레임 1장만 그리며, 반복은 아래 effectVisible 기반 useEffect 루프가 담당한다(자기참조 rAF 회피).
   const drawChromaOnce = useCallback(() => {
     const v = backEffectRef.current;
-    const c = effectCanvasRef.current;
     const info = currentBgEffectRef.current;
-    if (!v || !c || !info || v.readyState < 2 || !v.videoWidth) return;
+    if (!v || !info || v.readyState < 2 || !v.videoWidth) return;
+    let c = effectCanvasRef.current;
+    if (!c) { c = document.createElement("canvas"); effectCanvasRef.current = c; }
     if (c.width !== EFFECT_CHROMA_W) c.width = EFFECT_CHROMA_W;
     if (c.height !== EFFECT_CHROMA_H) c.height = EFFECT_CHROMA_H;
     const cx = c.getContext("2d", { willReadFrequently: true });
@@ -236,10 +242,8 @@ export function CameraSection({
 
   const stopEffect = useCallback(() => {
     if (effectTimerRef.current) { clearTimeout(effectTimerRef.current); effectTimerRef.current = null; }
-    const v = backEffectRef.current;
-    if (v) { v.pause(); try { v.currentTime = 0; } catch {} }
-    const c = effectCanvasRef.current;
-    if (c) { const cx = c.getContext("2d"); cx?.clearRect(0, 0, c.width, c.height); }
+    // 재생만 멈추고 현재 프레임/키잉 결과는 남겨 둔다 — 합성 루프의 알파 페이드아웃이 자연스럽게 사라지게 한다.
+    backEffectRef.current?.pause();
     setEffectVisible(false);
   }, []);
 
@@ -735,6 +739,34 @@ export function CameraSection({
     // 실행하고, 그 사이 프레임은 직전 마스크를 재사용한다 (사람 실루엣은 프레임 간 급변하지 않음).
     const INFERENCE_INTERVAL_MS = 200;
 
+    // dissolve/chromakey 이펙트를 배경 위·사람 아래에 그린다(사람 뒤 레이어). 표시 상태에 따라 알파를 부드럽게 페이드.
+    // 배경과 동일하게 미러 없이 그린다. transition 모드는 배경 자체를 바꾸므로 여기서 그리지 않는다.
+    const drawEffectLayer = (ctx: CanvasRenderingContext2D, w: number, h: number) => {
+      const info = currentBgEffectRef.current;
+      const target = effectVisibleRef.current && info && info.mode !== "transition" ? 1 : 0;
+      effectAlphaRef.current += (target - effectAlphaRef.current) * 0.18; // ~250ms 이징
+      const alpha = effectAlphaRef.current;
+      if (!info || alpha < 0.01) return;
+      if (info.mode === "dissolve") {
+        const v = backEffectRef.current;
+        if (!v || v.readyState < 2 || !v.videoWidth) return;
+        // "normal"은 캔버스 합성 연산 "source-over"에 대응. 그 외(screen/lighten/…)는 그대로 유효.
+        const op = info.blendMode === "normal" ? "source-over" : info.blendMode;
+        ctx.save();
+        ctx.globalAlpha = alpha;
+        ctx.globalCompositeOperation = op as GlobalCompositeOperation;
+        drawCoverSource(ctx, v, w, h);
+        ctx.restore();
+      } else if (info.mode === "chromakey") {
+        const ec = effectCanvasRef.current;
+        if (!ec) return;
+        ctx.save();
+        ctx.globalAlpha = alpha;
+        drawCoverSource(ctx, ec, w, h);
+        ctx.restore();
+      }
+    };
+
     const processFrame = () => {
       const video = videoRef.current;
       const display = displayCanvasRef.current;
@@ -870,6 +902,9 @@ export function CameraSection({
 
       if (processed) {
         drawBackground(ctx, dw, dh);
+        // 이펙트 레이어: 배경 위·사람 아래에 그려 "배경 → 이펙트 → 사람" 순서를 만든다.
+        // dissolve=블렌드 합성, chromakey=키색 제거 프레임. transition은 배경 자체라 여기서 제외.
+        drawEffectLayer(ctx, dw, dh);
         ctx.save();
         ctx.translate(dw, 0);
         ctx.scale(-1, 1);
@@ -1320,38 +1355,20 @@ export function CameraSection({
               <canvas ref={stickerCanvasRef} className="camera-video absolute inset-0 pointer-events-none" />
             </>
           )}
-          {/* 동작 트리거 이펙트 오버레이 — dissolve/chromakey 모드에서만 프리뷰 위에 재생.
-              transition 모드는 배경 자체를 전환하므로 오버레이가 없다(drawBackground가 처리). */}
+          {/* 동작 트리거 이펙트 프레임 소스 — dissolve/chromakey에서 <video>를 숨김으로 재생하고,
+              실제 표시는 합성 루프(drawEffectLayer)가 배경 위·사람 아래에 그린다. transition은 배경 자체 전환이라 제외. */}
           {currentBgEffect && (currentBgEffect.mode === "dissolve" || currentBgEffect.mode === "chromakey") && (
-            <>
-              <video
-                ref={backEffectRef}
-                key={currentBgEffect.src}
-                src={currentBgEffect.src}
-                className="absolute inset-0 w-full h-full object-cover z-20 pointer-events-none rounded-[17px]"
-                muted
-                playsInline
-                preload="auto"
-                disablePictureInPicture
-                onEnded={stopEffect}
-                style={
-                  currentBgEffect.mode === "dissolve"
-                    ? {
-                        mixBlendMode: currentBgEffect.blendMode as CSSProperties["mixBlendMode"],
-                        opacity: effectVisible ? 1 : 0,
-                        transition: "opacity 400ms ease-in-out",
-                      }
-                    : { opacity: 0 } // chromakey: <video>는 프레임 소스로만 쓰고 캔버스로 출력
-                }
-              />
-              {currentBgEffect.mode === "chromakey" && (
-                <canvas
-                  ref={effectCanvasRef}
-                  className="absolute inset-0 w-full h-full object-cover z-20 pointer-events-none rounded-[17px]"
-                  style={{ opacity: effectVisible ? 1 : 0, transition: "opacity 400ms ease-in-out" }}
-                />
-              )}
-            </>
+            <video
+              ref={backEffectRef}
+              key={currentBgEffect.src}
+              src={currentBgEffect.src}
+              className="pointer-events-none absolute h-px w-px opacity-0"
+              muted
+              playsInline
+              preload="auto"
+              disablePictureInPicture
+              onEnded={stopEffect}
+            />
           )}
           {/* 촬영 직후 촬영본 0.5초 프리뷰 (카메라 위에 덮어씀) */}
           {capturedPreview && (

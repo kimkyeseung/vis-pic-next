@@ -453,7 +453,7 @@ export default function EditDialog({
                     ))}
                   </select>
                   <p className="mt-1 text-sm text-gray-500">
-                    영상을 프리뷰 위에 이 방식으로 겹쳐 재생합니다. (촬영본에는 포함되지 않음)
+                    영상을 배경 위·사람 뒤에 이 방식으로 블렌드해 재생합니다. (촬영본에도 반영)
                   </p>
                 </div>
               )}
@@ -526,7 +526,7 @@ export default function EditDialog({
                     />
                   </div>
                   <p className="text-sm text-gray-500">
-                    영상에서 이 색을 제거하고 남은 부분만 프리뷰 위에 겹칩니다. (촬영본에는 포함되지 않음)
+                    영상에서 이 색을 제거하고 남은 부분만 배경 위·사람 뒤에 겹칩니다. (촬영본에도 반영)
                   </p>
                 </div>
               )}

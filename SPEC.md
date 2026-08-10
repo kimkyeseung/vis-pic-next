@@ -1378,10 +1378,11 @@ npm run tauri:build
 
 - 같은 감지 루프에서 **배경별로 지정한 제스처**(`Image.effectGesture`, 기본 Victory)를 손바닥(촬영)과 별개로 인식한다(독립 arming).
 - 현재 선택된 배경에 이펙트 영상(`Image.effectFilename`, §9)이 설정돼 있으면, 그 제스처 홀드 시 **재생 모드**(`Image.effectMode`)에 따라 반영한다. 한 번 발동 후 손을 내렸다 다시 취해야 재발동(독립 arming).
+- **레이어 순서는 항상 배경 → 이펙트 → 사람(카메라)** — 이펙트는 사람 뒤에서 합성된다. 3종 모두 합성 캔버스(`processFrame`) 안에서 그려지므로 **촬영본·송출 프레임에도 반영**된다. 표시/사라짐은 알파 이징(≈250ms) 페이드.
 - **재생 모드(3종)** — 관리자 배경 편집에서 선택(`EFFECT_MODES`):
-  - **dissolve**(기본): 프리뷰 위에 `<video>`를 CSS `mix-blend-mode`(`effectBlendMode`, 기본 screen)로 겹쳐 1회 재생. `effectDuration`(초) 경과 또는 영상 종료 시 정지. **촬영본에는 포함되지 않는 프리뷰 전용 연출.**
-  - **transition**: 트리거 시 배경이 이펙트 영상으로 전환되고, **다시 트리거하면 원배경으로 복귀**(제스처 토글, `effectDuration` 무시). 전환 효과 `effectTransition`(`fade` 크로스페이드 / `cut` 즉시), 페이드 시간 `effectTransitionMs`. 배경 소스 자체를 바꾸므로 **촬영본에도 반영**된다(`drawBackground`의 크로스페이드 합성).
-  - **chromakey**: dissolve처럼 오버레이하되 키 색상(`effectChromaColor`)을 제거하고 남은 부분만 캔버스로 그려 겹친다. 감도·부드러움(`effectChromaSimilarity`/`effectChromaSmoothness`)은 메인 크로마키(§Chromakey)와 동일한 파생식(`softDist=감도×(1+부드러움/50)`). 프리뷰 전용.
+  - **dissolve**(기본): 배경 위에 이펙트 영상을 캔버스 `globalCompositeOperation`(`effectBlendMode`, 기본 screen; `normal`=source-over)로 블렌드해 1회 재생. `effectDuration`(초) 경과 또는 영상 종료 시 정지. `<video>`는 숨김 프레임 소스로만 쓰고 표시는 `drawEffectLayer`가 담당.
+  - **transition**: 트리거 시 배경이 이펙트 영상으로 전환되고, **다시 트리거하면 원배경으로 복귀**(제스처 토글, `effectDuration` 무시). 전환 효과 `effectTransition`(`fade` 크로스페이드 / `cut` 즉시), 페이드 시간 `effectTransitionMs`. 배경 소스 자체를 바꾼다(`drawBackground`의 크로스페이드 합성).
+  - **chromakey**: 키 색상(`effectChromaColor`)을 제거한 프레임을 오프스크린 캔버스에 굽고 배경 위·사람 아래에 그린다. 감도·부드러움(`effectChromaSimilarity`/`effectChromaSmoothness`)은 메인 크로마키(§Chromakey)와 동일한 파생식(`softDist=감도×(1+부드러움/50)`).
 - 관리자: 이미지 관리 → 배경 편집(EditDialog)에서 이펙트 영상 업로드/제거 + **트리거 제스처(select)** + **재생 방식(모드)** + 모드별 파라미터 지정
   (`POST/DELETE /api/admin/images/[id]/effect`로 파일, PATCH로 제스처·시간·모드·모드별 값 저장, §8).
 - 제스처 옵션은 `EFFECT_TRIGGER_GESTURES`(Victory·Thumb_Up·Thumb_Down·Pointing_Up·ILoveYou·Closed_Fist — 손바닥은 촬영 트리거라 제외), 기본 `DEFAULT_EFFECT_GESTURE`(`src/constants/images.ts`).
