@@ -68,6 +68,15 @@ const FIELDS: { name: string; label: string; type?: "text" | "number" | "select"
     showIf: (s) => s.CHROMAKEY_MODE === "chromakey",
   },
   {
+    name: "CHROMAKEY_SMOOTHNESS",
+    label: "크로마키 경계 부드러움",
+    type: "number",
+    min: 0,
+    max: 100,
+    hint: "낮을수록 경계가 딱딱하게 잘리고, 높을수록 부드럽게 번집니다. 기본값 50.",
+    showIf: (s) => s.CHROMAKEY_MODE === "chromakey",
+  },
+  {
     name: "CAPTURE_THRESHOLD",
     label: "AI 배경제거 경계 침식 (%)",
     type: "number",
@@ -211,6 +220,8 @@ export default function CaptureSettingPage() {
           onChromaColorChange={(rgb) => updateSetting("CHROMAKEY_RGB", rgb)}
           similarity={clampPercent(parseIntSafe(settings.CHROMAKEY_SIMILARITY || "", 50), 1)}
           onSimilarityChange={(n) => updateSetting("CHROMAKEY_SIMILARITY", String(n))}
+          smoothness={clampPercent(parseIntSafe(settings.CHROMAKEY_SMOOTHNESS || "", 50))}
+          onSmoothnessChange={(n) => updateSetting("CHROMAKEY_SMOOTHNESS", String(n))}
           threshold={clampPercent(parseIntSafe(settings.CAPTURE_THRESHOLD || "", 15))}
           onThresholdChange={(n) => updateSetting("CAPTURE_THRESHOLD", String(n))}
           feather={clampPercent(parseIntSafe(settings.CAPTURE_SMOOTHNESS || "", 35), 1)}

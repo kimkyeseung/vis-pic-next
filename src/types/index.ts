@@ -53,6 +53,8 @@ export interface DeviceConfig {
   chromakeyRgb: string;
   /** 크로마키 감도(색상 허용 거리, 1-100). 높을수록 키 색과 더 먼 색까지 제거. 기본 50. */
   chromakeySimilarity: number;
+  /** 크로마키 경계 부드러움(0-100). 낮을수록 경계가 또렷하게 잘리고, 높을수록 부드럽게 번진다. 기본 50. */
+  chromakeySmoothness: number;
   captureModes: string[];
   bgRemovalMode: BgRemovalMode;
   idleTimeoutSeconds: number;

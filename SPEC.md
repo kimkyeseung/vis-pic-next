@@ -695,8 +695,8 @@ sticker 오버레이 (canvas.drawImage / fillText)
 
 ### Chromakey (`bgRemovalMode: "chromakey"`)
 
-- 설정: `CHROMAKEY_RGB`(키 색상, 기본 "0,255,0") + `CHROMAKEY_SIMILARITY`(감도, 1-100, 기본 50) — 관리자 촬영 설정 페이지·미리보기에서 조정
-- RGB 색상거리 기반 제거: `distSq = dr²+dg²+db²`. 임계값은 **감도에서 파생** — `HARD = 감도²`(완전 투명), `SOFT = (감도×2)²`(그 사이 부드럽게 페이드). 감도 기본 50 → 예전 고정값(50²/100²)과 동일, 높일수록 넓게 제거
+- 설정: `CHROMAKEY_RGB`(키 색상, 기본 "0,255,0") + `CHROMAKEY_SIMILARITY`(감도, 1-100, 기본 50) + `CHROMAKEY_SMOOTHNESS`(경계 부드러움, 0-100, 기본 50) — 관리자 촬영 설정 페이지·미리보기에서 조정
+- RGB 색상거리 기반 제거: `distSq = dr²+dg²+db²`. 임계값은 **감도·부드러움에서 파생** — `HARD = 감도²`(완전 투명), `softDist = 감도×(1+부드러움/50)`, `SOFT = softDist²`(그 사이 부드럽게 페이드). 부드러움 기본 50 → `softDist=감도×2`로 예전 고정값과 동일, 0 → `SOFT=HARD`로 경계가 딱 잘리고, 높일수록 페이드 폭이 넓어짐
 
 ### 없음 (`bgRemovalMode: "off"`)
 

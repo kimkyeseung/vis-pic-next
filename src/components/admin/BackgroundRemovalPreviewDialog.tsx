@@ -43,6 +43,8 @@ export function BackgroundRemovalPreviewDialog({
   onChromaColorChange,
   similarity,
   onSimilarityChange,
+  smoothness,
+  onSmoothnessChange,
   threshold,
   onThresholdChange,
   feather,
@@ -54,6 +56,8 @@ export function BackgroundRemovalPreviewDialog({
   onChromaColorChange: (rgb: string) => void;
   similarity: number;
   onSimilarityChange: (n: number) => void;
+  smoothness: number;
+  onSmoothnessChange: (n: number) => void;
   threshold: number;
   onThresholdChange: (n: number) => void;
   feather: number;
@@ -73,10 +77,12 @@ export function BackgroundRemovalPreviewDialog({
   // rAF 루프가 최신 값을 읽도록 ref로 미러링 (슬라이더 조작마다 이펙트/루프를 재시작하지 않기 위함)
   const chromaColorRef = useRef(chromaColor);
   const similarityRef = useRef(similarity);
+  const smoothnessRef = useRef(smoothness);
   const thresholdRef = useRef(threshold);
   const featherRef = useRef(feather);
   useEffect(() => { chromaColorRef.current = chromaColor; }, [chromaColor]);
   useEffect(() => { similarityRef.current = similarity; }, [similarity]);
+  useEffect(() => { smoothnessRef.current = smoothness; }, [smoothness]);
   useEffect(() => { thresholdRef.current = threshold; }, [threshold]);
   useEffect(() => { featherRef.current = feather; }, [feather]);
 
@@ -222,8 +228,11 @@ export function BackgroundRemovalPreviewDialog({
             const data = imageData.data;
             const { r: kr, g: kg, b: kb } = chromaColorRef.current;
             const simDist = Math.max(1, similarityRef.current);
+            // 경계 부드러움(0-100): softDist=simDist×(1+부드러움/50). 50 → 2×simDist(예전 하드코딩), 0 → 딱 잘림.
+            const softDist = simDist * (1 + Math.max(0, smoothnessRef.current) / 50);
+            const softBand = Math.max(1e-6, softDist - simDist);
             const HARD = simDist * simDist;
-            const SOFT = (simDist * 2) * (simDist * 2);
+            const SOFT = softDist * softDist;
             for (let i = 0; i < data.length; i += 4) {
               const dr = data[i] - kr;
               const dg = data[i + 1] - kg;
@@ -232,7 +241,7 @@ export function BackgroundRemovalPreviewDialog({
               if (distSq < HARD) {
                 data[i + 3] = 0;
               } else if (distSq < SOFT) {
-                data[i + 3] = Math.round(((Math.sqrt(distSq) - simDist) / simDist) * 255);
+                data[i + 3] = Math.round(((Math.sqrt(distSq) - simDist) / softBand) * 255);
               }
             }
             offCtx.putImageData(imageData, 0, 0);
@@ -376,6 +385,18 @@ export function BackgroundRemovalPreviewDialog({
               />
             </div>
             <p className="text-gray-500 text-xs">감도가 높을수록 키 색과 더 먼 색까지 제거됩니다.</p>
+            <div className="flex items-center gap-3">
+              <label className="text-gray-400 text-sm w-40 shrink-0">경계 부드러움 ({smoothness})</label>
+              <input
+                type="range"
+                min={0}
+                max={100}
+                value={smoothness}
+                onChange={(e) => onSmoothnessChange(Number(e.target.value))}
+                className="flex-1"
+              />
+            </div>
+            <p className="text-gray-500 text-xs">낮을수록 경계가 딱딱하게 잘리고, 높을수록 부드럽게 번집니다.</p>
           </div>
         ) : (
           <div className="space-y-3">

@@ -214,6 +214,7 @@ function ServiceContent() {
           bgRemovalMode={config.bgRemovalMode}
           chromakeyRgb={config.chromakeyRgb}
           chromakeySimilarity={config.chromakeySimilarity}
+          chromakeySmoothness={config.chromakeySmoothness}
           segmentThreshold={config.segmentThreshold}
           segmentFeather={config.segmentFeather}
         />

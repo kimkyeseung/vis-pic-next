@@ -589,10 +589,13 @@ export function CameraSection({
   useEffect(() => {
     const offscreen = document.createElement("canvas");
     // 크로마키 감도(색상 허용 거리). 높을수록 키 색과 더 먼 색까지 제거한다.
-    // hardDist=감도(완전 제거) / softDist=감도×2(경계 페더). 기본 50 → 예전 하드코딩(50/100)과 동일.
+    // hardDist=감도(완전 제거) / softDist=경계 페더 바깥 경계 = simDist×(1+부드러움/50).
+    // 부드러움 50 → softDist=2×simDist(예전 하드코딩과 동일), 0 → SOFT=HARD로 딱 잘림.
     const simDist = Math.max(1, config.chromakeySimilarity);
+    const softDist = simDist * (1 + Math.max(0, config.chromakeySmoothness) / 50);
+    const softBand = Math.max(1e-6, softDist - simDist);
     const HARD = simDist * simDist;
-    const SOFT = (simDist * 2) * (simDist * 2);
+    const SOFT = softDist * softDist;
     // mediapipe 추론(segmentForVideo)은 화면 갱신보다 훨씬 무거우므로 초당 최대 이 간격으로만
     // 실행하고, 그 사이 프레임은 직전 마스크를 재사용한다 (사람 실루엣은 프레임 간 급변하지 않음).
     const INFERENCE_INTERVAL_MS = 200;
@@ -723,7 +726,7 @@ export function CameraSection({
           if (distSq < HARD) {
             data[i + 3] = 0;
           } else if (distSq < SOFT) {
-            data[i + 3] = Math.round(((Math.sqrt(distSq) - simDist) / simDist) * 255);
+            data[i + 3] = Math.round(((Math.sqrt(distSq) - simDist) / softBand) * 255);
           }
         }
         offCtx.putImageData(imageData, 0, 0);
@@ -762,7 +765,7 @@ export function CameraSection({
 
     animFrameRef.current = requestAnimationFrame(processFrame);
     return () => cancelAnimationFrame(animFrameRef.current);
-  }, [selectedBackground, chromaKey, config.chromakeySimilarity, bgRemovalMode, segmentThresh, segmentFeather, drawBackground, frameChannelRef, snapshotWithStickers]);
+  }, [selectedBackground, chromaKey, config.chromakeySimilarity, config.chromakeySmoothness, bgRemovalMode, segmentThresh, segmentFeather, drawBackground, frameChannelRef, snapshotWithStickers]);
 
   // 카운트다운 도중 언마운트(이전/다음 이동 등) 시 타이머가 살아남아
   // onCapture가 화면 전환 후에 실행되는 것을 막는다.

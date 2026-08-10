@@ -89,6 +89,7 @@ function makeConfig(paymentEnabled: boolean): DeviceConfig {
     cameraResolution: "fhd",
     chromakeyRgb: "0,255,0",
     chromakeySimilarity: 50,
+    chromakeySmoothness: 50,
     captureModes: ["1x1", "2x1", "2x2", "2x3", "2x4", "4x1"],
     bgRemovalMode: "mediapipe",
     idleTimeoutSeconds: 30,
