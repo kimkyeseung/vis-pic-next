@@ -51,7 +51,9 @@ export const EFFECT_DURATION_RANGE = { min: 1, max: 30 } as const;
 export const EFFECT_VIDEO_EXTENSIONS = ["mp4", "webm"] as const;
 
 // ── 이펙트 재생 모드 ──
-// dissolve: 영상을 프리뷰 위에 블렌드 오버레이로 1회 재생(촬영본에는 안 들어감).
+// 레이어 순서는 항상 배경 → 이펙트 → 사람. 프리뷰뿐 아니라 촬영본(captureHiRes)에도
+// 동일하게 합성되므로, 촬영 순간 재생 중이던 이펙트는 사진에 담긴다.
+// dissolve: 영상을 배경 위·사람 아래에 블렌드 오버레이로 1회 재생.
 // transition: 트리거 시 배경이 영상으로 전환, 다시 트리거하면 원배경으로 복귀(제스처 토글).
 // chromakey: dissolve처럼 오버레이하되 키 색상을 제거하고 남은 부분만 합성.
 export const EFFECT_MODES = [

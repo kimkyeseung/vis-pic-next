@@ -255,9 +255,13 @@ export function CameraSection({
     if (effectTimerRef.current) { clearTimeout(effectTimerRef.current); effectTimerRef.current = null; }
     setEffectVisible(true);
     try { v.currentTime = 0; } catch {}
+    // 카운트다운 중 재트리거면 duration 타이머·onEnded로 중간에 꺼지지 않게 loop로 유지한다.
+    // (capturePhoto가 스냅샷 후 loop 해제·정리 — 재발동 시에도 사진에 이펙트가 담기도록.)
+    const holding = countdownRef.current !== null;
+    v.loop = holding;
     const p = v.play();
     if (p) p.catch(() => {});
-    effectTimerRef.current = setTimeout(stopEffect, durationMs);
+    if (!holding) effectTimerRef.current = setTimeout(stopEffect, durationMs);
   }, [stopEffect]);
 
   // 트리거 발동 시 모드별 분기: transition은 배경 토글, 그 외는 오버레이 1회 재생.
@@ -1094,7 +1098,9 @@ export function CameraSection({
         }
 
         // 스냅샷을 마쳤으면 붙잡아 둔 이펙트를 원상복귀(루프 해제)하고 정리(페이드아웃).
-        if (holdEffect) {
+        // 시작 시 hold였든 카운트다운 중 재트리거로 붙잡혔든(playEffect가 loop 유지),
+        // 스냅샷 시점 실제 상태를 기준으로 정리한다 — 촬영 후 이펙트가 무한 루프하지 않도록.
+        if (holdEffect || effectVisibleRef.current) {
           const ev = backEffectRef.current;
           if (ev) ev.loop = false;
           stopEffect();
