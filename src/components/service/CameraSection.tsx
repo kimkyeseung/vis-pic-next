@@ -15,7 +15,7 @@ import {
   normalizeEffectTransition,
 } from "@/constants/images";
 import { getCameraResolution } from "@/constants/camera";
-import { fillGradientFromCSS, computeCaptureSize } from "@/lib/canvas";
+import { fillGradientFromCSS, computeCaptureSize, drawCoverSource } from "@/lib/canvas";
 import { useFrameSender } from "@/hooks/useSceneSync";
 import { useAutoCaptureTimer } from "@/hooks/useAutoCaptureTimer";
 import { createSoundPlayer, type SoundPlayer } from "@/lib/sounds";
@@ -40,31 +40,6 @@ const GIF_FRAME_WIDTH = 800;
 // 프리뷰 원해상도 대신 이 크기로 다운스케일해 부담을 줄이고, CSS로 프리뷰에 맞춰 늘린다.
 const EFFECT_CHROMA_W = 640;
 const EFFECT_CHROMA_H = 480;
-
-/**
- * 이미지/동영상 소스를 원본 비율 유지한 채 대상 영역을 가득 채우고(cover) 넘치는 부분만 잘라 그린다.
- * 소스가 아직 그릴 수 없으면(크기 0) 아무것도 그리지 않고 false를 반환한다.
- */
-function drawCoverSource(
-  ctx: CanvasRenderingContext2D,
-  src: CanvasImageSource,
-  w: number,
-  h: number,
-): boolean {
-  const iw = (src as HTMLVideoElement).videoWidth || (src as HTMLImageElement).naturalWidth || 0;
-  const ih = (src as HTMLVideoElement).videoHeight || (src as HTMLImageElement).naturalHeight || 0;
-  if (iw <= 0 || ih <= 0) return false;
-  const destRatio = w / h;
-  const imgRatio = iw / ih;
-  let sx: number, sy: number, sw: number, sh: number;
-  if (imgRatio > destRatio) {
-    sh = ih; sw = ih * destRatio; sx = (iw - sw) / 2; sy = 0;
-  } else {
-    sw = iw; sh = iw / destRatio; sx = 0; sy = (ih - sh) / 2;
-  }
-  ctx.drawImage(src, sx, sy, sw, sh, 0, 0, w, h);
-  return true;
-}
 
 export function CameraSection({
   config,

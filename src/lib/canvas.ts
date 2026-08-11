@@ -80,6 +80,35 @@ export function drawImageCover(
 }
 
 /**
+ * 이미지/동영상 소스를 원본 비율 유지한 채 대상 영역을 가득 채우고(cover) 넘치는 부분만 잘라 그린다.
+ * 소스가 아직 그릴 수 없으면(크기 0) 아무것도 그리지 않고 false를 반환한다.
+ * (이미지·동영상을 함께 다루므로 focal 지원 drawImageCover와 별개로 둔다.)
+ */
+export function drawCoverSource(
+  ctx: CanvasRenderingContext2D,
+  src: CanvasImageSource,
+  w: number,
+  h: number,
+): boolean {
+  // 소스 종류별 고유(픽셀) 크기: 영상=videoWidth, 이미지=naturalWidth, 캔버스=width.
+  // (캔버스에는 videoWidth/naturalWidth가 없어 .width/.height로 폴백해야 한다 — 크로마키
+  //  키잉 결과처럼 오프스크린 캔버스를 소스로 넘기는 경로에서 필수.)
+  const iw = (src as HTMLVideoElement).videoWidth || (src as HTMLImageElement).naturalWidth || (src as HTMLCanvasElement).width || 0;
+  const ih = (src as HTMLVideoElement).videoHeight || (src as HTMLImageElement).naturalHeight || (src as HTMLCanvasElement).height || 0;
+  if (iw <= 0 || ih <= 0) return false;
+  const destRatio = w / h;
+  const imgRatio = iw / ih;
+  let sx: number, sy: number, sw: number, sh: number;
+  if (imgRatio > destRatio) {
+    sh = ih; sw = ih * destRatio; sx = (iw - sw) / 2; sy = 0;
+  } else {
+    sw = iw; sh = iw / destRatio; sx = 0; sy = (ih - sh) / 2;
+  }
+  ctx.drawImage(src, sx, sy, sw, sh, 0, 0, w, h);
+  return true;
+}
+
+/**
  * 촬영 캡처 목표 해상도 계산 — 원본보다 크게 확대하지 않고(min) maxW로 상한을 둔다.
  * 프리뷰 상한과 별개로 인쇄 품질(예: 10×15cm 300DPI ≈ 긴 변 1800px)에 맞춘 크기를 낸다.
  * 원본 비율(예: 4:3)은 그대로 유지한다. 유효하지 않은 입력이면 {w:0,h:0}.

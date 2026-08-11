@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import EffectPreviewDialog from "./EffectPreviewDialog";
 import {
   BACKGROUND_IMAGE_TYPE,
   FRAME_IMAGE_TYPE,
@@ -126,6 +127,7 @@ export default function EditDialog({
     image.effectChromaSmoothness ?? DEFAULT_EFFECT_CHROMA_SMOOTHNESS
   );
   const [effectBusy, setEffectBusy] = useState(false);
+  const [showPreview, setShowPreview] = useState(false);
   const effectInputRef = useRef<HTMLInputElement>(null);
 
   const handleEffectUpload = async (file: File) => {
@@ -166,11 +168,12 @@ export default function EditDialog({
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
+      // 미리보기가 열려 있으면 Escape는 미리보기만 닫는다(EditDialog는 유지).
+      if (e.key === "Escape" && !showPreview) onClose();
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [onClose]);
+  }, [onClose, showPreview]);
 
   const toggleDevice = (deviceId: string) => {
     setSelectedDeviceIds((prev) =>
@@ -427,7 +430,18 @@ export default function EditDialog({
               </div>
 
               <div className="mt-4">
-                <label className="mb-1 block text-gray-300">재생 방식(모드)</label>
+                <div className="mb-1 flex items-center justify-between">
+                  <label className="block text-gray-300">재생 방식(모드)</label>
+                  <button
+                    type="button"
+                    onClick={() => setShowPreview(true)}
+                    disabled={!effectFilename}
+                    className="rounded-md bg-gray-700 px-3 py-1 text-sm text-blue-300 hover:bg-gray-600 disabled:opacity-40"
+                    title={effectFilename ? "선택한 재생 방식으로 미리보기" : "이펙트 영상을 먼저 업로드하세요"}
+                  >
+                    미리보기
+                  </button>
+                </div>
                 <select
                   value={effectMode}
                   onChange={(e) => setEffectMode(e.target.value)}
@@ -582,6 +596,24 @@ export default function EditDialog({
           </div>
         </div>
       </div>
+
+      {/* 이펙트 미리보기 — 현재 선택된 재생 방식·파라미터로 배경 위에 합성해 보여준다(사람 생략). */}
+      {showPreview && effectFilename && (
+        <EffectPreviewDialog
+          imageBaseUrl={imageBaseUrl}
+          backgroundFilename={image.filename}
+          effectFilename={effectFilename}
+          mode={effectMode}
+          blendMode={effectBlendMode}
+          transition={effectTransition}
+          transitionMs={parseInt(effectTransitionMs) || 0}
+          chromaColor={effectChromaColor}
+          chromaSimilarity={effectChromaSimilarity}
+          chromaSmoothness={effectChromaSmoothness}
+          durationMs={(parseInt(effectDuration) || DEFAULT_EFFECT_DURATION) * 1000}
+          onClose={() => setShowPreview(false)}
+        />
+      )}
     </div>
   );
 }
