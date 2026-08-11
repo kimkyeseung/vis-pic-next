@@ -15,7 +15,7 @@ import {
   normalizeEffectTransition,
 } from "@/constants/images";
 import { getCameraResolution } from "@/constants/camera";
-import { fillGradientFromCSS } from "@/lib/canvas";
+import { fillGradientFromCSS, computeCaptureSize } from "@/lib/canvas";
 import { useFrameSender } from "@/hooks/useSceneSync";
 import { useAutoCaptureTimer } from "@/hooks/useAutoCaptureTimer";
 import { createSoundPlayer, type SoundPlayer } from "@/lib/sounds";
@@ -109,6 +109,9 @@ export function CameraSection({
   const maskCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const maskReadyRef = useRef(false);
   const lastInferenceTimeRef = useRef(0);
+  // 촬영 순간에만 쓰는 고해상도 합성 캔버스(프리뷰 1440 상한과 별개로 원본 해상도로 캡처).
+  const captureCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const capturePersonCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const [countdown, setCountdown] = useState<number | null>(null);
   // 제스처 루프(deps [])가 촬영 진행 여부를 알 수 있도록 countdown을 ref로도 유지.
   const countdownRef = useRef<number | null>(null);
@@ -569,6 +572,31 @@ export function CameraSection({
     }
   }, [selectedBackground]);
 
+  // 이펙트 레이어(배경 위·사람 아래)를 주어진 알파로 그린다. 알파 이징(진행)은 호출부(프리뷰 루프)가
+  // 담당하고, 이 함수는 그리기만 한다 — 프리뷰 루프와 고해상도 캡처가 함께 재사용한다.
+  const drawEffectLayer = useCallback((ctx: CanvasRenderingContext2D, w: number, h: number, alpha: number) => {
+    const info = currentBgEffectRef.current;
+    if (!info || alpha < 0.01) return;
+    if (info.mode === "dissolve") {
+      const v = backEffectRef.current;
+      if (!v || v.readyState < 2 || !v.videoWidth) return;
+      // "normal"은 캔버스 합성 연산 "source-over"에 대응. 그 외(screen/lighten/…)는 그대로 유효.
+      const op = info.blendMode === "normal" ? "source-over" : info.blendMode;
+      ctx.save();
+      ctx.globalAlpha = alpha;
+      ctx.globalCompositeOperation = op as GlobalCompositeOperation;
+      drawCoverSource(ctx, v, w, h);
+      ctx.restore();
+    } else if (info.mode === "chromakey") {
+      const ec = effectCanvasRef.current;
+      if (!ec) return;
+      ctx.save();
+      ctx.globalAlpha = alpha;
+      drawCoverSource(ctx, ec, w, h);
+      ctx.restore();
+    }
+  }, []);
+
   const stopCamera = useCallback(() => {
     cameraStreamRef.current?.getTracks().forEach((t) => t.stop());
     cameraStreamRef.current = null;
@@ -704,6 +732,90 @@ export function CameraSection({
     return c.toDataURL("image/jpeg", quality);
   }, [drawStickers]);
 
+  // 촬영 순간에만 실행하는 고해상도 캡처(프리뷰 루프는 그대로 1440 상한 유지).
+  // 원본 video(고해상도)를 다시 그리고, 프리뷰에서 만든 저해상도 마스크(maskCanvasRef)를 확대 적용해
+  // "배경 → 이펙트 → 사람" 순서로 한 번만 합성한다. 실패 시 null → 호출부가 기존 경로로 폴백.
+  const CAPTURE_MAX_W = 1800; // 10×15cm 인화 300DPI 기준(≈1800×1200). 그 이상은 인쇄상 무의미.
+  const captureHiRes = useCallback((): string | null => {
+    const video = videoRef.current;
+    const display = displayCanvasRef.current;
+    if (!video || video.readyState < 2 || !video.videoWidth || !display || !display.width) return null;
+    // 원본보다 크게 확대하지 않고(min) 최대 1800까지. 프리뷰(1440) 상한과 별개.
+    const { w: TW, h: TH } = computeCaptureSize(video.videoWidth, video.videoHeight, CAPTURE_MAX_W);
+    if (TW <= 0 || TH <= 0) return null;
+
+    let c = captureCanvasRef.current;
+    if (!c) { c = document.createElement("canvas"); captureCanvasRef.current = c; }
+    c.width = TW; c.height = TH;
+    const ctx = c.getContext("2d");
+    if (!ctx) return null;
+
+    const drawRawMirrored = () => {
+      ctx.save();
+      ctx.translate(TW, 0);
+      ctx.scale(-1, 1);
+      ctx.drawImage(video, 0, 0, TW, TH);
+      ctx.restore();
+    };
+
+    if (bgRemovalMode === "off") {
+      drawRawMirrored();
+    } else {
+      // 고해상도 사람(미러 전) 캔버스를 만든다.
+      let person = capturePersonCanvasRef.current;
+      if (!person) { person = document.createElement("canvas"); capturePersonCanvasRef.current = person; }
+      person.width = TW; person.height = TH;
+      const pctx = person.getContext("2d", { willReadFrequently: bgRemovalMode === "chromakey" });
+      let built = false;
+      if (pctx) {
+        pctx.clearRect(0, 0, TW, TH);
+        pctx.drawImage(video, 0, 0, TW, TH);
+        if (bgRemovalMode === "mediapipe" && maskReadyRef.current && maskCanvasRef.current) {
+          // 프리뷰에서 구운 soft-alpha 마스크를 확대 적용(destination-in). 추론은 다시 안 돈다.
+          pctx.save();
+          pctx.globalCompositeOperation = "destination-in";
+          pctx.drawImage(maskCanvasRef.current, 0, 0, TW, TH);
+          pctx.restore();
+          built = true;
+        } else if (bgRemovalMode === "chromakey") {
+          const img = pctx.getImageData(0, 0, TW, TH);
+          const d = img.data;
+          const { r: kr, g: kg, b: kb } = chromaKey;
+          const simDist = Math.max(1, config.chromakeySimilarity);
+          const softDist = simDist * (1 + Math.max(0, config.chromakeySmoothness) / 50);
+          const softBand = Math.max(1e-6, softDist - simDist);
+          const HARD = simDist * simDist;
+          const SOFT = softDist * softDist;
+          for (let i = 0; i < d.length; i += 4) {
+            const dr = d[i] - kr;
+            const dg = d[i + 1] - kg;
+            const db = d[i + 2] - kb;
+            const distSq = dr * dr + dg * dg + db * db;
+            if (distSq < HARD) d[i + 3] = 0;
+            else if (distSq < SOFT) d[i + 3] = Math.round(((Math.sqrt(distSq) - simDist) / softBand) * 255);
+          }
+          pctx.putImageData(img, 0, 0);
+          built = true;
+        }
+      }
+      if (built && person) {
+        drawBackground(ctx, TW, TH);
+        drawEffectLayer(ctx, TW, TH, effectAlphaRef.current);
+        ctx.save();
+        ctx.translate(TW, 0);
+        ctx.scale(-1, 1);
+        ctx.drawImage(person, 0, 0, TW, TH);
+        ctx.restore();
+      } else {
+        drawRawMirrored();
+      }
+    }
+
+    // 스티커: 프리뷰(display) 대비 배율로 크기를 맞춘다(위치는 정규화라 무관).
+    drawStickers(ctx, TW, TH, TW / display.width);
+    return c.toDataURL("image/jpeg", 0.92);
+  }, [bgRemovalMode, chromaKey, config.chromakeySimilarity, config.chromakeySmoothness, drawBackground, drawEffectLayer, drawStickers]);
+
   // 스티커 전용 오버레이 캔버스 루프 — 메인 합성 루프와 독립적으로 60fps 렌더
   useEffect(() => {
     let raf = 0;
@@ -738,32 +850,6 @@ export function CameraSection({
 
     // dissolve/chromakey 이펙트를 배경 위·사람 아래에 그린다(사람 뒤 레이어). 표시 상태에 따라 알파를 부드럽게 페이드.
     // 배경과 동일하게 미러 없이 그린다. transition 모드는 배경 자체를 바꾸므로 여기서 그리지 않는다.
-    const drawEffectLayer = (ctx: CanvasRenderingContext2D, w: number, h: number) => {
-      const info = currentBgEffectRef.current;
-      const target = effectVisibleRef.current && info && info.mode !== "transition" ? 1 : 0;
-      effectAlphaRef.current += (target - effectAlphaRef.current) * 0.18; // ~250ms 이징
-      const alpha = effectAlphaRef.current;
-      if (!info || alpha < 0.01) return;
-      if (info.mode === "dissolve") {
-        const v = backEffectRef.current;
-        if (!v || v.readyState < 2 || !v.videoWidth) return;
-        // "normal"은 캔버스 합성 연산 "source-over"에 대응. 그 외(screen/lighten/…)는 그대로 유효.
-        const op = info.blendMode === "normal" ? "source-over" : info.blendMode;
-        ctx.save();
-        ctx.globalAlpha = alpha;
-        ctx.globalCompositeOperation = op as GlobalCompositeOperation;
-        drawCoverSource(ctx, v, w, h);
-        ctx.restore();
-      } else if (info.mode === "chromakey") {
-        const ec = effectCanvasRef.current;
-        if (!ec) return;
-        ctx.save();
-        ctx.globalAlpha = alpha;
-        drawCoverSource(ctx, ec, w, h);
-        ctx.restore();
-      }
-    };
-
     const processFrame = () => {
       const video = videoRef.current;
       const display = displayCanvasRef.current;
@@ -785,7 +871,7 @@ export function CameraSection({
       const PROCESS_SCALE = w >= 2560 ? 0.25 : 0.5;
 
       // 프리뷰 캔버스는 최대 1440px로 제한 — 캔버스 렌더링·GPU 전송 비용을 줄인다.
-      // 촬영 캡처(snapshotWithStickers)도 이 크기로 출력되며, 포토부스 인화 품질에 충분하다.
+      // 최종 촬영본은 이 상한과 별개로 captureHiRes()가 촬영 순간에만 원본 해상도(최대 1800px)로 합성한다.
       const MAX_PREVIEW_W = 1440;
       const previewScale = Math.min(1, MAX_PREVIEW_W / w);
       const dw = Math.round(w * previewScale);
@@ -901,7 +987,13 @@ export function CameraSection({
         drawBackground(ctx, dw, dh);
         // 이펙트 레이어: 배경 위·사람 아래에 그려 "배경 → 이펙트 → 사람" 순서를 만든다.
         // dissolve=블렌드 합성, chromakey=키색 제거 프레임. transition은 배경 자체라 여기서 제외.
-        drawEffectLayer(ctx, dw, dh);
+        // 알파 이징(표시/사라짐 페이드)은 여기서 진행하고, 그 알파를 캡처에서도 재사용한다.
+        {
+          const info = currentBgEffectRef.current;
+          const target = effectVisibleRef.current && info && info.mode !== "transition" ? 1 : 0;
+          effectAlphaRef.current += (target - effectAlphaRef.current) * 0.18; // ~250ms 이징
+        }
+        drawEffectLayer(ctx, dw, dh, effectAlphaRef.current);
         ctx.save();
         ctx.translate(dw, 0);
         ctx.scale(-1, 1);
@@ -932,7 +1024,7 @@ export function CameraSection({
 
     animFrameRef.current = requestAnimationFrame(processFrame);
     return () => cancelAnimationFrame(animFrameRef.current);
-  }, [selectedBackground, chromaKey, config.chromakeySimilarity, config.chromakeySmoothness, bgRemovalMode, segmentThresh, segmentFeather, drawBackground, frameChannelRef, snapshotWithStickers]);
+  }, [selectedBackground, chromaKey, config.chromakeySimilarity, config.chromakeySmoothness, bgRemovalMode, segmentThresh, segmentFeather, drawBackground, drawEffectLayer, frameChannelRef, snapshotWithStickers]);
 
   // 카운트다운 도중 언마운트(이전/다음 이동 등) 시 타이머가 살아남아
   // onCapture가 화면 전환 후에 실행되는 것을 막는다.
@@ -981,7 +1073,7 @@ export function CameraSection({
         setCountdown(null);
 
         pushFrame();
-        const dataUrl = snapshotWithStickers(0.92);
+        const dataUrl = captureHiRes() ?? snapshotWithStickers(0.92);
         if (dataUrl) {
           onCapture(dataUrl, frames);
           // 촬영본 1초 프리뷰
@@ -998,7 +1090,7 @@ export function CameraSection({
     }, 1000);
 
     captureTimersRef.current.push(frameTimer, interval);
-  }, [countdown, photos.length, maxPhotos, config.captureSeconds, onCapture, snapshotWithStickers]);
+  }, [countdown, photos.length, maxPhotos, config.captureSeconds, onCapture, snapshotWithStickers, captureHiRes]);
 
   // 자동 촬영 타이머 (훅으로 분리 — 회귀 방지 이유는 useAutoCaptureTimer 참고).
   const { autoTimer, cancel: cancelAutoTimer } = useAutoCaptureTimer({

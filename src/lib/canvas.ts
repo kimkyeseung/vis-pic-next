@@ -79,6 +79,21 @@ export function drawImageCover(
   ctx.drawImage(img, sx, sy, sw, sh, dx, dy, dw, dh);
 }
 
+/**
+ * 촬영 캡처 목표 해상도 계산 — 원본보다 크게 확대하지 않고(min) maxW로 상한을 둔다.
+ * 프리뷰 상한과 별개로 인쇄 품질(예: 10×15cm 300DPI ≈ 긴 변 1800px)에 맞춘 크기를 낸다.
+ * 원본 비율(예: 4:3)은 그대로 유지한다. 유효하지 않은 입력이면 {w:0,h:0}.
+ */
+export function computeCaptureSize(
+  nativeW: number,
+  nativeH: number,
+  maxW: number,
+): { w: number; h: number } {
+  if (!(nativeW > 0) || !(nativeH > 0) || !(maxW > 0)) return { w: 0, h: 0 };
+  const scale = Math.min(1, maxW / nativeW);
+  return { w: Math.round(nativeW * scale), h: Math.round(nativeH * scale) };
+}
+
 export function loadImage(src: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
     const img = new Image();
