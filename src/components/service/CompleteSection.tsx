@@ -18,15 +18,6 @@ import {
 import { useLanguage } from "@/i18n/LanguageContext";
 import { ServiceNav } from "./ServiceNav";
 
-// 서버는 만료일을 ISO(YYYY-MM-DD)로 반환 → 현재 언어에 맞춰 표시 포맷.
-const EXPIRY_LOCALE: Record<string, string> = { ko: "ko-KR", en: "en-US", ja: "ja-JP", zh: "zh-CN" };
-function formatExpiryForDisplay(value: string, lang: string): string {
-  const m = value.match(/^(\d{4})-(\d{2})-(\d{2})$/);
-  if (!m) return value; // 구 형식(이미 포맷된 문자열)이면 그대로 사용
-  const d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
-  return d.toLocaleDateString(EXPIRY_LOCALE[lang] ?? "en-US", { year: "numeric", month: "long", day: "numeric" });
-}
-
 export function CompleteSection({
   photos,
   selectedPhotos,
@@ -68,7 +59,7 @@ export function CompleteSection({
   onPrev: () => void;
   onRestart: () => void;
 }) {
-  const { t, lang } = useLanguage();
+  const { t } = useLanguage();
   const hasPreparedImage = Boolean(compositeImage && preparedPhotoUrl);
   const [printStatus, setPrintStatus] = useState<"compositing" | "ready" | "printing" | "done" | "error">(
     hasPreparedImage ? "ready" : "compositing",
@@ -580,7 +571,7 @@ export function CompleteSection({
                     <div className="flex items-center gap-2 bg-black/40 px-4 py-2 rounded-full text-sm">
                       <span>⏰</span>
                       <span className="text-gray-300">
-                        {t("complete.expiry", { date: formatExpiryForDisplay(qrExpiryDate, lang) })}
+                        {t("complete.expiry")}
                       </span>
                     </div>
                   )}

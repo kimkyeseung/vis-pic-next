@@ -49,7 +49,7 @@
 - 스티커 오버레이 (지점별 이미지 뱅크)
 - 카드 결제 (PayApp Lite)
 - 인화지 출력 (Windows 프린터)
-- QR코드 기반 디지털 사진 공유 (3일 만료 URL)
+- QR코드 기반 디지털 사진 공유 (24시간 만료 URL)
 - 보조 모니터 실시간 카메라 미리보기
 - 다국어 지원 (한국어/영어/일본어/중국어 — §24)
 
@@ -300,7 +300,7 @@
 ### Step 7: COMPLETE
 
 1. 선택 사진 합성 이미지 생성 (`src/lib/printLayout.ts` 공용 레이아웃 계산 사용) — **모든 컷(1컷 포함) 동일 경로**로 프레임·슬롯 합성. 세로 용지 모드(2컷 등)는 프레임(인쇄 배경) 이미지를 **90° 회전**해 용지 방향에 맞춘다 (§13)
-2. `POST /api/print/upload-image` → 3일 만료 URL
+2. `POST /api/print/upload-image` → 24시간 만료 URL
 3. `POST /api/gif/create-layout` → 애니메이션 GIF URL
 4. QR 코드 표시 (사진 URL + GIF URL)
 5. 인쇄 버튼 → `print_image` Tauri 명령어 호출 (전역 설정 `PRINTER_NAME` 사용, 비어 있으면 기본 프린터)
@@ -451,8 +451,8 @@ useSceneSyncReceiver → BroadcastChannel.onmessage(state)   ※ 레거시
 
 | 메서드 | 경로 | 설명 |
 |--------|------|------|
-| POST | `/api/print/upload-image` | 합성 사진 업로드 (3일 만료 URL) |
-| GET | `/api/print/cleanup` | 만료(3일 경과) 사진 정리 — Supabase·로컬 모두. `CRON_SECRET` 있으면 Bearer 인증 |
+| POST | `/api/print/upload-image` | 합성 사진 업로드 (24시간 만료 URL) |
+| GET | `/api/print/cleanup` | 만료(24시간 경과) 사진 정리 — Supabase·로컬 모두. `CRON_SECRET` 있으면 Bearer 인증 |
 | POST | `/api/gif/create` | 단순 GIF 생성 |
 | POST | `/api/gif/create-layout` | 레이아웃 기반 GIF 생성 |
 | GET | `/api/gif/[gifId]` | GIF 메타데이터 조회 |
@@ -883,7 +883,7 @@ open_camera_window(x, y, width, height)
 - 저장 순서:
   1. Supabase Storage `pic-prints` 버킷 (우선)
   2. 로컬 `/static/prints/` (폴백)
-- 반환: URL + 3일 만료 날짜
+- 반환: URL + 24시간(1일) 만료 날짜
 
 ### GIF 생성 (`/api/gif/create`)
 

@@ -3,7 +3,8 @@ import { writeFile, mkdir } from "fs/promises";
 import path from "path";
 
 export const PRINTS_BUCKET = "pic-prints";
-export const EXPIRY_DAYS = 3;
+// QR 다운로드 보관 기간(일). 1일 = 24시간. 표시 문구도 24시간 기준(complete.expiry).
+export const EXPIRY_DAYS = 1;
 
 export function getPrintsClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;

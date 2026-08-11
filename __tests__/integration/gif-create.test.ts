@@ -50,7 +50,7 @@ describe("POST /api/gif/create", () => {
     expect(data.gif_id).toBeTruthy();
     expect(data.gif_url).toMatch(/\.gif$/);
     expect(data.image_count).toBe(2);
-    expect(data.expiry_days).toBe(3);
+    expect(data.expiry_days).toBe(1);
     expect(data.expiry_date).toBeTruthy();
   });
 
@@ -109,7 +109,7 @@ describe("POST /api/print/upload-image", () => {
     expect(data.success).toBe(true);
     expect(data.image_id).toBeTruthy();
     expect(data.image_url).toMatch(/\.jpg$/);
-    expect(data.expiry_days).toBe(3);
+    expect(data.expiry_days).toBe(1);
     expect(data.expiry_date).toBeTruthy();
   });
 

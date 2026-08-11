@@ -72,7 +72,7 @@ test.describe("Service page QR code flow", () => {
     expect(await qrCodes.count()).toBeGreaterThanOrEqual(2);
 
     // Verify expiry badge is shown
-    await expect(page.getByText("까지 다운로드 가능")).toBeVisible();
+    await expect(page.getByText("24시간 동안 다운로드 가능")).toBeVisible();
 
     // Verify buttons exist
     await expect(page.getByRole("button", { name: "인쇄하기" })).toBeVisible();
