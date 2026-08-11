@@ -1049,6 +1049,17 @@ export function CameraSection({
     setCountdown(count);
     // 카운트다운 숫자마다 효과음을 1초씩만 재생
     soundRef.current?.playCountingTick();
+
+    // 촬영 시작 시 dissolve/chromakey 이펙트가 재생 중이면 스냅샷까지 유지한다.
+    // (스냅샷은 카운트다운 후에 찍히는데, 그 사이 durationMs·영상 종료로 이펙트가 꺼지면
+    //  captureHiRes가 그릴 이펙트가 없어 사진에 안 담기던 문제 방지.)
+    const holdEffect = effectVisibleRef.current;
+    if (holdEffect) {
+      if (effectTimerRef.current) { clearTimeout(effectTimerRef.current); effectTimerRef.current = null; }
+      const ev = backEffectRef.current;
+      if (ev) { ev.loop = true; ev.play().catch(() => {}); }
+    }
+
     const frames: string[] = [];
     const pushFrame = () => {
       const snap = snapshotWithStickers(0.75, GIF_FRAME_WIDTH);
@@ -1082,6 +1093,13 @@ export function CameraSection({
           capturedPreviewTimerRef.current = setTimeout(() => setCapturedPreview(null), 1000);
         }
 
+        // 스냅샷을 마쳤으면 붙잡아 둔 이펙트를 원상복귀(루프 해제)하고 정리(페이드아웃).
+        if (holdEffect) {
+          const ev = backEffectRef.current;
+          if (ev) ev.loop = false;
+          stopEffect();
+        }
+
         // 촬영 순간 셔터음 재생 + 플래시
         soundRef.current?.playShutter();
         setFlash(true);
@@ -1090,7 +1108,7 @@ export function CameraSection({
     }, 1000);
 
     captureTimersRef.current.push(frameTimer, interval);
-  }, [countdown, photos.length, maxPhotos, config.captureSeconds, onCapture, snapshotWithStickers, captureHiRes]);
+  }, [countdown, photos.length, maxPhotos, config.captureSeconds, onCapture, snapshotWithStickers, captureHiRes, stopEffect]);
 
   // 자동 촬영 타이머 (훅으로 분리 — 회귀 방지 이유는 useAutoCaptureTimer 참고).
   const { autoTimer, cancel: cancelAutoTimer } = useAutoCaptureTimer({
