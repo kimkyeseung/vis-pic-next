@@ -420,6 +420,11 @@ fn print_file(printer_name: &str, file_path: &str, copies: u32) -> Result<bool, 
             Add-Type -AssemblyName System.Drawing
             $img = [System.Drawing.Image]::FromFile("{}")
             $pd = New-Object System.Drawing.Printing.PrintDocument
+            # 기본 PrintController(PrintControllerWithStatusDialog)는 인쇄 중
+            # "페이지 인쇄 중..." 상태 대화상자를 포그라운드로 띄운다. 키오스크에서는
+            # 이 창이 우측 하단에 보이고, 포그라운드를 뺏겨 풀스크린 창이 흐트러지면서
+            # 화면 위아래로 바탕화면이 드러난다. StandardPrintController로 무음 인쇄한다.
+            $pd.PrintController = New-Object System.Drawing.Printing.StandardPrintController
             {}
             $pd.PrinterSettings.Copies = {}
             if ($img.Width -gt $img.Height) {{
