@@ -66,7 +66,7 @@ export function SelectSection({
 
   return (
     <section className={`${SERVICE_SECTION_CLASS} grid-rows-[auto_auto_1fr]`}>
-      <h2 className="text-title font-extrabold text-white mb-4 animate-fadeInDown" style={{ textShadow: "0 2px 15px rgba(0,0,0,0.5)" }}>
+      <h2 className="text-title text-center font-extrabold text-white mb-4 animate-fadeInDown" style={{ textShadow: "0 2px 15px rgba(0,0,0,0.5)" }}>
         {t("select.title")}
       </h2>
       {/* 사진 영역(1fr)이 위로 넘쳐 문구와 겹치지 않도록 하단 여백으로 간격 확보. */}

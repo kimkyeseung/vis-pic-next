@@ -128,7 +128,7 @@ export function PaymentSection({
     <section className={`${SERVICE_SECTION_CLASS} grid-rows-[auto_1fr] px-16`}>
       {status === "idle" ? (
         <>
-          <h2 className="text-title font-extrabold text-white animate-fadeInDown" style={{ textShadow: "0 2px 15px rgba(0,0,0,0.5)" }}>
+          <h2 className="text-title text-center whitespace-pre-line font-extrabold text-white animate-fadeInDown" style={{ textShadow: "0 2px 15px rgba(0,0,0,0.5)" }}>
             {t("payment.selectQuantity")}
           </h2>
 
@@ -205,7 +205,7 @@ export function PaymentSection({
             <div className="py-8">
               <div className="w-20 h-20 border-4 border-white/20 border-t-green-500 rounded-full animate-spin mx-auto mb-8" />
               <p className="text-white text-2xl mb-4">{t("payment.waiting")}</p>
-              <p className="text-gray-400 text-lg mb-2">{t("payment.tapCard")}</p>
+              <p className="text-gray-400 text-lg mb-2 whitespace-pre-line">{t("payment.tapCard")}</p>
               <p className="text-white/70 text-lg mb-8">
                 {t("payment.sheets", { count: String(selectedQty) })} · {t("payment.amount", { amount: fmt(totalAmount) })}
               </p>

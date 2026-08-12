@@ -24,7 +24,7 @@ export function BackgroundSection({
 
   return (
     <section className={`${SERVICE_SECTION_CLASS} grid-rows-[auto_1fr]`}>
-      <h2 className="text-title font-extrabold text-white animate-fadeInDown" style={{ textShadow: "0 2px 15px rgba(0,0,0,0.5)" }}>
+      <h2 className="text-title text-center font-extrabold text-white animate-fadeInDown" style={{ textShadow: "0 2px 15px rgba(0,0,0,0.5)" }}>
         {t("bg.title")}
       </h2>
 

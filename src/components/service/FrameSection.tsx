@@ -102,7 +102,7 @@ export function FrameSection({
 
   return (
     <section className={`${SERVICE_SECTION_CLASS} grid-rows-[auto_1fr] px-16`}>
-      <h2 className="text-title font-extrabold text-white animate-fadeInDown" style={{ textShadow: "0 2px 15px rgba(0,0,0,0.5)" }}>
+      <h2 className="text-title text-center whitespace-pre-line font-extrabold text-white animate-fadeInDown" style={{ textShadow: "0 2px 15px rgba(0,0,0,0.5)" }}>
         {t("frame.title")}
       </h2>
 
