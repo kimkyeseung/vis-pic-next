@@ -582,18 +582,6 @@ export function CompleteSection({
             {printStatus === "done" && (
               <p className="text-gray-400 text-lg">{t("complete.printDone")}</p>
             )}
-
-            {/* 하단 모서리 버튼 (시안): 이전(좌하단) / 인화하기(우하단) */}
-            {printStatus === "ready" && (
-              <ServiceNav onPrev={onPrev} onNext={handlePrint} nextKey="complete.print" />
-            )}
-            {printStatus === "done" && (
-              <div className="absolute bottom-16 right-16 z-20 portrait:bottom-10 portrait:right-10">
-                <button className="service-button nav-button nav-next-lg" onClick={onRestart}>
-                  {t("complete.restart")}
-                </button>
-              </div>
-            )}
           </>
         )}
 
@@ -619,6 +607,20 @@ export function CompleteSection({
           </>
         )}
       </div>
+
+      {/* 하단 고정 버튼은 애니메이션(transform) 래퍼 밖 = section 기준으로 절대배치한다.
+          transform이 걸린 안쪽 div를 기준으로 잡으면 QR 로드로 콘텐츠 높이가 커질 때
+          버튼이 아래로 밀려 내려가므로, section 직속에 두어 위치를 고정한다. */}
+      {compositeImage && printStatus === "ready" && (
+        <ServiceNav onPrev={onPrev} onNext={handlePrint} nextKey="complete.print" />
+      )}
+      {compositeImage && printStatus === "done" && (
+        <div className="absolute bottom-16 right-16 z-20 portrait:bottom-10 portrait:right-10">
+          <button className="service-button nav-button nav-next-lg" onClick={onRestart}>
+            {t("complete.restart")}
+          </button>
+        </div>
+      )}
     </section>
   );
 }
