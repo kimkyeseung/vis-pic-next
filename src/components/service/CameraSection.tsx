@@ -1330,7 +1330,7 @@ export function CameraSection({
 
       {/* 좌측: 배경 변경 패널 */}
       {showBgStrip && (
-        <div className="flex flex-col min-h-0 px-2 pr-4 border-r border-white/10" style={{ gridArea: "bg" }}>
+        <div className="flex flex-col min-h-0 px-2 pr-4" style={{ gridArea: "bg" }}>
           <h3 className="text-white text-xl font-bold text-center mb-4 shrink-0">{t("camera.bgChange")}</h3>
           {/* p-1: 선택 ring(요소 바깥 3px)이 스크롤 컨테이너 가장자리에서 잘리지 않도록 여백 확보 */}
           <div className="grid grid-cols-2 gap-3 overflow-y-auto flex-1 min-h-0 content-start p-1">
@@ -1511,7 +1511,7 @@ export function CameraSection({
       </div>
 
       {/* 우측(가로)·우하단(세로): 스티커 패널 */}
-      <div className="flex flex-col min-h-0 pl-4 border-l border-white/10" style={{ gridArea: "sticker" }}>
+      <div className="flex flex-col min-h-0 pl-4" style={{ gridArea: "sticker" }}>
         <h3 className="text-white text-2xl font-bold text-center mb-4 shrink-0">{t("camera.stickerPrompt")}</h3>
 
         {/* 스티커 패널 (상시 노출) */}
