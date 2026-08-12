@@ -137,7 +137,7 @@ export function CameraSection({
   //  · dissolve  : 배경 위에 블렌드(globalCompositeOperation)로 1회 재생
   //  · chromakey : 키 색상을 제거한 프레임을 배경 위에 1회 재생
   //  · transition: 트리거 시 배경↔영상 토글(크로스페이드). 다시 트리거하면 원배경 복귀.
-  const backEffectRef = useRef<HTMLVideoElement>(null);          // dissolve/chromakey 프레임 소스(숨김 <video>)
+  const backEffectRef = useRef<HTMLVideoElement | null>(null);  // dissolve/chromakey 프레임 소스(명령형 <video>)
   const effectCanvasRef = useRef<HTMLCanvasElement | null>(null); // chromakey 키잉 결과(오프스크린)
   const effectBgVideoRef = useRef<HTMLVideoElement | null>(null); // transition 배경용 이펙트 영상(루프)
   const effectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -272,8 +272,34 @@ export function CameraSection({
     return () => { vid.pause(); vid.src = ""; effectBgVideoRef.current = null; };
   }, [currentBgEffect]);
 
-  // 배경/모드가 바뀌면 재생 중이던 이펙트와 전환 상태를 정리한다. <video>는 key로 remount되어 재생이 멈추므로
-  // 여기서는 타이머/루프/토글만 정리하고, 표시 상태 리셋은 콜백으로 미룬다(effect 본문 동기 setState 회피).
+  // dissolve/chromakey 프레임 소스 영상을 명령형으로 생성한다. 크로마키는 drawChromaOnce가
+  // getImageData로 픽셀을 읽고, dissolve는 표시 캔버스에 그려져 toDataURL 캡처에 들어가므로,
+  // 교차 출처(Supabase) 영상은 crossOrigin을 src보다 먼저 지정해 CORS 모드로 로드해야 캔버스
+  // 오염(SecurityError) 없이 키잉·캡처가 된다. (JSX <video src crossOrigin>은 속성 적용 순서가
+  // 보장되지 않아 no-cors로 로드→오염될 수 있어 명령형으로 만든다.)
+  useEffect(() => {
+    backEffectRef.current = null;
+    const info = currentBgEffect;
+    if (!info || (info.mode !== "dissolve" && info.mode !== "chromakey")) return;
+    const v = document.createElement("video");
+    v.crossOrigin = "anonymous";
+    v.muted = true;
+    v.playsInline = true;
+    v.preload = "auto";
+    v.src = info.src;
+    v.addEventListener("ended", stopEffect);
+    backEffectRef.current = v;
+    return () => {
+      v.removeEventListener("ended", stopEffect);
+      v.pause();
+      v.src = "";
+      backEffectRef.current = null;
+    };
+  }, [currentBgEffect, stopEffect]);
+
+  // 배경/모드가 바뀌면 재생 중이던 이펙트와 전환 상태를 정리한다. 프레임 소스 <video>는 위 effect가
+  // src/모드 변경 시 새로 만들며 재생이 멈추므로, 여기서는 타이머/토글만 정리하고 표시 상태 리셋은
+  // 콜백으로 미룬다(effect 본문 동기 setState 회피).
   useEffect(() => {
     if (effectTimerRef.current) { clearTimeout(effectTimerRef.current); effectTimerRef.current = null; }
     transitionActiveRef.current = false;
@@ -1442,21 +1468,8 @@ export function CameraSection({
               <canvas ref={stickerCanvasRef} className="camera-video absolute inset-0 pointer-events-none" />
             </>
           )}
-          {/* 동작 트리거 이펙트 프레임 소스 — dissolve/chromakey에서 <video>를 숨김으로 재생하고,
-              실제 표시는 합성 루프(drawEffectLayer)가 배경 위·사람 아래에 그린다. transition은 배경 자체 전환이라 제외. */}
-          {currentBgEffect && (currentBgEffect.mode === "dissolve" || currentBgEffect.mode === "chromakey") && (
-            <video
-              ref={backEffectRef}
-              key={currentBgEffect.src}
-              src={currentBgEffect.src}
-              className="pointer-events-none absolute h-px w-px opacity-0"
-              muted
-              playsInline
-              preload="auto"
-              disablePictureInPicture
-              onEnded={stopEffect}
-            />
-          )}
+          {/* 동작 트리거 이펙트 프레임 소스(dissolve/chromakey)는 crossOrigin이 필요해 JSX가 아니라
+              명령형 <video>로 만든다(위 useEffect). 실제 표시는 합성 루프(drawEffectLayer)가 배경 위·사람 아래에 그린다. */}
           {/* 촬영 직후 촬영본 0.5초 프리뷰 (카메라 위에 덮어씀) */}
           {capturedPreview && (
             // eslint-disable-next-line @next/next/no-img-element
