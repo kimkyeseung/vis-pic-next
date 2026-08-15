@@ -875,9 +875,11 @@ export function CameraSection({
     const softBand = Math.max(1e-6, softDist - simDist);
     const HARD = simDist * simDist;
     const SOFT = softDist * softDist;
-    // mediapipe 추론(segmentForVideo)은 화면 갱신보다 훨씬 무거우므로 초당 최대 이 간격으로만
-    // 실행하고, 그 사이 프레임은 직전 마스크를 재사용한다 (사람 실루엣은 프레임 간 급변하지 않음).
-    const INFERENCE_INTERVAL_MS = 200;
+    // 추론 스로틀 간격. 이 간격 사이 프레임은 직전 마스크를 재사용하는데, 그동안 영상은
+    // 계속 갱신되므로 마스크가 뒤처져 움직일 때 실루엣이 잔상처럼 남는다.
+    // GPU(WebGL) 델리게이트는 추론이 빨라 매 프레임(0ms) 돌려 잔상을 없애고,
+    // CPU(WASM)는 매 프레임이면 FPS가 급락하므로 200ms 스로틀을 유지한다.
+    const INFERENCE_INTERVAL_MS = useGpuDelegate ? 0 : 200;
 
     // dissolve/chromakey 이펙트를 배경 위·사람 아래에 그린다(사람 뒤 레이어). 표시 상태에 따라 알파를 부드럽게 페이드.
     // 배경과 동일하게 미러 없이 그린다. transition 모드는 배경 자체를 바꾸므로 여기서 그리지 않는다.
@@ -1078,7 +1080,7 @@ export function CameraSection({
 
     animFrameRef.current = requestAnimationFrame(processFrame);
     return () => cancelAnimationFrame(animFrameRef.current);
-  }, [selectedBackground, chromaKey, config.chromakeySimilarity, config.chromakeySmoothness, bgRemovalMode, segmentThresh, segmentFeather, drawBackground, drawEffectLayer, frameChannelRef, snapshotWithStickers]);
+  }, [selectedBackground, chromaKey, config.chromakeySimilarity, config.chromakeySmoothness, bgRemovalMode, segmentThresh, segmentFeather, useGpuDelegate, drawBackground, drawEffectLayer, frameChannelRef, snapshotWithStickers]);
 
   // 카운트다운 도중 언마운트(이전/다음 이동 등) 시 타이머가 살아남아
   // onCapture가 화면 전환 후에 실행되는 것을 막는다.

@@ -702,8 +702,10 @@ sticker 오버레이 (canvas.drawImage / fillText)
   - `FEATHER`(경계 부드러움, %) = `CAPTURE_SMOOTHNESS` 설정값 / 100 (최소 1%), 기본 35%
   - 관리자 촬영 설정 페이지(`/admin/capture-setting`)에서 두 값 모두 조정 가능 (§23 참고)
 - 성능: 세그멘테이션/합성 처리는 원본의 절반 해상도로 다운스케일(픽셀 수 1/4)하고,
-  무거운 추론(`segmentForVideo`) 자체는 200ms 간격으로만 실행해 그 사이 프레임은 직전
-  마스크를 재사용한다 (화면 갱신은 계속 최대 60fps). 최종 표시/캡처는 원본 해상도로
+  무거운 추론(`segmentForVideo`)은 스로틀 간격으로만 실행해 그 사이 프레임은 직전
+  마스크를 재사용한다 (화면 갱신은 계속 최대 60fps). 스로틀 간격은 델리게이트에 따라
+  달라진다 — **GPU는 매 프레임(0ms)** 돌려 마스크 지연으로 인한 잔상을 없애고, **CPU는
+  200ms**(매 프레임이면 FPS 급락)로 유지한다. 최종 표시/캡처는 원본 해상도로
   업스케일되어 화질 손실은 미미함. 이 스로틀링/다운스케일 로직은
   `CameraSection.tsx`(메인 촬영 화면), `CameraStreamer.tsx`(서브 모니터 송출),
   `BackgroundRemovalPreviewDialog.tsx`(관리자 미리보기) 3곳에 동일하게 구현되어 있다.
