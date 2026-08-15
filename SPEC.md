@@ -688,9 +688,10 @@ sticker 오버레이 (canvas.drawImage / fillText)
 - 모델: `selfie_multiclass_256x256.tflite` (multiclass 세그멘터)
 - WASM: `vision_wasm_internal.js` + `.wasm` (SIMD / non-SIMD 자동 선택)
 - **추론 델리게이트(CPU/GPU)**: 세그멘터 생성 시 `baseOptions.delegate`로 `CPU`(WASM) 또는
-  `GPU`(WebGL) 선택. 기본값은 `CPU`(기존 동작). 메인 촬영 화면(`CameraSection.tsx`)에서
+  `GPU`(WebGL) 선택. **기본값은 `GPU`**. 메인 촬영 화면(`CameraSection.tsx`)에서
   **디버그 모드 토글 스위치**로 전환할 수 있으며(§27), 값은 `localStorage`
-  (`photobooth_seg_delegate`)에 저장돼 재시작에도 유지된다. 토글 변경 시 세그멘터가 자동
+  (`photobooth_seg_delegate`)에 저장돼 재시작에도 유지된다(명시적으로 `cpu`를 저장한 경우에만
+  CPU, 그 외에는 GPU). 토글 변경 시 세그멘터가 자동
   재생성된다. GPU로 켜면 추론이 WebGL로 넘어가 CPU 대비 크게 빨라질 수 있다(기기별 상이 —
   디버그 계측으로 실측 비교). 서브 모니터(`CameraStreamer.tsx`)·관리자 미리보기
   (`BackgroundRemovalPreviewDialog.tsx`)는 아직 별도 세그멘터라 CPU 고정.

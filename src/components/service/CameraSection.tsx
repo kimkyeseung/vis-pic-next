@@ -103,11 +103,11 @@ export function CameraSection({
   // ── 성능 계측(A) & 세그멘테이션 델리게이트 토글(B) — 운영자 디버그 모드에서만 노출 ──
   // 델리게이트: CPU(WASM) ↔ GPU(WebGL). 값이 바뀌면 아래 initSegmenter effect가 세그멘터를
   // 재생성한다. localStorage에 저장돼 앱 재시작에도 유지된다(SSR 기본 false → effect에서 복원).
-  const [useGpuDelegate, setUseGpuDelegate] = useState(false);
-  // SSR 마크업(false)과 일치시키려 콜백에서 복원(effect 동기 setState 회피 — DebugContext와 동일 패턴)
+  // 기본값 GPU(WebGL). 운영자가 디버그 토글로 명시적으로 CPU를 선택한 경우에만 CPU로 복원한다.
+  const [useGpuDelegate, setUseGpuDelegate] = useState(true);
   useEffect(() => {
     const timer = setTimeout(() => {
-      try { setUseGpuDelegate(localStorage.getItem("photobooth_seg_delegate") === "gpu"); } catch {}
+      try { setUseGpuDelegate(localStorage.getItem("photobooth_seg_delegate") !== "cpu"); } catch {}
     }, 0);
     return () => clearTimeout(timer);
   }, []);
