@@ -687,6 +687,13 @@ sticker 오버레이 (canvas.drawImage / fillText)
 
 - 모델: `selfie_multiclass_256x256.tflite` (multiclass 세그멘터)
 - WASM: `vision_wasm_internal.js` + `.wasm` (SIMD / non-SIMD 자동 선택)
+- **추론 델리게이트(CPU/GPU)**: 세그멘터 생성 시 `baseOptions.delegate`로 `CPU`(WASM) 또는
+  `GPU`(WebGL) 선택. 기본값은 `CPU`(기존 동작). 메인 촬영 화면(`CameraSection.tsx`)에서
+  **디버그 모드 토글 스위치**로 전환할 수 있으며(§27), 값은 `localStorage`
+  (`photobooth_seg_delegate`)에 저장돼 재시작에도 유지된다. 토글 변경 시 세그멘터가 자동
+  재생성된다. GPU로 켜면 추론이 WebGL로 넘어가 CPU 대비 크게 빨라질 수 있다(기기별 상이 —
+  디버그 계측으로 실측 비교). 서브 모니터(`CameraStreamer.tsx`)·관리자 미리보기
+  (`BackgroundRemovalPreviewDialog.tsx`)는 아직 별도 세그멘터라 CPU 고정.
 - 출력: `confidenceMasks[0]` = 배경 확신도. 전경 확신도는 `1 - masks[0][i]`로 계산
   (레이블 검색이나 중앙/테두리 픽셀 휴리스틱 같은 건 없음 — 배경 채널을 고정 인덱스로 사용)
 - 알파 변환: `softAlpha = clamp((fgConf - THRESH) / FEATHER, 0, 1)`
@@ -1396,6 +1403,7 @@ npm run tauri:build
 - **토글**: 좌상단 로고 **5회 연속 탭**(2초 내) 또는 **`Ctrl+Shift+D`**. 대기화면엔 로고가 없어 키보드 사용.
 - **진단 패널**(`DebugOverlay`): 좌하단에 deviceId·단계·프레임/슬롯·선택 사진·배경/인쇄배경·배경제거 모드·카메라 해상도·촬영 설정·서브모니터 등 표시(민감정보 제외). **축소/펼치기·끄기** 버튼.
 - **그리드 시각화**(`DebugGridOverlay`): `getComputedStyle`로 `grid-template-rows`를 실측해 각 **행=초록 박스**(r1·r2 라벨), **셀(그리드 아이템)=빨간 박스**를 절대배치 오버레이로 그린다. Tailwind `.grid`와 인라인 `grid-template`(촬영 화면) 모두 대상. `pointer-events-none`이라 터치를 막지 않음(완료 화면은 flex라 그릴 그리드 없음).
+- **배경제거 성능 패널**(촬영 화면, `bgRemovalMode:"mediapipe"`일 때): 미리보기 좌상단에 **표시 FPS·추론(`segmentForVideo`) ms·마스크 생성 ms·추론 간격·세그멘터 상태**를 실시간 표시(0.5초 갱신). 계측 누적은 항상 돌지만 디버그가 꺼진 손님 세션에선 갱신 리렌더를 건너뛴다. 같은 패널에 **GPU 가속 토글 스위치**(CPU/WASM ↔ GPU/WebGL, §12)가 있어 A/B 비교가 가능하다. 구현은 `CameraSection.tsx`.
 - 구현: `src/components/service/DebugContext.tsx`(컨텍스트+`useSecretTap`), `DebugOverlay.tsx`, `DebugGridOverlay.tsx`.
 
 ---

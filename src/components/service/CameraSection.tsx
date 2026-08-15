@@ -20,6 +20,7 @@ import { useFrameSender } from "@/hooks/useSceneSync";
 import { useAutoCaptureTimer } from "@/hooks/useAutoCaptureTimer";
 import { createSoundPlayer, type SoundPlayer } from "@/lib/sounds";
 import { CircularTimer } from "@/components/service/CircularTimer";
+import { useDebug } from "@/components/service/DebugContext";
 import { suppressMediapipeLogs } from "@/lib/suppressMediapipeLogs";
 import { useLanguage } from "@/i18n/LanguageContext";
 import type { MessageKey } from "@/i18n/translations";
@@ -71,6 +72,7 @@ export function CameraSection({
   onBackgroundSelect: (bg: number) => void;
 }) {
   const { t } = useLanguage();
+  const { debug } = useDebug();
   const videoRef = useRef<HTMLVideoElement>(null);
   const displayCanvasRef = useRef<HTMLCanvasElement>(null);
   const bgSourceRef = useRef<HTMLImageElement | HTMLVideoElement | null>(null);
@@ -98,6 +100,28 @@ export function CameraSection({
   const capturedPreviewTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [segmenterStatus, setSegmenterStatus] = useState<"idle" | "loading" | "ready" | "error">("idle");
   const [segmenterError, setSegmenterError] = useState<string | null>(null);
+  // ── 성능 계측(A) & 세그멘테이션 델리게이트 토글(B) — 운영자 디버그 모드에서만 노출 ──
+  // 델리게이트: CPU(WASM) ↔ GPU(WebGL). 값이 바뀌면 아래 initSegmenter effect가 세그멘터를
+  // 재생성한다. localStorage에 저장돼 앱 재시작에도 유지된다(SSR 기본 false → effect에서 복원).
+  const [useGpuDelegate, setUseGpuDelegate] = useState(false);
+  // SSR 마크업(false)과 일치시키려 콜백에서 복원(effect 동기 setState 회피 — DebugContext와 동일 패턴)
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      try { setUseGpuDelegate(localStorage.getItem("photobooth_seg_delegate") === "gpu"); } catch {}
+    }, 0);
+    return () => clearTimeout(timer);
+  }, []);
+  const setDelegate = useCallback((gpu: boolean) => {
+    setUseGpuDelegate(gpu);
+    try { localStorage.setItem("photobooth_seg_delegate", gpu ? "gpu" : "cpu"); } catch {}
+  }, []);
+  // 프레임 레이트(표시 루프)와 추론/마스크 생성 시간(ms)을 perfRef에 누적하고 0.5초마다 표시 상태로 flush.
+  const perfRef = useRef({ frames: 0, lastFlush: 0, inferMs: 0, maskMs: 0 });
+  const [perf, setPerf] = useState({ fps: 0, inferMs: 0, maskMs: 0 });
+  // 무-deps rAF 루프가 최신 debug 값을 읽도록 ref로 보관 — 디버그가 꺼진 손님 세션에선
+  // 0.5초마다의 setPerf 리렌더를 건너뛴다(계측 자체는 가벼워 항상 누적).
+  const debugRef = useRef(debug);
+  useEffect(() => { debugRef.current = debug; }, [debug]);
   const [cameraDeviceDiag, setCameraDeviceDiag] = useState<string | null>(null);
   const [dbStickerImages, setDbStickerImages] = useState<Array<{ id: number; filename: string; name: string }>>([]);
   const [draggingId, setDraggingId] = useState<string | null>(null);
@@ -386,6 +410,8 @@ export function CameraSection({
           baseOptions: {
             modelAssetPath:
               "/static/mediapipe/model/selfie_multiclass_256x256.tflite",
+            // CPU(WASM) ↔ GPU(WebGL) 전환. 디버그 토글(B)이 이 값을 바꾸면 effect가 재생성.
+            delegate: useGpuDelegate ? "GPU" : "CPU",
           },
           runningMode: "VIDEO",
           outputCategoryMask: false,
@@ -416,7 +442,7 @@ export function CameraSection({
       maskReadyRef.current = false;
       lastInferenceTimeRef.current = 0;
     };
-  }, [bgRemovalMode]);
+  }, [bgRemovalMode, useGpuDelegate]);
 
   // 손바닥(Open_Palm) 제스처 인식기 초기화 — 배경 제거 모드와 무관하게 항상 동작.
   // 배경제거용 ImageSegmenter와 같은 tasks-vision 패키지·WASM 파일셋을 재사용한다.
@@ -870,6 +896,24 @@ export function CameraSection({
         return;
       }
 
+      // 표시 루프 FPS 계측 — 매 프레임 카운트하고 0.5초마다 표시 상태로 flush(디버그 오버레이용).
+      {
+        const p = perfRef.current;
+        p.frames++;
+        const tnow = performance.now();
+        if (tnow - p.lastFlush >= 500) {
+          if (debugRef.current) {
+            setPerf({
+              fps: Math.round((p.frames * 1000) / (tnow - p.lastFlush)),
+              inferMs: Math.round(p.inferMs * 10) / 10,
+              maskMs: Math.round(p.maskMs * 10) / 10,
+            });
+          }
+          p.frames = 0;
+          p.lastFlush = tnow;
+        }
+      }
+
       // 배경제거 처리 해상도를 낮춰 프레임 드롭을 줄인다. 4K(2880+)에서는 0.25로 더 줄여
       // 처리 픽셀 수를 1/16로 낮춘다. 최종 표시는 네이티브 해상도로 업스케일되므로
       // 화질 손실은 가장자리 마스크 정밀도 정도로 미미하고 FEATHER 블렌딩이 이를 가려준다.
@@ -926,7 +970,9 @@ export function CameraSection({
           if (now - lastInferenceTimeRef.current >= INFERENCE_INTERVAL_MS || !maskReadyRef.current) {
             // 다운스케일된 offscreen을 입력으로 넘겨 마스크 자체를 더 작게 받는다
             // (video를 그대로 넘기면 마스크가 네이티브 해상도로 나와 다운스케일 효과가 없어짐)
+            const inferStart = performance.now();
             const result = segmenterRef.current.segmentForVideo(offscreen, now);
+            const inferEnd = performance.now();
             const masks = result.confidenceMasks as ConfidenceMask[] | undefined;
             if (masks && masks.length > 0) {
               const mask = masks[0];
@@ -953,6 +999,9 @@ export function CameraSection({
               mctx.putImageData(mImg, 0, 0);
               lastInferenceTimeRef.current = now;
               maskReadyRef.current = true;
+              // 계측: 추론(segmentForVideo)과 마스크 굽기(getAsFloat32Array+픽셀루프+putImageData)를 분리 기록.
+              perfRef.current.inferMs = inferEnd - inferStart;
+              perfRef.current.maskMs = performance.now() - inferEnd;
             }
           }
 
@@ -1474,6 +1523,29 @@ export function CameraSection({
           {capturedPreview && (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={capturedPreview} alt="captured" className="absolute inset-0 w-full h-full object-cover z-30 rounded-[17px]" />
+          )}
+          {/* 성능 계측 + GPU 델리게이트 토글 — 디버그 모드에서만, 손님에겐 안 보임(운영자용). */}
+          {debug && bgRemovalMode === "mediapipe" && (
+            <div className="absolute top-4 left-4 z-40 bg-black/80 text-white text-xs font-mono px-3 py-2 rounded-lg space-y-1.5 leading-tight">
+              <div className="flex justify-between gap-4"><span className="opacity-70">FPS(표시)</span><span className="tabular-nums">{perf.fps}</span></div>
+              <div className="flex justify-between gap-4"><span className="opacity-70">추론 segmentForVideo</span><span className="tabular-nums">{perf.inferMs} ms</span></div>
+              <div className="flex justify-between gap-4"><span className="opacity-70">마스크 생성</span><span className="tabular-nums">{perf.maskMs} ms</span></div>
+              <div className="flex justify-between gap-4"><span className="opacity-70">추론 간격</span><span className="tabular-nums">200 ms</span></div>
+              <div className="flex justify-between gap-4"><span className="opacity-70">상태</span><span>{segmenterStatus}</span></div>
+              <div className="h-px bg-white/20 my-1" />
+              <button
+                type="button"
+                role="switch"
+                aria-checked={useGpuDelegate}
+                onClick={() => setDelegate(!useGpuDelegate)}
+                className="flex items-center justify-between gap-3 w-full"
+              >
+                <span>GPU 가속 {useGpuDelegate ? "(WebGL)" : "(끔 · CPU/WASM)"}</span>
+                <span className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors ${useGpuDelegate ? "bg-emerald-500" : "bg-slate-500"}`}>
+                  <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${useGpuDelegate ? "translate-x-4" : "translate-x-0.5"}`} />
+                </span>
+              </button>
+            </div>
           )}
           {bgRemovalMode === "mediapipe" && segmenterStatus === "loading" && (
             <div className="absolute bottom-4 left-4 bg-black/70 text-white text-sm px-4 py-2 rounded-lg">
