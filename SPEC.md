@@ -1406,7 +1406,8 @@ npm run tauri:build
 - **토글**: 좌상단 로고 **5회 연속 탭**(2초 내) 또는 **`Ctrl+Shift+D`**. 대기화면엔 로고가 없어 키보드 사용.
 - **진단 패널**(`DebugOverlay`): 좌하단에 deviceId·단계·프레임/슬롯·선택 사진·배경/인쇄배경·배경제거 모드·카메라 해상도·촬영 설정·서브모니터 등 표시(민감정보 제외). **축소/펼치기·끄기** 버튼.
 - **그리드 시각화**(`DebugGridOverlay`): `getComputedStyle`로 `grid-template-rows`를 실측해 각 **행=초록 박스**(r1·r2 라벨), **셀(그리드 아이템)=빨간 박스**를 절대배치 오버레이로 그린다. Tailwind `.grid`와 인라인 `grid-template`(촬영 화면) 모두 대상. `pointer-events-none`이라 터치를 막지 않음(완료 화면은 flex라 그릴 그리드 없음).
-- **배경제거 성능 패널**(촬영 화면, `bgRemovalMode:"mediapipe"`일 때): 미리보기 좌상단에 **표시 FPS·추론(`segmentForVideo`) ms·마스크 생성 ms·추론 간격·세그멘터 상태**를 실시간 표시(0.5초 갱신). 계측 누적은 항상 돌지만 디버그가 꺼진 손님 세션에선 갱신 리렌더를 건너뛴다. 같은 패널에 **GPU 가속 토글 스위치**(CPU/WASM ↔ GPU/WebGL, §12)가 있어 A/B 비교가 가능하다. 구현은 `CameraSection.tsx`.
+- **배경제거 성능 패널**(촬영 화면, `bgRemovalMode:"mediapipe"`일 때): 미리보기 좌상단에 **표시 FPS·추론(`segmentForVideo`) ms·마스크 생성 ms·추론 간격·세그멘터 상태**를 실시간 표시(0.5초 갱신). 계측 누적은 항상 돌지만 디버그도 개발도 아닌 손님 세션에선 갱신 리렌더를 건너뛴다. 같은 패널에 **GPU 가속 토글 스위치**(CPU/WASM ↔ GPU/WebGL, §12)가 있어 A/B 비교가 가능하다. 구현은 `CameraSection.tsx`.
+- **FPS 배지(개발 전용)**: 개발 모드(`process.env.NODE_ENV !== "production"` = `next dev`/localhost)에서 디버그가 꺼져 있을 때 좌상단에 **FPS만** 작게 표시(디버그를 켜면 위 전체 패널로 대체). `IS_DEV` 상수로 게이트하므로 **배포된 키오스크(production 빌드, `127.0.0.1:3001`)에서는 절대 뜨지 않는다**(호스트명이 아니라 빌드 모드로 판별 — 키오스크도 localhost류 주소라 호스트명 판별은 손님 화면 노출 위험).
 - 구현: `src/components/service/DebugContext.tsx`(컨텍스트+`useSecretTap`), `DebugOverlay.tsx`, `DebugGridOverlay.tsx`.
 
 ---

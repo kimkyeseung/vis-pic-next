@@ -37,6 +37,10 @@ const GIF_FRAME_INTERVAL_MS = 180;
 const GIF_MAX_FRAMES = 24;
 const GIF_FRAME_WIDTH = 800;
 
+// 개발(next dev = localhost) 여부. 빌드 시점에 인라인되는 상수라 SSR/클라이언트가 일치하고,
+// 배포된 키오스크(production 빌드, 127.0.0.1:3001)에서는 항상 false → 손님 화면엔 계측이 안 뜬다.
+const IS_DEV = process.env.NODE_ENV !== "production";
+
 // 크로마키 이펙트 오버레이를 키잉하는 캔버스 해상도(4:3). 프레임마다 getImageData를 돌리므로
 // 프리뷰 원해상도 대신 이 크기로 다운스케일해 부담을 줄이고, CSS로 프리뷰에 맞춰 늘린다.
 const EFFECT_CHROMA_W = 640;
@@ -118,8 +122,8 @@ export function CameraSection({
   // 프레임 레이트(표시 루프)와 추론/마스크 생성 시간(ms)을 perfRef에 누적하고 0.5초마다 표시 상태로 flush.
   const perfRef = useRef({ frames: 0, lastFlush: 0, inferMs: 0, maskMs: 0 });
   const [perf, setPerf] = useState({ fps: 0, inferMs: 0, maskMs: 0 });
-  // 무-deps rAF 루프가 최신 debug 값을 읽도록 ref로 보관 — 디버그가 꺼진 손님 세션에선
-  // 0.5초마다의 setPerf 리렌더를 건너뛴다(계측 자체는 가벼워 항상 누적).
+  // 무-deps rAF 루프가 최신 debug 값을 읽도록 ref로 보관 — 디버그도 아니고 개발도 아닌
+  // 손님 세션에선 0.5초마다의 setPerf 리렌더를 건너뛴다(계측 자체는 가벼워 항상 누적).
   const debugRef = useRef(debug);
   useEffect(() => { debugRef.current = debug; }, [debug]);
   const [cameraDeviceDiag, setCameraDeviceDiag] = useState<string | null>(null);
@@ -904,7 +908,7 @@ export function CameraSection({
         p.frames++;
         const tnow = performance.now();
         if (tnow - p.lastFlush >= 500) {
-          if (debugRef.current) {
+          if (debugRef.current || IS_DEV) {
             setPerf({
               fps: Math.round((p.frames * 1000) / (tnow - p.lastFlush)),
               inferMs: Math.round(p.inferMs * 10) / 10,
@@ -1525,6 +1529,13 @@ export function CameraSection({
           {capturedPreview && (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={capturedPreview} alt="captured" className="absolute inset-0 w-full h-full object-cover z-30 rounded-[17px]" />
+          )}
+          {/* 개발(localhost) 비디버그 상태에선 좌상단에 FPS만 표시. 디버그일 땐 아래 전체 패널이
+              대신 뜨므로(!debug) 중복 없음. 배포된 키오스크(production)에선 IS_DEV=false라 안 뜬다. */}
+          {IS_DEV && !debug && (
+            <div className="absolute top-4 left-4 z-40 bg-black/70 text-white text-xs font-mono px-2 py-1 rounded-md tabular-nums pointer-events-none">
+              {perf.fps} FPS
+            </div>
           )}
           {/* 성능 계측 + GPU 델리게이트 토글 — 디버그 모드에서만, 손님에겐 안 보임(운영자용). */}
           {debug && bgRemovalMode === "mediapipe" && (
