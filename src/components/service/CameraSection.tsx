@@ -119,13 +119,68 @@ export function CameraSection({
     setUseGpuDelegate(gpu);
     try { localStorage.setItem("photobooth_seg_delegate", gpu ? "gpu" : "cpu"); } catch {}
   }, []);
+  // 세그멘테이션 모델 토글: 경량 selfie_segmenter(249KB, 빠름) ↔ 멀티클래스(16MB, 정밀).
+  // 경량은 배경 처리 품질이 떨어져 기본은 정밀(멀티클래스). 값이 바뀌면 세그멘터/워커가 재생성된다.
+  // 극성이 반대라(경량 masks[0]=전경, 멀티클래스 masks[0]=배경) 모델과 극성을 함께 전환한다.
+  const [useLightModel, setUseLightModel] = useState(false);
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      try { setUseLightModel(localStorage.getItem("photobooth_seg_model") === "light"); } catch {}
+    }, 0);
+    return () => clearTimeout(timer);
+  }, []);
+  const setModel = useCallback((light: boolean) => {
+    setUseLightModel(light);
+    try { localStorage.setItem("photobooth_seg_model", light ? "light" : "multiclass"); } catch {}
+  }, []);
+  // 메인 스레드 폴백 경로가 deps 재생성 없이 최신 극성을 읽도록 ref로도 보관.
+  const lightModelRef = useRef(false);
+  useEffect(() => { lightModelRef.current = useLightModel; }, [useLightModel]);
+  // Web Worker 토글: 추론을 워커로 분리(기본 false = 메인 스레드). 값이 바뀌면 세그멘터/워커가 재생성된다.
+  const [useWorker, setUseWorker] = useState(false);
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      try { setUseWorker(localStorage.getItem("photobooth_seg_worker") === "on"); } catch {}
+    }, 0);
+    return () => clearTimeout(timer);
+  }, []);
+  const setWorkerEnabled = useCallback((on: boolean) => {
+    setUseWorker(on);
+    try { localStorage.setItem("photobooth_seg_worker", on ? "on" : "off"); } catch {}
+  }, []);
+  // 메인 스레드 추론 스로틀 간격(ms). 낮을수록 마스크가 자주 갱신돼 잔상↓이지만 메인 스레드 부하↑.
+  // 워커 경로는 이 값을 쓰지 않는다(busy 플래그로 왕복 속도만큼 갱신).
+  const [inferenceInterval, setInferenceInterval] = useState(50);
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      try {
+        const v = Number(localStorage.getItem("photobooth_seg_interval"));
+        if ([50, 100, 150, 200].includes(v)) setInferenceInterval(v);
+      } catch {}
+    }, 0);
+    return () => clearTimeout(timer);
+  }, []);
+  // rAF 루프(무-deps)가 최신 값을 읽도록 ref로 보관 — 값이 바뀌어도 루프를 재생성하지 않는다.
+  const inferenceIntervalRef = useRef(50);
+  useEffect(() => { inferenceIntervalRef.current = inferenceInterval; }, [inferenceInterval]);
+  const chooseInterval = useCallback((ms: number) => {
+    setInferenceInterval(ms);
+    try { localStorage.setItem("photobooth_seg_interval", String(ms)); } catch {}
+  }, []);
   // 프레임 레이트(표시 루프)와 추론/마스크 생성 시간(ms)을 perfRef에 누적하고 0.5초마다 표시 상태로 flush.
-  const perfRef = useRef({ frames: 0, lastFlush: 0, inferMs: 0, maskMs: 0 });
+  const perfRef = useRef({ frames: 0, lastFlush: 0, inferMs: 0, maskMs: 0, sentAt: 0 });
   const [perf, setPerf] = useState({ fps: 0, inferMs: 0, maskMs: 0 });
   // 무-deps rAF 루프가 최신 debug 값을 읽도록 ref로 보관 — 디버그도 아니고 개발도 아닌
   // 손님 세션에선 0.5초마다의 setPerf 리렌더를 건너뛴다(계측 자체는 가벼워 항상 누적).
   const debugRef = useRef(debug);
   useEffect(() => { debugRef.current = debug; }, [debug]);
+
+  // ── 세그멘테이션 워커 ── 추론+마스크 readback을 메인 스레드에서 떼어내 표시 루프가 안 막히게 한다.
+  // worker가 뜨면 workerActive=true로 워커 경로를, 실패하면 기존 메인 스레드 세그멘터로 폴백한다.
+  const workerRef = useRef<Worker | null>(null);
+  const workerBusyRef = useRef(false); // 워커가 한 프레임 처리 중이면 새 프레임을 안 보낸다(큐 적체 방지).
+  const workerActiveRef = useRef(false);
+  const [workerActive, setWorkerActive] = useState(false);
   const [cameraDeviceDiag, setCameraDeviceDiag] = useState<string | null>(null);
   const [dbStickerImages, setDbStickerImages] = useState<Array<{ id: number; filename: string; name: string }>>([]);
   const [draggingId, setDraggingId] = useState<string | null>(null);
@@ -345,6 +400,11 @@ export function CameraSection({
   // 관리자 설정(0-100%) → confidence 스케일(0-1). FEATHER는 0으로 나누기 방지를 위해 최소 1%로 clamp됨(useDeviceSetup 참고).
   const segmentThresh = config.segmentThreshold / 100;
   const segmentFeather = config.segmentFeather / 100;
+  // 워커 init 메시지에 임계값/부드러움을 deps 없이 최신값으로 실어 보내기 위한 ref.
+  const segmentThreshRef = useRef(segmentThresh);
+  const segmentFeatherRef = useRef(segmentFeather);
+  useEffect(() => { segmentThreshRef.current = segmentThresh; }, [segmentThresh]);
+  useEffect(() => { segmentFeatherRef.current = segmentFeather; }, [segmentFeather]);
 
   const chromaKey = useMemo(() => {
     const [r, g, b] = config.chromakeyRgb.split(",").map(Number);
@@ -412,8 +472,9 @@ export function CameraSection({
         if (cancelled) { console.log = origLog; console.info = origInfo; console.warn = origWarn; return; }
         const segmenter = await ImageSegmenter.createFromOptions(vision, {
           baseOptions: {
-            modelAssetPath:
-              "/static/mediapipe/model/selfie_multiclass_256x256.tflite",
+            modelAssetPath: useLightModel
+              ? "/static/mediapipe/model/selfie_segmenter.tflite"
+              : "/static/mediapipe/model/selfie_multiclass_256x256.tflite",
             // CPU(WASM) ↔ GPU(WebGL) 전환. 디버그 토글(B)이 이 값을 바꾸면 effect가 재생성.
             delegate: useGpuDelegate ? "GPU" : "CPU",
           },
@@ -438,15 +499,100 @@ export function CameraSection({
       }
     }
 
-    initSegmenter();
+    // 워커가 안 뜨거나 에러나면 메인 스레드 세그멘터로 폴백(배경제거가 아예 깨지지 않도록).
+    function fallbackToMainThread(reason: string) {
+      if (cancelled) return;
+      console.error("Segmenter worker unavailable, falling back to main thread:", reason);
+      if (workerRef.current) { workerRef.current.terminate(); workerRef.current = null; }
+      workerActiveRef.current = false;
+      setWorkerActive(false);
+      maskReadyRef.current = false;
+      initSegmenter();
+    }
+
+    // 초기 로딩 표시(effect 본문 동기 setState 회피 — 마이크로태스크로 미룸).
+    Promise.resolve().then(() => { if (!cancelled) setSegmenterStatus("loading"); });
+    maskReadyRef.current = false;
+    workerBusyRef.current = false;
+
+    // Web Worker 토글이 꺼져 있으면 곧장 메인 스레드 세그멘터를 쓴다(기본값).
+    if (!useWorker) {
+      workerActiveRef.current = false;
+      Promise.resolve().then(() => { if (!cancelled) setWorkerActive(false); });
+      initSegmenter();
+    }
+
+    let worker: Worker | null = null;
+    if (useWorker) {
+      try {
+        worker = new Worker(new URL("../../workers/segmenter.worker.ts", import.meta.url), { type: "module" });
+      } catch (err) {
+        fallbackToMainThread(err instanceof Error ? err.message : String(err));
+      }
+    }
+
+    if (worker) {
+      workerRef.current = worker;
+      worker.onmessage = (e: MessageEvent) => {
+        if (cancelled) return;
+        const msg = e.data;
+        if (msg.type === "ready") {
+          workerActiveRef.current = true;
+          setWorkerActive(true);
+          setSegmenterStatus("ready");
+        } else if (msg.type === "error") {
+          fallbackToMainThread(msg.error);
+        } else if (msg.type === "mask") {
+          // 워커가 돌려준 alpha 마스크를 maskCanvasRef에 그려 둔다(표시 루프·촬영 캡처가 공유).
+          workerBusyRef.current = false;
+          const bmp: ImageBitmap | null = msg.bitmap;
+          if (bmp) {
+            let mc = maskCanvasRef.current;
+            if (!mc) { mc = document.createElement("canvas"); maskCanvasRef.current = mc; }
+            if (mc.width !== bmp.width) mc.width = bmp.width;
+            if (mc.height !== bmp.height) mc.height = bmp.height;
+            const mctx = mc.getContext("2d")!;
+            mctx.clearRect(0, 0, mc.width, mc.height);
+            mctx.drawImage(bmp, 0, 0);
+            bmp.close();
+            maskReadyRef.current = true;
+            const sent = perfRef.current.sentAt;
+            if (sent) perfRef.current.inferMs = performance.now() - sent; // 계측: 워커 왕복 시간
+          }
+        }
+      };
+      worker.onerror = (ev) => fallbackToMainThread(ev.message || "worker onerror");
+      worker.postMessage({
+        type: "init",
+        useGpu: useGpuDelegate,
+        light: useLightModel,
+        thresh: segmentThreshRef.current,
+        feather: segmentFeatherRef.current,
+      });
+    }
+
     return () => {
       cancelled = true;
+      if (workerRef.current) {
+        try { workerRef.current.postMessage({ type: "close" }); } catch { /* noop */ }
+        workerRef.current.terminate();
+        workerRef.current = null;
+      }
+      workerActiveRef.current = false;
       segmenterRef.current?.close();
       segmenterRef.current = null;
       maskReadyRef.current = false;
       lastInferenceTimeRef.current = 0;
+      workerBusyRef.current = false;
     };
-  }, [bgRemovalMode, useGpuDelegate]);
+  }, [bgRemovalMode, useGpuDelegate, useLightModel, useWorker]);
+
+  // 임계값/부드러움 변경을 워커에 반영(워커가 마스크를 굽기 때문). 메인 스레드 폴백은 processFrame이 직접 읽는다.
+  useEffect(() => {
+    if (workerActiveRef.current && workerRef.current) {
+      workerRef.current.postMessage({ type: "config", thresh: segmentThresh, feather: segmentFeather });
+    }
+  }, [segmentThresh, segmentFeather]);
 
   // 손바닥(Open_Palm) 제스처 인식기 초기화 — 배경 제거 모드와 무관하게 항상 동작.
   // 배경제거용 ImageSegmenter와 같은 tasks-vision 패키지·WASM 파일셋을 재사용한다.
@@ -879,11 +1025,6 @@ export function CameraSection({
     const softBand = Math.max(1e-6, softDist - simDist);
     const HARD = simDist * simDist;
     const SOFT = softDist * softDist;
-    // 추론 스로틀 간격. 이 간격 사이 프레임은 직전 마스크를 재사용하는데, 그동안 영상은
-    // 계속 갱신되므로 마스크가 뒤처져 움직일 때 실루엣이 잔상처럼 남는다.
-    // GPU(WebGL) 델리게이트는 추론이 빨라 매 프레임(0ms) 돌려 잔상을 없애고,
-    // CPU(WASM)는 매 프레임이면 FPS가 급락하므로 200ms 스로틀을 유지한다.
-    const INFERENCE_INTERVAL_MS = useGpuDelegate ? 0 : 200;
 
     // dissolve/chromakey 이펙트를 배경 위·사람 아래에 그린다(사람 뒤 레이어). 표시 상태에 따라 알파를 부드럽게 페이드.
     // 배경과 동일하게 미러 없이 그린다. transition 모드는 배경 자체를 바꾸므로 여기서 그리지 않는다.
@@ -967,52 +1108,63 @@ export function CameraSection({
 
       let processed = false;
 
-      if (bgRemovalMode === "mediapipe" && segmenterRef.current) {
+      if (bgRemovalMode === "mediapipe") {
         try {
           const now = performance.now();
-          // 추론(무거운 WASM 호출)은 INFERENCE_INTERVAL_MS 간격으로만 실행하고, 그때
-          // soft alpha 마스크를 별도 캔버스에 한 번만 굽는다. 기존엔 매 프레임 getImageData
-          // + 픽셀 루프 + putImageData를 돌려 프레임이 뚝뚝 끊겼다.
-          if (now - lastInferenceTimeRef.current >= INFERENCE_INTERVAL_MS || !maskReadyRef.current) {
-            // 다운스케일된 offscreen을 입력으로 넘겨 마스크 자체를 더 작게 받는다
-            // (video를 그대로 넘기면 마스크가 네이티브 해상도로 나와 다운스케일 효과가 없어짐)
-            const inferStart = performance.now();
-            const result = segmenterRef.current.segmentForVideo(offscreen, now);
-            const inferEnd = performance.now();
-            const masks = result.confidenceMasks as ConfidenceMask[] | undefined;
-            if (masks && masks.length > 0) {
-              const mask = masks[0];
-              const arr = mask.getAsFloat32Array();
-              const mw = mask.width ?? pw;
-              const mh = mask.height ?? ph;
-              let mc = maskCanvasRef.current;
-              if (!mc) { mc = document.createElement("canvas"); maskCanvasRef.current = mc; }
-              if (mc.width !== mw) mc.width = mw;
-              if (mc.height !== mh) mc.height = mh;
-              const mctx = mc.getContext("2d")!;
-              // multiclass model: masks[0]=background → foreground = 1 - background (어두운 옷 보존)
-              // rgb는 흰색으로 채우고 alpha에만 soft mask를 굽는다(합성 시 alpha만 사용).
-              const mImg = mctx.createImageData(mw, mh);
-              const md = mImg.data;
-              const THRESH = segmentThresh;
-              const FEATHER = segmentFeather;
-              for (let i = 0; i < arr.length; i++) {
-                const fgConf = 1 - arr[i];
-                const softAlpha = Math.max(0, Math.min(1, (fgConf - THRESH) / FEATHER));
-                md[i * 4] = 255; md[i * 4 + 1] = 255; md[i * 4 + 2] = 255;
-                md[i * 4 + 3] = Math.round(softAlpha * 255);
+          if (workerActiveRef.current && workerRef.current) {
+            // 워커 경로: 무거운 추론+readback을 워커가 담당하므로 메인 스레드(표시 루프)는 안 막힌다.
+            // 워커가 idle일 때만 현재 프레임을 다운스케일(pw×ph)해 보낸다 — 큐 적체 방지.
+            if (!workerBusyRef.current) {
+              workerBusyRef.current = true;
+              perfRef.current.sentAt = now;
+              createImageBitmap(video, { resizeWidth: pw, resizeHeight: ph, resizeQuality: "low" })
+                .then((bmp) => {
+                  const worker = workerRef.current;
+                  if (worker) worker.postMessage({ type: "frame", bitmap: bmp, timestamp: performance.now() }, [bmp]);
+                  else bmp.close();
+                })
+                .catch(() => { workerBusyRef.current = false; });
+            }
+          } else if (segmenterRef.current) {
+            // 메인 스레드 경로: 선택된 스로틀 간격(inferenceIntervalRef)마다 soft alpha 마스크를 굽는다.
+            if (now - lastInferenceTimeRef.current >= inferenceIntervalRef.current || !maskReadyRef.current) {
+              const inferStart = performance.now();
+              const result = segmenterRef.current.segmentForVideo(offscreen, now);
+              const inferEnd = performance.now();
+              const masks = result.confidenceMasks as ConfidenceMask[] | undefined;
+              if (masks && masks.length > 0) {
+                const mask = masks[0];
+                const arr = mask.getAsFloat32Array();
+                const mw = mask.width ?? pw;
+                const mh = mask.height ?? ph;
+                let mc = maskCanvasRef.current;
+                if (!mc) { mc = document.createElement("canvas"); maskCanvasRef.current = mc; }
+                if (mc.width !== mw) mc.width = mw;
+                if (mc.height !== mh) mc.height = mh;
+                const mctx = mc.getContext("2d")!;
+                // 전경 극성: 경량 selfie는 masks[0]=전경, 멀티클래스는 masks[0]=배경(전경=1-v).
+                const fgIsMask0 = lightModelRef.current;
+                const mImg = mctx.createImageData(mw, mh);
+                const md = mImg.data;
+                const THRESH = segmentThresh;
+                const FEATHER = segmentFeather;
+                for (let i = 0; i < arr.length; i++) {
+                  const fgConf = fgIsMask0 ? arr[i] : 1 - arr[i];
+                  const softAlpha = Math.max(0, Math.min(1, (fgConf - THRESH) / FEATHER));
+                  md[i * 4] = 255; md[i * 4 + 1] = 255; md[i * 4 + 2] = 255;
+                  md[i * 4 + 3] = Math.round(softAlpha * 255);
+                }
+                mctx.putImageData(mImg, 0, 0);
+                lastInferenceTimeRef.current = now;
+                maskReadyRef.current = true;
+                perfRef.current.inferMs = inferEnd - inferStart;
+                perfRef.current.maskMs = performance.now() - inferEnd;
               }
-              mctx.putImageData(mImg, 0, 0);
-              lastInferenceTimeRef.current = now;
-              maskReadyRef.current = true;
-              // 계측: 추론(segmentForVideo)과 마스크 굽기(getAsFloat32Array+픽셀루프+putImageData)를 분리 기록.
-              perfRef.current.inferMs = inferEnd - inferStart;
-              perfRef.current.maskMs = performance.now() - inferEnd;
             }
           }
 
-          // 매 프레임: 준비된 마스크를 GPU 합성(destination-in)으로만 적용 → 픽셀 루프 없음.
-          // 마스크를 pw×ph로 확대할 때 생기는 bilinear 보간이 경계를 더 부드럽게 해준다.
+          // 워커/폴백 공통: 준비된 최신 마스크를 GPU 합성(destination-in)으로 적용.
+          // 마스크를 pw×ph로 확대할 때의 bilinear 보간이 경계를 더 부드럽게 해준다.
           const mc = maskCanvasRef.current;
           if (maskReadyRef.current && mc) {
             offCtx.save();
@@ -1541,9 +1693,19 @@ export function CameraSection({
           {debug && bgRemovalMode === "mediapipe" && (
             <div className="absolute top-4 left-4 z-40 bg-black/80 text-white text-xs font-mono px-3 py-2 rounded-lg space-y-1.5 leading-tight">
               <div className="flex justify-between gap-4"><span className="opacity-70">FPS(표시)</span><span className="tabular-nums">{perf.fps}</span></div>
-              <div className="flex justify-between gap-4"><span className="opacity-70">추론 segmentForVideo</span><span className="tabular-nums">{perf.inferMs} ms</span></div>
-              <div className="flex justify-between gap-4"><span className="opacity-70">마스크 생성</span><span className="tabular-nums">{perf.maskMs} ms</span></div>
-              <div className="flex justify-between gap-4"><span className="opacity-70">추론 간격</span><span className="tabular-nums">200 ms</span></div>
+              {workerActive ? (
+                <>
+                  <div className="flex justify-between gap-4"><span className="opacity-70">추론 왕복(worker)</span><span className="tabular-nums">{perf.inferMs} ms</span></div>
+                  <div className="flex justify-between gap-4"><span className="opacity-70">마스크 갱신</span><span className="tabular-nums">{perf.inferMs > 0 ? Math.round(1000 / perf.inferMs) : 0} /s</span></div>
+                  <div className="flex justify-between gap-4"><span className="opacity-70">처리</span><span>Web Worker</span></div>
+                </>
+              ) : (
+                <>
+                  <div className="flex justify-between gap-4"><span className="opacity-70">추론 segmentForVideo</span><span className="tabular-nums">{perf.inferMs} ms</span></div>
+                  <div className="flex justify-between gap-4"><span className="opacity-70">마스크 생성</span><span className="tabular-nums">{perf.maskMs} ms</span></div>
+                  <div className="flex justify-between gap-4"><span className="opacity-70">처리</span><span>메인 스레드(폴백)</span></div>
+                </>
+              )}
               <div className="flex justify-between gap-4"><span className="opacity-70">상태</span><span>{segmenterStatus}</span></div>
               <div className="h-px bg-white/20 my-1" />
               <button
@@ -1558,6 +1720,46 @@ export function CameraSection({
                   <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${useGpuDelegate ? "translate-x-4" : "translate-x-0.5"}`} />
                 </span>
               </button>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={useLightModel}
+                onClick={() => setModel(!useLightModel)}
+                className="flex items-center justify-between gap-3 w-full"
+              >
+                <span>경량 모델 {useLightModel ? "(빠름·selfie)" : "(정밀·멀티클래스)"}</span>
+                <span className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors ${useLightModel ? "bg-emerald-500" : "bg-slate-500"}`}>
+                  <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${useLightModel ? "translate-x-4" : "translate-x-0.5"}`} />
+                </span>
+              </button>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={useWorker}
+                onClick={() => setWorkerEnabled(!useWorker)}
+                className="flex items-center justify-between gap-3 w-full"
+              >
+                <span>Web Worker {useWorker ? "(분리)" : "(끔 · 메인 스레드)"}</span>
+                <span className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors ${useWorker ? "bg-emerald-500" : "bg-slate-500"}`}>
+                  <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${useWorker ? "translate-x-4" : "translate-x-0.5"}`} />
+                </span>
+              </button>
+              {/* 메인 스레드 추론 스로틀 간격(ms). 워커 경로에선 무시되므로 흐리게 표시. */}
+              <div className={`flex items-center justify-between gap-2 ${useWorker ? "opacity-40" : ""}`}>
+                <span>스로틀{useWorker ? "(워커 미적용)" : ""}</span>
+                <span className="flex gap-1">
+                  {[50, 100, 150, 200].map((ms) => (
+                    <button
+                      key={ms}
+                      type="button"
+                      onClick={() => chooseInterval(ms)}
+                      className={`px-1.5 py-0.5 rounded tabular-nums ${inferenceInterval === ms ? "bg-emerald-500 text-white" : "bg-white/15 hover:bg-white/25"}`}
+                    >
+                      {ms}
+                    </button>
+                  ))}
+                </span>
+              </div>
             </div>
           )}
           {bgRemovalMode === "mediapipe" && segmenterStatus === "loading" && (
