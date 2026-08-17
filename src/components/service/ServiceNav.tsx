@@ -2,6 +2,7 @@
 
 import { useLanguage } from "@/i18n/LanguageContext";
 import type { MessageKey } from "@/i18n/translations";
+import { SERVICE_BIG_BUTTON_CLASS } from "./sectionLayout";
 
 /**
  * 서비스 화면 공통 네비게이션: "다음" 버튼만 하단 중앙에 크게 배치한다.
@@ -28,7 +29,7 @@ export function ServiceNav({
   return (
     <div className="absolute bottom-16 left-1/2 -translate-x-1/2 z-20 portrait:bottom-10">
       <button
-        className="service-button nav-button nav-next-lg"
+        className={`service-button nav-next-lg ${SERVICE_BIG_BUTTON_CLASS}`}
         onClick={onNext}
         style={nextDisabled ? { opacity: 0.5, pointerEvents: "none" } : {}}
       >

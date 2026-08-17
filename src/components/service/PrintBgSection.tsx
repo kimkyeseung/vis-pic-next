@@ -1,8 +1,7 @@
 import type { BGImage } from "@/types";
 import { useLanguage } from "@/i18n/LanguageContext";
 import { resolveImageSrc } from "@/lib/imageUrl";
-import { ServiceNav } from "./ServiceNav";
-import { SERVICE_SECTION_CLASS } from "./sectionLayout";
+import { SectionShell } from "./SectionShell";
 
 export function PrintBgSection({
   printBgImages,
@@ -22,11 +21,7 @@ export function PrintBgSection({
   const { t } = useLanguage();
 
   return (
-    <section className={`${SERVICE_SECTION_CLASS} grid-rows-[auto_1fr]`}>
-      <h2 className="text-title text-center font-extrabold text-white animate-fadeInDown" style={{ textShadow: "0 2px 15px rgba(0,0,0,0.5)" }}>
-        {t("printbg.title")}
-      </h2>
-
+    <SectionShell title={t("printbg.title")} onPrev={onPrev} onNext={onNext} nextDisabled={selectedPrintBg === null}>
       <div className="min-h-0 flex items-center justify-center">
         {/* 세로: 2열 그리드(6개 → 2×3). 프레임을 크게 보이도록 셀을 꽉 채우고 폭을 넓힌다. */}
         <div className="grid grid-cols-3 gap-10 animate-fadeInUp portrait:grid-cols-2 portrait:gap-6 portrait:w-full portrait:max-w-4xl">
@@ -49,8 +44,6 @@ export function PrintBgSection({
           ))}
         </div>
       </div>
-
-      <ServiceNav onPrev={onPrev} onNext={onNext} nextDisabled={selectedPrintBg === null} />
-    </section>
+    </SectionShell>
   );
 }

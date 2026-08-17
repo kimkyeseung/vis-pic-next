@@ -2,8 +2,7 @@ import { useState } from "react";
 import type { BGImage } from "@/types";
 import { useLanguage } from "@/i18n/LanguageContext";
 import { FramedPreview } from "./FramedPreview";
-import { ServiceNav } from "./ServiceNav";
-import { SERVICE_SECTION_CLASS } from "./sectionLayout";
+import { SectionShell } from "./SectionShell";
 import { normalizeSlots, firstEmptySlot, tapPhoto } from "@/lib/slotSelection";
 
 // 한 페이지에 보여줄 촬영본 수 (2×2). 이보다 많으면 좌우 화살표로 페이지 전환.
@@ -65,10 +64,14 @@ export function SelectSection({
   const pagePhotos = photos.slice(pageStart, pageStart + PAGE_SIZE);
 
   return (
-    <section className={`${SERVICE_SECTION_CLASS} grid-rows-[auto_auto_1fr]`}>
-      <h2 className="text-title text-center font-extrabold text-white mb-4 animate-fadeInDown" style={{ textShadow: "0 2px 15px rgba(0,0,0,0.5)" }}>
-        {t("select.title")}
-      </h2>
+    <SectionShell
+      title={t("select.title")}
+      titleClassName="text-center mb-4"
+      rows="auto_auto_1fr"
+      onPrev={onPrev}
+      onNext={onNext}
+      nextDisabled={!canProceed}
+    >
       {/* 사진 영역(1fr)이 위로 넘쳐 문구와 겹치지 않도록 하단 여백으로 간격 확보. */}
       <p className="text-gray-400 text-xl mb-12 portrait:mb-8 animate-fadeInDown">
         {t("select.count", { req: requiredCount, sel: filledCount })}
@@ -160,8 +163,6 @@ export function SelectSection({
         )}
       </div>
       </div>
-
-      <ServiceNav onPrev={onPrev} onNext={onNext} nextDisabled={!canProceed} />
-    </section>
+    </SectionShell>
   );
 }

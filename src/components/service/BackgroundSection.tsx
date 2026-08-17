@@ -1,8 +1,7 @@
 import type { BGImage } from "@/types";
 import { FALLBACK_BACKGROUNDS } from "@/constants/frames";
 import { useLanguage } from "@/i18n/LanguageContext";
-import { ServiceNav } from "./ServiceNav";
-import { SERVICE_SECTION_CLASS } from "./sectionLayout";
+import { SectionShell } from "./SectionShell";
 
 export function BackgroundSection({
   backgroundImages,
@@ -23,11 +22,7 @@ export function BackgroundSection({
   const hasDbImages = backgroundImages.length > 0;
 
   return (
-    <section className={`${SERVICE_SECTION_CLASS} grid-rows-[auto_1fr]`}>
-      <h2 className="text-title text-center font-extrabold text-white animate-fadeInDown" style={{ textShadow: "0 2px 15px rgba(0,0,0,0.5)" }}>
-        {t("bg.title")}
-      </h2>
-
+    <SectionShell title={t("bg.title")} onPrev={onPrev} onNext={onNext} nextDisabled={selectedBackground === null}>
       <div className="min-h-0 flex items-center justify-center">
       <div className="grid grid-cols-3 gap-6 w-[84vw] max-w-[1040px] animate-fadeInUp portrait:grid-cols-2 portrait:gap-5">
         {hasDbImages
@@ -73,8 +68,6 @@ export function BackgroundSection({
             ))}
       </div>
       </div>
-
-      <ServiceNav onPrev={onPrev} onNext={onNext} nextDisabled={selectedBackground === null} />
-    </section>
+    </SectionShell>
   );
 }

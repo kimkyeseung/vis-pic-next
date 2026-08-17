@@ -17,6 +17,7 @@ import {
 } from "@/lib/printLayout";
 import { useLanguage } from "@/i18n/LanguageContext";
 import { ServiceNav } from "./ServiceNav";
+import { SectionTitle } from "./SectionShell";
 
 export function CompleteSection({
   photos,
@@ -536,7 +537,7 @@ export function CompleteSection({
 
   return (
     <section ref={sectionRef} className="w-full h-full flex flex-col items-center justify-center relative z-10">
-      <div className="text-center animate-fadeInUp portrait:w-full portrait:px-6">
+      <div className="w-full text-center animate-fadeInUp portrait:px-6">
         {printStatus === "compositing" && (
           <>
             <div className="w-20 h-20 border-4 border-white/20 border-t-blue-500 rounded-full animate-spin mx-auto mb-8" />
@@ -546,13 +547,13 @@ export function CompleteSection({
 
         {(printStatus === "ready" || printStatus === "done") && compositeImage && (
           <>
-            <h2 className="text-title portrait:text-5xl break-keep font-extrabold text-white mb-4 portrait:mb-8 animate-fadeInDown" style={{ textShadow: "0 2px 15px rgba(0,0,0,0.5)" }}>
+            <SectionTitle className="portrait:text-5xl break-keep mb-4 portrait:mb-8">
               {printStatus === "done" ? t("complete.done") : t("complete.ready")}
-            </h2>
+            </SectionTitle>
 
             {/* 좌우 반반(12컬럼 6/6): 미리보기 | QR. 세로에선 상하 스택.
                 가로 결과물(matchHeight)에선 QR 카드 상·하단을 프레임에 맞추려 상단 정렬. */}
-            <div className={`flex justify-center gap-10 mb-6 w-full max-w-6xl portrait:flex-col portrait:items-center portrait:gap-8 portrait:w-full ${matchHeight ? "items-start" : "items-center"}`}>
+            <div className={`flex justify-center gap-10 mb-6 w-full max-w-6xl mx-auto portrait:flex-col portrait:items-center portrait:gap-8 portrait:w-full ${matchHeight ? "items-start" : "items-center"}`}>
               <div className="flex-1 flex justify-center min-w-0 portrait:w-full">
                 <div ref={previewBoxRef} className="rounded-2xl overflow-hidden" style={{ boxShadow: "0 20px 50px rgba(0,0,0,0.4)" }}>
                   <img src={compositeImage} alt="Composite" className="max-h-[54vh] portrait:max-h-[46vh] portrait:max-w-full w-auto object-contain block" />

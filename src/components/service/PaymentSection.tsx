@@ -5,6 +5,7 @@ import type { DeviceConfig } from "@/types";
 import { useLanguage } from "@/i18n/LanguageContext";
 import { LOCALES, type MessageKey } from "@/i18n/translations";
 import { SERVICE_SECTION_CLASS } from "./sectionLayout";
+import { SectionTitle } from "./SectionShell";
 
 export function PaymentSection({
   config,
@@ -128,9 +129,9 @@ export function PaymentSection({
     <section className={`${SERVICE_SECTION_CLASS} grid-rows-[auto_1fr] px-16`}>
       {status === "idle" ? (
         <>
-          <h2 className="text-title text-center whitespace-pre-line font-extrabold text-white animate-fadeInDown" style={{ textShadow: "0 2px 15px rgba(0,0,0,0.5)" }}>
+          <SectionTitle className="text-center whitespace-pre-line">
             {t("payment.selectQuantity")}
-          </h2>
+          </SectionTitle>
 
           <div className="min-h-0 w-full flex flex-col items-center justify-center">
           <div className="w-full max-w-5xl flex flex-col items-center animate-fadeInUp">

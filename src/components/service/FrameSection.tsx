@@ -1,9 +1,8 @@
 import { FRAME_INFO } from "@/constants/frames";
 import { computePrintLayout } from "@/lib/printLayout";
 import { useLanguage } from "@/i18n/LanguageContext";
-import { ServiceNav } from "./ServiceNav";
+import { SectionShell } from "./SectionShell";
 import { resolveImageSrc } from "@/lib/imageUrl";
-import { SERVICE_SECTION_CLASS } from "./sectionLayout";
 import type { BGImage, FrameInfoEntry } from "@/types";
 
 // 미리보기 축척: 1cm → 12px (인화지 10×15cm 기준 120×180px)
@@ -101,11 +100,14 @@ export function FrameSection({
   const usePortraitGrid = frames.length > 3;
 
   return (
-    <section className={`${SERVICE_SECTION_CLASS} grid-rows-[auto_1fr] px-16`}>
-      <h2 className="text-title text-center whitespace-pre-line font-extrabold text-white animate-fadeInDown" style={{ textShadow: "0 2px 15px rgba(0,0,0,0.5)" }}>
-        {t("frame.title")}
-      </h2>
-
+    <SectionShell
+      title={t("frame.title")}
+      titleClassName="text-center whitespace-pre-line"
+      className="px-16"
+      onPrev={onPrev}
+      onNext={onNext}
+      nextDisabled={!selectedFrame}
+    >
       {/* 결제 단계와 동일하게 w-full 래퍼로 폭을 채워 좌우 여백을 맞춘다(세로 3열 그리드가 넓게 퍼지도록). */}
       <div className="min-h-0 w-full flex items-center justify-center">
       <div className={`flex gap-10 animate-fadeInUp ${usePortraitGrid ? "portrait:grid portrait:grid-cols-3 portrait:gap-6 portrait:w-full portrait:max-w-5xl portrait:items-stretch" : "portrait:gap-6"}`}>
@@ -124,8 +126,6 @@ export function FrameSection({
         ))}
       </div>
       </div>
-
-      <ServiceNav onPrev={onPrev} onNext={onNext} nextDisabled={!selectedFrame} />
-    </section>
+    </SectionShell>
   );
 }

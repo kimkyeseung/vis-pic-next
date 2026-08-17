@@ -21,6 +21,7 @@ import { useAutoCaptureTimer } from "@/hooks/useAutoCaptureTimer";
 import { createSoundPlayer, type SoundPlayer } from "@/lib/sounds";
 import { CircularTimer } from "@/components/service/CircularTimer";
 import { useDebug } from "@/components/service/DebugContext";
+import { SERVICE_BIG_BUTTON_CLASS } from "./sectionLayout";
 import { suppressMediapipeLogs } from "@/lib/suppressMediapipeLogs";
 import { useLanguage } from "@/i18n/LanguageContext";
 import type { MessageKey } from "@/i18n/translations";
@@ -1789,7 +1790,7 @@ export function CameraSection({
           커진 이전/다음 버튼과 겹치지 않게 한다. */}
       <div className="absolute bottom-16 left-1/2 -translate-x-1/2 z-20 portrait:bottom-52">
         <button
-          className="service-button tracking-widest rounded-[22px] font-extrabold text-5xl portrait:text-5xl px-28 py-8 portrait:px-20 portrait:py-12 min-w-[34rem] portrait:min-w-[46rem]"
+          className={`service-button ${SERVICE_BIG_BUTTON_CLASS}`}
           onClick={handleManualCapture}
           style={countdown !== null || photos.length >= maxPhotos ? { opacity: 0.5, pointerEvents: "none" } : {}}
         >
