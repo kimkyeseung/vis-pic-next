@@ -551,6 +551,13 @@ fn should_shutdown_server_on_destroy(window_label: &str) -> bool {
     window_label == "main"
 }
 
+/// 메인 창 종료 요청(Alt+F4 등) 시, 서브 모니터 창(camera-output)도 함께 닫을지 판단한다.
+/// 메인 창이면 true → 종료를 막지 않고 서브 창까지 닫아 앱이 한 번에 깔끔히 종료된다.
+/// (서브 창을 안 닫으면 그 창만 남아 앱이 종료되지 않는 좀비 상태가 된다.)
+fn should_close_subwindows_with(window_label: &str) -> bool {
+    window_label == "main"
+}
+
 /// F11 전체화면 ↔ 창 모드 토글.
 /// 창은 borderless 1920x1080 전체화면으로 시작하므로, 전체화면만 해제하면
 /// 여전히 모니터 전체를 덮어 아무 변화가 없어 보인다. 창 모드로 나올 때는
@@ -574,12 +581,33 @@ pub fn run() {
         .plugin(tauri_plugin_shell::init())
         .plugin(
             tauri_plugin_global_shortcut::Builder::new()
-                .with_handler(|app, _shortcut, event| {
-                    use tauri_plugin_global_shortcut::ShortcutState;
-                    if event.state() == ShortcutState::Pressed {
-                        if let Some(window) = app.get_webview_window("main") {
-                            toggle_fullscreen(&window);
+                .with_handler(|app, shortcut, event| {
+                    use tauri_plugin_global_shortcut::{Code, ShortcutState};
+                    if event.state() != ShortcutState::Pressed {
+                        return;
+                    }
+                    match shortcut.key {
+                        // F11 → 메인 창 전체화면 토글
+                        Code::F11 => {
+                            if let Some(window) = app.get_webview_window("main") {
+                                toggle_fullscreen(&window);
+                            }
                         }
+                        // Ctrl+Alt+F4 → 서브 모니터 창(camera-output) 강제 종료.
+                        // 서브 창이 always_on_top·전체화면으로 메인 모니터를 덮어 Alt+Tab조차
+                        // 안 먹는 상황의 탈출구다(전역 단축키라 어떤 창이 위에 있든 발동).
+                        // 등록한 조합이 Ctrl+Alt+F4뿐이라 이 핸들러엔 그 조합만 들어온다.
+                        Code::F4 => {
+                            if let Some(cam) = app.get_webview_window("camera-output") {
+                                let _ = cam.close();
+                            }
+                            // 가려져 있던 메인 창을 다시 앞으로 가져와 조작권을 회복한다.
+                            if let Some(main) = app.get_webview_window("main") {
+                                let _ = main.show();
+                                let _ = main.set_focus();
+                            }
+                        }
+                        _ => {}
                     }
                 })
                 .build(),
@@ -608,13 +636,23 @@ pub fn run() {
             // F11 → 전체화면 토글 (OS 레벨, WebView2 키 소비 우회)
             // 등록 실패(다른 앱이 F11 선점 등) 시 앱을 죽이지 않고
             // 웹뷰 keydown 리스너(FullscreenToggle.tsx)가 폴백으로 동작한다.
-            use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Shortcut};
+            use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut};
             if let Err(e) = app
                 .handle()
                 .global_shortcut()
                 .register(Shortcut::new(None, Code::F11))
             {
                 eprintln!("F11 전역 단축키 등록 실패 (웹뷰 폴백 사용): {e}");
+            }
+
+            // Ctrl+Alt+F4 → 서브 모니터 창 강제 종료(메인이 가려져 조작 불가일 때의 탈출구).
+            // 위 with_handler가 shortcut.key로 F11과 구분해 처리한다.
+            if let Err(e) = app
+                .handle()
+                .global_shortcut()
+                .register(Shortcut::new(Some(Modifiers::CONTROL | Modifiers::ALT), Code::F4))
+            {
+                eprintln!("Ctrl+Alt+F4 전역 단축키 등록 실패: {e}");
             }
 
             // WebView2는 PermissionRequested 핸들러가 없으면 기본으로 카메라를 거부한다.
@@ -699,8 +737,18 @@ pub fn run() {
 
             Ok(())
         })
-        .on_window_event(|window, event| {
-            if let tauri::WindowEvent::Destroyed = event {
+        .on_window_event(|window, event| match event {
+            // 메인 창 종료 요청(Alt+F4·닫기). 종료를 막지 않고, 서브 모니터 창(camera-output)이
+            // 떠 있으면 함께 닫는다 → Alt+F4 한 번에 두 창이 모두 닫히고 앱이 깔끔히 종료된다.
+            // (서브 창을 안 닫으면 그 창만 남아 앱이 종료되지 않는 좀비 상태가 된다.)
+            tauri::WindowEvent::CloseRequested { .. } => {
+                if should_close_subwindows_with(window.label()) {
+                    if let Some(cam) = window.get_webview_window("camera-output") {
+                        let _ = cam.close();
+                    }
+                }
+            }
+            tauri::WindowEvent::Destroyed => {
                 if !should_shutdown_server_on_destroy(window.label()) {
                     return;
                 }
@@ -713,6 +761,7 @@ pub fn run() {
                     }
                 }
             }
+            _ => {}
         })
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
@@ -789,6 +838,22 @@ mod tests {
     fn unknown_window_destroy_keeps_server_alive() {
         assert!(!should_shutdown_server_on_destroy("some-future-window"));
         assert!(!should_shutdown_server_on_destroy(""));
+    }
+
+    // ── 메인 창 종료 시 서브 모니터 창도 함께 닫기(Alt+F4 한 번에 전체 종료) ──────
+    // 메인 창이 닫힐 때만 camera-output을 같이 닫아, 서브 창만 남는 좀비 상태를 막는다.
+
+    #[test]
+    fn main_close_also_closes_subwindows() {
+        assert!(should_close_subwindows_with("main"));
+    }
+
+    #[test]
+    fn subwindow_close_does_not_close_others() {
+        // camera-output 자체가 닫힐 땐 다른 창을 건드리지 않는다.
+        assert!(!should_close_subwindows_with("camera-output"));
+        assert!(!should_close_subwindows_with("some-future-window"));
+        assert!(!should_close_subwindows_with(""));
     }
 
     #[test]

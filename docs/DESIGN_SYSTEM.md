@@ -88,8 +88,10 @@ wallpaper(cover)·그 외 단계는 `THEME_BG_COLOR` 단색, 버튼 탭 글로�
 
 `globals.css`의 `.touch-button`(2em)·`.nav-button`(1.4em)은 `em` 단위라 `--type-scale`의
 영향을 받지 않는다. 이 버튼들 크기는 해당 클래스에서 직접 조절한다.
-`.nav-next-lg`("다음" 강조 버튼)는 **크기는 `.nav-button`과 동일**하고 primary 색상만 입힌다
-(예전엔 1.7em로 더 컸으나 "이전"과 크기를 맞춤).
+`.nav-next-lg`("다음" 강조 버튼)는 primary 색상만 담당하는 클래스이고, **크기는
+`sectionLayout.ts`의 `SERVICE_BIG_BUTTON_CLASS`**(Tailwind 유틸)로 정한다 — 촬영하기 버튼
+(`CameraSection`)과 **같은 상수를 공유**해 두 버튼 크기가 항상 일치한다. 다음/촬영하기
+버튼을 키우거나 줄이려면 이 상수 한 곳만 고치면 된다.
 
 > 서비스 화면 **외곽 여백**(각 섹션 상/하 패딩·네비 버튼 코너 오프셋)은 토큰이 아니라
 > 컴포넌트의 Tailwind 클래스로 관리한다 — 섹션 `pt-24 pb-52`, `ServiceNav` `bottom-16 left-16`

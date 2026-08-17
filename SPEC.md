@@ -326,7 +326,8 @@
 | `PrintBgSection.tsx` | 인쇄 배경(프레임) 선택 UI — printbg 단계. 인쇄 배경 이미지가 있을 때만 노출 |
 | `CompleteSection.tsx` | 결과 출력 + QR + 인쇄 |
 | `FramedPreview.tsx` | 선택 프레임 위에 사진 슬롯 배치 미리보기 (CompleteSection과 동일 배경 우선순위) |
-| `ServiceNav.tsx` | 서비스 화면 공통 이전/다음 네비게이션 버튼 (모서리 절대배치) |
+| `SectionShell.tsx` | 서비스 화면 공통 3단 껍데기(타이틀·본문·다음 버튼) + `SectionTitle`. Background/Frame/PrintBg/Select가 사용. 타이틀 스타일을 한 곳에서 관리 |
+| `ServiceNav.tsx` | 서비스 화면 공통 "다음" 버튼 (하단 중앙 절대배치, 촬영하기와 동일 크기 = `SERVICE_BIG_BUTTON_CLASS`) |
 | `CircularTimer.tsx` | 원형 카운트다운 — frame·background·select·printbg는 유휴 타임아웃, complete는 인화 자동복귀 타이머로 표시 (start·payment·camera 제외) |
 | `CameraStreamer.tsx` | 카메라 상시 웜업 + 서브 모니터 프레임 전송 (배경 합성 포함, §15) |
 | `FloatingElements.tsx` | 배경 데코레이션 애니메이션 |
@@ -613,19 +614,25 @@ useSceneSyncReceiver → BroadcastChannel.onmessage(state)   ※ 레거시
 5. `node.exe server.js` 자식 프로세스 시작 (`HOSTNAME=127.0.0.1` 바인딩)
 6. 최대 60초 대기 후 서버 준비 확인
 7. WebView2 카메라 권한 자동 허용 (localhost URL)
-8. F11 전역 단축키 등록 (실패해도 앱 시작은 계속 — 웹뷰 리스너가 폴백)
+8. 전역 단축키 등록 — `F11`(전체화면 토글), `Ctrl+Alt+F4`(서브 모니터 창 강제 종료).
+   등록에 실패해도 앱 시작은 계속된다 (F11은 웹뷰 리스너가 폴백)
 
 ### 종료 동작
 
 - **메인 창**(`main`)이 파괴될 때만 Node 자식 프로세스를 종료한다.
   서브 모니터 창(`camera-output`)을 닫거나 재생성해도 서버는 유지된다
   (`should_shutdown_server_on_destroy`, 단위 테스트 포함).
+- 메인 창이 **닫힘 요청**(Alt+F4 등)을 받으면, 종료를 막지 않고 서브 모니터
+  창(`camera-output`)도 함께 닫는다 → Alt+F4 한 번에 두 창이 모두 닫히고 앱이
+  깔끔히 종료된다. (닫지 않으면 서브 창만 남아 앱이 종료되지 않는 좀비 상태가
+  되는 것을 방지 — `should_close_subwindows_with`, `WindowEvent::CloseRequested`, 단위 테스트 포함.)
 
 ### 키보드 단축키
 
 | 단축키 | 동작 | 구현 위치 |
 |--------|------|---------|
 | `F11` | 전체화면 ↔ 창 모드 토글 | 1차: Rust 전역 단축키 (`toggle_fullscreen`, lib.rs) / 폴백: `src/components/FullscreenToggle.tsx` (전역 레이아웃에 마운트) |
+| `Ctrl+Alt+F4` | 서브 모니터 창(`camera-output`) 강제 종료 + 메인 창 복귀(show·focus) | Rust 전역 단축키 (lib.rs `with_handler`, `shortcut.key`로 F11과 분기) |
 
 - 창은 borderless 1920×1080 전체화면으로 시작하므로, 창 모드 전환 시
   **테두리 복원 + 1280×800 축소 + 화면 중앙 배치**로 토글이 시각적으로 구분되게 한다
@@ -633,6 +640,10 @@ useSceneSyncReceiver → BroadcastChannel.onmessage(state)   ※ 레거시
 - 두 구현(Rust/웹뷰)은 동일한 동작을 수행하며, 전역 단축키가 등록되면
   OS가 키를 소비하므로 웹뷰 리스너는 실행되지 않는다 (이중 토글 없음)
 - 브라우저 직접 실행: 동작 없음 (Tauri API 미존재)
+- `Ctrl+Alt+F4`는 서브 모니터 창이 잘못된(메인) 모니터에 `always_on_top`·전체화면으로
+  떠 화면을 덮어 Alt+Tab조차 안 먹는 상황의 **탈출구**다. 전역(OS) 단축키라 어떤 창이
+  위에 있든 발동하며, 메인 창 웹뷰 keydown으로는 (메인이 포커스를 잃어) 이 상황을 못 벗어난다.
+  등록 조합이 `Ctrl+Alt+F4`뿐이라 평범한 `Alt+F4`(앱 종료)와 충돌하지 않는다.
 
 ---
 
@@ -897,6 +908,10 @@ open_camera_window(x, y, width, height)
   → .fullscreen(true).decorations(false).always_on_top(true)
   → .position(x, y).inner_size(width, height)
 ```
+
+- 닫는 경로: (1) 동기화 OFF 토글 → `close_camera_window`, (2) 메인 창 닫힘(Alt+F4) 시
+  동반 종료(§10 종료 동작), (3) `Ctrl+Alt+F4` 전역 단축키(§10 키보드 단축키).
+  이 창은 `decorations(false)`라 자체 닫기 UI가 없고 포커스도 받지 않으므로, 위 세 경로로만 닫힌다.
 
 ---
 
