@@ -536,8 +536,16 @@ export function CompleteSection({
   };
 
   return (
-    <section ref={sectionRef} className="w-full h-full flex flex-col items-center justify-center relative z-10">
-      <div className="w-full text-center animate-fadeInUp portrait:px-6">
+    <section ref={sectionRef} className="w-full h-full flex flex-col items-center justify-start pt-7 pb-52 portrait:justify-center portrait:pt-0 portrait:pb-0 relative z-10">
+      <div className="w-full flex-1 flex flex-col text-center animate-fadeInUp portrait:flex-none portrait:px-6">
+        {/* 타이틀은 다른 페이지처럼 상단 고정(pt-7). 본문은 아래 flex-1 영역에서 중앙 정렬한다. */}
+        {(printStatus === "ready" || printStatus === "done") && compositeImage && (
+          <SectionTitle className="portrait:text-5xl break-keep mb-16 portrait:mb-8">
+            {printStatus === "done" ? t("complete.done") : t("complete.ready")}
+          </SectionTitle>
+        )}
+        {/* 남은 세로 공간에서 본문(미리보기·QR·로딩·에러)을 중앙 정렬. 세로 화면은 flex-none으로 기존 스택 유지. */}
+        <div className="w-full flex-1 min-h-0 flex flex-col items-center justify-center portrait:flex-none">
         {printStatus === "compositing" && (
           <>
             <div className="w-20 h-20 border-4 border-white/20 border-t-blue-500 rounded-full animate-spin mx-auto mb-8" />
@@ -547,10 +555,6 @@ export function CompleteSection({
 
         {(printStatus === "ready" || printStatus === "done") && compositeImage && (
           <>
-            <SectionTitle className="portrait:text-5xl break-keep mb-4 portrait:mb-8">
-              {printStatus === "done" ? t("complete.done") : t("complete.ready")}
-            </SectionTitle>
-
             {/* 좌우 반반(12컬럼 6/6): 미리보기 | QR. 세로에선 상하 스택.
                 가로 결과물(matchHeight)에선 QR 카드 상·하단을 프레임에 맞추려 상단 정렬. */}
             <div className={`flex justify-center gap-10 mb-6 w-full max-w-6xl mx-auto portrait:flex-col portrait:items-center portrait:gap-8 portrait:w-full ${matchHeight ? "items-start" : "items-center"}`}>
@@ -607,6 +611,7 @@ export function CompleteSection({
             </button>
           </>
         )}
+        </div>
       </div>
 
       {/* 하단 고정 버튼은 애니메이션(transform) 래퍼 밖 = section 기준으로 절대배치한다.
