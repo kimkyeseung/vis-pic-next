@@ -1,6 +1,7 @@
 import { useState } from "react";
 import type { BGImage } from "@/types";
 import { useLanguage } from "@/i18n/LanguageContext";
+import { FRAME_INFO } from "@/constants/frames";
 import { FramedPreview } from "./FramedPreview";
 import { SectionShell } from "./SectionShell";
 import { normalizeSlots, firstEmptySlot, tapPhoto } from "@/lib/slotSelection";
@@ -57,6 +58,25 @@ export function SelectSection({
     setActiveSlot(result.activeSlot);
   };
 
+  // 오른쪽 인화 미리보기 축척: 왼쪽 2×2 촬영본 그리드(≈2행)와 위아래 높이가
+  // 맞도록 키운다. 세로 용지(2컷 등)는 같은 배율이면 훨씬 커지므로 방향별로
+  // 배율을 달리해 미리보기 "높이"를 그리드와 비슷하게 유지한다(가로 용지 50 / 세로 용지 34).
+  const previewIsPortrait =
+    selectedFrame != null && FRAME_INFO[selectedFrame]?.orientation === "portrait";
+  const previewScale = previewIsPortrait ? 34 : 50;
+
+  // 세로 화면 + 촬영본 4장 + 세로 용지 프레임(2컷 등): 왼쪽 사진을 세로 1열로 세우고
+  // 미리보기를 오른쪽에 나란히 둔다(첨부 레이아웃). 가로 용지 프레임(가로 4컷=2x2 등)은
+  // 미리보기가 넓어 옆에 두면 어색하므로 제외 → 기존 세로 배치(2×2 위, 미리보기 아래)를 쓴다.
+  // CSS portrait: 변형으로 세로 화면에서만 1열 배치가 적용된다.
+  const fourShotColumn = photos.length === 4 && previewIsPortrait;
+  // 촬영본 2장(1컷 등): 좌우로 나란히 두면 세로 1행이라 오른쪽 큰 미리보기보다 훨씬 낮다.
+  // 세로 1열로 쌓아 두 장 합 높이가 미리보기 높이(가로 용지 기준 ≈500)와 맞도록 한다.
+  const twoShotColumn = photos.length === 2;
+  // 세로 화면에서는 세로 높이 여유가 커서 미리보기를 더 크게 키운다(사진 1열 높이와 비슷하게).
+  // 가로 용지는 세로 화면 폭에 맞춰 더 작게 잡는다.
+  const portraitBigScale = previewIsPortrait ? 64 : 46;
+
   const [page, setPage] = useState(0);
   const pageCount = Math.max(1, Math.ceil(photos.length / PAGE_SIZE));
   const curPage = Math.min(page, pageCount - 1);
@@ -78,7 +98,7 @@ export function SelectSection({
       </p>
 
       <div className="min-h-0 w-full flex items-center justify-center">
-      <div className="flex items-center justify-center gap-12 max-w-6xl max-h-full animate-fadeInUp portrait:flex-col portrait:items-center portrait:gap-6">
+      <div className={`flex items-center justify-center gap-12 max-w-[1550px] max-h-full animate-fadeInUp ${fourShotColumn ? "portrait:gap-8" : "portrait:flex-col portrait:items-center portrait:gap-6"}`}>
         {/* 촬영본이 많으면 4장씩 페이지로 나눠 좌우 화살표로 넘긴다 */}
         <div className="flex items-center gap-3">
           {pageCount > 1 && (
@@ -93,7 +113,7 @@ export function SelectSection({
           )}
 
           <div className="flex flex-col items-center gap-3">
-            <div className="grid grid-cols-2 gap-6 portrait:gap-4">
+            <div className={`grid gap-6 portrait:gap-4 ${twoShotColumn ? "grid-cols-1" : "grid-cols-2"} ${fourShotColumn ? "portrait:grid-cols-1" : ""}`}>
               {pagePhotos.map((photo, li) => {
                 const i = pageStart + li;
                 const slotOf = photoToSlot.get(i);
@@ -101,7 +121,7 @@ export function SelectSection({
                 return (
                   <div
                     key={i}
-                    className={`photo-thumbnail w-80 portrait:w-[420px] bg-black/30 relative overflow-hidden ${isSelected ? "selected" : ""}`}
+                    className={`photo-thumbnail w-80 ${fourShotColumn ? "portrait:w-[330px]" : "portrait:w-[420px]"} bg-black/30 relative overflow-hidden ${isSelected ? "selected" : ""}`}
                     style={{ aspectRatio: "auto" }}
                     onClick={() => handlePhotoTap(i)}
                   >
@@ -146,21 +166,34 @@ export function SelectSection({
           )}
         </div>
 
-        {selectedFrame && (
-          <FramedPreview
-            selectedFrame={selectedFrame}
-            photos={photos}
-            selectedPhotos={selectedPhotos}
-            printSettings={printSettings}
-            imageBaseUrl={imageBaseUrl}
-            selectedBackground={selectedBackground}
-            backgroundImages={backgroundImages}
-            printBgImages={printBgImages}
-            scale={24}
-            activeSlot={activeSlot}
-            onSlotClick={setActiveSlot}
-          />
-        )}
+        {selectedFrame && (() => {
+          const previewProps = {
+            selectedFrame,
+            photos,
+            selectedPhotos,
+            printSettings,
+            imageBaseUrl,
+            selectedBackground,
+            backgroundImages,
+            printBgImages,
+            activeSlot,
+            onSlotClick: setActiveSlot,
+          };
+          // 촬영본 4장: 가로 화면은 그리드 정렬용(previewScale), 세로 화면은 크게(portraitBigScale).
+          // CSS로 방향에 따라 하나만 보이게 한다(JS는 미리보기의 강제세로를 감지하지 못함).
+          return fourShotColumn ? (
+            <>
+              <div className="portrait:hidden">
+                <FramedPreview {...previewProps} scale={previewScale} />
+              </div>
+              <div className="hidden portrait:block">
+                <FramedPreview {...previewProps} scale={portraitBigScale} />
+              </div>
+            </>
+          ) : (
+            <FramedPreview {...previewProps} scale={previewScale} />
+          );
+        })()}
       </div>
       </div>
     </SectionShell>
