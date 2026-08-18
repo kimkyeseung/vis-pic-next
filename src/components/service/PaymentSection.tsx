@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import type { DeviceConfig } from "@/types";
 import { useLanguage } from "@/i18n/LanguageContext";
 import { LOCALES, type MessageKey } from "@/i18n/translations";
-import { SERVICE_SECTION_CLASS } from "./sectionLayout";
+import { SERVICE_SECTION_CLASS, SERVICE_BIG_BUTTON_CLASS } from "./sectionLayout";
 import { SectionTitle } from "./SectionShell";
 
 export function PaymentSection({
@@ -133,14 +133,14 @@ export function PaymentSection({
             {t("payment.selectQuantity")}
           </SectionTitle>
 
-          <div className="min-h-0 w-full flex flex-col items-center justify-center">
-          <div className="w-full max-w-5xl flex flex-col items-center animate-fadeInUp">
+          <div className="min-h-0 w-full flex flex-col items-center justify-start pt-8 portrait:pt-12">
+          <div className="w-full max-w-[1700px] flex flex-col items-center animate-fadeInUp">
           {/* 언어 선택 */}
-          <div className="flex gap-3 mb-10 portrait:mb-8 flex-wrap justify-center">
+          <div className="flex gap-5 portrait:gap-6 mb-12 portrait:mb-10 flex-wrap justify-center">
             {LOCALES.map(({ code, label }) => (
               <button
                 key={code}
-                className={`px-8 py-4 rounded-2xl text-2xl font-semibold transition-all ${
+                className={`px-14 py-6 portrait:px-8 portrait:py-8 rounded-2xl text-4xl portrait:text-5xl font-semibold transition-all ${
                   lang === code
                     ? "bg-white text-gray-900 shadow-lg"
                     : "bg-white/10 text-white/60 hover:bg-white/20 hover:text-white"
@@ -153,24 +153,24 @@ export function PaymentSection({
           </div>
 
           {/* 매수/가격 티어 카드 — 세로에선 전체폭 세로 스택 */}
-          <div className="flex gap-6 justify-center flex-wrap mb-12 portrait:flex-col portrait:flex-nowrap portrait:w-full portrait:items-stretch portrait:gap-4">
+          <div className="flex gap-10 portrait:gap-6 justify-center flex-wrap mb-12 portrait:flex-col portrait:flex-nowrap portrait:w-full portrait:items-stretch">
             {tiers.map((tier) => {
               const selected = tier.qty === selectedQty;
               return (
                 <button
                   key={tier.qty}
                   onClick={() => selectQty(tier.qty)}
-                  className={`w-56 h-56 portrait:w-full portrait:h-72 rounded-2xl flex flex-col items-center justify-center gap-2 portrait:gap-4 transition-all duration-200 border-2 ${
+                  className={`w-[32rem] h-[26rem] portrait:w-full portrait:h-[22rem] rounded-2xl flex flex-col items-center justify-center gap-3 portrait:gap-5 transition-all duration-200 border-2 ${
                     selected
                       ? "bg-white border-white scale-[1.04] shadow-2xl"
                       : "border-white/20 hover:border-white/40"
                   }`}
                   style={selected ? {} : { background: "var(--theme-primary, #6c6fb4)" }}
                 >
-                  <span className={`text-5xl portrait:text-6xl font-extrabold ${selected ? "text-[#4a4e8c]" : "text-white"}`}>
+                  <span className={`text-8xl portrait:text-8xl font-extrabold ${selected ? "text-[#4a4e8c]" : "text-white"}`}>
                     {t("payment.sheets", { count: String(tier.qty) })}
                   </span>
-                  <span className={`text-3xl portrait:text-4xl font-bold ${selected ? "text-[#4a4e8c]" : "text-white/90"}`}>
+                  <span className={`text-5xl portrait:text-6xl font-bold ${selected ? "text-[#4a4e8c]" : "text-white/90"}`}>
                     {t("payment.amount", { amount: fmt(tier.price) })}
                   </span>
                 </button>
@@ -188,7 +188,7 @@ export function PaymentSection({
 
           {/* 하단 고정 바 — 결제하기 버튼만 중앙에 배치(총액·이전 버튼 제거). */}
           <div className="absolute bottom-16 left-1/2 -translate-x-1/2 z-20 flex items-center justify-center portrait:bottom-10">
-            <button className="service-button nav-button nav-next-lg" onClick={handlePay}>
+            <button className={`service-button nav-next-lg ${SERVICE_BIG_BUTTON_CLASS}`} onClick={handlePay}>
               {t("payment.pay")} &#9654;
             </button>
           </div>
