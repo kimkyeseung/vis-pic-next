@@ -195,8 +195,9 @@ export function CameraStreamer({
       for (let attempt = 0; !cancelled; attempt++) {
         try {
           return await navigator.mediaDevices.getUserMedia({
-            // 촬영(CameraSection)과 동일하게 4:3(960×720)으로 요청해 서브 모니터 미러 비율을 일치시킨다.
-            video: { width: { ideal: 960 }, height: { ideal: 720 }, aspectRatio: { ideal: 4 / 3 } },
+            // 촬영(CameraSection FHD 기본)과 동일하게 4:3(1440×1080)으로 요청해 서브 모니터
+            // 미러 비율을 맞추고, 송출 상한(MAX_STREAM_W=1440)까지 실제 디테일을 채운다.
+            video: { width: { ideal: 1440 }, height: { ideal: 1080 }, aspectRatio: { ideal: 4 / 3 } },
           });
         } catch (err) {
           const e = err as DOMException;
@@ -230,8 +231,8 @@ export function CameraStreamer({
           const h = video.videoHeight;
           // 4K(2560+)에서 배경제거 처리 해상도를 0.25로 낮춰 픽셀 연산량을 ~75% 감소.
           const PROCESS_SCALE = w >= 2560 ? 0.25 : 0.5;
-          // 송출 전용 캔버스는 최대 1280px로 캡 — toDataURL 인코딩 비용 대폭 감소.
-          const MAX_STREAM_W = 1280;
+          // 송출 전용 캔버스는 최대 1440px로 캡 — 서브 모니터 선명도와 toDataURL 인코딩 비용의 절충.
+          const MAX_STREAM_W = 1440;
           const cScale = Math.min(1, MAX_STREAM_W / w);
           const cw = Math.round(w * cScale);
           const ch = Math.round(h * cScale);
@@ -341,7 +342,7 @@ export function CameraStreamer({
             lastSentRef.current = now;
             frameChannelRef.current.postMessage({
               type: "frame",
-              dataUrl: canvas.toDataURL("image/jpeg", 0.5),
+              dataUrl: canvas.toDataURL("image/jpeg", 0.85),
             });
           }
         };
