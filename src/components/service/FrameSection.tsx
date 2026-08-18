@@ -5,7 +5,8 @@ import { SectionShell } from "./SectionShell";
 import { resolveImageSrc } from "@/lib/imageUrl";
 import type { BGImage, FrameInfoEntry } from "@/types";
 
-// 미리보기 축척: 1cm → 12px (인화지 10×15cm 기준 120×180px)
+// 미리보기 축척(1cm → N px) 기본값. 카드 크기에 따라 호출부에서 scale로 덮어쓴다.
+// 소형(옵션 4개↑): 12px, 대형(1/2/4컷 고정): 20px.
 const PREVIEW_SCALE = 12;
 
 // 대표 프레임이 없을 때의 중립 용지 색
@@ -26,16 +27,18 @@ function PaperPreview({
   mode,
   frame,
   frameSrc,
+  scale = PREVIEW_SCALE,
 }: {
   mode: string;
   frame: FrameInfoEntry;
   frameSrc: string | null;
+  scale?: number;
 }) {
   const isPortrait = frame.orientation === "portrait";
   const paperW = isPortrait ? 10 : 15;
   const paperH = isPortrait ? 15 : 10;
-  const wPx = paperW * PREVIEW_SCALE;
-  const hPx = paperH * PREVIEW_SCALE;
+  const wPx = paperW * scale;
+  const hPx = paperH * scale;
   const { slots } = computePrintLayout({ frame, mode, paperW, paperH, settings: {} });
 
   return (
@@ -98,6 +101,10 @@ export function FrameSection({
   // 세로 화면 배치: 옵션이 3개 이하면 가로 한 줄, 4개 이상이면 3열 그리드(예: 6개 → 2×3).
   // (가로 화면은 항상 한 줄) 세로 1열은 너무 길어져 스크롤이 생기므로 3열로 접는다.
   const usePortraitGrid = frames.length > 3;
+  // 1/2/4컷 고정 구성(옵션 3개 이하)에서는 카드를 크게 키운다(레이아웃 V3).
+  // 4개 이상이면 가로 한 줄이 넘치므로 기존 소형 카드를 유지한다.
+  const bigCards = frames.length <= 3;
+  const previewScale = bigCards ? 20 : 12;
 
   return (
     <SectionShell
@@ -110,18 +117,18 @@ export function FrameSection({
     >
       {/* 결제 단계와 동일하게 w-full 래퍼로 폭을 채워 좌우 여백을 맞춘다(세로 3열 그리드가 넓게 퍼지도록). */}
       <div className="min-h-0 w-full flex items-center justify-center">
-      <div className={`flex gap-10 animate-fadeInUp ${usePortraitGrid ? "portrait:grid portrait:grid-cols-3 portrait:gap-6 portrait:w-full portrait:max-w-5xl portrait:items-stretch" : "portrait:gap-6"}`}>
+      <div className={`flex ${bigCards ? "gap-14 portrait:flex-col portrait:w-full portrait:items-stretch" : "gap-10"} animate-fadeInUp ${usePortraitGrid ? "portrait:grid portrait:grid-cols-3 portrait:gap-6 portrait:w-full portrait:max-w-5xl portrait:items-stretch" : "portrait:gap-6"}`}>
         {frames.map((frame) => (
           <div
             key={frame.id}
-            className={`frame-option w-64 text-center ${usePortraitGrid ? "portrait:w-full" : ""} ${selectedFrame === frame.id ? "selected" : ""}`}
+            className={`frame-option ${bigCards ? "w-[26rem] portrait:w-full portrait:min-h-[24rem] portrait:flex portrait:flex-row portrait:items-center portrait:justify-center portrait:gap-12" : "w-64"} text-center ${usePortraitGrid ? "portrait:w-full" : ""} ${selectedFrame === frame.id ? "selected" : ""}`}
             onClick={() => onSelect(frame.id)}
           >
             {selectedFrame === frame.id && <span className="check-mark">&#10003;</span>}
-            <div className="h-48 portrait:h-52 flex items-center justify-center mb-5">
-              <PaperPreview mode={frame.id} frame={frame} frameSrc={frameSrc} />
+            <div className={`${bigCards ? "h-80 mb-8 portrait:h-auto portrait:mb-0" : "h-48 portrait:h-52 mb-5"} flex items-center justify-center`}>
+              <PaperPreview mode={frame.id} frame={frame} frameSrc={frameSrc} scale={previewScale} />
             </div>
-            <span className="text-2xl portrait:text-3xl font-bold text-white">{t("frame.cut", { n: frame.count })}</span>
+            <span className={`${bigCards ? "text-6xl" : "text-2xl portrait:text-3xl"} font-bold text-white`}>{t("frame.cut", { n: frame.count })}</span>
           </div>
         ))}
       </div>

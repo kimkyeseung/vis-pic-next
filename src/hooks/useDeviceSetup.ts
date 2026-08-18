@@ -24,7 +24,7 @@ const DEFAULT_CONFIG: DeviceConfig = {
   chromakeyRgb: "0,255,0",
   chromakeySimilarity: 50,
   chromakeySmoothness: 50,
-  captureModes: ["1x1", "2x2"],
+  captureModes: ["1x1", "2x1", "2x2"],
   bgRemovalMode: "mediapipe",
   idleTimeoutSeconds: 30,
   cameraAutoTimerSeconds: 60,

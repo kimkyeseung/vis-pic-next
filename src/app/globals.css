@@ -380,7 +380,7 @@ body {
 .frame-option {
   border: 3px solid transparent;
   border-radius: 20px;
-  padding: 30px 20px 25px;
+  padding: 40px 28px 36px;
   cursor: pointer;
   transition: all 0.4s ease;
   position: relative;
