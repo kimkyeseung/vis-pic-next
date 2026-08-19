@@ -1,6 +1,6 @@
 import type { CSSProperties } from "react";
 import type { BGImage } from "@/types";
-import { FRAME_INFO, FALLBACK_BACKGROUNDS } from "@/constants/frames";
+import { FRAME_INFO, FALLBACK_BACKGROUNDS, DUMMY_SLOT_GRADIENT } from "@/constants/frames";
 import { resolveImageSrc } from "@/lib/imageUrl";
 import {
   computePrintLayout,
@@ -59,15 +59,19 @@ export function FramedPreview({
 
   const { slots } = computePrintLayout({ frame, mode: selectedFrame!, paperW: pw, paperH: ph, settings: printSettings });
 
-  // 용지 배경으로 쓸 프레임: 선택한 프레임(selectedPrintBg)이 있으면 그것, 없으면 첫 번째 프레임(대표).
-  const frameInfo = selectedPrintBg != null
+  // 프레임 선택 전(selectedPrintBg 없음)에는 대표 프레임을 미리 씌우지 않고 흰 용지 + 회색
+  // 슬롯(더미)로만 보여준다(레이아웃 V3). 프레임을 확정한 뒤에만 선택 프레임을 합성해 보여준다.
+  const frameSelected = selectedPrintBg != null;
+  const frameInfo = frameSelected
     ? (printBgImages || []).find((b) => b.id === selectedPrintBg)
-    : (printBgImages || [])[0];
+    : null;
   const frameSrc = frameInfo ? resolveImageSrc(frameInfo.filename, imageBaseUrl) : null;
 
-  // 프레임이 없을 때의 배경 폴백: PRINT_BACKGROUND 설정 > 촬영 배경 > 폴백 그라디언트
+  // 프레임 미선택: 흰 더미 용지. 선택 후: PRINT_BACKGROUND 설정 > 촬영 배경 > 폴백 그라디언트.
   let backgroundStyle: CSSProperties = { background: DEFAULT_GRADIENT };
-  if (printSettings.PRINT_BACKGROUND) {
+  if (!frameSelected) {
+    backgroundStyle = { background: "#ffffff" };
+  } else if (printSettings.PRINT_BACKGROUND) {
     backgroundStyle = {
       backgroundImage: `url(${resolveImageSrc(printSettings.PRINT_BACKGROUND, imageBaseUrl)})`,
       backgroundSize: "cover",
@@ -122,7 +126,7 @@ export function FramedPreview({
           <div
             key={i}
             onClick={onSlotClick ? () => onSlotClick(i) : undefined}
-            className={`absolute overflow-hidden flex items-center justify-center bg-white/10 ${interactive ? "cursor-pointer" : ""}`}
+            className={`absolute overflow-hidden flex items-center justify-center ${interactive ? "cursor-pointer" : ""}`}
             style={{
               left: `${(s.x / pw) * 100}%`,
               top: `${(s.y / ph) * 100}%`,
@@ -130,6 +134,8 @@ export function FramedPreview({
               height: `${(s.h / ph) * 100}%`,
               borderRadius: FRAME_CORNER_RADIUS_CM * scale,
               border: `${FRAME_BORDER_CM * scale}px solid ${FRAME_BORDER_COLOR}`,
+              // 빈 슬롯 자리 표시: 프레임 미선택(더미)이면 회색 그라디언트, 선택 후면 반투명 흰색.
+              background: frameSelected ? "rgba(255,255,255,0.1)" : DUMMY_SLOT_GRADIENT,
             }}
           >
             {photo ? (

@@ -1,37 +1,25 @@
-import { FRAME_INFO } from "@/constants/frames";
+import { FRAME_INFO, DUMMY_SLOT_GRADIENT } from "@/constants/frames";
 import { computePrintLayout } from "@/lib/printLayout";
 import { useLanguage } from "@/i18n/LanguageContext";
 import { SectionShell } from "./SectionShell";
-import { resolveImageSrc } from "@/lib/imageUrl";
-import type { BGImage, FrameInfoEntry } from "@/types";
+import type { FrameInfoEntry } from "@/types";
 
 // 미리보기 축척(1cm → N px) 기본값. 카드 크기에 따라 호출부에서 scale로 덮어쓴다.
 // 소형(옵션 4개↑): 12px, 대형(1/2/4컷 고정): 20px.
 const PREVIEW_SCALE = 12;
 
-// 대표 프레임이 없을 때의 중립 용지 색
-const FRAME_PLACEHOLDER = "#3f3f46";
-
 /**
- * 컷 선택 단계 용지 미리보기용 대표 프레임(첫 번째) 이미지 URL. 없으면 null.
- * (프레임은 나중 "프레임 선택" 단계에서 확정 — 여기선 대표로 미리 보여준다)
+ * 실제 인화지 비율(10×15cm)과 공용 레이아웃 계산을 축소해 그리는 미리보기.
+ * 프레임은 나중 "프레임 선택" 단계에서 확정하므로, 여기선 대표 프레임을 미리 씌우지 않고
+ * 흰 용지 + 회색 슬롯(더미)로만 보여준다(레이아웃 V3).
  */
-function resolveFrameSrc(printBgImages: BGImage[], imageBaseUrl: string): string | null {
-  const first = printBgImages[0];
-  if (!first) return null;
-  return resolveImageSrc(first.filename, imageBaseUrl);
-}
-
-/** 실제 인화지 비율(10×15cm)과 공용 레이아웃 계산을 축소해 그리는 미리보기 */
 function PaperPreview({
   mode,
   frame,
-  frameSrc,
   scale = PREVIEW_SCALE,
 }: {
   mode: string;
   frame: FrameInfoEntry;
-  frameSrc: string | null;
   scale?: number;
 }) {
   const isPortrait = frame.orientation === "portrait";
@@ -43,32 +31,19 @@ function PaperPreview({
 
   return (
     <div
-      className="relative rounded-[3px] shadow-[0_6px_16px_rgba(0,0,0,0.45)] overflow-hidden"
-      style={{ width: wPx, height: hPx, background: FRAME_PLACEHOLDER }}
+      className="relative rounded-[3px] shadow-[0_6px_16px_rgba(0,0,0,0.45)] overflow-hidden bg-white"
+      style={{ width: wPx, height: hPx }}
     >
-      {/* 대표 프레임(가로 디자인)을 세로 인쇄 모드에선 90도 회전해 용지에 맞춘다 */}
-      {frameSrc && (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-          src={frameSrc}
-          alt=""
-          className="absolute left-1/2 top-1/2 max-w-none object-cover"
-          style={{
-            width: isPortrait ? hPx : wPx,
-            height: isPortrait ? wPx : hPx,
-            transform: `translate(-50%, -50%)${isPortrait ? " rotate(90deg)" : ""}`,
-          }}
-        />
-      )}
       {slots.map((s, i) => (
         <div
           key={i}
-          className="absolute bg-white shadow-inner"
+          className="absolute rounded-[2px]"
           style={{
             left: `${(s.x / paperW) * 100}%`,
             top: `${(s.y / paperH) * 100}%`,
             width: `${(s.w / paperW) * 100}%`,
             height: `${(s.h / paperH) * 100}%`,
+            background: DUMMY_SLOT_GRADIENT,
           }}
         />
       ))}
@@ -82,22 +57,17 @@ export function FrameSection({
   onSelect,
   onNext,
   onPrev,
-  printBgImages = [],
-  imageBaseUrl = "",
 }: {
   captureModes: string[];
   selectedFrame: string | null;
   onSelect: (frame: string) => void;
   onNext: () => void;
   onPrev: () => void;
-  printBgImages?: BGImage[];
-  imageBaseUrl?: string;
 }) {
   const { t } = useLanguage();
   const frames = captureModes
     .map((mode) => ({ id: mode, ...FRAME_INFO[mode] }))
     .filter((f) => f.label);
-  const frameSrc = resolveFrameSrc(printBgImages, imageBaseUrl);
   // 세로 화면 배치: 옵션이 3개 이하면 가로 한 줄, 4개 이상이면 3열 그리드(예: 6개 → 2×3).
   // (가로 화면은 항상 한 줄) 세로 1열은 너무 길어져 스크롤이 생기므로 3열로 접는다.
   const usePortraitGrid = frames.length > 3;
@@ -126,7 +96,7 @@ export function FrameSection({
           >
             {selectedFrame === frame.id && <span className="check-mark">&#10003;</span>}
             <div className={`${bigCards ? "h-80 mb-8 portrait:h-auto portrait:mb-0" : "h-48 portrait:h-52 mb-5"} flex items-center justify-center`}>
-              <PaperPreview mode={frame.id} frame={frame} frameSrc={frameSrc} scale={previewScale} />
+              <PaperPreview mode={frame.id} frame={frame} scale={previewScale} />
             </div>
             <span className={`${bigCards ? "text-6xl" : "text-2xl portrait:text-3xl"} font-bold text-white`}>{t("frame.cut", { n: frame.count })}</span>
           </div>

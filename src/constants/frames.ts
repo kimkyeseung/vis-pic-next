@@ -9,6 +9,11 @@ export const FRAME_INFO: Record<string, FrameInfoEntry> = {
   "4x1": { label: "4컷", cols: 1, rows: 4, count: 4, orientation: "portrait" },
 };
 
+// 프레임을 아직 선택하지 않은 단계(컷 선택·인화 사진 선택)에서 용지 미리보기를
+// 흰 더미 프레임으로 보여줄 때, 사진이 들어갈 슬롯 자리를 나타내는 회색 그라디언트.
+// (레이아웃 V3 목업: 흰 용지 + 회청색 슬롯)
+export const DUMMY_SLOT_GRADIENT = "linear-gradient(135deg, #838da3 0%, #b9c0d0 100%)";
+
 export const FALLBACK_BACKGROUNDS: FallbackBackground[] = [
   { id: -1, gradient: "linear-gradient(135deg, #ff6b9d 0%, #c44fd5 100%)", name: "Pink Purple" },
   { id: -2, gradient: "linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)", name: "Blue Cyan" },

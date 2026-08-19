@@ -212,8 +212,6 @@ export default function PreviewPage() {
             onSelect={selectFrame}
             onNext={noop}
             onPrev={noop}
-            printBgImages={MOCK_FRAMES}
-            imageBaseUrl=""
           />
         );
       case "background":

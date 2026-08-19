@@ -283,8 +283,6 @@ function ServiceContent() {
           onSelect={flow.setSelectedFrame}
           onNext={() => flow.goToStep("background")}
           onPrev={() => (config.paymentEnabled ? flow.goToStep("payment") : flow.resetAll())}
-          printBgImages={printBgImages}
-          imageBaseUrl={imageBaseUrl}
         />
       )}
       {currentStep === "background" && (
