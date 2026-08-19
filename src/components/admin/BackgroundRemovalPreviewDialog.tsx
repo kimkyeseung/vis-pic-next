@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { HexColorPicker } from "react-colorful";
+import { applyChromaKey } from "@/lib/chromakey";
 
 // 크로마키 임계값은 감도(similarity)에서 파생한다 — CameraSection.tsx와 동일 규칙.
 // 배경제거 처리 해상도를 낮춰 프레임 드롭을 줄인다 (CameraSection.tsx와 동일한 이유).
@@ -45,6 +46,12 @@ export function BackgroundRemovalPreviewDialog({
   onSimilarityChange,
   smoothness,
   onSmoothnessChange,
+  spill,
+  onSpillChange,
+  choke,
+  onChokeChange,
+  lumaIndependent,
+  onLumaIndependentChange,
   threshold,
   onThresholdChange,
   feather,
@@ -58,6 +65,12 @@ export function BackgroundRemovalPreviewDialog({
   onSimilarityChange: (n: number) => void;
   smoothness: number;
   onSmoothnessChange: (n: number) => void;
+  spill: number;
+  onSpillChange: (n: number) => void;
+  choke: number;
+  onChokeChange: (n: number) => void;
+  lumaIndependent: boolean;
+  onLumaIndependentChange: (v: boolean) => void;
   threshold: number;
   onThresholdChange: (n: number) => void;
   feather: number;
@@ -78,11 +91,17 @@ export function BackgroundRemovalPreviewDialog({
   const chromaColorRef = useRef(chromaColor);
   const similarityRef = useRef(similarity);
   const smoothnessRef = useRef(smoothness);
+  const spillRef = useRef(spill);
+  const chokeRef = useRef(choke);
+  const lumaRef = useRef(lumaIndependent);
   const thresholdRef = useRef(threshold);
   const featherRef = useRef(feather);
   useEffect(() => { chromaColorRef.current = chromaColor; }, [chromaColor]);
   useEffect(() => { similarityRef.current = similarity; }, [similarity]);
   useEffect(() => { smoothnessRef.current = smoothness; }, [smoothness]);
+  useEffect(() => { spillRef.current = spill; }, [spill]);
+  useEffect(() => { chokeRef.current = choke; }, [choke]);
+  useEffect(() => { lumaRef.current = lumaIndependent; }, [lumaIndependent]);
   useEffect(() => { thresholdRef.current = threshold; }, [threshold]);
   useEffect(() => { featherRef.current = feather; }, [feather]);
 
@@ -225,25 +244,15 @@ export function BackgroundRemovalPreviewDialog({
             }
           } else if (mode === "chromakey") {
             const imageData = offCtx.getImageData(0, 0, pw, ph);
-            const data = imageData.data;
-            const { r: kr, g: kg, b: kb } = chromaColorRef.current;
-            const simDist = Math.max(1, similarityRef.current);
-            // 경계 부드러움(0-100): softDist=simDist×(1+부드러움/50). 50 → 2×simDist(예전 하드코딩), 0 → 딱 잘림.
-            const softDist = simDist * (1 + Math.max(0, smoothnessRef.current) / 50);
-            const softBand = Math.max(1e-6, softDist - simDist);
-            const HARD = simDist * simDist;
-            const SOFT = softDist * softDist;
-            for (let i = 0; i < data.length; i += 4) {
-              const dr = data[i] - kr;
-              const dg = data[i + 1] - kg;
-              const db = data[i + 2] - kb;
-              const distSq = dr * dr + dg * dg + db * db;
-              if (distSq < HARD) {
-                data[i + 3] = 0;
-              } else if (distSq < SOFT) {
-                data[i + 3] = Math.round(((Math.sqrt(distSq) - simDist) / softBand) * 255);
-              }
-            }
+            applyChromaKey(
+              imageData.data, pw, ph,
+              chromaColorRef.current,
+              similarityRef.current,
+              smoothnessRef.current,
+              spillRef.current,
+              chokeRef.current,
+              lumaRef.current,
+            );
             offCtx.putImageData(imageData, 0, 0);
             processed = true;
           }
@@ -397,6 +406,40 @@ export function BackgroundRemovalPreviewDialog({
               />
             </div>
             <p className="text-gray-500 text-xs">낮을수록 경계가 딱딱하게 잘리고, 높을수록 부드럽게 번집니다.</p>
+            <div className="flex items-center gap-3">
+              <label className="text-gray-400 text-sm w-40 shrink-0">스필 제거 ({spill})</label>
+              <input
+                type="range"
+                min={0}
+                max={100}
+                value={spill}
+                onChange={(e) => onSpillChange(Number(e.target.value))}
+                className="flex-1"
+              />
+            </div>
+            <p className="text-gray-500 text-xs">인물 테두리에 남는 키 색 번짐(초록/파랑기)을 눌러 제거합니다.</p>
+            <div className="flex items-center gap-3">
+              <label className="text-gray-400 text-sm w-40 shrink-0">경계 침식 ({choke})</label>
+              <input
+                type="range"
+                min={0}
+                max={100}
+                value={choke}
+                onChange={(e) => onChokeChange(Number(e.target.value))}
+                className="flex-1"
+              />
+            </div>
+            <p className="text-gray-500 text-xs">인물 마스크 경계를 안쪽으로 깎아 가장자리 프린지를 제거합니다.</p>
+            <label className="flex items-center gap-3 cursor-pointer pt-1">
+              <input
+                type="checkbox"
+                checked={lumaIndependent}
+                onChange={(e) => onLumaIndependentChange(e.target.checked)}
+                className="h-4 w-4 accent-blue-500"
+              />
+              <span className="text-gray-400 text-sm">밝기 무시 키잉 (그늘/얼룩진 그린스크린 보정)</span>
+            </label>
+            <p className="text-gray-500 text-xs">밝기 차이를 무시하고 색만 비교합니다. 조명이 불균일해 그늘/밝은 부분이 한 감도로 안 빠질 때 켜세요.</p>
           </div>
         ) : (
           <div className="space-y-3">

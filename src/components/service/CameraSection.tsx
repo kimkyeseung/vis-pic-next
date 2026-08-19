@@ -16,6 +16,7 @@ import {
 } from "@/constants/images";
 import { getCameraResolution } from "@/constants/camera";
 import { fillGradientFromCSS, computeCaptureSize, drawCoverSource } from "@/lib/canvas";
+import { applyChromaKey } from "@/lib/chromakey";
 import { useFrameSender } from "@/hooks/useSceneSync";
 import { useAutoCaptureTimer } from "@/hooks/useAutoCaptureTimer";
 import { createSoundPlayer, type SoundPlayer } from "@/lib/sounds";
@@ -961,21 +962,7 @@ export function CameraSection({
           built = true;
         } else if (bgRemovalMode === "chromakey") {
           const img = pctx.getImageData(0, 0, TW, TH);
-          const d = img.data;
-          const { r: kr, g: kg, b: kb } = chromaKey;
-          const simDist = Math.max(1, config.chromakeySimilarity);
-          const softDist = simDist * (1 + Math.max(0, config.chromakeySmoothness) / 50);
-          const softBand = Math.max(1e-6, softDist - simDist);
-          const HARD = simDist * simDist;
-          const SOFT = softDist * softDist;
-          for (let i = 0; i < d.length; i += 4) {
-            const dr = d[i] - kr;
-            const dg = d[i + 1] - kg;
-            const db = d[i + 2] - kb;
-            const distSq = dr * dr + dg * dg + db * db;
-            if (distSq < HARD) d[i + 3] = 0;
-            else if (distSq < SOFT) d[i + 3] = Math.round(((Math.sqrt(distSq) - simDist) / softBand) * 255);
-          }
+          applyChromaKey(img.data, TW, TH, chromaKey, config.chromakeySimilarity, config.chromakeySmoothness, config.chromakeySpill, config.chromakeyChoke, config.chromakeyLumaIndependent);
           pctx.putImageData(img, 0, 0);
           built = true;
         }
@@ -996,7 +983,7 @@ export function CameraSection({
     // 스티커: 프리뷰(display) 대비 배율로 크기를 맞춘다(위치는 정규화라 무관).
     drawStickers(ctx, TW, TH, TW / display.width);
     return c.toDataURL("image/jpeg", 0.92);
-  }, [bgRemovalMode, chromaKey, config.chromakeySimilarity, config.chromakeySmoothness, drawBackground, drawEffectLayer, drawStickers]);
+  }, [bgRemovalMode, chromaKey, config.chromakeySimilarity, config.chromakeySmoothness, config.chromakeySpill, config.chromakeyChoke, config.chromakeyLumaIndependent, drawBackground, drawEffectLayer, drawStickers]);
 
   // 스티커 전용 오버레이 캔버스 루프 — 메인 합성 루프와 독립적으로 60fps 렌더
   useEffect(() => {
@@ -1018,14 +1005,6 @@ export function CameraSection({
 
   useEffect(() => {
     const offscreen = document.createElement("canvas");
-    // 크로마키 감도(색상 허용 거리). 높을수록 키 색과 더 먼 색까지 제거한다.
-    // hardDist=감도(완전 제거) / softDist=경계 페더 바깥 경계 = simDist×(1+부드러움/50).
-    // 부드러움 50 → softDist=2×simDist(예전 하드코딩과 동일), 0 → SOFT=HARD로 딱 잘림.
-    const simDist = Math.max(1, config.chromakeySimilarity);
-    const softDist = simDist * (1 + Math.max(0, config.chromakeySmoothness) / 50);
-    const softBand = Math.max(1e-6, softDist - simDist);
-    const HARD = simDist * simDist;
-    const SOFT = softDist * softDist;
 
     // dissolve/chromakey 이펙트를 배경 위·사람 아래에 그린다(사람 뒤 레이어). 표시 상태에 따라 알파를 부드럽게 페이드.
     // 배경과 동일하게 미러 없이 그린다. transition 모드는 배경 자체를 바꾸므로 여기서 그리지 않는다.
@@ -1179,19 +1158,7 @@ export function CameraSection({
         }
       } else if (bgRemovalMode === "chromakey") {
         const imageData = offCtx.getImageData(0, 0, pw, ph);
-        const data = imageData.data;
-        const { r: kr, g: kg, b: kb } = chromaKey;
-        for (let i = 0; i < data.length; i += 4) {
-          const dr = data[i] - kr;
-          const dg = data[i + 1] - kg;
-          const db = data[i + 2] - kb;
-          const distSq = dr * dr + dg * dg + db * db;
-          if (distSq < HARD) {
-            data[i + 3] = 0;
-          } else if (distSq < SOFT) {
-            data[i + 3] = Math.round(((Math.sqrt(distSq) - simDist) / softBand) * 255);
-          }
-        }
+        applyChromaKey(imageData.data, pw, ph, chromaKey, config.chromakeySimilarity, config.chromakeySmoothness, config.chromakeySpill, config.chromakeyChoke, config.chromakeyLumaIndependent);
         offCtx.putImageData(imageData, 0, 0);
         processed = true;
       }
@@ -1237,7 +1204,7 @@ export function CameraSection({
 
     animFrameRef.current = requestAnimationFrame(processFrame);
     return () => cancelAnimationFrame(animFrameRef.current);
-  }, [selectedBackground, chromaKey, config.chromakeySimilarity, config.chromakeySmoothness, bgRemovalMode, segmentThresh, segmentFeather, useGpuDelegate, drawBackground, drawEffectLayer, frameChannelRef, snapshotWithStickers]);
+  }, [selectedBackground, chromaKey, config.chromakeySimilarity, config.chromakeySmoothness, config.chromakeySpill, config.chromakeyChoke, config.chromakeyLumaIndependent, bgRemovalMode, segmentThresh, segmentFeather, useGpuDelegate, drawBackground, drawEffectLayer, frameChannelRef, snapshotWithStickers]);
 
   // 카운트다운 도중 언마운트(이전/다음 이동 등) 시 타이머가 살아남아
   // onCapture가 화면 전환 후에 실행되는 것을 막는다.

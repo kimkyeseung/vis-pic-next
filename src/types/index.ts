@@ -55,6 +55,12 @@ export interface DeviceConfig {
   chromakeySimilarity: number;
   /** 크로마키 경계 부드러움(0-100). 낮을수록 경계가 또렷하게 잘리고, 높을수록 부드럽게 번진다. 기본 50. */
   chromakeySmoothness: number;
+  /** 크로마키 스필 제거(0-100). 인물 테두리에 남는 키 색 번짐(초록/파랑기)을 눌러 제거. 기본 0(끔). */
+  chromakeySpill: number;
+  /** 크로마키 경계 침식(0-100). 인물 마스크 경계를 안쪽으로 깎아 가장자리 프린지를 제거. 기본 0(끔). */
+  chromakeyChoke: number;
+  /** 밝기 무시 키잉. 켜면 밝기 차이를 무시하고 색만 비교해 그늘/얼룩진 그린스크린도 고르게 제거. 기본 false. */
+  chromakeyLumaIndependent: boolean;
   captureModes: string[];
   bgRemovalMode: BgRemovalMode;
   idleTimeoutSeconds: number;

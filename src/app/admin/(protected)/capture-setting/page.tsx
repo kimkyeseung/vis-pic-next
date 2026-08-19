@@ -77,6 +77,32 @@ const FIELDS: { name: string; label: string; type?: "text" | "number" | "select"
     showIf: (s) => s.CHROMAKEY_MODE === "chromakey",
   },
   {
+    name: "CHROMAKEY_SPILL",
+    label: "크로마키 스필 제거",
+    type: "number",
+    min: 0,
+    max: 100,
+    hint: "인물 테두리에 남는 키 색 번짐(초록/파랑기)을 제거합니다. 높일수록 강하게 눌러냅니다. 기본값 0(끔).",
+    showIf: (s) => s.CHROMAKEY_MODE === "chromakey",
+  },
+  {
+    name: "CHROMAKEY_CHOKE",
+    label: "크로마키 경계 침식",
+    type: "number",
+    min: 0,
+    max: 100,
+    hint: "인물 마스크 경계를 안쪽으로 깎아 가장자리 초록/파랑 프린지를 제거합니다. 기본값 0(끔).",
+    showIf: (s) => s.CHROMAKEY_MODE === "chromakey",
+  },
+  {
+    name: "CHROMAKEY_LUMA",
+    label: "밝기 무시 키잉",
+    type: "select",
+    options: [{ value: "off", label: "끔 (기본)" }, { value: "on", label: "켬 — 그늘/얼룩 보정" }],
+    hint: "켜면 밝기 차이를 무시하고 색만 비교합니다. 그린스크린 조명이 불균일해 그늘/밝은 부분이 한 감도로 안 빠질 때 켜세요.",
+    showIf: (s) => s.CHROMAKEY_MODE === "chromakey",
+  },
+  {
     name: "CAPTURE_THRESHOLD",
     label: "AI 배경제거 경계 침식 (%)",
     type: "number",
@@ -222,6 +248,12 @@ export default function CaptureSettingPage() {
           onSimilarityChange={(n) => updateSetting("CHROMAKEY_SIMILARITY", String(n))}
           smoothness={clampPercent(parseIntSafe(settings.CHROMAKEY_SMOOTHNESS || "", 50))}
           onSmoothnessChange={(n) => updateSetting("CHROMAKEY_SMOOTHNESS", String(n))}
+          spill={clampPercent(parseIntSafe(settings.CHROMAKEY_SPILL || "", 0))}
+          onSpillChange={(n) => updateSetting("CHROMAKEY_SPILL", String(n))}
+          choke={clampPercent(parseIntSafe(settings.CHROMAKEY_CHOKE || "", 0))}
+          onChokeChange={(n) => updateSetting("CHROMAKEY_CHOKE", String(n))}
+          lumaIndependent={settings.CHROMAKEY_LUMA === "on"}
+          onLumaIndependentChange={(v) => updateSetting("CHROMAKEY_LUMA", v ? "on" : "off")}
           threshold={clampPercent(parseIntSafe(settings.CAPTURE_THRESHOLD || "", 15))}
           onThresholdChange={(n) => updateSetting("CAPTURE_THRESHOLD", String(n))}
           feather={clampPercent(parseIntSafe(settings.CAPTURE_SMOOTHNESS || "", 35), 1)}
