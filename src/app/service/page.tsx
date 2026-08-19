@@ -97,6 +97,27 @@ function ServiceContent() {
     return () => window.removeEventListener("pointerdown", spawn);
   }, []);
 
+  // ── 웹 브라우저 레터박스 ────────────────────────────────────────────
+  // 브라우저 주소창 등으로 창이 정확한 16:9(세로는 9:16)가 아니면 px 기반 레이아웃이
+  // 깨져 보인다. 고정 스테이지(1920×1080 / 1080×1920)를 창 실측 크기에 맞춰 통째로
+  // scale해 비율을 유지하고 남는 공간은 검은 레터박스로 채운다.
+  // 풀스크린(정확히 16:9)에선 scale=1이라 기존과 동일하게 렌더된다.
+  const [viewport, setViewport] = useState({ w: 1920, h: 1080 });
+  useEffect(() => {
+    const compute = () => setViewport({ w: window.innerWidth, h: window.innerHeight });
+    compute();
+    window.addEventListener("resize", compute);
+    window.addEventListener("orientationchange", compute);
+    return () => {
+      window.removeEventListener("resize", compute);
+      window.removeEventListener("orientationchange", compute);
+    };
+  }, []);
+  const stagePortrait = viewport.h > viewport.w;
+  const stageW = stagePortrait ? 1080 : 1920;
+  const stageH = stagePortrait ? 1920 : 1080;
+  const stageScale = Math.min(viewport.w / stageW, viewport.h / stageH) || 1;
+
   // 배경 로드 시 랜덤 자동 선택: null이면 랜덤 선택, fallback 선택 중에 DB 이미지가 로드되면 DB 이미지로 교체
   useEffect(() => {
     const hasDbImages = backgroundImages.length > 0;
@@ -164,7 +185,16 @@ function ServiceContent() {
   } as React.CSSProperties;
 
   return (
-    <div className="service-theme w-full h-screen overflow-hidden relative" style={themeStyle}>
+    <div
+      className="fixed inset-0 bg-black overflow-hidden flex items-center justify-center"
+      style={{ width: viewport.w, height: viewport.h }}
+    >
+    {/* 스케일된 스테이지의 실제 차지 크기를 예약해 레터박스 중앙 정렬이 정확히 맞도록 한다. */}
+    <div style={{ width: stageW * stageScale, height: stageH * stageScale }}>
+    <div
+      className="service-theme overflow-hidden relative"
+      style={{ ...themeStyle, width: stageW, height: stageH, transform: `scale(${stageScale})`, transformOrigin: "top left" }}
+    >
       {showTimer && (
         <CircularTimer value={idleRemaining!} total={config.idleTimeoutSeconds} testId="page-idle-timer" onLongPress={toggleIdlePause} paused={idlePaused} />
       )}
@@ -352,6 +382,8 @@ function ServiceContent() {
 
       <DebugGridOverlay />
       <DebugOverlay data={debugData} />
+    </div>
+    </div>
     </div>
   );
 }
