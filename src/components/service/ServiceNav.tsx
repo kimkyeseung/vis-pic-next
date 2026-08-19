@@ -33,7 +33,7 @@ export function ServiceNav({
         onClick={onNext}
         style={nextDisabled ? { opacity: 0.5, pointerEvents: "none" } : {}}
       >
-        {t(nextKey)} &#9654;
+        {t(nextKey)}
       </button>
     </div>
   );
