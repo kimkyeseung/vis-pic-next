@@ -242,8 +242,8 @@
 - 6종 레이아웃 그리드 표시 (`CAPTURE_MODES` 설정에 따라 필터링)
 - 카드 미리보기는 실물 인화지 비율(10×15cm, 모드별 방향)의 종이 위에
   `computePrintLayout` 폴백 배치를 축소해 그린다 (`PaperPreview`, 여백 설정값 미반영)
-  - 용지(프레임) 배경에는 현재 선택된 촬영 배경 이미지(없으면 폴백 그라디언트)를 적용하고,
-    사진이 들어갈 슬롯은 흰색으로 비워 두어 완성 시 사진이 채워질 위치를 보여준다
+  - 프레임은 이후 "프레임 선택"(Step 6.5)에서 확정하므로, 여기선 대표 프레임·배경을 미리 씌우지 않고
+    **흰 용지 + 회색 더미 슬롯**으로 사진이 채워질 위치만 보여준다(레이아웃 V3, `DUMMY_SLOT_GRADIENT`)
 - 선택 시 `slotsNeeded` (슬롯 수) 결정
 
 ### Step 4: BACKGROUND SELECT
@@ -264,8 +264,9 @@
 ### Step 5: CAMERA CAPTURE (메인 루프)
 
 - WebRTC `getUserMedia`로 카메라 스트림 획득 — **해상도는 관리자 설정 `CAMERA_RESOLUTION`**(가장 낮음 320×240 ~ 4K 2880×2160, 모두 4:3, 미설정 시 FHD). ideal 제약이라 카메라 미지원 시 가장 가까운 값으로 대체 (§11)
-- 레이아웃: 좌측 프리뷰(화면 높이 기준 최대 크기) + 우측 고정폭(320px) 컨트롤 패널
-- **프리뷰 하단 배경 썸네일 스트립**: 촬영 중 배경 즉시 변경 가능
+- 레이아웃(레이아웃 V3): 제목 · 카메라 프리뷰(4:3) · 배경 변경 패널 · 스티커 패널을 CSS Grid 영역으로 배치
+  — 세로 화면은 프리뷰 아래 배경/스티커 2분할, 가로 화면은 배경·프리뷰·스티커 3열(컨테이너 실제 비율로 방향 판단)
+- **배경 변경 패널**: 촬영 중 배경 즉시 변경 가능
   (`onBackgroundSelect` → flow의 `selectedBackground` 갱신 → 프리뷰·서브 모니터 실시간 반영,
   배경제거 `off` 모드에서는 숨김)
 - 30fps 캔버스 렌더링 루프:
@@ -739,8 +740,16 @@ sticker 오버레이 (canvas.drawImage / fillText)
 
 ### Chromakey (`bgRemovalMode: "chromakey"`)
 
-- 설정: `CHROMAKEY_RGB`(키 색상, 기본 "0,255,0") + `CHROMAKEY_SIMILARITY`(감도, 1-100, 기본 50) + `CHROMAKEY_SMOOTHNESS`(경계 부드러움, 0-100, 기본 50) — 관리자 촬영 설정 페이지·미리보기에서 조정
-- RGB 색상거리 기반 제거: `distSq = dr²+dg²+db²`. 임계값은 **감도·부드러움에서 파생** — `HARD = 감도²`(완전 투명), `softDist = 감도×(1+부드러움/50)`, `SOFT = softDist²`(그 사이 부드럽게 페이드). 부드러움 기본 50 → `softDist=감도×2`로 예전 고정값과 동일, 0 → `SOFT=HARD`로 경계가 딱 잘리고, 높일수록 페이드 폭이 넓어짐
+- 설정(관리자 촬영 설정 페이지·미리보기에서 조정):
+  - `CHROMAKEY_RGB`(키 색상, 기본 "0,255,0")
+  - `CHROMAKEY_SIMILARITY`(감도, 1-100, 기본 50) · `CHROMAKEY_SMOOTHNESS`(경계 부드러움, 0-100, 기본 50)
+  - `CHROMAKEY_SPILL`(스필 제거, 0-100, 기본 0) · `CHROMAKEY_CHOKE`(경계 침식, 0-100, 기본 0) · `CHROMAKEY_LUMA`(밝기 무시 키잉, on/off, 기본 off)
+- 키잉 로직은 **공용 `src/lib/chromakey.applyChromaKey`**로 통합 — 촬영 프리뷰·고해상도 캡처·관리자 미리보기가 동일 픽셀 처리를 공유
+  - **색상거리/임계값**: `distSq = dr²+dg²+db²`. `HARD = 감도²`(완전 투명), `softDist = 감도×(1+부드러움/50)`, `SOFT = softDist²`(그 사이 부드럽게 페이드). 부드러움 50 → `softDist=감도×2`(예전 고정값), 0 → `SOFT=HARD`(딱 잘림)
+  - **밝기 무시 키잉**(`CHROMAKEY_LUMA=on`): 픽셀 밝기를 키 색 밝기에 맞춰 정규화한 뒤 거리를 재, 그늘지거나 밝게 반사된 같은 색(불균일 조명 그린스크린)도 한 감도로 함께 제거
+  - **스필 제거**(`CHROMAKEY_SPILL`): 남은 인물 픽셀에서 키 색 우세 채널(그린=G, 블루=B)을 나머지 두 채널 최댓값으로 눌러 테두리 초록/파랑 번짐 제거
+  - **경계 침식**(`CHROMAKEY_CHOKE`): 알파 마스크를 분리형 min 필터로 안쪽으로 깎아 가장자리 프린지 제거(반경은 이미지 폭에 비례)
+  - spill·choke=0, luma=off면 감도/부드러움만 쓰던 기존 동작과 픽셀 단위로 동일
 
 ### 없음 (`bgRemovalMode: "off"`)
 
@@ -750,10 +759,11 @@ sticker 오버레이 (canvas.drawImage / fillText)
 
 - 관리자 촬영 설정 페이지의 "카메라로 미리보기" 버튼으로 실행. 카메라를 켜서 현재
   `CHROMAKEY_MODE`에 맞는 처리(AI 또는 크로마키)를 실시간으로 보여주며, 다이얼로그 내
-  슬라이더/컬러피커로 값을 조정하면 미리보기와 뒤쪽 설정 폼에 동시 반영되어 바로 저장 가능
+  컬러피커·슬라이더(감도·부드러움·**스필 제거·경계 침식**)와 **밝기 무시 키잉 토글**로 값을 조정하면
+  미리보기와 뒤쪽 설정 폼에 동시 반영되어 바로 저장 가능
 - 제거되는 영역은 체커보드 패턴으로 표시
 - **크로마키 스포이드**: "스포이드" 버튼 → 미리보기 클릭 지점의 **원본 카메라 색**을 키 색상(`CHROMAKEY_RGB`)으로 추출(표시 미러 보정, 제거된 영역을 찍어도 원본 색). 한 번 추출 후 자동 해제
-- `CameraSection.tsx`와 동일한 마스크/색상거리 알고리즘을 재사용해 실제 서비스 화면과 결과가 일치함
+- 크로마키 키잉은 `CameraSection.tsx`와 **공용 `lib/chromakey.applyChromaKey`**를 재사용해 실제 서비스 화면과 결과가 일치함
 
 ---
 
@@ -1144,7 +1154,7 @@ mediapipe 파일은 웹 빌드에 없으므로 프리캐시하지 않고, 존재
 | `CAPTURE_MODES` | "1x1,2x2" | 활성 프레임 모드 |
 | `CHROMAKEY_MODE` | "mediapipe" | 배경 제거 모드 |
 | `CHROMAKEY_RGB` | "0,255,0" | 크로마키 색상 |
-| `CHROMAKEY_SIMILARITY` | "50" | 크로마키 감도(색상 허용 거리, 1-100). 높을수록 키 색과 더 먼 색까지 제거. hardDist=값, softDist=값×2 (기본 50=예전 하드코딩 50/100) |
+| `CHROMAKEY_SIMILARITY` | "50" | 크로마키 감도(색상 허용 거리, 1-100). 높을수록 키 색과 더 먼 색까지 제거. 그 외 크로마키 키(`CHROMAKEY_SMOOTHNESS`·`CHROMAKEY_SPILL`·`CHROMAKEY_CHOKE`·`CHROMAKEY_LUMA`)는 §12 |
 | `PAYMENT_ENABLED` | "0" | 결제 활성화 |
 | `PAYMENT_AMOUNT` | "5000" | **1장당 가격**(원). 결제 화면 매수는 1/2/4장 고정, 총액 = 가격 × 매수 |
 | `PAYMENT_TERMINAL_MODE` | "manual" | 결제 모드 |

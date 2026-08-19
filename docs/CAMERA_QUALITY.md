@@ -88,11 +88,15 @@ alpha = clamp01( (fgConf - THRESH) / FEATHER )     // fgConf = 1 - 배경확신�
 → 손가락 윤곽이 실제 영상 경계를 따라가 실질적 개선. 실시간 비용 중간(마스크 해상도에서 돌려 스로틀 budget 안에 유지).
 → 3-1(넓게 살림) + 3-2(깔끔하게 깎음)는 **궁합이 좋다.**
 
-### 3-3. 촬영 순간 전용 고품질 모델 (권장)
+### 3-3. 촬영 순간 전용 고품질 모델 (권장 · 미구현)
 
 라이브 프리뷰는 지금의 빠른 256 모델 유지, **셔터가 눌린 그 한 프레임만** 고해상도 매팅 모델
 (예: RobustVideoMatting / MODNet / RMBG 계열)로 다시 세그먼트.
 → 한 컷 지연은 촬영 시점에 허용됨. 손님이 가져가는 **인화본 품질이 직접 좋아진다.**
+
+> **현재 구현**: `captureHiRes()`가 촬영 순간 원본 해상도로 합성하지만, **프리뷰에서 구운 마스크를
+> 확대 재사용**할 뿐 별도 고품질 모델은 쓰지 않는다(같은 256 모델). 따라서 이 항목(더 나은 모델)은
+> 여전히 미도입 상태다.
 
 **도입 시 검토할 것:**
 - 번들·로딩: 모델(수~수십 MB) + 런타임(ONNX/WASM) → 키오스크 초기 로딩·오프라인 캐싱
@@ -153,14 +157,15 @@ MediaPipe에 256보다 뚜렷이 나은 공식 tflite가 없어, 실시간 고�
 
 ## 6. 관련 파일 · 설정 레퍼런스
 
+> 줄 번호는 코드 변경마다 어긋나므로 함수·심볼로 참조한다.
+
 | 항목 | 위치 |
 |------|------|
-| 세그먼터 초기화 · 모델 로드 | `src/components/service/CameraSection.tsx:365-411` |
-| 마스크 굽기(촬영 경로) | `src/components/service/CameraSection.tsx:929-956` |
-| 촬영본 마스크 확대 적용 | `src/components/service/CameraSection.tsx:778-784` |
-| 마스크 합성(프리뷰 경로) | `src/components/service/CameraStreamer.tsx:297-319` |
-| 설정 기본값(THRESH 15 / FEATHER 35) | `src/hooks/useDeviceSetup.ts:32-33` |
-| 설정 소스 키(CAPTURE_THRESHOLD / CAPTURE_SMOOTHNESS) | `src/hooks/useDeviceSetup.ts:111-112` |
+| 세그먼터 초기화 · 모델 로드 | `src/components/service/CameraSection.tsx` — `initSegmenter` effect |
+| 프리뷰 합성 루프(마스크 굽기·적용) | `src/components/service/CameraSection.tsx` — `processFrame` |
+| 촬영 순간 고해상도 합성(프리뷰 마스크 재사용) | `src/components/service/CameraSection.tsx` — `captureHiRes()` |
+| 보조 모니터 합성 | `src/components/service/CameraStreamer.tsx` |
+| 설정 기본값(THRESH 15 / FEATHER 35)·소스 키 | `src/hooks/useDeviceSetup.ts` — `CAPTURE_THRESHOLD` / `CAPTURE_SMOOTHNESS` |
 | 관리자 조정 UI | `src/app/admin/(protected)/capture-setting/page.tsx` |
 | 방식별 미리보기 다이얼로그 | `src/components/admin/BackgroundRemovalPreviewDialog.tsx` |
 
