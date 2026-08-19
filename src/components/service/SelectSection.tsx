@@ -79,8 +79,9 @@ export function SelectSection({
   // 가로 화면은 기존 배율(previewScale=50)을 유지한다.
   const oneCutColumn = twoShotColumn && !previewIsPortrait;
   const oneCutPortraitScale = 37;
-  // 세로 화면에서는 세로 높이 여유가 커서 미리보기를 더 크게 키운다(사진 1열 높이와 비슷하게).
-  // 가로 용지는 세로 화면 폭에 맞춰 더 작게 잡는다.
+  // 세로 화면 4장 컬럼(2컷 등): 미리보기 높이를 왼쪽 사진 1열 높이와 맞춘다.
+  // 사진 폭 310px·4장(4:3) → 컬럼 높이 ≈ 3×310+gap48 = 978px, 미리보기 15cm×64 ≈ 960px로 정합.
+  // (사진·미리보기를 같은 비율로 줄여 좌우 여백을 확보) 가로 용지는 세로 화면 폭에 맞춰 더 작게 잡는다.
   const portraitBigScale = previewIsPortrait ? 64 : 46;
 
   const [page, setPage] = useState(0);
@@ -104,7 +105,7 @@ export function SelectSection({
       </p>
 
       <div className="min-h-0 w-full flex items-center justify-center">
-      <div className={`flex items-center justify-center gap-12 max-w-[1550px] max-h-full animate-fadeInUp ${fourShotColumn ? "portrait:gap-8" : "portrait:flex-col portrait:items-center portrait:gap-6"}`}>
+      <div className={`flex items-center justify-center gap-12 max-w-[1550px] max-h-full animate-fadeInUp ${fourShotColumn ? "portrait:gap-6" : "portrait:flex-col portrait:items-center portrait:gap-6"}`}>
         {/* 촬영본이 많으면 4장씩 페이지로 나눠 좌우 화살표로 넘긴다 */}
         <div className="flex items-center gap-3">
           {pageCount > 1 && (
@@ -127,7 +128,7 @@ export function SelectSection({
                 return (
                   <div
                     key={i}
-                    className={`photo-thumbnail w-80 ${fourShotColumn ? "portrait:w-[330px]" : oneCutColumn ? "portrait:w-[560px]" : "portrait:w-[420px]"} bg-black/30 relative overflow-hidden ${isSelected ? "selected" : ""}`}
+                    className={`photo-thumbnail w-80 ${fourShotColumn ? "portrait:w-[310px]" : oneCutColumn ? "portrait:w-[560px]" : "portrait:w-[420px]"} bg-black/30 relative overflow-hidden ${isSelected ? "selected" : ""}`}
                     style={{ aspectRatio: "auto" }}
                     onClick={() => handlePhotoTap(i)}
                   >
