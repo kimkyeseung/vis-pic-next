@@ -133,8 +133,8 @@ export function PaymentSection({
             {t("payment.selectQuantity")}
           </SectionTitle>
 
-          <div className="min-h-0 w-full flex flex-col items-center justify-start pt-8 portrait:pt-12">
-          <div className="w-full max-w-[1700px] flex flex-col items-center animate-fadeInUp">
+          <div className="min-h-0 w-full flex flex-col items-center justify-start pt-8 portrait:pt-12 portrait:pb-28">
+          <div className="w-full max-w-[1700px] flex flex-col items-center animate-fadeInUp portrait:flex-1 portrait:min-h-0">
           {/* 언어 선택 */}
           <div className="flex gap-5 portrait:gap-6 mb-12 portrait:mb-10 flex-wrap justify-center">
             {LOCALES.map(({ code, label }) => (
@@ -153,14 +153,14 @@ export function PaymentSection({
           </div>
 
           {/* 매수/가격 티어 카드 — 세로에선 전체폭 세로 스택 */}
-          <div className="flex gap-10 portrait:gap-6 justify-center flex-wrap mb-12 portrait:flex-col portrait:flex-nowrap portrait:w-full portrait:items-stretch">
+          <div className="flex gap-10 portrait:gap-6 justify-center flex-wrap mb-12 portrait:mb-0 portrait:flex-col portrait:flex-nowrap portrait:w-full portrait:items-stretch portrait:flex-1 portrait:min-h-0">
             {tiers.map((tier) => {
               const selected = tier.qty === selectedQty;
               return (
                 <button
                   key={tier.qty}
                   onClick={() => selectQty(tier.qty)}
-                  className={`w-[32rem] h-[26rem] portrait:w-full portrait:h-[22rem] rounded-2xl flex flex-col items-center justify-center gap-3 portrait:gap-5 transition-all duration-200 border-2 ${
+                  className={`w-[32rem] h-[26rem] portrait:w-full portrait:h-auto portrait:flex-1 portrait:min-h-0 rounded-2xl flex flex-col items-center justify-center gap-3 portrait:gap-5 transition-all duration-200 border-2 ${
                     selected
                       ? "bg-white border-white scale-[1.04] shadow-2xl"
                       : "border-white/20 hover:border-white/40"
@@ -189,7 +189,7 @@ export function PaymentSection({
           {/* 하단 고정 바 — 결제하기 버튼만 중앙에 배치(총액·이전 버튼 제거). */}
           <div className="absolute bottom-16 left-1/2 -translate-x-1/2 z-20 flex items-center justify-center portrait:bottom-10">
             <button className={`service-button nav-next-lg ${SERVICE_BIG_BUTTON_CLASS}`} onClick={handlePay}>
-              {t("payment.pay")} &#9654;
+              {t("payment.pay")}
             </button>
           </div>
         </>
