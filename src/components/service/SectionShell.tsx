@@ -17,7 +17,7 @@ export function SectionTitle({
 }) {
   return (
     <h2
-      className={`text-title font-extrabold text-white animate-fadeInDown ${className}`}
+      className={`text-title font-extrabold text-white leading-[1.2] animate-fadeInDown ${className}`}
       style={{ textShadow: "0 2px 15px rgba(0,0,0,0.5)" }}
     >
       {children}
