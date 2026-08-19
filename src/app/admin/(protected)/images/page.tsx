@@ -58,6 +58,24 @@ export default function ImagesPage() {
   const [deviceFilter, setDeviceFilter] = useState<"all" | "device">("all");
   const currentDeviceId = selectedDevice?.deviceId ?? null;
 
+  // 업로드 페이지에서 ?type= 으로 돌아올 때 마지막 탭을 복원한다(스티커 업로드 후 배경 탭 리셋 방지).
+  // URL은 SSR 시점에 없으므로 하이드레이션 불일치를 피하려 마운트 후 한 번만 반영한다.
+  useEffect(() => {
+    const t = Number(new URLSearchParams(window.location.search).get("type"));
+    if ([BACKGROUND_IMAGE_TYPE, FRAME_IMAGE_TYPE, STICKER_IMAGE_TYPE].includes(t)) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setSelectedType(t);
+    }
+  }, []);
+
+  // 탭 전환을 URL에 반영해 새로고침·업로드 왕복에도 탭이 유지되게 한다.
+  const selectType = (id: number) => {
+    setSelectedType(id);
+    const url = new URL(window.location.href);
+    url.searchParams.set("type", String(id));
+    window.history.replaceState(null, "", url);
+  };
+
   useEffect(() => {
     const loadImageBaseUrl = async () => {
       try {
@@ -249,7 +267,7 @@ export default function ImagesPage() {
           {imageTypes.filter((type) => !THEME_MANAGED_TYPES.has(type.id)).map((type) => (
             <button
               key={type.id}
-              onClick={() => setSelectedType(type.id)}
+              onClick={() => selectType(type.id)}
               className={`px-4 py-2 rounded-lg transition-colors ${
                 selectedType === type.id
                   ? "bg-blue-600 text-white"

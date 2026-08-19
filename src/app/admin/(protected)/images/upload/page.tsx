@@ -126,7 +126,8 @@ function ImageUploadForm() {
         if (!regRes.ok) { setError(regData.error || "등록에 실패했습니다."); return; }
       }
 
-      router.push("/admin/images");
+      // 업로드한 타입 탭으로 되돌아간다(스티커 업로드 후 배경 탭으로 리셋되던 문제 방지).
+      router.push(`/admin/images?type=${imageType}`);
     } catch {
       setError("서버 연결에 실패했습니다.");
     } finally {
