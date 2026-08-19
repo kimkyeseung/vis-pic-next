@@ -73,6 +73,12 @@ export function SelectSection({
   // 촬영본 2장(1컷 등): 좌우로 나란히 두면 세로 1행이라 오른쪽 큰 미리보기보다 훨씬 낮다.
   // 세로 1열로 쌓아 두 장 합 높이가 미리보기 높이(가로 용지 기준 ≈500)와 맞도록 한다.
   const twoShotColumn = photos.length === 2;
+  // 1컷(가로 용지 + 촬영본 2장): 세로 화면에서 위쪽 사진과 아래 미리보기의 좌우 폭을 맞추고,
+  // 콘텐츠가 세로 공간을 채우도록 넓혀 타이틀↔콘텐츠 사이 여백(세로 중앙 정렬 여백)을 줄인다.
+  // 사진 폭 portrait:w-[560px] ↔ 미리보기 폭 15×37=555로 맞춘다(세로로 넘치지 않는 최대치).
+  // 가로 화면은 기존 배율(previewScale=50)을 유지한다.
+  const oneCutColumn = twoShotColumn && !previewIsPortrait;
+  const oneCutPortraitScale = 37;
   // 세로 화면에서는 세로 높이 여유가 커서 미리보기를 더 크게 키운다(사진 1열 높이와 비슷하게).
   // 가로 용지는 세로 화면 폭에 맞춰 더 작게 잡는다.
   const portraitBigScale = previewIsPortrait ? 64 : 46;
@@ -121,7 +127,7 @@ export function SelectSection({
                 return (
                   <div
                     key={i}
-                    className={`photo-thumbnail w-80 ${fourShotColumn ? "portrait:w-[330px]" : "portrait:w-[420px]"} bg-black/30 relative overflow-hidden ${isSelected ? "selected" : ""}`}
+                    className={`photo-thumbnail w-80 ${fourShotColumn ? "portrait:w-[330px]" : oneCutColumn ? "portrait:w-[560px]" : "portrait:w-[420px]"} bg-black/30 relative overflow-hidden ${isSelected ? "selected" : ""}`}
                     style={{ aspectRatio: "auto" }}
                     onClick={() => handlePhotoTap(i)}
                   >
@@ -181,18 +187,32 @@ export function SelectSection({
           };
           // 촬영본 4장: 가로 화면은 그리드 정렬용(previewScale), 세로 화면은 크게(portraitBigScale).
           // CSS로 방향에 따라 하나만 보이게 한다(JS는 미리보기의 강제세로를 감지하지 못함).
-          return fourShotColumn ? (
-            <>
-              <div className="portrait:hidden">
-                <FramedPreview {...previewProps} scale={previewScale} />
-              </div>
-              <div className="hidden portrait:block">
-                <FramedPreview {...previewProps} scale={portraitBigScale} />
-              </div>
-            </>
-          ) : (
-            <FramedPreview {...previewProps} scale={previewScale} />
-          );
+          if (fourShotColumn) {
+            return (
+              <>
+                <div className="portrait:hidden">
+                  <FramedPreview {...previewProps} scale={previewScale} />
+                </div>
+                <div className="hidden portrait:block">
+                  <FramedPreview {...previewProps} scale={portraitBigScale} />
+                </div>
+              </>
+            );
+          }
+          // 1컷: 세로 화면에서만 미리보기를 줄여(oneCutPortraitScale) 위쪽 사진 폭과 맞춘다.
+          if (oneCutColumn) {
+            return (
+              <>
+                <div className="portrait:hidden">
+                  <FramedPreview {...previewProps} scale={previewScale} />
+                </div>
+                <div className="hidden portrait:block">
+                  <FramedPreview {...previewProps} scale={oneCutPortraitScale} />
+                </div>
+              </>
+            );
+          }
+          return <FramedPreview {...previewProps} scale={previewScale} />;
         })()}
       </div>
       </div>
