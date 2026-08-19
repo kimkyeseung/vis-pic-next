@@ -1471,7 +1471,7 @@ export function CameraSection({
   return (
     <section
       ref={sectionRef}
-      className="w-full h-full relative z-10 p-12 pb-60 portrait:pb-[22rem]"
+      className="w-full h-full relative z-10 p-12 pb-60 portrait:pb-52"
       style={{
         display: "grid",
         gap: "1rem",
@@ -1506,9 +1506,12 @@ export function CameraSection({
       {/* 좌측: 배경 변경 패널 */}
       {showBgStrip && (
         <div className="flex flex-col min-h-0 px-2 pr-4" style={{ gridArea: "bg" }}>
-          <h3 className="text-white text-xl font-bold text-center mb-4 shrink-0">{t("camera.bgChange")}</h3>
+          <h3 className="text-white text-2xl font-bold text-center mb-4 shrink-0">{t("camera.bgChange")}</h3>
+          {/* 우측 스티커 패널의 '지우기' 버튼 행(min-h-[22px] mb-2)과 높이를 맞춰 두 패널의 시작 줄을 정렬한다. */}
+          <div className="min-h-[22px] mb-2 shrink-0" aria-hidden />
           {/* p-1: 선택 ring(요소 바깥 3px)이 스크롤 컨테이너 가장자리에서 잘리지 않도록 여백 확보 */}
-          <div className="grid grid-cols-2 gap-3 overflow-y-auto flex-1 min-h-0 content-start p-1">
+          {/* portrait:mb-28: 우측 '남은 촬영 횟수' 박스의 하단 여백과 맞춰 두 패널의 끝 줄을 정렬한다. */}
+          <div className="grid grid-cols-2 gap-3 overflow-y-auto flex-1 min-h-0 content-start p-1 portrait:mb-28">
             {bgOptions.map((bg) => {
               const isSelected = selectedBackground === bg.id;
               const isDb = "filename" in bg;
@@ -1753,9 +1756,8 @@ export function CameraSection({
           )}
         </div>
 
-      {/* 촬영하기 — 하단 중앙. 세로에선 이전/다음보다 한 줄 위(bottom-52)에 배치해
-          커진 이전/다음 버튼과 겹치지 않게 한다. */}
-      <div className="absolute bottom-16 left-1/2 -translate-x-1/2 z-20 portrait:bottom-52">
+      {/* 촬영하기 — 하단 중앙. 다른 단계의 다음 버튼(ServiceNav)과 같은 위치(가로 bottom-16 · 세로 bottom-10)에 맞춘다. */}
+      <div className="absolute bottom-16 left-1/2 -translate-x-1/2 z-20 portrait:bottom-10">
         <button
           className={`service-button ${SERVICE_BIG_BUTTON_CLASS}`}
           onClick={handleManualCapture}
@@ -1770,7 +1772,7 @@ export function CameraSection({
         <h3 className="text-white text-2xl font-bold text-center mb-4 shrink-0">{t("camera.stickerPrompt")}</h3>
 
         {/* 스티커 패널 (상시 노출) */}
-        <div className="flex flex-col min-h-0 mb-4">
+        <div className="flex flex-col min-h-0 mb-2">
           <div className="flex items-center justify-end mb-2 min-h-[22px]">
             {stickers.length > 0 && (
               <button
@@ -1782,17 +1784,20 @@ export function CameraSection({
             )}
           </div>
 
-          <div className="max-h-[42vh] overflow-y-auto bg-black/20 rounded-2xl p-2">
+          {/* 스티커 영역은 항상 2줄 높이로 고정(스티커가 없거나 8개 초과여도 동일 크기).
+              aspect-[1.9/1]: 4열 정사각 타일 2줄 높이에 맞춘 비율(폭에 따라 세로/가로 모두 2줄 유지).
+              9개 이상이면 이 고정 높이 안에서 세로 스크롤. */}
+          <div className="aspect-[1.9/1] shrink-0 overflow-y-auto bg-black/20 rounded-2xl p-2">
             {dbStickerImages.length === 0 ? (
-              <p className="text-center text-white/40 text-xs py-4">
+              <p className="flex h-full items-center justify-center text-center text-white/40 text-sm">
                 {t("camera.noStickers")}
               </p>
             ) : (
-              <div className="grid grid-cols-4 gap-2">
+              <div className="grid grid-cols-4 gap-1.5">
                 {dbStickerImages.map((img) => (
                   <button
                     key={img.id}
-                    className="aspect-square rounded-xl overflow-hidden hover:ring-2 hover:ring-white/50 transition-all bg-white/5"
+                    className="aspect-square w-full rounded-xl overflow-hidden hover:ring-2 hover:ring-white/50 transition-all bg-white/5"
                     onClick={() => addSticker({ src: `${imageBaseUrl}/${img.filename}` })}
                     title={img.name}
                   >
@@ -1809,10 +1814,12 @@ export function CameraSection({
           </div>
         </div>
 
-        {/* 손바닥 촬영 안내 — 스티커와 남은 촬영 횟수 사이 여백에 강조 표시 */}
-        <div className="flex-1 flex items-center justify-center px-2 min-h-0">
+        {/* 손바닥 촬영 안내 — 스티커와 남은 촬영 횟수 사이 여백에 강조 표시.
+            위아래 박스(스티커 패널·남은 촬영 횟수)와 같은 너비로 보이도록 w-full로 맞춘다.
+            items-start로 스티커 패널 바로 아래에 붙여 사이 간격을 좁힌다(남는 세로 공간은 아래로). */}
+        <div className="flex-1 flex items-start min-h-0">
           <div
-            className="text-center rounded-2xl px-6 py-7 border border-[var(--theme-primary,#6c6fb4)]/50 bg-[var(--theme-primary,#6c6fb4)]/10"
+            className="w-full text-center rounded-2xl px-6 py-8 border border-[var(--theme-primary,#6c6fb4)]/50 bg-[var(--theme-primary,#6c6fb4)]/10"
             style={{ boxShadow: "0 0 34px -10px var(--theme-primary, #6c6fb4)" }}
           >
             <div className="text-6xl mb-3 animate-soft-blink select-none" aria-hidden>✋</div>
@@ -1822,8 +1829,9 @@ export function CameraSection({
           </div>
         </div>
 
-        {/* 남은 촬영 횟수 — 세로에선 좌측 배경 선택 패널 하단과 줄이 맞도록 위로 더 올린다. */}
-        <div className="shrink-0 w-full text-center border border-dashed border-white/30 rounded-xl py-4 portrait:mb-28">
+        {/* 남은 촬영 횟수 — 세로에선 좌측 배경 선택 패널의 보이는 끝선과 맞도록 높이를 줄이고(py-3)
+            위로 올린다(mb-[8.625rem]). 위쪽 여백(팔 안내와의 간격)도 함께 줄어든다. */}
+        <div className="shrink-0 w-full text-center border border-dashed border-white/30 rounded-xl py-3 portrait:mb-[8.625rem]">
           <span className="text-white font-bold text-3xl">
             {t("camera.remaining", { n: String(Math.max(0, maxPhotos - photos.length)) })}
           </span>
