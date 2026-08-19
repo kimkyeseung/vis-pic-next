@@ -18,6 +18,7 @@ import {
 import { useLanguage } from "@/i18n/LanguageContext";
 import { ServiceNav } from "./ServiceNav";
 import { SectionTitle } from "./SectionShell";
+import { SERVICE_BIG_BUTTON_CLASS } from "./sectionLayout";
 
 export function CompleteSection({
   photos,
@@ -560,7 +561,8 @@ export function CompleteSection({
             <div className={`flex justify-center gap-10 mb-6 w-full max-w-6xl mx-auto portrait:flex-col portrait:items-center portrait:gap-8 portrait:w-full ${matchHeight ? "items-start" : "items-center"}`}>
               <div className="flex-1 flex justify-center min-w-0 portrait:w-full">
                 <div ref={previewBoxRef} className="rounded-2xl overflow-hidden" style={{ boxShadow: "0 20px 50px rgba(0,0,0,0.4)" }}>
-                  <img src={compositeImage} alt="Composite" className="max-h-[54vh] portrait:max-h-[46vh] portrait:max-w-full w-auto object-contain block" />
+                  {/* 스테이지 고정 높이(가로 1080·세로 1920) 기준 px 상한 — 레터박스(창≠스테이지)에서도 정확. */}
+                  <img src={compositeImage} alt="Composite" className="max-h-[583px] portrait:max-h-[883px] portrait:max-w-full w-auto object-contain block" />
                 </div>
               </div>
 
@@ -621,8 +623,8 @@ export function CompleteSection({
         <ServiceNav onPrev={onPrev} onNext={handlePrint} nextKey="complete.print" />
       )}
       {compositeImage && printStatus === "done" && (
-        <div className="absolute bottom-16 right-16 z-20 portrait:bottom-10 portrait:right-10">
-          <button className="service-button nav-button nav-next-lg" onClick={onRestart}>
+        <div className="absolute bottom-16 left-1/2 -translate-x-1/2 z-20 portrait:bottom-10">
+          <button className={`service-button nav-next-lg ${SERVICE_BIG_BUTTON_CLASS}`} onClick={onRestart}>
             {t("complete.restart")}
           </button>
         </div>
