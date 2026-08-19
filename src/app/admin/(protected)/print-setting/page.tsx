@@ -20,26 +20,14 @@ interface PrintBgImage {
   focalY: number;
 }
 
-function gcd(a: number, b: number): number {
-  return b === 0 ? a : gcd(b, a % b);
-}
-
 /**
- * 사진 가로/세로(cm 문자열)로 가로:세로 비율 문자열을 만든다.
- * 정수로 깔끔히 약분되면 "3:2"처럼, 아니면 소수 비율 "1.50 : 1"로 표기. 값이 유효하지 않으면 null.
+ * 사진은 4:3(가로:세로)이므로, 가로 크기(cm 문자열)로 세로 크기를 계산한다(세로 = 가로 × 3/4).
+ * 값이 비었거나 유효하지 않으면 빈 문자열. 소수 둘째 자리에서 반올림.
  */
-function formatAspectRatio(wStr: string | undefined, hStr: string | undefined): string | null {
-  const w = parseFloat(wStr ?? "");
-  const h = parseFloat(hStr ?? "");
-  if (!Number.isFinite(w) || !Number.isFinite(h) || w <= 0 || h <= 0) return null;
-  const wi = Math.round(w * 100);
-  const hi = Math.round(h * 100);
-  const g = gcd(wi, hi) || 1;
-  const a = wi / g;
-  const b = hi / g;
-  if (a <= 50 && b <= 50) return `${a}:${b}`;
-  const r = w / h;
-  return r >= 1 ? `${r.toFixed(2)} : 1` : `1 : ${(1 / r).toFixed(2)}`;
+function heightFor43(wStr: string): string {
+  const w = parseFloat(wStr);
+  if (!Number.isFinite(w) || w <= 0) return "";
+  return String(Math.round(w * 0.75 * 100) / 100);
 }
 
 export default function PrintSettingPage() {
@@ -628,35 +616,37 @@ export default function PrintSettingPage() {
                   <div className="grid grid-cols-2 gap-3">
                     {[
                       { suffix: "WIDTH", label: "사진 가로 크기" },
-                      { suffix: "HEIGHT", label: "사진 세로 크기" },
+                      { suffix: "HEIGHT", label: "사진 세로 크기 (4:3 자동)" },
                       { suffix: "HGAP", label: "사진 간 가로 간격" },
                       { suffix: "VGAP", label: "사진 간 세로 간격" },
                     ].map(({ suffix, label }) => {
                       const key = prefix + suffix;
+                      // 사진은 4:3 고정 — 가로를 바꾸면 세로(= 가로 × 3/4)를 함께 갱신하고,
+                      // 세로 입력은 비활성화해 비율이 항상 유지되게 한다.
+                      const isHeight = suffix === "HEIGHT";
                       return (
                         <div key={suffix}>
                           <label className="block text-gray-500 text-xs mb-1">{label}</label>
                           <input
                             type="number"
                             value={settings[key] || ""}
-                            onChange={(e) => setSettings((prev) => ({ ...prev, [key]: e.target.value }))}
+                            onChange={(e) =>
+                              setSettings((prev) =>
+                                suffix === "WIDTH"
+                                  ? { ...prev, [key]: e.target.value, [prefix + "HEIGHT"]: heightFor43(e.target.value) }
+                                  : { ...prev, [key]: e.target.value },
+                              )
+                            }
                             placeholder="0"
                             step="0.1"
                             min="0"
+                            disabled={isHeight}
                             className={inputClass}
                           />
                         </div>
                       );
                     })}
                   </div>
-                  {(() => {
-                    const ratio = formatAspectRatio(settings[prefix + "WIDTH"], settings[prefix + "HEIGHT"]);
-                    return ratio ? (
-                      <p className="text-xs text-gray-400 mt-2">
-                        사진 가로:세로 비율 = <span className="font-semibold text-blue-300">{ratio}</span>
-                      </p>
-                    ) : null;
-                  })()}
 
                   <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mt-5 mb-1">
                     여백 설정
