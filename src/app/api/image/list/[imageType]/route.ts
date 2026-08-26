@@ -8,13 +8,17 @@ export async function GET(
 ) {
   try {
     const { imageType } = await params;
+    const parsedImageType = parseInt(imageType, 10);
+    if (isNaN(parsedImageType)) {
+      return NextResponse.json({ error: "Invalid imageType" }, { status: 400 });
+    }
     const searchParams = request.nextUrl.searchParams;
     const deviceId = searchParams.get("device_id");
     // linked=1: "해당 디바이스에 연결된 것만"(전체 디바이스용 제외) — 지점별 전용 이미지(테마 등)에 사용
     const linkedOnly = searchParams.get("linked") === "1";
 
     const whereClause: Record<string, unknown> = {
-      imageType: parseInt(imageType),
+      imageType: parsedImageType,
     };
 
     if (deviceId) {

@@ -12,9 +12,13 @@ export async function GET(
 
   try {
     const { id } = await params;
+    const deviceId = parseInt(id, 10);
+    if (isNaN(deviceId)) {
+      return NextResponse.json({ error: "Invalid ID" }, { status: 400 });
+    }
 
     const device = await prisma.device.findUnique({
-      where: { id: parseInt(id) },
+      where: { id: deviceId },
       include: {
         settings: true,
       },
@@ -47,6 +51,10 @@ export async function PUT(
 
   try {
     const { id } = await params;
+    const deviceId = parseInt(id, 10);
+    if (isNaN(deviceId)) {
+      return NextResponse.json({ error: "Invalid ID" }, { status: 400 });
+    }
     const body = await request.json();
     const { name, description, isActive, password } = body;
 
@@ -62,7 +70,7 @@ export async function PUT(
     }
 
     const updated = await prisma.device.update({
-      where: { id: parseInt(id) },
+      where: { id: deviceId },
       data: {
         ...(name !== undefined && { name }),
         ...(description !== undefined && { description }),
@@ -90,18 +98,22 @@ export async function DELETE(
 
   try {
     const { id } = await params;
+    const deviceId = parseInt(id, 10);
+    if (isNaN(deviceId)) {
+      return NextResponse.json({ error: "Invalid ID" }, { status: 400 });
+    }
 
     // Delete related settings first
     await prisma.deviceSetting.deleteMany({
       where: {
         device: {
-          id: parseInt(id),
+          id: deviceId,
         },
       },
     });
 
     await prisma.device.delete({
-      where: { id: parseInt(id) },
+      where: { id: deviceId },
     });
 
     return NextResponse.json({ success: true });
