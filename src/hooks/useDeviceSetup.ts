@@ -7,6 +7,30 @@ import { LOGO_IMAGE_TYPE, WALLPAPER_IMAGE_TYPE, BUTTON_IMAGE_TYPE, WALLPAPER_NAM
 // 결제 화면 인쇄 매수 선택지(고정). 가격 = 1장당 가격(PAYMENT_AMOUNT) × 수량.
 const PAYMENT_QUANTITIES = [1, 2, 4];
 
+const RETRY_MAX_ATTEMPTS = 5;
+const RETRY_DELAY_MS = 3000;
+
+/**
+ * task가 false를 반환(또는 예외 발생)하면 RETRY_DELAY_MS 뒤 재시도한다.
+ * AbortError나 signal.aborted는 즉시 중단, 최대 RETRY_MAX_ATTEMPTS회까지만 재시도.
+ * 서버 기동 직후 등 일시적 실패로 폴백 값에 머무르지 않도록 각 로더가 공유하는 재시도 골격.
+ */
+async function withRetry(signal: AbortSignal, task: () => Promise<boolean>): Promise<void> {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      if (await task()) return;
+    } catch (err) {
+      if ((err as Error).name === "AbortError") return;
+    }
+    if (signal.aborted || attempt >= RETRY_MAX_ATTEMPTS) return;
+    await new Promise<void>((resolve) => {
+      const timer = setTimeout(resolve, RETRY_DELAY_MS);
+      signal.addEventListener("abort", () => { clearTimeout(timer); resolve(); }, { once: true });
+    });
+    if (signal.aborted) return;
+  }
+}
+
 const DEFAULT_CONFIG: DeviceConfig = {
   deviceId: "test",
   deviceName: "테스트 장치",
@@ -59,22 +83,15 @@ export function useDeviceSetup(deviceId: string) {
 
     // 설정 계층: 하드코딩 기본값 ← 전역 설정(Setting) ← 디바이스별 설정(DeviceSetting)
     // 일시적 실패 시 기본값(결제 비활성 등)으로 남지 않도록 재시도한다
-    async function loadSettings(id: string, attempt = 0) {
-      const MAX_RETRIES = 5;
-      const retry = () => {
-        if (signal.aborted || attempt >= MAX_RETRIES) return;
-        const timer = setTimeout(() => loadSettings(id, attempt + 1), 3000);
-        signal.addEventListener("abort", () => clearTimeout(timer), { once: true });
-      };
-      try {
+    async function loadSettings(id: string) {
+      await withRetry(signal, async () => {
         const [globalRes, deviceRes] = await Promise.all([
           fetch("/api/setting/", { signal }).catch(() => null),
           fetch(`/api/device/${id}/settings/`, { signal }).catch(() => null),
         ]);
 
         if ((!globalRes || !globalRes.ok) && (!deviceRes || !deviceRes.ok)) {
-          retry();
-          return;
+          return false;
         }
 
         const globalData = globalRes?.ok ? await globalRes.json() : {};
@@ -125,76 +142,49 @@ export function useDeviceSetup(deviceId: string) {
           btnGlowColor: s.THEME_BTN_GLOW_COLOR || "#6c6fb4",
           btnGlowSize: parseIntSafe(s.THEME_BTN_GLOW_SIZE || "", 28),
         });
-      } catch (err) {
-        if ((err as Error).name === "AbortError") return;
-        retry();
-      }
+        return true;
+      });
     }
 
     // 서버 기동 직후 등 일시적 실패 시 폴백 그라디언트로 남지 않도록 재시도한다
-    async function loadBackgrounds(id: string, attempt = 0) {
-      const MAX_RETRIES = 5;
-      const retry = () => {
-        if (signal.aborted || attempt >= MAX_RETRIES) return;
-        const timer = setTimeout(() => loadBackgrounds(id, attempt + 1), 3000);
-        signal.addEventListener("abort", () => clearTimeout(timer), { once: true });
-      };
-      try {
+    async function loadBackgrounds(id: string) {
+      await withRetry(signal, async () => {
         // 뱅크 모델: 이 지점에 노출되도록 선택된 배경만(순서대로, 최대 6개) 로드
         const res = await fetch(`/api/device/${id}/backgrounds/`, {
           signal,
           cache: "no-store",
         });
-        if (!res.ok) {
-          retry();
-          return;
-        }
+        if (!res.ok) return false;
         const data = await res.json();
         if (data.images) setBackgroundImages(data.images);
         if (data.baseUrl) setImageBaseUrl(data.baseUrl);
-      } catch (err) {
-        if ((err as Error).name === "AbortError") return;
-        retry();
-      }
+        return true;
+      });
     }
 
-    async function loadPrintBackgrounds(id: string, attempt = 0) {
-      const MAX_RETRIES = 5;
-      const retry = () => {
-        if (signal.aborted || attempt >= MAX_RETRIES) return;
-        const timer = setTimeout(() => loadPrintBackgrounds(id, attempt + 1), 3000);
-        signal.addEventListener("abort", () => clearTimeout(timer), { once: true });
-      };
-      try {
+    async function loadPrintBackgrounds(id: string) {
+      await withRetry(signal, async () => {
         // 뱅크 모델: 이 지점에 노출되도록 선택된 프레임만(순서대로, 최대 6개) 로드
         const res = await fetch(`/api/device/${id}/frames/`, {
           signal,
           cache: "no-store",
         });
-        if (!res.ok) { retry(); return; }
+        if (!res.ok) return false;
         const data = await res.json();
         if (data.images) setPrintBgImages(data.images);
-      } catch (err) {
-        if ((err as Error).name === "AbortError") return;
-        retry();
-      }
+        return true;
+      });
     }
 
     // 테마 배경화면(wallpaper, imageType 5) — 첫(대기) 화면 배경.
     // 같은 타입 안에서 name으로 가로/세로 슬롯을 구분해 각각 노출한다(화면 방향에 맞춰 서비스에서 선택).
-    async function loadWallpaper(id: string, attempt = 0) {
-      const MAX_RETRIES = 5;
-      const retry = () => {
-        if (signal.aborted || attempt >= MAX_RETRIES) return;
-        const timer = setTimeout(() => loadWallpaper(id, attempt + 1), 3000);
-        signal.addEventListener("abort", () => clearTimeout(timer), { once: true });
-      };
-      try {
+    async function loadWallpaper(id: string) {
+      await withRetry(signal, async () => {
         const res = await fetch(`/api/image/list/${WALLPAPER_IMAGE_TYPE}/?device_id=${id}&linked=1`, {
           signal,
           cache: "no-store",
         });
-        if (!res.ok) { retry(); return; }
+        if (!res.ok) return false;
         const data = await res.json();
         const list: Array<{ name: string; filename: string }> = data.images ?? [];
         const pick = (name: string) => {
@@ -203,33 +193,23 @@ export function useDeviceSetup(deviceId: string) {
         };
         setWallpaperUrl(pick(WALLPAPER_NAME_LANDSCAPE));
         setWallpaperPortraitUrl(pick(WALLPAPER_NAME_PORTRAIT));
-      } catch (err) {
-        if ((err as Error).name === "AbortError") return;
-        retry();
-      }
+        return true;
+      });
     }
 
     // 테마 로고(imageType 6) — 서비스 화면 로고. 첫 항목 한 장만 사용.
-    async function loadLogo(id: string, attempt = 0) {
-      const MAX_RETRIES = 5;
-      const retry = () => {
-        if (signal.aborted || attempt >= MAX_RETRIES) return;
-        const timer = setTimeout(() => loadLogo(id, attempt + 1), 3000);
-        signal.addEventListener("abort", () => clearTimeout(timer), { once: true });
-      };
-      try {
+    async function loadLogo(id: string) {
+      await withRetry(signal, async () => {
         const res = await fetch(`/api/image/list/${LOGO_IMAGE_TYPE}/?device_id=${id}&linked=1`, {
           signal,
           cache: "no-store",
         });
-        if (!res.ok) { retry(); return; }
+        if (!res.ok) return false;
         const data = await res.json();
         const first = data.images?.[0];
         setLogoUrl(first && data.baseUrl ? `${data.baseUrl}/${first.filename}` : null);
-      } catch (err) {
-        if ((err as Error).name === "AbortError") return;
-        retry();
-      }
+        return true;
+      });
     }
 
     // 테마 버튼 이미지(imageType 7) — 대형 강조 버튼(촬영하기·다음 등) 배경. 첫 항목 한 장만 사용.
