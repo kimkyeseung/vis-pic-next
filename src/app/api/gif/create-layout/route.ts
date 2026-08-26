@@ -145,7 +145,7 @@ export async function POST(request: NextRequest) {
           "public",
           "static",
           "images",
-          background_image,
+          path.basename(background_image),
         );
         const rawBg = await readFile(bgPath);
         bgBuffer = await sharp(rawBg).resize(cw, ch, { fit: "cover" }).ensureAlpha().png().toBuffer();
