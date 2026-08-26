@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
 import prisma from "@/lib/db";
 import { deleteImage } from "@/lib/storage";
 import { requireAdmin } from "@/lib/adminAuth";
@@ -12,6 +13,8 @@ import {
   normalizeRgbString,
   EFFECT_TRANSITION_MS_RANGE,
 } from "@/constants/images";
+
+class MaxActiveBackgroundsError extends Error {}
 
 export async function PATCH(
   request: NextRequest,
@@ -86,31 +89,6 @@ export async function PATCH(
       data.effectChromaSmoothness = Math.max(0, Math.min(100, Math.trunc(body.effectChromaSmoothness)));
     }
 
-    // 배경(type 1)을 활성화하려는 경우, 이미 최대치만큼 활성화돼 있으면 거부한다.
-    if (data.active === true) {
-      const target = await prisma.image.findUnique({
-        where: { id: imageId },
-        select: { imageType: true, active: true },
-      });
-      if (
-        target?.imageType === BACKGROUND_IMAGE_TYPE &&
-        !target.active // 이미 활성인 것을 다시 활성화하는 요청은 카운트 변화 없음
-      ) {
-        const activeCount = await prisma.image.count({
-          where: { imageType: BACKGROUND_IMAGE_TYPE, active: true },
-        });
-        if (activeCount >= MAX_ACTIVE_BACKGROUNDS) {
-          return NextResponse.json(
-            {
-              error: `배경은 최대 ${MAX_ACTIVE_BACKGROUNDS}개까지만 활성화할 수 있습니다.`,
-              code: "MAX_ACTIVE_BACKGROUNDS",
-            },
-            { status: 409 },
-          );
-        }
-      }
-    }
-
     // deviceIds 배열이 오면 조인 행을 통째로 교체한다(빈 배열 = 모든 디바이스).
     const hasDeviceIds = Array.isArray(body.deviceIds);
     const deviceIds: string[] = hasDeviceIds
@@ -121,19 +99,63 @@ export async function PATCH(
       return NextResponse.json({ error: "No valid fields" }, { status: 400 });
     }
 
-    await prisma.$transaction(async (tx) => {
-      if (Object.keys(data).length > 0) {
-        await tx.image.update({ where: { id: imageId }, data });
+    try {
+      await prisma.$transaction(
+        async (tx) => {
+          // 배경(type 1)을 활성화하려는 경우, 이미 최대치만큼 활성화돼 있으면 거부한다.
+          // 카운트 조회와 업데이트를 같은 Serializable 트랜잭션에 묶어, 동시 활성화
+          // 요청이 동시에 카운트를 통과해 MAX를 초과하는 것을 DB가 감지·거부하게 한다.
+          if (data.active === true) {
+            const target = await tx.image.findUnique({
+              where: { id: imageId },
+              select: { imageType: true, active: true },
+            });
+            if (
+              target?.imageType === BACKGROUND_IMAGE_TYPE &&
+              !target.active // 이미 활성인 것을 다시 활성화하는 요청은 카운트 변화 없음
+            ) {
+              const activeCount = await tx.image.count({
+                where: { imageType: BACKGROUND_IMAGE_TYPE, active: true },
+              });
+              if (activeCount >= MAX_ACTIVE_BACKGROUNDS) {
+                throw new MaxActiveBackgroundsError();
+              }
+            }
+          }
+
+          if (Object.keys(data).length > 0) {
+            await tx.image.update({ where: { id: imageId }, data });
+          }
+          if (hasDeviceIds) {
+            await tx.imageDevice.deleteMany({ where: { imageId } });
+            if (deviceIds.length > 0) {
+              await tx.imageDevice.createMany({
+                data: deviceIds.map((deviceId) => ({ imageId, deviceId })),
+              });
+            }
+          }
+        },
+        { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+      );
+    } catch (error) {
+      if (error instanceof MaxActiveBackgroundsError) {
+        return NextResponse.json(
+          {
+            error: `배경은 최대 ${MAX_ACTIVE_BACKGROUNDS}개까지만 활성화할 수 있습니다.`,
+            code: "MAX_ACTIVE_BACKGROUNDS",
+          },
+          { status: 409 },
+        );
       }
-      if (hasDeviceIds) {
-        await tx.imageDevice.deleteMany({ where: { imageId } });
-        if (deviceIds.length > 0) {
-          await tx.imageDevice.createMany({
-            data: deviceIds.map((deviceId) => ({ imageId, deviceId })),
-          });
-        }
+      // Serializable 격리 수준에서의 쓰기 충돌(동시 활성화 요청 등) — 재시도를 요청한다.
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2034") {
+        return NextResponse.json(
+          { error: "다른 요청과 충돌했습니다. 다시 시도해 주세요.", code: "CONFLICT" },
+          { status: 409 },
+        );
       }
-    });
+      throw error;
+    }
 
     const updated = await prisma.image.findUnique({
       where: { id: imageId },
