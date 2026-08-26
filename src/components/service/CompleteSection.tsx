@@ -406,29 +406,40 @@ export function CompleteSection({
       h: s.h * cmToPx,
     }));
 
+    // 슬롯별 사진 디코딩은 서로 독립적이므로 병렬로 로드한 뒤, 그리기만 순서대로 수행한다.
+    const slotCount = Math.min(selectedPhotos.length, slots.length);
+    const loadedImages = await Promise.all(
+      Array.from({ length: slotCount }, async (_, i) => {
+        const photo = photos[selectedPhotos[i]];
+        if (!photo) return null;
+        try {
+          // data: URL은 fetch+createImageBitmap 방식이 crossOrigin 문제 없이 더 안정적
+          if (photo.startsWith("data:")) {
+            try {
+              const res = await fetch(photo);
+              const blob = await res.blob();
+              return await createImageBitmap(blob);
+            } catch {
+              return await loadImage(photo);
+            }
+          }
+          return await loadImage(photo);
+        } catch (err) {
+          console.error(`[createComposite] 사진 ${i} 로드 실패:`, err);
+          return null;
+        }
+      }),
+    );
+
     // Draw photos in slots
-    for (let i = 0; i < selectedPhotos.length && i < slots.length; i++) {
-      const photo = photos[selectedPhotos[i]];
-      if (!photo) {
+    for (let i = 0; i < slotCount; i++) {
+      const img = loadedImages[i];
+      if (!img) {
         continue;
       }
       const { x, y, w, h } = slots[i];
 
       try {
-        // data: URL은 fetch+createImageBitmap 방식이 crossOrigin 문제 없이 더 안정적
-        let img: HTMLImageElement | ImageBitmap;
-        if (photo.startsWith("data:")) {
-          try {
-            const res = await fetch(photo);
-            const blob = await res.blob();
-            img = await createImageBitmap(blob);
-          } catch {
-            img = await loadImage(photo);
-          }
-        } else {
-          img = await loadImage(photo);
-        }
-
         ctx.save();
         roundRect(ctx, x, y, w, h, FRAME_CORNER_RADIUS_CM * cmToPx);
         ctx.clip();
@@ -451,7 +462,7 @@ export function CompleteSection({
         roundRect(ctx, x, y, w, h, FRAME_CORNER_RADIUS_CM * cmToPx);
         ctx.stroke();
       } catch (err) {
-        console.error(`[createComposite] 사진 ${i} 로드 실패:`, err);
+        console.error(`[createComposite] 사진 ${i} 그리기 실패:`, err);
       }
     }
 
