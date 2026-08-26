@@ -3,9 +3,9 @@
 import { useEffect, useRef } from "react";
 import { useFrameSender } from "@/hooks/useSceneSync";
 import { fillGradientFromCSS } from "@/lib/canvas";
+import { applyChromaKey } from "@/lib/chromakey";
 import { FALLBACK_BACKGROUNDS } from "@/constants/frames";
 import { suppressMediapipeLogs } from "@/lib/suppressMediapipeLogs";
-import { applyChromaKey } from "@/lib/chromakey";
 import type { BGImage, BgRemovalMode } from "@/types";
 
 type Segmenter = {
@@ -53,7 +53,7 @@ export function CameraStreamer({
   chromakeySimilarity?: number;
   /** 크로마키 경계 부드러움(0-100). 메인 촬영 화면과 동일한 관리자 설정값. */
   chromakeySmoothness?: number;
-  /** 크로마키 스필 제거(0-100). 메인 촬영 화면과 동일한 관리자 설정값. */
+  /** 크로마키 스필 제거 강도(0-100). 메인 촬영 화면과 동일한 관리자 설정값. */
   chromakeySpill?: number;
   /** 크로마키 경계 침식(0-100). 메인 촬영 화면과 동일한 관리자 설정값. */
   chromakeyChoke?: number;
@@ -270,7 +270,9 @@ export function CameraStreamer({
             const imgData = offCtx.getImageData(0, 0, pw, ph);
             const [kr, kg, kb] = chromakeyRgbRef.current.split(",").map(Number);
             applyChromaKey(
-              imgData.data, pw, ph,
+              imgData.data,
+              pw,
+              ph,
               { r: kr ?? 0, g: kg ?? 255, b: kb ?? 0 },
               chromakeySimilarityRef.current,
               chromakeySmoothnessRef.current,
