@@ -94,6 +94,10 @@ export function PreflightSection({
       if (!cancelled) setCheck(id, status, detail);
     };
 
+    // 재시도 시 이전 시도의 상태가 남아있으면 settled 판정이 새 검사 완료 전에
+    // 오래된 값으로 성립해버릴 수 있어, 매 attempt 시작 시 전부 pending으로 되돌린다.
+    setChecks((prev) => prev.map((c) => ({ ...c, status: "pending", detail: undefined })));
+
     async function runChecks(): Promise<boolean> {
       // ① 서버 연결 + ② 번들 정합성 (health 응답 하나로 처리)
       let serverOk = false;
