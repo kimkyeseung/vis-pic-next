@@ -48,6 +48,30 @@ export function fillGradientFromCSS(
 }
 
 /**
+ * object-fit: cover 방식의 소스 크롭 사각형을 계산한다.
+ * focalX/focalY (0.0~1.0): 잘려나가는 축에서 유지할 위치. 기본값 0.5(중앙).
+ * drawImageCover·drawCoverSource가 이 계산을 공유한다.
+ */
+function computeCoverSourceRect(
+  iw: number, ih: number,
+  dw: number, dh: number,
+  focalX = 0.5, focalY = 0.5,
+): { sx: number; sy: number; sw: number; sh: number } {
+  const destRatio = dw / dh;
+  const imgRatio = iw / ih;
+  if (imgRatio > destRatio) {
+    // 이미지가 더 넓음 → 좌우를 잘라냄
+    const sh = ih;
+    const sw = ih * destRatio;
+    return { sx: (iw - sw) * focalX, sy: 0, sw, sh };
+  }
+  // 이미지가 더 높음 → 상하를 잘라냄
+  const sw = iw;
+  const sh = iw / destRatio;
+  return { sx: 0, sy: (ih - sh) * focalY, sw, sh };
+}
+
+/**
  * 이미지를 object-fit: cover 방식으로 캔버스에 그립니다.
  * focalX/focalY (0.0~1.0): 이미지의 초점 위치. 기본값 0.5 (중앙).
  */
@@ -57,25 +81,9 @@ export function drawImageCover(
   dx: number, dy: number, dw: number, dh: number,
   focalX = 0.5, focalY = 0.5,
 ) {
-  const iw = img.naturalWidth;
-  const ih = img.naturalHeight;
-  const destRatio = dw / dh;
-  const imgRatio = iw / ih;
-
-  let sx: number, sy: number, sw: number, sh: number;
-  if (imgRatio > destRatio) {
-    // 이미지가 더 넓음 → 좌우를 잘라냄
-    sh = ih;
-    sw = ih * destRatio;
-    sx = (iw - sw) * focalX;
-    sy = 0;
-  } else {
-    // 이미지가 더 높음 → 상하를 잘라냄
-    sw = iw;
-    sh = iw / destRatio;
-    sx = 0;
-    sy = (ih - sh) * focalY;
-  }
+  const { sx, sy, sw, sh } = computeCoverSourceRect(
+    img.naturalWidth, img.naturalHeight, dw, dh, focalX, focalY,
+  );
   ctx.drawImage(img, sx, sy, sw, sh, dx, dy, dw, dh);
 }
 
@@ -96,14 +104,7 @@ export function drawCoverSource(
   const iw = (src as HTMLVideoElement).videoWidth || (src as HTMLImageElement).naturalWidth || (src as HTMLCanvasElement).width || 0;
   const ih = (src as HTMLVideoElement).videoHeight || (src as HTMLImageElement).naturalHeight || (src as HTMLCanvasElement).height || 0;
   if (iw <= 0 || ih <= 0) return false;
-  const destRatio = w / h;
-  const imgRatio = iw / ih;
-  let sx: number, sy: number, sw: number, sh: number;
-  if (imgRatio > destRatio) {
-    sh = ih; sw = ih * destRatio; sx = (iw - sw) / 2; sy = 0;
-  } else {
-    sw = iw; sh = iw / destRatio; sx = 0; sy = (ih - sh) / 2;
-  }
+  const { sx, sy, sw, sh } = computeCoverSourceRect(iw, ih, w, h);
   ctx.drawImage(src, sx, sy, sw, sh, 0, 0, w, h);
   return true;
 }
