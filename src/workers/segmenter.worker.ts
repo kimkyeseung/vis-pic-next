@@ -87,11 +87,9 @@ async function handle(msg: InMsg) {
         msg.bitmap.close();
         return;
       }
+      let result: ImageSegmenterResult | undefined;
       try {
-        const result: ImageSegmenterResult = segmenter.segmentForVideo(
-          msg.bitmap,
-          msg.timestamp
-        );
+        result = segmenter.segmentForVideo(msg.bitmap, msg.timestamp);
         const masks = result.confidenceMasks;
         if (masks && masks.length > 0) {
           const mask = masks[0];
@@ -122,6 +120,7 @@ async function handle(msg: InMsg) {
           error: err instanceof Error ? `${err.name}: ${err.message}` : String(err),
         });
       } finally {
+        result?.close();
         msg.bitmap.close();
       }
       return;
