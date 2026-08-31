@@ -13,6 +13,7 @@ import {
   normalizeEffectMode,
   normalizeEffectBlendMode,
   normalizeEffectTransition,
+  getGestureEmoji,
 } from "@/constants/images";
 import { getCameraResolution } from "@/constants/camera";
 import { fillGradientFromCSS, computeCaptureSize, drawCoverSource } from "@/lib/canvas";
@@ -1816,22 +1817,37 @@ export function CameraSection({
 
         {/* 손바닥 촬영 안내 — 스티커와 남은 촬영 횟수 사이 여백에 강조 표시.
             위아래 박스(스티커 패널·남은 촬영 횟수)와 같은 너비로 보이도록 w-full로 맞춘다.
-            items-start로 스티커 패널 바로 아래에 붙여 사이 간격을 좁힌다(남는 세로 공간은 아래로). */}
+            items-start로 스티커 패널 바로 아래에 붙여 사이 간격을 좁힌다(남는 세로 공간은 아래로).
+            현재 배경에 동작 트리거 이펙트가 설정돼 있으면, 같은 박스를 절반으로 나눠 아래쪽에
+            그 제스처 안내를 추가한다(제스처에 매칭되는 이모지가 있으면 이모지로 표시).
+            두 안내가 함께 뜰 때는(칸이 좁아지므로) 이모지·문구를 가로로 나란히 배치한다. */}
         <div className="flex-1 flex items-start min-h-0">
-          <div
-            className="w-full text-center rounded-2xl px-6 py-8 border border-[var(--theme-primary,#6c6fb4)]/50 bg-[var(--theme-primary,#6c6fb4)]/10"
-            style={{ boxShadow: "0 0 34px -10px var(--theme-primary, #6c6fb4)" }}
-          >
-            <div className="text-6xl mb-3 animate-soft-blink select-none" aria-hidden>✋</div>
-            <p className="text-white font-extrabold text-2xl leading-snug break-keep">
-              {t("camera.palmHint")}
-            </p>
+          <div className="w-full rounded-2xl overflow-hidden border border-[var(--theme-primary,#6c6fb4)]/50 bg-[var(--theme-primary,#6c6fb4)]/10">
+            <div className={currentBgEffect ? "flex items-center justify-center gap-4 px-6 py-6" : "text-center px-6 py-6"}>
+              <div className={currentBgEffect ? "text-5xl shrink-0 animate-soft-blink select-none" : "text-5xl mb-2 animate-soft-blink select-none"} aria-hidden>✋</div>
+              <p className={`text-white font-extrabold text-xl leading-snug break-keep ${currentBgEffect ? "text-left" : ""}`}>
+                {t("camera.palmHint")}
+              </p>
+            </div>
+            {currentBgEffect && (
+              <div className="flex items-center justify-center gap-4 px-6 py-6 border-t border-[var(--theme-primary,#6c6fb4)]/30">
+                <div className="text-5xl shrink-0 select-none" aria-hidden>
+                  {getGestureEmoji(currentBgEffect.gesture) ?? "🤚"}
+                </div>
+                <p className="text-white font-extrabold text-xl leading-snug break-keep text-left">
+                  {t("camera.effectHint")}
+                </p>
+              </div>
+            )}
           </div>
         </div>
 
         {/* 남은 촬영 횟수 — 세로에선 좌측 배경 선택 패널의 보이는 끝선과 맞도록 높이를 줄이고(py-3)
             위로 올린다(mb-[8.625rem]). 위쪽 여백(팔 안내와의 간격)도 함께 줄어든다. */}
-        <div className="shrink-0 w-full text-center border border-dashed border-white/30 rounded-xl py-3 portrait:mb-[8.625rem]">
+        <div
+          className="shrink-0 w-full text-center border border-dashed border-white/30 rounded-xl py-3 portrait:mb-[8.625rem]"
+          style={{ boxShadow: "0 0 34px -10px var(--theme-primary, #6c6fb4)" }}
+        >
           <span className="text-white font-bold text-3xl">
             {t("camera.remaining", { n: String(Math.max(0, maxPhotos - photos.length)) })}
           </span>
