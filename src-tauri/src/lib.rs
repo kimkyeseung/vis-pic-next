@@ -427,8 +427,12 @@ fn print_file(printer_name: &str, file_path: &str, copies: u32) -> Result<bool, 
             $pd.PrintController = New-Object System.Drawing.Printing.StandardPrintController
             {}
             $pd.PrinterSettings.Copies = {}
-            if ($img.Width -gt $img.Height) {{
-                $pd.DefaultPageSettings.Landscape = $true
+            $paperW = $pd.DefaultPageSettings.PaperSize.Width
+            $paperH = $pd.DefaultPageSettings.PaperSize.Height
+            $paperIsLandscape = $paperW -gt $paperH
+            $imgIsLandscape = $img.Width -gt $img.Height
+            if ($imgIsLandscape -ne $paperIsLandscape) {{
+                $img.RotateFlip([System.Drawing.RotateFlipType]::Rotate90FlipNone)
             }}
             $pd.add_PrintPage({{
                 param($sender, $e)
