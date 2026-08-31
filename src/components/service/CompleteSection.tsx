@@ -111,19 +111,19 @@ export function CompleteSection({
   // 세로 공간에 맞춰 반응형으로 축소된다(라벨은 고정, QR 박스만 flex-1로 늘고 줆).
   const renderQRCard = (url: string, emoji: string, label: string) => (
     // 세로(portrait)에선 카드를 좌우로 꽉 채우고(flex-1) QR·라벨을 키운다(시안 대응).
-    <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-6 border border-white/20 text-center flex flex-col items-center min-w-0 portrait:flex-1">
-      <div className="text-3xl portrait:text-5xl mb-2 shrink-0">{emoji}</div>
-      <p className="text-white text-xl portrait:text-3xl font-semibold mb-4 portrait:mb-6 shrink-0">{label}</p>
+    <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-8 border border-white/20 text-center flex flex-col items-center min-w-0 portrait:flex-1">
+      <div className="text-4xl portrait:text-5xl mb-2 shrink-0">{emoji}</div>
+      <p className="text-white text-2xl portrait:text-3xl font-semibold mb-4 portrait:mb-6 shrink-0">{label}</p>
       <div
         className={`bg-white p-4 rounded-xl cursor-pointer ${matchHeight ? "flex-1 min-h-0 w-full flex items-center justify-center" : "portrait:w-full portrait:flex portrait:items-center portrait:justify-center"}`}
         onDoubleClick={() => openDebugUrl(url)}
       >
         {matchHeight ? (
-          // 남은 세로 공간에 맞춰 축소(라벨은 고정). 과대·가로 오버플로 방지로 상한 200px.
-          <QRCodeSVG value={url} size={180} className="h-full w-auto max-h-[200px] max-w-full" style={{ aspectRatio: "1 / 1" }} />
+          // 남은 세로 공간에 맞춰 축소(라벨은 고정). 과대·가로 오버플로 방지로 상한 260px.
+          <QRCodeSVG value={url} size={220} className="h-full w-auto max-h-[260px] max-w-full" style={{ aspectRatio: "1 / 1" }} />
         ) : (
-          // 가로: 고정 180px. 세로: 카드 폭에 맞춰 확대(상한 300px).
-          <QRCodeSVG value={url} size={180} className="portrait:h-auto portrait:w-full portrait:max-w-[300px]" style={{ aspectRatio: "1 / 1" }} />
+          // 가로: 고정 220px. 세로: 카드 폭에 맞춰 확대(상한 300px).
+          <QRCodeSVG value={url} size={220} className="portrait:h-auto portrait:w-full portrait:max-w-[300px]" style={{ aspectRatio: "1 / 1" }} />
         )}
       </div>
       <p className="text-gray-400 text-sm portrait:text-lg mt-3 shrink-0">{t("complete.qrScan")}</p>
@@ -537,9 +537,9 @@ export function CompleteSection({
   };
 
   return (
-    <section ref={sectionRef} className="w-full h-full flex flex-col items-center justify-start pt-7 pb-52 portrait:justify-center portrait:pt-0 portrait:pb-0 relative z-10">
+    <section ref={sectionRef} className="w-full h-full flex flex-col items-center justify-start pt-14 pb-52 portrait:justify-center portrait:pt-0 portrait:pb-0 relative z-10">
       <div className="w-full flex-1 flex flex-col text-center animate-fadeInUp portrait:flex-none portrait:px-6">
-        {/* 타이틀은 다른 페이지처럼 상단 고정(pt-7). 본문은 아래 flex-1 영역에서 중앙 정렬한다. */}
+        {/* 타이틀은 다른 페이지처럼 상단 고정(pt-14 — SERVICE_SECTION_CLASS와 동일). 본문은 아래 flex-1 영역에서 중앙 정렬한다. */}
         {(printStatus === "ready" || printStatus === "done") && compositeImage && (
           <SectionTitle className="portrait:text-5xl break-keep mb-16 portrait:mb-8">
             {printStatus === "done" ? t("complete.done") : t("complete.ready")}
@@ -558,11 +558,11 @@ export function CompleteSection({
           <>
             {/* 좌우 반반(12컬럼 6/6): 미리보기 | QR. 세로에선 상하 스택.
                 가로 결과물(matchHeight)에선 QR 카드 상·하단을 프레임에 맞추려 상단 정렬. */}
-            <div className={`flex justify-center gap-10 mb-6 w-full max-w-6xl mx-auto portrait:flex-col portrait:items-center portrait:gap-8 portrait:w-full ${matchHeight ? "items-start" : "items-center"}`}>
+            <div className={`flex justify-center gap-10 mb-6 w-full max-w-[1600px] mx-auto portrait:flex-col portrait:items-center portrait:gap-8 portrait:w-full ${matchHeight ? "items-start" : "items-center"}`}>
               <div className="flex-1 flex justify-center min-w-0 portrait:w-full">
                 <div ref={previewBoxRef} className="rounded-2xl overflow-hidden" style={{ boxShadow: "0 20px 50px rgba(0,0,0,0.4)" }}>
                   {/* 스테이지 고정 높이(가로 1080·세로 1920) 기준 px 상한 — 레터박스(창≠스테이지)에서도 정확. */}
-                  <img src={compositeImage} alt="Composite" className="max-h-[583px] portrait:max-h-[883px] portrait:max-w-full w-auto object-contain block" />
+                  <img src={compositeImage} alt="Composite" className="max-h-[650px] portrait:max-h-[883px] portrait:max-w-full w-auto object-contain block" />
                 </div>
               </div>
 
