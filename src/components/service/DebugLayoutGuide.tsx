@@ -10,13 +10,15 @@ import { useDebug } from "./DebugContext";
 // 모두 "디자인 좌표"(가로 1920×1080 / 세로 1080×1920) 기준이고, 실제 화면 배율과 함께
 // 자동으로 스케일된다.
 //
-// titleH/buttonH는 실제 각 단계 화면(payment/frame/background/camera/select/printbg/complete)의
-// <h2> 하단·버튼 상단을 getBoundingClientRect로 측정해 정했다 — PAGE_PADDING 기준선부터
-// 실 콘텐츠 끝까지의 거리(가장 긴 경우: 부제가 있는 select 단계 타이틀)에 여유 소폭만 더한 값.
-// 실제 버튼 위치는 모든 단계에서 페이지 하단으로부터 정확히 동일(가로 181 / 세로 189 design px)했다.
+// titleH/buttonH는 실제 7개 단계 화면(payment/frame/background/camera/select/printbg/complete)의
+// <h2> 하단·버튼 상단을 4개 언어(ko/en/ja/zh) 모두에서 getBoundingClientRect로 측정해 정했다 —
+// PAGE_PADDING 기준선부터 실 콘텐츠 끝까지의 거리에 여유 소폭만 더한 값.
+// 타이틀 텍스트가 언어에 따라 2줄인 경우(예: 영어 payment.selectQuantity, 일본어 frame.title)가
+// 가장 크므로 그 값을 기준으로 잡았다 — 1줄 화면에서는 밴드 하단에 약간의 여유가 남는다.
+// 실제 버튼 위치는 모든 단계·언어에서 페이지 하단으로부터 정확히 동일(가로 181 / 세로 189 design px)했다.
 const BANDS = {
-  landscape: { titleH: 140, buttonH: 120 },
-  portrait: { titleH: 330, buttonH: 130 },
+  landscape: { titleH: 190, buttonH: 120 },
+  portrait: { titleH: 380, buttonH: 130 },
 } as const;
 
 const GAP = 32; // 타이틀↔본문, 본문↔버튼 사이 간격
