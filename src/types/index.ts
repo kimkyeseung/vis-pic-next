@@ -4,8 +4,7 @@ export type Orientation = "landscape" | "portrait";
 
 export interface Sticker {
   id: string;
-  emoji?: string; // 이모지 스티커
-  src?: string;   // 이미지 스티커 URL
+  src: string;    // 이미지 스티커 URL
   x: number;      // 0-1, canvas 너비 비율
   y: number;      // 0-1, canvas 높이 비율
   scale: number;

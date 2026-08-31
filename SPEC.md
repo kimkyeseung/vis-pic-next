@@ -838,15 +838,14 @@ PRINTER_NAME             # 출력 프린터 이름 (비우면 기본 프린터)
   **뱅크 UI**로 관리한다. 관리자 이미지 관리에서 지점별로 노출할 스티커를 선택
   (`ImageDevice` + `sortOrder`)하면, 촬영 화면 우측 패널에 그 지점 스티커 썸네일이 나열된다.
 - 촬영 화면은 `/api/device/[deviceId]/stickers/`로 **선택·정렬된 목록**을 로드
-  (`MAX_ACTIVE_STICKERS`=20). 이모지 기본 세트는 더 이상 제공하지 않는다.
+  (`MAX_ACTIVE_STICKERS`=20). 이모지 스티커는 지원하지 않는다(이미지 스티커만).
 
 ### 데이터 구조
 
 ```typescript
 interface Sticker {
   id: string;
-  src?: string;    // 스티커 이미지 URL (주 경로 — 뱅크에서 추가)
-  emoji?: string;  // 레거시: 현재 UI 미사용, 렌더러만 하위호환
+  src: string;     // 스티커 이미지 URL (뱅크에서 추가)
   x: number;       // 0~1 (캔버스 너비 비율)
   y: number;       // 0~1 (캔버스 높이 비율)
   scale: number;   // 크기 배율

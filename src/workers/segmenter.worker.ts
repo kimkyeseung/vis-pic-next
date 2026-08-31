@@ -77,6 +77,9 @@ async function handle(msg: InMsg) {
     case "close":
       segmenter?.close();
       segmenter = null;
+      // 메인 스레드가 terminate()로 강제 종료하면 이 메시지 처리 자체가 중단돼
+      // 위 close()가 실행되지 못할 수 있다 — 워커가 스스로 종료해 리소스 해제를 보장한다.
+      self.close();
       return;
 
     case "frame": {

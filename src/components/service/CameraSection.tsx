@@ -48,6 +48,11 @@ const IS_DEV = process.env.NODE_ENV !== "production";
 const EFFECT_CHROMA_W = 640;
 const EFFECT_CHROMA_H = 480;
 
+// 스티커 기본 크기(px, scale=1·pxScale=1 기준). 캔버스 실제 그리기(drawStickers)와 드래그
+// 히트박스(overlayRef 안 JSX)가 같은 비율을 쓰도록 상수로 공유한다.
+const STICKER_IMG_BOX = 160; // 이미지 스티커: 이 정사각 박스 안에 원본 비율 그대로 contain
+const STICKER_IMG_HITBOX = 108; // 드래그/삭제버튼 히트박스(투명 오버레이용, 그리기보다 약간 작게)
+
 export function CameraSection({
   config,
   photos,
@@ -157,7 +162,7 @@ export function CameraSection({
     const timer = setTimeout(() => {
       try {
         const v = Number(localStorage.getItem("photobooth_seg_interval"));
-        if ([50, 100, 150, 200].includes(v)) setInferenceInterval(v);
+        if ([10, 20, 50, 100, 150, 200].includes(v)) setInferenceInterval(v);
       } catch {}
     }, 0);
     return () => clearTimeout(timer);
@@ -505,7 +510,9 @@ export function CameraSection({
     function fallbackToMainThread(reason: string) {
       if (cancelled) return;
       console.error("Segmenter worker unavailable, falling back to main thread:", reason);
-      if (workerRef.current) { workerRef.current.terminate(); workerRef.current = null; }
+      // terminate()로 즉시 죽이면 워커 안의 segmenter.close()가 실행되지 못해 GPU/WASM
+      // 리소스가 새므로, close 메시지를 보내 워커가 스스로 정리 후 종료하도록 한다.
+      if (workerRef.current) { try { workerRef.current.postMessage({ type: "close" }); } catch { /* noop */ } workerRef.current = null; }
       workerActiveRef.current = false;
       setWorkerActive(false);
       maskReadyRef.current = false;
@@ -575,9 +582,10 @@ export function CameraSection({
 
     return () => {
       cancelled = true;
+      // terminate()로 즉시 죽이면 워커 안의 segmenter.close()가 실행되지 못해 GPU/WASM
+      // 리소스가 새므로, close 메시지를 보내 워커가 스스로 정리 후 종료하도록 한다.
       if (workerRef.current) {
         try { workerRef.current.postMessage({ type: "close" }); } catch { /* noop */ }
-        workerRef.current.terminate();
         workerRef.current = null;
       }
       workerActiveRef.current = false;
@@ -864,10 +872,10 @@ export function CameraSection({
   // 이미지 스티커 프리로드
   useEffect(() => {
     stickers.forEach((s) => {
-      if (s.src && !stickerImgCacheRef.current.has(s.src)) {
+      if (!stickerImgCacheRef.current.has(s.src)) {
         const img = new Image();
         img.crossOrigin = "anonymous";
-        img.onload = () => stickerImgCacheRef.current.set(s.src!, img);
+        img.onload = () => stickerImgCacheRef.current.set(s.src, img);
         img.src = s.src;
       }
     });
@@ -877,19 +885,16 @@ export function CameraSection({
   // 상대 크기가 유지되도록 픽셀 단위 크기에 곱한다.
   const drawStickers = useCallback((ctx: CanvasRenderingContext2D, w: number, h: number, pxScale = 1) => {
     stickersRef.current.forEach((s) => {
-      if (s.src) {
-        const img = stickerImgCacheRef.current.get(s.src);
-        if (img) {
-          const size = Math.round(s.scale * 120 * pxScale);
-          ctx.drawImage(img, s.x * w - size / 2, s.y * h - size / 2, size, size);
-        }
-      } else if (s.emoji) {
-        const fontSize = Math.round(s.scale * 72 * pxScale);
-        ctx.font = `${fontSize}px serif`;
-        ctx.textAlign = "center";
-        ctx.textBaseline = "middle";
-        ctx.fillText(s.emoji, s.x * w, s.y * h);
-      }
+      const img = stickerImgCacheRef.current.get(s.src);
+      if (!img) return;
+      // 정사각 박스에 억지로 늘리지 않고, 박스 안에 원본 가로세로 비율 그대로 맞춘다(object-fit: contain과 동일).
+      const box = Math.round(s.scale * STICKER_IMG_BOX * pxScale);
+      const iw = img.naturalWidth || img.width || 1;
+      const ih = img.naturalHeight || img.height || 1;
+      const fit = Math.min(box / iw, box / ih);
+      const dw = iw * fit;
+      const dh = ih * fit;
+      ctx.drawImage(img, s.x * w - dw / 2, s.y * h - dh / 2, dw, dh);
     });
   }, []);
 
@@ -1320,10 +1325,10 @@ export function CameraSection({
     }
   }, [photos.length, maxPhotos]);
 
-  const addSticker = useCallback((opts: { emoji?: string; src?: string }) => {
+  const addSticker = useCallback((src: string) => {
     const newSticker: Sticker = {
       id: `${Date.now()}-${Math.random()}`,
-      ...opts,
+      src,
       x: 0.5,
       y: 0.5,
       scale: 1,
@@ -1573,9 +1578,8 @@ export function CameraSection({
                     cursor: draggingId === s.id ? "grabbing" : "grab",
                     userSelect: "none",
                     touchAction: "none",
-                    width: s.src ? `${s.scale * 80}px` : undefined,
-                    height: s.src ? `${s.scale * 80}px` : undefined,
-                    fontSize: s.emoji ? `${s.scale * 48}px` : undefined,
+                    width: `${s.scale * STICKER_IMG_HITBOX}px`,
+                    height: `${s.scale * STICKER_IMG_HITBOX}px`,
                     lineHeight: 1,
                     outline: isSelected ? "2px dashed rgba(255,255,255,0.7)" : undefined,
                     borderRadius: "4px",
@@ -1583,12 +1587,8 @@ export function CameraSection({
                   onMouseDown={(e) => handleStickerMouseDown(e, s.id)}
                   onTouchStart={(e) => handleStickerTouchStart(e, s.id)}
                 >
-                  {s.src ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={s.src} alt="sticker" style={{ width: "100%", height: "100%", objectFit: "contain", pointerEvents: "none", opacity: 0 }} />
-                  ) : (
-                    <span style={{ color: "transparent" }}>{s.emoji}</span>
-                  )}
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={s.src} alt="sticker" style={{ width: "100%", height: "100%", objectFit: "contain", pointerEvents: "none", opacity: 0 }} />
                   {/* 데스크톱: hover 시 삭제 / 터치: 탭 선택 후 삭제 */}
                   <button
                     className={`absolute -top-3 -right-3 w-6 h-6 bg-red-500 text-white rounded-full text-sm flex items-center justify-center leading-none shadow-md transition-opacity ${isSelected ? "opacity-100" : "opacity-0 group-hover:opacity-100"}`}
@@ -1719,7 +1719,7 @@ export function CameraSection({
               <div className={`flex items-center justify-between gap-2 ${useWorker ? "opacity-40" : ""}`}>
                 <span>스로틀{useWorker ? "(워커 미적용)" : ""}</span>
                 <span className="flex gap-1">
-                  {[50, 100, 150, 200].map((ms) => (
+                  {[10, 20, 50, 100, 150, 200].map((ms) => (
                     <button
                       key={ms}
                       type="button"
@@ -1798,7 +1798,7 @@ export function CameraSection({
                   <button
                     key={img.id}
                     className="aspect-square w-full rounded-xl overflow-hidden hover:ring-2 hover:ring-white/50 transition-all bg-white/5"
-                    onClick={() => addSticker({ src: `${imageBaseUrl}/${img.filename}` })}
+                    onClick={() => addSticker(`${imageBaseUrl}/${img.filename}`)}
                     title={img.name}
                   >
                     {/* eslint-disable-next-line @next/next/no-img-element */}

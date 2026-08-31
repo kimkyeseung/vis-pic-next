@@ -11,14 +11,14 @@ interface CircularTimerProps {
   onLongPress?: () => void;
   /** 일시정지 상태 — ⏸ 표시 + 딤 처리. */
   paused?: boolean;
-  /** 위치(Tailwind) 클래스. 기본 우상단 여백 top-12 right-12. */
+  /** 위치(Tailwind) 클래스. 기본 우상단 여백 top-16 right-16 — 페이지 상하좌우 패딩선(64px)에 맞춤. */
   positionClass?: string;
 }
 
 const strokeWidth = 4;
 const LONG_PRESS_MS = 700;
 
-export function CircularTimer({ value, total, size = 108, testId, onLongPress, paused = false, positionClass = "top-12 right-12" }: CircularTimerProps) {
+export function CircularTimer({ value, total, size = 108, testId, onLongPress, paused = false, positionClass = "top-16 right-16" }: CircularTimerProps) {
   const radius = (size - strokeWidth * 2) / 2;
   const circumference = 2 * Math.PI * radius;
   const progress = Math.max(0, Math.min(1, value / total));

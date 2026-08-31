@@ -23,7 +23,7 @@ import { PrintBgSection } from "@/components/service/PrintBgSection";
 import { CompleteSection } from "@/components/service/CompleteSection";
 import { DebugProvider, useDebug, useSecretTap } from "@/components/service/DebugContext";
 import { DebugOverlay } from "@/components/service/DebugOverlay";
-import { DebugGridOverlay } from "@/components/service/DebugGridOverlay";
+import { DebugLayoutGuide } from "@/components/service/DebugLayoutGuide";
 
 function ServiceContent() {
   const searchParams = useSearchParams();
@@ -211,8 +211,9 @@ function ServiceContent() {
       {/* 좌측 상단 로고 — 첫(대기) 화면을 제외한 단계에 표시. 업로드한 로고 없으면 기본 AR-pic. */}
       {currentStep !== "start" && (
         // 로고 5회 연속 탭(2초 내) → 디버그 모드 토글 (손님에겐 티 안 나는 운영자용).
+        // top-16/left-16(64px) — 페이지 상하좌우 패딩선에 맞춤(가로·세로 동일)
         <div
-          className="absolute top-12 left-16 portrait:top-8 portrait:left-10 z-20 select-none"
+          className="absolute top-16 left-16 z-20 select-none"
           style={{ cursor: "default" }}
           onClick={handleLogoSecretTap}
         >
@@ -378,7 +379,7 @@ function ServiceContent() {
         />
       )}
 
-      <DebugGridOverlay />
+      <DebugLayoutGuide />
       <DebugOverlay data={debugData} />
     </div>
     </div>
