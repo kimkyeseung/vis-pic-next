@@ -1541,7 +1541,7 @@ export function CameraSection({
 
       {flash && <div className="fixed inset-0 bg-white z-50 pointer-events-none animate-flash" />}
 
-      <h2 className="self-center text-center text-5xl portrait:text-4xl font-extrabold text-white" style={{ gridArea: "title", textShadow: "0 2px 15px rgba(0,0,0,0.5)" }}>
+      <h2 className="self-center text-center text-5xl portrait:text-[calc(2.25rem*1.5*var(--type-scale))] portrait:mt-12 font-extrabold text-white" style={{ gridArea: "title", textShadow: "0 2px 15px rgba(0,0,0,0.5)" }}>
         {t("camera.start")}
       </h2>
 
