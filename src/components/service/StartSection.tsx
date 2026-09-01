@@ -29,14 +29,20 @@ export function StartSection({
       <div className="absolute top-8 right-10 text-gray-500 text-xs select-none">
         빌드 {process.env.NEXT_PUBLIC_BUILD_DATE}
       </div>
-      <div className="main-container flex flex-col items-center max-w-[92vw]">
+      {/* max-w는 vw가 아니라 스테이지 디자인 캔버스(가로 1920/세로 1080) 기준 고정 px로 잡는다 —
+          이 스테이지는 transform: scale()로 축소되는데 vw는 그 transform 영향을 안 받고 실제
+          브라우저 뷰포트 기준으로 계산돼, 실기기 해상도가 디자인 캔버스와 정확히 안 맞으면
+          (거의 항상 그렇다) 의도한 비율보다 좁아져 안내 문구가 줄바꿈되는 문제가 있었다. */}
+      <div className="main-container flex flex-col items-center max-w-[1766px] portrait:max-w-[994px]">
         {/* 버튼 대신 깜빡이는 안내 문구 — 화면 아무 곳이나 터치하면 시작(section onClick) */}
         <div
-          className="flex items-center gap-4 text-white text-6xl portrait:text-7xl font-extrabold animate-soft-blink select-none max-w-[90vw] text-center"
+          className="flex items-center gap-4 text-white text-6xl portrait:text-7xl font-extrabold animate-soft-blink select-none max-w-[1728px] portrait:max-w-[972px] text-center"
           style={{ textShadow: "0 2px 15px rgba(0,0,0,0.5)" }}
         >
           <span className="inline-block text-5xl portrait:text-6xl">&#128070;</span>
-          {t("start.touch")}
+          {/* whitespace-pre-line: 번역문에 \n이 있으면(현재 일본어만) 그 지점에서 줄바꿈,
+              없으면 기존처럼 한 줄. leading-none으로 2줄일 때도 줄간격이 벌어지지 않게 한다. */}
+          <span className="whitespace-pre-line leading-none">{t("start.touch")}</span>
         </div>
 
         {/* 언어 선택 — 결제 화면으로 이동. 결제 비활성 시에만 여기 표시. */}
