@@ -1845,7 +1845,9 @@ export function CameraSection({
               {/* whitespace-pre-line: 번역문에 \n이 있으면 그 지점에서 줄바꿈. 한국어는 자동
                   줄바꿈에 맡기면 좁은 화면에서 단어 중간이 끊겨 보일 수 있어 어절 경계에
                   \n을 미리 넣어 항상 깔끔하게 2줄로 보이게 한다. */}
-              <p className={`text-white font-extrabold text-xl leading-snug whitespace-pre-line ${currentBgEffect ? "text-left" : ""}`}>
+              {/* 이모지 글리프 자체의 좌우 여백이 비대칭이라(폰트 내장), justify-center로
+                  그룹을 중앙 정렬해도 텍스트가 한쪽으로 쏠려 보인다 — px-4로 상쇄. */}
+              <p className={`text-white font-extrabold text-xl leading-snug whitespace-pre-line ${currentBgEffect ? "text-left px-4" : ""}`}>
                 {t("camera.palmHint")}
               </p>
             </div>
@@ -1856,7 +1858,7 @@ export function CameraSection({
                 </div>
                 {/* 영어 번역문은 \n으로 2줄에 균형 있게 나뉘도록 강제한다 — 그냥 두면 자동
                     줄바꿈이 3줄로 떨어져(위 손바닥 안내는 2줄인데) 박스 높이가 들쭉날쭉해 보였다. */}
-                <p className="text-white font-extrabold text-xl leading-snug whitespace-pre-line text-left">
+                <p className="text-white font-extrabold text-xl leading-snug whitespace-pre-line text-left px-4">
                   {t("camera.effectHint")}
                 </p>
               </div>
