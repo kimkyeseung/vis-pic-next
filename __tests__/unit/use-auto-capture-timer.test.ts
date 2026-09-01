@@ -137,4 +137,62 @@ describe("useAutoCaptureTimer", () => {
     act(() => { vi.advanceTimersByTime(15000); });
     expect(onFire).not.toHaveBeenCalled();
   });
+
+  // ── 길게 눌러 일시정지/재개 ─────────────────────────────────────────────
+  it("togglePause()로 일시정지하면 시간이 지나도 autoTimer가 그대로 멈춰있고 onFire도 안 불린다", () => {
+    const onFire = vi.fn();
+    const { result } = renderHook(() => useAutoCaptureTimer({ ...defaults, seconds: 10, onFire }));
+
+    act(() => { vi.advanceTimersByTime(0); });
+    act(() => { vi.advanceTimersByTime(3000); });
+    expect(result.current.autoTimer).toBe(7);
+
+    act(() => { result.current.togglePause(); });
+    expect(result.current.paused).toBe(true);
+
+    act(() => { vi.advanceTimersByTime(20000); });
+    expect(result.current.autoTimer).toBe(7);
+    expect(onFire).not.toHaveBeenCalled();
+  });
+
+  it("일시정지 후 재개하면 멈췄던 시점의 남은 시간부터 이어서 카운트다운한다", () => {
+    const onFire = vi.fn();
+    const { result } = renderHook(() => useAutoCaptureTimer({ ...defaults, seconds: 10, onFire }));
+
+    act(() => { vi.advanceTimersByTime(0); });
+    act(() => { vi.advanceTimersByTime(3000); });
+    expect(result.current.autoTimer).toBe(7);
+
+    act(() => { result.current.togglePause(); }); // 일시정지
+    act(() => { vi.advanceTimersByTime(8000); }); // 정지 중 시간 경과(발동 안 해야 함)
+    act(() => { result.current.togglePause(); }); // 재개
+    expect(result.current.paused).toBe(false);
+
+    // 재개 직후엔 아직 7초 남아있어야 한다
+    act(() => { vi.advanceTimersByTime(0); });
+    expect(result.current.autoTimer).toBe(7);
+    expect(onFire).not.toHaveBeenCalled();
+
+    // 재개 후 7초가 더 지나야 발동한다
+    act(() => { vi.advanceTimersByTime(6000); });
+    expect(onFire).not.toHaveBeenCalled();
+    act(() => { vi.advanceTimersByTime(1000); });
+    expect(onFire).toHaveBeenCalledTimes(1);
+  });
+
+  it("새 촬영 사이클이 시작되면(photosCount 변경) paused가 초기화된다", () => {
+    const onFire = vi.fn();
+    const { result, rerender } = renderHook(
+      ({ photosCount }: { photosCount: number }) =>
+        useAutoCaptureTimer({ ...defaults, seconds: 10, photosCount, onFire }),
+      { initialProps: { photosCount: 0 } },
+    );
+
+    act(() => { vi.advanceTimersByTime(0); });
+    act(() => { result.current.togglePause(); });
+    expect(result.current.paused).toBe(true);
+
+    rerender({ photosCount: 1 });
+    expect(result.current.paused).toBe(false);
+  });
 });

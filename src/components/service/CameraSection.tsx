@@ -1331,7 +1331,7 @@ export function CameraSection({
   }, [countdown, photos.length, maxPhotos, config.captureSeconds, onCapture, snapshotWithStickers, captureHiRes, stopEffect]);
 
   // 자동 촬영 타이머 (훅으로 분리 — 회귀 방지 이유는 useAutoCaptureTimer 참고).
-  const { autoTimer, cancel: cancelAutoTimer } = useAutoCaptureTimer({
+  const { autoTimer, cancel: cancelAutoTimer, paused: autoTimerPaused, togglePause: toggleAutoTimerPause } = useAutoCaptureTimer({
     photosCount: photos.length,
     maxPhotos,
     countdown,
@@ -1783,7 +1783,14 @@ export function CameraSection({
             </div>
           )}
           {autoTimer !== null && countdown === null && photos.length < maxPhotos && (
-            <CircularTimer value={autoTimer} total={config.cameraAutoTimerSeconds} size={72} positionClass="top-4 right-4" />
+            <CircularTimer
+              value={autoTimer}
+              total={config.cameraAutoTimerSeconds}
+              size={72}
+              positionClass="top-4 right-4"
+              onLongPress={toggleAutoTimerPause}
+              paused={autoTimerPaused}
+            />
           )}
           {countdown !== null && (
             <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
