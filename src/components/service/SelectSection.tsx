@@ -100,7 +100,7 @@ export function SelectSection({
       nextDisabled={!canProceed}
     >
       {/* 사진 영역(1fr)이 위로 넘쳐 문구와 겹치지 않도록 하단 여백으로 간격 확보. */}
-      <p className="text-gray-400 text-xl mb-12 portrait:mb-8 animate-fadeInDown">
+      <p className="text-gray-400 text-3xl portrait:text-4xl mb-12 portrait:mb-8 animate-fadeInDown">
         {t("select.count", { req: requiredCount, sel: filledCount })}
       </p>
 
