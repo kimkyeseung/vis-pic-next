@@ -1497,7 +1497,11 @@ export function CameraSection({
         // (최상단 행 minmax(4.5rem) — 좌측 상단 로고 오버레이와 겹치지 않도록 최소 높이 확보)
         ...(isPortrait
           ? {
-              gridTemplateColumns: showBgStrip ? "1fr 1fr" : "1fr",
+              // "1fr"만 쓰면 트랙 최소 폭이 auto(=내용의 min-content)라, "preview" 캔버스가
+              // width/height 속성(카메라 해상도, 예: UHD 2880px)만큼의 intrinsic 크기를
+              // 요구해 그리드 전체가 부풀며 좌측 bg 패널이 화면 밖으로 밀려났다.
+              // minmax(0, 1fr)로 트랙이 화면 폭 안으로 정상 축소되게 한다.
+              gridTemplateColumns: showBgStrip ? "minmax(0, 1fr) minmax(0, 1fr)" : "minmax(0, 1fr)",
               gridTemplateRows: "minmax(4.5rem, auto) minmax(0, 1.1fr) minmax(0, 1fr)",
               gridTemplateAreas: showBgStrip
                 ? '"title title" "preview preview" "bg sticker"'
@@ -1798,8 +1802,13 @@ export function CameraSection({
 
           {/* 스티커 영역은 항상 2줄 높이로 고정(스티커가 없거나 8개 초과여도 동일 크기).
               aspect-[1.9/1]: 4열 정사각 타일 2줄 높이에 맞춘 비율(폭에 따라 세로/가로 모두 2줄 유지).
-              9개 이상이면 이 고정 높이 안에서 세로 스크롤. */}
-          <div className="aspect-[1.9/1] shrink-0 overflow-y-auto bg-black/20 rounded-2xl p-2">
+              9개 이상이면 이 고정 높이 안에서 세로 스크롤.
+              배경 제거 모드가 꺼져 배경 패널 없이 이 컬럼이 훨씬 넓어지는 경우, 폭에 비례해
+              늘어난 aspect-ratio 높이가 아래 안내 박스를 침범해 겹쳐 보였다 — max-w로 폭 자체를
+              막아 비율에서 나오는 높이도 함께 억제하고, mx-auto로 넓어진 컬럼 안에서 중앙 정렬한다.
+              aspect-ratio로 계산한 박스 높이와 실제 타일 2줄 높이(패딩·gap 반영)가 정확히
+              들어맞지 않아 하단에 여백이 살짝 남는다 — flex justify-center로 흡수한다. */}
+          <div className="aspect-[1.9/1] max-w-[480px] mx-auto shrink-0 overflow-y-auto bg-black/20 rounded-2xl p-2 flex flex-col justify-center">
             {dbStickerImages.length === 0 ? (
               <p className="flex h-full items-center justify-center text-center text-white/40 text-sm">
                 {t("camera.noStickers")}
@@ -1837,7 +1846,9 @@ export function CameraSection({
             횟수" 박스와 겹쳐 보이는 버그가 있었다. */}
         <div className="flex-1 flex items-start mb-2">
           <div className="w-full rounded-2xl overflow-hidden border border-[var(--theme-primary,#6c6fb4)]/50 bg-[var(--theme-primary,#6c6fb4)]/10">
-            <div className={currentBgEffect ? "flex items-center justify-center gap-4 px-6 py-6" : "text-center px-6 py-6"}>
+            {/* 세로 모드는 두 안내가 한 박스 안에 나란히 들어가 py-6이면 높이가 넘쳐 아래
+                박스와 겹쳤다 — 세로에서만 py-3으로 줄인다(가로는 원래대로 유지). */}
+            <div className={currentBgEffect ? "flex items-center justify-center gap-4 px-6 py-6 portrait:py-3" : "text-center px-6 py-6 portrait:py-3"}>
               <div className={currentBgEffect ? "text-5xl shrink-0 animate-soft-blink select-none" : "text-5xl mb-2 animate-soft-blink select-none"} aria-hidden>✋</div>
               {/* break-keep(word-break: keep-all)를 쓰지 않는다 — 한국어/영어는 공백 기준으로
                   잘 줄바꿈되지만, 일본어·중국어 문구는 공백이 없어 keep-all이면 줄바꿈 지점을
@@ -1852,7 +1863,7 @@ export function CameraSection({
               </p>
             </div>
             {currentBgEffect && (
-              <div className="flex items-center justify-center gap-4 px-6 py-6 border-t border-[var(--theme-primary,#6c6fb4)]/30">
+              <div className="flex items-center justify-center gap-4 px-6 py-6 portrait:py-3 border-t border-[var(--theme-primary,#6c6fb4)]/30">
                 <div className="text-5xl shrink-0 select-none" aria-hidden>
                   {getGestureEmoji(currentBgEffect.gesture) ?? "🤚"}
                 </div>
