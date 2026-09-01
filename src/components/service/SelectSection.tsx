@@ -74,22 +74,35 @@ export function SelectSection({
   // requiredCount<4인 프레임도 촬영본만 4장이면 같은 좌우 배치를 탄다. 진짜 4컷은 아래
   // 310px/64 배율로 튜닝돼 있으므로, 그 값을 그대로 쓰는 건 진짜 4컷일 때만으로 좁힌다.
   const isGenuineFourCut = fourShotColumn && requiredCount === 4;
+  // 4컷인데 촬영본이 4장이 아닌 경우(예: 촬영 매수가 슬롯보다 많아 페이지 넘김이 생김) —
+  // fourShotColumn 전용 배치를 못 타고 기본(2×2 그리드 + 세로 스택) 레이아웃을 쓰는데, 이 기본
+  // 배치는 세로 화면 폭 튜닝만 있고 높이는 안 줄여서 미리보기 그림자가 "다음으로" 버튼과
+  // 거의 맞닿는다(실측 여유 2.5px, 그림자 번짐으로 시각적으로 겹쳐 보임). 세로 화면에서만
+  // 콘텐츠 블록을 40px 위로 올려(margin-bottom을 그 2배인 80px 줘서 중앙 정렬이 위로 밀리게)
+  // 여유를 만든다.
+  const genericFourCutOverlapFix = requiredCount === 4 && !fourShotColumn;
   // 촬영본 2장(1컷 등): 좌우로 나란히 두면 세로 1행이라 오른쪽 큰 미리보기보다 훨씬 낮다.
   // 세로 1열로 쌓아 두 장 합 높이가 미리보기 높이(가로 용지 기준 ≈500)와 맞도록 한다.
   const twoShotColumn = photos.length === 2;
-  // 1컷(가로 용지 + 촬영본 2장): 세로 화면에서 위쪽 사진과 아래 미리보기의 좌우 폭을 맞추고,
-  // 콘텐츠가 세로 공간을 채우도록 넓혀 타이틀↔콘텐츠 사이 여백(세로 중앙 정렬 여백)을 줄인다.
-  // 사진 폭 portrait:w-[560px] ↔ 미리보기 폭 15×37=555로 맞춘다(세로로 넘치지 않는 최대치).
+  // 1컷(가로 용지 + 촬영본 2장): 세로 화면에서 위쪽 사진과 아래 미리보기의 좌우 폭을 맞춘다.
+  // 사진 폭 560 · 미리보기 15×37=555였을 때 실측 결과 스택 높이(≈1253px)가 세로 중앙 정렬
+  // 여백을 넘어서 하단 "다음으로" 버튼과 26px 겹쳤다 — 폭을 495(=15×33)로 줄여 스택 높이를
+  // ≈1113px로 낮추고 버튼과 ≈44px 여유를 확보한다. 사진·미리보기 폭은 계속 동일하게 유지.
   // 가로 화면은 기존 배율(previewScale=50)을 유지한다.
   const oneCutColumn = twoShotColumn && !previewIsPortrait;
-  const oneCutPortraitScale = 37;
+  const oneCutPortraitScale = 33;
   // 세로 화면 진짜 4컷: 미리보기 높이를 왼쪽 사진 1열 높이와 맞춘다.
   // 사진 폭 310px·4장(4:3) → 컬럼 높이 ≈ 3×310+gap48 = 978px, 미리보기 15cm×64 ≈ 960px로 정합.
   // (사진·미리보기를 같은 비율로 줄여 좌우 여백을 확보) 가로 용지는 세로 화면 폭에 맞춰 더 작게 잡는다.
   const portraitBigScale = previewIsPortrait ? 64 : 46;
-  // fourShotColumn이지만 진짜 4컷은 아닌 경우(예: 2컷, 촬영본만 4장) — 사진 폭을 270px로
-  // 줄인 만큼(컬럼 높이 ≈ 3×270+gap48 ≈ 858px) 미리보기 배율도 같은 비율로 낮춰 높이를 맞춘다.
-  const fourPhotoNonCutBigScale = Math.round(portraitBigScale * (270 / 310));
+  // fourShotColumn이지만 진짜 4컷은 아닌 경우(예: 2컷, 촬영본만 4장) — 사진 폭 270px(컬럼 높이
+  // ≈858px)에 맞춰 미리보기 배율도 낮췄더니, 좌우 폭이 페이지 패딩 가이드(952px)에 한참
+  // 못 미쳐 여백이 커 보였다. 사진 폭을 300px로 키우고(컬럼 높이 ≈948px, 세로 여유 충분)
+  // 미리보기 배율도 같은 비율로 올려 폭 합계(300+gap24+미리보기620=944px)가 가이드에 맞도록 한다.
+  // Tailwind는 arbitrary 값을 소스에서 정적으로 찾아야 하므로 아래 JSX의 리터럴
+  // "portrait:w-[300px]"과 이 값을 함께 바꿔야 한다.
+  const fourPhotoNonCutWidth = 300;
+  const fourPhotoNonCutBigScale = Math.round(portraitBigScale * (fourPhotoNonCutWidth / 310));
 
   const [page, setPage] = useState(0);
   const pageCount = Math.max(1, Math.ceil(photos.length / PAGE_SIZE));
@@ -113,7 +126,7 @@ export function SelectSection({
       </p>
 
       <div className="min-h-0 w-full flex items-center justify-center">
-      <div className={`flex items-center justify-center gap-12 max-w-[1550px] max-h-full animate-fadeInUp ${fourShotColumn ? "portrait:gap-6" : "portrait:flex-col portrait:items-center portrait:gap-6"}`}>
+      <div className={`flex items-center justify-center gap-12 max-w-[1550px] max-h-full animate-fadeInUp ${fourShotColumn ? "portrait:gap-6" : "portrait:flex-col portrait:items-center portrait:gap-6"} ${genericFourCutOverlapFix ? "portrait:mb-20" : ""}`}>
         {/* 촬영본이 많으면 4장씩 페이지로 나눠 좌우 화살표로 넘긴다 */}
         {/* fourShotColumn은 세로에서도 썸네일 열과 미리보기가 나란히(좌우 배치) 있는 유일한
             경우라, 페이지 좌우 여백(portrait:px-16)을 넣고 나면 폭이 빠듯해 미리보기 카드와
@@ -140,7 +153,7 @@ export function SelectSection({
                 return (
                   <div
                     key={i}
-                    className={`photo-thumbnail w-80 ${fourShotColumn ? (isGenuineFourCut ? "portrait:w-[310px]" : "portrait:w-[270px]") : oneCutColumn ? "portrait:w-[560px]" : "portrait:w-[420px]"} bg-black/30 relative overflow-hidden ${isSelected ? "selected" : ""}`}
+                    className={`photo-thumbnail w-80 ${fourShotColumn ? (isGenuineFourCut ? "portrait:w-[310px]" : "portrait:w-[300px]") : oneCutColumn ? "portrait:w-[495px]" : "portrait:w-[420px]"} bg-black/30 relative overflow-hidden ${isSelected ? "selected" : ""}`}
                     style={{ aspectRatio: "auto" }}
                     onClick={() => handlePhotoTap(i)}
                   >
