@@ -110,6 +110,16 @@ export function CompleteSection({
   // 배치일 때만 사진 쪽 상한을 더 낮춰 QR 카드와 비슷한 높이로 맞춘다.
   const photoMaxHClass = !isLandscapeResult && !stacked ? "max-h-[550px]" : "max-h-[650px]";
 
+  // 정사각형 QR 박스(흰 배경 + 패딩 + QR) 자체 — 두 분기(matchHeight/기본)가 같은 정사각형
+  // 로직을 공유하게 한다. 실제 크기 제약(가용 공간에 맞출지, 고정 220px로 둘지 등)은 호출부가
+  // sizeClass로 넘긴다. aspect-square라 폭·높이 중 어느 쪽으로 제약을 걸어도 항상 정사각형을
+  // 유지하며, w-full h-full인 QR이 패딩을 제외한 안쪽을 정확히 채운다.
+  const renderQRBox = (url: string, sizeClass: string) => (
+    <div className={`bg-white p-4 rounded-xl cursor-pointer aspect-square ${sizeClass}`} onDoubleClick={() => openDebugUrl(url)}>
+      <QRCodeSVG value={url} size={220} className="w-full h-full" />
+    </div>
+  );
+
   // QR 다운로드 카드 1개 렌더. matchHeight면 카드가 프레임 높이에 stretch되고 QR이 남은
   // 세로 공간에 맞춰 반응형으로 축소된다(라벨은 고정, QR 박스만 flex-1로 늘고 줆).
   const renderQRCard = (url: string, emoji: string, label: string) => (
@@ -122,18 +132,11 @@ export function CompleteSection({
         // 박스 여백이 상하좌우 고르게 보인다 — h-full처럼 한쪽을 고정하면 남는 공간만큼
         // 박스가 직사각형이 되어 QR 주변 패딩이 불균일해진다.
         <div className="flex-1 min-h-0 w-full flex items-center justify-center">
-          <div className="bg-white p-4 rounded-xl cursor-pointer aspect-square max-h-full max-w-full" onDoubleClick={() => openDebugUrl(url)}>
-            <QRCodeSVG value={url} size={220} className="h-full w-full" />
-          </div>
+          {renderQRBox(url, "max-h-full max-w-full")}
         </div>
       ) : (
-        <div
-          className="bg-white p-4 rounded-xl cursor-pointer portrait:w-full portrait:flex portrait:items-center portrait:justify-center"
-          onDoubleClick={() => openDebugUrl(url)}
-        >
-          {/* 가로: 고정 220px. 세로: 카드 폭에 맞춰 확대(상한 300px). */}
-          <QRCodeSVG value={url} size={220} className="portrait:h-auto portrait:w-full portrait:max-w-[300px]" style={{ aspectRatio: "1 / 1" }} />
-        </div>
+        // 가로: 고정 220px 정사각형. 세로: 카드 폭에 맞춰 확대(상한 300px) 정사각형.
+        renderQRBox(url, "w-[220px] portrait:w-full portrait:max-w-[300px]")
       )}
       <p className="text-gray-400 text-sm portrait:text-lg mt-3 shrink-0">{t("complete.qrScan")}</p>
     </div>
