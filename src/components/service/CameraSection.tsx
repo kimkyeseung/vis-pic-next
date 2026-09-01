@@ -1509,7 +1509,7 @@ export function CameraSection({
   return (
     <section
       ref={sectionRef}
-      className="w-full h-full relative z-10 p-12 pb-60 portrait:pb-52"
+      className="w-full h-full relative z-10 p-12 pb-60 portrait:px-16 portrait:pb-52"
       style={{
         display: "grid",
         gap: "1rem",
@@ -1816,8 +1816,11 @@ export function CameraSection({
       <div className="flex flex-col min-h-0 pl-4 overflow-y-auto" style={{ gridArea: "sticker" }}>
         <h3 className="text-white text-2xl font-bold text-center mb-4 shrink-0">{t("camera.stickerPrompt")}</h3>
 
-        {/* 스티커 패널 (상시 노출) */}
-        <div className="flex flex-col min-h-0 mb-2">
+        {/* 스티커 패널 (상시 노출) — shrink-0: 이 래퍼가 min-h-0라 부모(stickerCol)의
+            flex-shrink 배분 대상이 되면, 안의 그리드(shrink-0, aspect-ratio 고정 높이)는
+            더 줄어들지 못하고 래퍼 밖으로 그대로 넘쳐(overflow) 아래 안내 박스와 겹쳐 보였다.
+            래퍼를 shrink-0으로 고정해 공간 부족분이 전부 안내 박스(flex-1) 쪽으로만 가게 한다. */}
+        <div className="flex flex-col shrink-0 mb-2">
           <div className="flex items-center justify-end mb-2 min-h-[22px]">
             {stickers.length > 0 && (
               <button
@@ -1836,8 +1839,12 @@ export function CameraSection({
               늘어난 aspect-ratio 높이가 아래 안내 박스를 침범해 겹쳐 보였다 — max-w로 폭 자체를
               막아 비율에서 나오는 높이도 함께 억제하고, mx-auto로 넓어진 컬럼 안에서 중앙 정렬한다.
               aspect-ratio로 계산한 박스 높이와 실제 타일 2줄 높이(패딩·gap 반영)가 정확히
-              들어맞지 않아 하단에 여백이 살짝 남는다 — flex justify-center로 흡수한다. */}
-          <div className="aspect-[1.9/1] max-w-[480px] mx-auto shrink-0 overflow-y-auto bg-black/20 rounded-2xl p-2 flex flex-col justify-center">
+              들어맞지 않아 하단에 여백이 살짝 남는다 — flex justify-center로 흡수한다.
+              w-full 없이 mx-auto만 있으면 flex 자식의 기본 stretch 정렬이 auto-margin
+              때문에 무효화돼 박스가 콘텐츠 크기로 줄어든다 — 스티커 로딩 전 "없음" 문구만
+              있을 때 박스가 글자 폭(≈126px)까지 쪼그라들던 원인. w-full로 항상 그리드 폭
+              그대로 유지한다. */}
+          <div className="aspect-[1.9/1] w-full max-w-[480px] mx-auto shrink-0 overflow-y-auto bg-black/20 rounded-2xl p-2 flex flex-col justify-center">
             {dbStickerImages.length === 0 ? (
               <p className="flex h-full items-center justify-center text-center text-white/40 text-sm">
                 {t("camera.noStickers")}
@@ -1906,10 +1913,10 @@ export function CameraSection({
           </div>
         </div>
 
-        {/* 남은 촬영 횟수 — 세로에선 좌측 배경 선택 패널의 보이는 끝선과 맞도록 높이를 줄이고(py-3)
-            위로 올린다(mb-[8.625rem]). 위쪽 여백(팔 안내와의 간격)도 함께 줄어든다. */}
+        {/* 남은 촬영 횟수 — 가로에서도 좌측 배경 선택 패널의 보이는 끝선과 맞도록 위로 올린다
+            (mb-[212px]). 세로에선 별도로 높이를 줄이고(py-3) 위로 올린다(mb-[8.625rem]). */}
         <div
-          className="shrink-0 w-full text-center border border-dashed border-white/30 rounded-xl py-3 portrait:mb-[8.625rem]"
+          className="shrink-0 w-full text-center border border-dashed border-white/30 rounded-xl py-3 mb-[212px] portrait:mb-[8.625rem]"
           style={{ boxShadow: "0 0 34px -10px var(--theme-primary, #6c6fb4)" }}
         >
           <span className="text-white font-bold text-3xl">

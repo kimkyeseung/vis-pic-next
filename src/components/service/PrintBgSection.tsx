@@ -22,7 +22,7 @@ export function PrintBgSection({
 
   return (
     <SectionShell title={t("printbg.title")} onPrev={onPrev} onNext={onNext} nextDisabled={selectedPrintBg === null}>
-      <div className="min-h-0 w-full flex items-center justify-center px-10">
+      <div className="min-h-0 w-full flex items-center justify-center px-10 portrait:px-16">
         {/* 배경 선택 단계와 동일한 그리드로 맞춘다(w-full·max-w-[1320px]·gap-6, 6개 → 3×2 / 세로 2×3). */}
         <div className="grid grid-cols-3 gap-6 w-full max-w-[1320px] animate-fadeInUp portrait:grid-cols-2 portrait:gap-6">
           {printBgImages.map((bg) => (
