@@ -172,7 +172,7 @@ export default function DevicesPage() {
 
       {cloneTarget && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
-          <div className="bg-gray-800 rounded-xl p-6 w-full max-w-md border border-gray-700">
+          <div className="bg-gray-800 rounded-xl p-6 w-full max-w-md border border-gray-700 max-h-[90vh] overflow-y-auto">
             <h3 className="text-lg font-bold text-white mb-4">
               장치 복제: {cloneTarget.name}
             </h3>

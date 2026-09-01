@@ -337,7 +337,7 @@ export function AccountsClient({ currentAdminId }: AccountsClientProps) {
       {/* 계정 추가 모달 */}
       {showAddModal && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
-          <div className="bg-gray-800 rounded-xl border border-gray-700 p-6 w-full max-w-md">
+          <div className="bg-gray-800 rounded-xl border border-gray-700 p-6 w-full max-w-md max-h-[90vh] overflow-y-auto">
             <h3 className="text-white font-bold text-lg mb-4">계정 추가</h3>
             <form onSubmit={handleAddSubmit} className="space-y-4">
               <div>
@@ -394,7 +394,7 @@ export function AccountsClient({ currentAdminId }: AccountsClientProps) {
       {/* 비밀번호 변경 모달 */}
       {pwModal && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
-          <div className="bg-gray-800 rounded-xl border border-gray-700 p-6 w-full max-w-md">
+          <div className="bg-gray-800 rounded-xl border border-gray-700 p-6 w-full max-w-md max-h-[90vh] overflow-y-auto">
             <h3 className="text-white font-bold text-lg mb-1">비밀번호 변경</h3>
             <p className="text-gray-400 text-sm mb-4">{pwModal.username}</p>
             <form onSubmit={handlePwSubmit} className="space-y-4">
