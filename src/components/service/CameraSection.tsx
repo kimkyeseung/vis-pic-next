@@ -233,6 +233,9 @@ export function CameraSection({
   const effectBgVideoRef = useRef<HTMLVideoElement | null>(null); // transition 배경용 이펙트 영상(루프)
   const effectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const effectDurationRef = useRef(0);
+  // 이펙트가 실제로 시작된 시각(performance.now()) — 촬영으로 붙잡아 두었다가 풀어줄 때
+  // 남은 재생 시간(설정된 지속시간 - 경과 시간)을 계산해 원래 지속시간만큼만 재생되게 한다.
+  const effectStartedAtRef = useRef(0);
   // 합성 루프(무-deps)가 최신 표시 상태를 읽도록 ref로 보관 + 페이드용 현재 알파(0~1).
   const effectVisibleRef = useRef(false);
   const effectAlphaRef = useRef(0);
@@ -318,8 +321,13 @@ export function CameraSection({
     const v = backEffectRef.current;
     const durationMs = effectDurationRef.current;
     if (!v || durationMs <= 0) return;
+    // 이미 재생 중(화면에 보이는 상태)이면 재트리거는 무시한다. currentTime을 0으로 되감으면
+    // 방금까지 꽉 차 보이던 이펙트가 빈 시작 프레임으로 리셋돼, 그 직후 촬영하면 사진에
+    // 효과가 안 담긴 것처럼 보이는 문제가 있었다(재생 중엔 그대로 두고 흘러가게 둔다).
+    if (effectVisibleRef.current) return;
     if (effectTimerRef.current) { clearTimeout(effectTimerRef.current); effectTimerRef.current = null; }
     setEffectVisible(true);
+    effectStartedAtRef.current = performance.now();
     try { v.currentTime = 0; } catch {}
     // 카운트다운 중 재트리거면 duration 타이머·onEnded로 중간에 꺼지지 않게 loop로 유지한다.
     // (capturePhoto가 스냅샷 후 loop 해제·정리 — 재발동 시에도 사진에 이펙트가 담기도록.)
@@ -1279,13 +1287,16 @@ export function CameraSection({
           capturedPreviewTimerRef.current = setTimeout(() => setCapturedPreview(null), 1000);
         }
 
-        // 스냅샷을 마쳤으면 붙잡아 둔 이펙트를 원상복귀(루프 해제)하고 정리(페이드아웃).
-        // 시작 시 hold였든 카운트다운 중 재트리거로 붙잡혔든(playEffect가 loop 유지),
-        // 스냅샷 시점 실제 상태를 기준으로 정리한다 — 촬영 후 이펙트가 무한 루프하지 않도록.
+        // 스냅샷을 마쳤으면 붙잡아 둔 이펙트의 루프는 풀어주되(무한 루프 방지), 바로 끄지 않고
+        // 원래 설정된 지속시간(effectDuration) 중 남은 시간만큼은 계속 재생되게 둔다 —
+        // 시작 시 hold였든 카운트다운 중 재트리거로 붙잡혔든 effectStartedAtRef 기준으로 계산.
         if (holdEffect || effectVisibleRef.current) {
           const ev = backEffectRef.current;
           if (ev) ev.loop = false;
-          stopEffect();
+          if (effectTimerRef.current) { clearTimeout(effectTimerRef.current); effectTimerRef.current = null; }
+          const remaining = effectDurationRef.current - (performance.now() - effectStartedAtRef.current);
+          if (remaining > 0) effectTimerRef.current = setTimeout(stopEffect, remaining);
+          else stopEffect();
         }
 
         // 촬영 순간 셔터음 재생 + 플래시
