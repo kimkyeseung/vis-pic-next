@@ -300,7 +300,7 @@ export function BackgroundRemovalPreviewDialog({
   return (
     <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-[100]" onClick={onClose}>
       <div
-        className="bg-gray-800 rounded-xl p-6 border border-gray-700 max-w-2xl w-full mx-4"
+        className="bg-gray-800 rounded-xl p-6 border border-gray-700 max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between mb-4">
