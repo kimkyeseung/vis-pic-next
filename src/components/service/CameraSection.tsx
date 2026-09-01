@@ -1812,8 +1812,12 @@ export function CameraSection({
         </button>
       </div>
 
-      {/* 우측(가로)·우하단(세로): 스티커 패널 */}
-      <div className="flex flex-col min-h-0 pl-4 overflow-y-auto" style={{ gridArea: "sticker" }}>
+      {/* 우측(가로)·우하단(세로): 스티커 패널.
+          overflow-auto였던 걸 제거 — "남은 촬영 횟수" 박스의 boxShadow 글로우가 우측 여백 없이
+          이 컬럼 우측 끝(페이지 패딩선)에 딱 붙어 있어, overflow가 있으면 글로우가 그대로
+          잘려 안 보였다. 스티커 그리드 자체는 이미 shrink-0(위)이라 컬럼 밖으로 안 넘치고,
+          8개 초과 스크롤은 그리드 박스 자체의 overflow-y-auto로 별도 처리된다. */}
+      <div className="flex flex-col min-h-0 pl-4" style={{ gridArea: "sticker" }}>
         <h3 className="text-white text-2xl font-bold text-center mb-4 shrink-0">{t("camera.stickerPrompt")}</h3>
 
         {/* 스티커 패널 (상시 노출) — shrink-0: 이 래퍼가 min-h-0라 부모(stickerCol)의
