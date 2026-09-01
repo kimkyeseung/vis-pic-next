@@ -1828,7 +1828,13 @@ export function CameraSection({
           <div className="w-full rounded-2xl overflow-hidden border border-[var(--theme-primary,#6c6fb4)]/50 bg-[var(--theme-primary,#6c6fb4)]/10">
             <div className={currentBgEffect ? "flex items-center justify-center gap-4 px-6 py-6" : "text-center px-6 py-6"}>
               <div className={currentBgEffect ? "text-5xl shrink-0 animate-soft-blink select-none" : "text-5xl mb-2 animate-soft-blink select-none"} aria-hidden>✋</div>
-              <p className={`text-white font-extrabold text-xl leading-snug break-keep ${currentBgEffect ? "text-left" : ""}`}>
+              {/* break-keep(word-break: keep-all)를 쓰지 않는다 — 한국어/영어는 공백 기준으로
+                  잘 줄바꿈되지만, 일본어·중국어 문구는 공백이 없어 keep-all이면 줄바꿈 지점을
+                  못 찾아 박스 밖으로 넘쳐 overflow-hidden에 잘려 보이는 문제가 있었다. */}
+              {/* whitespace-pre-line: 번역문에 \n이 있으면 그 지점에서 줄바꿈. 한국어는 자동
+                  줄바꿈에 맡기면 좁은 화면에서 단어 중간이 끊겨 보일 수 있어 어절 경계에
+                  \n을 미리 넣어 항상 깔끔하게 2줄로 보이게 한다. */}
+              <p className={`text-white font-extrabold text-xl leading-snug whitespace-pre-line ${currentBgEffect ? "text-left" : ""}`}>
                 {t("camera.palmHint")}
               </p>
             </div>
@@ -1837,7 +1843,9 @@ export function CameraSection({
                 <div className="text-5xl shrink-0 select-none" aria-hidden>
                   {getGestureEmoji(currentBgEffect.gesture) ?? "🤚"}
                 </div>
-                <p className="text-white font-extrabold text-xl leading-snug break-keep text-left">
+                {/* 영어 번역문은 \n으로 2줄에 균형 있게 나뉘도록 강제한다 — 그냥 두면 자동
+                    줄바꿈이 3줄로 떨어져(위 손바닥 안내는 2줄인데) 박스 높이가 들쭉날쭉해 보였다. */}
+                <p className="text-white font-extrabold text-xl leading-snug whitespace-pre-line text-left">
                   {t("camera.effectHint")}
                 </p>
               </div>

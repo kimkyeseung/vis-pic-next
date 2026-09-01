@@ -40,8 +40,10 @@ const ko = {
   "camera.bgChange": "배경 변경이 가능해요!",
   "camera.stickerPrompt": "스티커를 추가해 보세요!",
   "camera.remaining": "남은 촬영 횟수 {n}",
-  "camera.palmHint": "손바닥을 펼치면 자동으로 촬영됩니다!",
-  "camera.effectHint": "이 동작을 하면 특별한 효과가 나와요!",
+  // 박스 폭이 좁은 화면에서는 자동 줄바꿈이 "촬영됩니 / 다!"처럼 단어 중간에서 끊겨 보였다.
+  // 자연스러운 어절 경계에서 미리 두 줄로 나눠 항상 깔끔하게 보이도록 한다.
+  "camera.palmHint": "손바닥을 펼치면\n자동으로 촬영됩니다!",
+  "camera.effectHint": "이 동작을 하면\n특별한 효과가 나와요!",
   "camera.noStickers": "업로드된 스티커가 없습니다",
   "camera.clearStickers": "전체 삭제",
   "camera.aiLoading": "AI 모델 로딩 중...",
@@ -112,7 +114,9 @@ const en: Record<MessageKey, string> = {
   "camera.stickerPrompt": "Try adding stickers!",
   "camera.remaining": "Shots left: {n}",
   "camera.palmHint": "Open your palm to capture automatically!",
-  "camera.effectHint": "Do this gesture to trigger a special effect!",
+  // 자동 줄바꿈에 맡기면 안내 박스 폭에서 3줄로 떨어져(손바닥 안내는 2줄) 높이가 들쭉날쭉해
+  // 보인다. 두 줄 중 아래쪽 줄 길이를 손바닥 안내 첫 줄과 비슷하게(25자 안팎) 맞춰 균형 잡았다.
+  "camera.effectHint": "Do this gesture to\ntrigger a special effect!",
   "camera.noStickers": "No stickers uploaded",
   "camera.clearStickers": "Clear All",
   "camera.aiLoading": "Loading AI model...",
