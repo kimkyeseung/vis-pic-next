@@ -24,6 +24,11 @@ import { CompleteSection } from "@/components/service/CompleteSection";
 import { DebugProvider, useDebug, useSecretTap } from "@/components/service/DebugContext";
 import { DebugOverlay } from "@/components/service/DebugOverlay";
 import { DebugLayoutGuide } from "@/components/service/DebugLayoutGuide";
+import type { Step } from "@/types";
+
+// 개발(next dev = localhost) 여부. 빌드 시점에 인라인되는 상수라 SSR/클라이언트가 일치하고,
+// 배포된 키오스크(production 빌드)에서는 항상 false → 손님 화면엔 뒤로가기 버튼이 안 뜬다.
+const IS_DEV = process.env.NODE_ENV !== "production";
 
 function ServiceContent() {
   const searchParams = useSearchParams();
@@ -134,6 +139,22 @@ function ServiceContent() {
   const maxCaptures = slotsNeeded * config.captureCount;
   const showTimer = currentStep !== "start" && currentStep !== "camera" && currentStep !== "payment" && currentStep !== "complete" && idleRemaining !== null && config.idleTimeoutSeconds > 0;
 
+  // 결제 이후 각 단계의 "이전 단계로" 동작 — 화면엔 안 보이는 개발용 뒤로가기 버튼(아래)과
+  // 각 Section의 onPrev prop이 이 한 곳을 같이 참조한다(로직 중복 방지).
+  const prevHandlers: Partial<Record<Step, () => void>> = {
+    frame: () => (config.paymentEnabled ? flow.goToStep("payment") : flow.resetAll()),
+    background: () => flow.goToStep("frame"),
+    camera: () => { flow.setPhotos([]); flow.goToStep("background"); },
+    select: () => {
+      flow.setPhotos([]);
+      flow.setSelectedPhotos([]);
+      flow.setCompositeImage(null);
+      flow.goToStep("camera");
+    },
+    printbg: () => { flow.setCompositeImage(null); flow.goToStep("select"); },
+    complete: () => flow.goToStep(printBgImages.length > 0 ? "printbg" : "select"),
+  };
+
   // 디버그 오버레이에 표시할 진단값(비민감). 필요 시 항목을 추가/제거하면 된다.
   const debugData: Record<string, unknown> = {
     deviceId,
@@ -200,6 +221,15 @@ function ServiceContent() {
       )}
       {currentStep === "complete" && printRemaining !== null && config.printAutoTimerSeconds > 0 && (
         <CircularTimer value={printRemaining} total={config.printAutoTimerSeconds} testId="page-print-timer" onLongPress={togglePrintPause} paused={printPaused} />
+      )}
+      {/* 이전 단계로 — 우하단 투명 버튼(50×50). 결제 이후 모든 단계에 공통으로 뜨며,
+          개발 환경(IS_DEV)에서만 렌더된다 — 배포된 키오스크에선 손님에게 아예 없는 버튼. */}
+      {IS_DEV && prevHandlers[currentStep] && (
+        <button
+          className="absolute bottom-16 right-16 z-20 w-[50px] h-[50px] portrait:bottom-10"
+          onClick={prevHandlers[currentStep]}
+          aria-label={t("common.prev")}
+        />
       )}
       {flow.isPreparingComplete && (
         <div className="absolute inset-0 z-[100] bg-black/70 backdrop-blur-sm flex flex-col items-center justify-center">
@@ -283,7 +313,7 @@ function ServiceContent() {
           selectedFrame={flow.selectedFrame}
           onSelect={flow.setSelectedFrame}
           onNext={() => flow.goToStep("background")}
-          onPrev={() => (config.paymentEnabled ? flow.goToStep("payment") : flow.resetAll())}
+          onPrev={prevHandlers.frame!}
         />
       )}
       {currentStep === "background" && (
@@ -293,7 +323,7 @@ function ServiceContent() {
           imageBaseUrl={imageBaseUrl}
           onSelect={setSelectedBackground}
           onNext={() => flow.goToStep("camera")}
-          onPrev={() => flow.goToStep("frame")}
+          onPrev={prevHandlers.background!}
         />
       )}
       {currentStep === "camera" && (
@@ -316,10 +346,7 @@ function ServiceContent() {
             }
             flow.goToStep("select");
           }}
-          onPrev={() => {
-            flow.setPhotos([]);
-            flow.goToStep("background");
-          }}
+          onPrev={prevHandlers.camera!}
         />
       )}
       {currentStep === "select" && (
@@ -335,12 +362,7 @@ function ServiceContent() {
           backgroundImages={backgroundImages}
           printBgImages={printBgImages}
           onNext={() => { clearIdleTimer(); flow.handleSelectNext(printBgImages.length > 0); }}
-          onPrev={() => {
-            flow.setPhotos([]);
-            flow.setSelectedPhotos([]);
-            flow.setCompositeImage(null);
-            flow.goToStep("camera");
-          }}
+          onPrev={prevHandlers.select!}
         />
       )}
       {currentStep === "printbg" && (
@@ -350,10 +372,7 @@ function ServiceContent() {
           imageBaseUrl={imageBaseUrl}
           onSelect={setSelectedPrintBg}
           onNext={() => flow.goToStep("complete")}
-          onPrev={() => {
-            flow.setCompositeImage(null);
-            flow.goToStep("select");
-          }}
+          onPrev={prevHandlers.printbg!}
         />
       )}
       {currentStep === "complete" && (
@@ -374,7 +393,7 @@ function ServiceContent() {
           preparedPhotoUrl={flow.preparedPhotoUrl}
           preparedGifUrl={flow.preparedGifUrl}
           preparedExpiryDate={flow.preparedExpiryDate}
-          onPrev={() => flow.goToStep(printBgImages.length > 0 ? "printbg" : "select")}
+          onPrev={prevHandlers.complete!}
           onRestart={flow.resetAll}
         />
       )}
