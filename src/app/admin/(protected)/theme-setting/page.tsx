@@ -321,7 +321,7 @@ export default function ThemeSettingPage() {
       />
 
       {/* 배경 단색 */}
-      <div className="bg-gray-800 rounded-xl border border-gray-700 overflow-hidden">
+      <div className="bg-gray-800 rounded-xl border border-gray-700">
         <div className="px-6 pt-5 pb-6">
           <h3 className="text-white font-semibold text-base mb-1">배경 단색</h3>
           <p className="text-gray-500 text-xs mb-4">
@@ -337,7 +337,7 @@ export default function ThemeSettingPage() {
       </div>
 
       {/* Primary 컬러 */}
-      <div className="bg-gray-800 rounded-xl border border-gray-700 overflow-hidden">
+      <div className="bg-gray-800 rounded-xl border border-gray-700">
         <div className="px-6 pt-5 pb-6">
           <h3 className="text-white font-semibold text-base mb-1">강조(Primary) 색상</h3>
           <p className="text-gray-500 text-xs mb-4">
@@ -361,7 +361,7 @@ export default function ThemeSettingPage() {
       </div>
 
       {/* 글자 색상 */}
-      <div className="bg-gray-800 rounded-xl border border-gray-700 overflow-hidden">
+      <div className="bg-gray-800 rounded-xl border border-gray-700">
         <div className="px-6 pt-5 pb-6">
           <h3 className="text-white font-semibold text-base mb-1">글자 색상</h3>
           <p className="text-gray-500 text-xs mb-4">
@@ -379,7 +379,7 @@ export default function ThemeSettingPage() {
       </div>
 
       {/* 버튼 글로우 */}
-      <div className="bg-gray-800 rounded-xl border border-gray-700 overflow-hidden">
+      <div className="bg-gray-800 rounded-xl border border-gray-700">
         <div className="px-6 pt-5 pb-6">
           <div className="flex items-center justify-between mb-1">
             <h3 className="text-white font-semibold text-base">버튼 글로우</h3>

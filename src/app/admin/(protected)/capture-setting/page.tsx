@@ -141,7 +141,7 @@ export default function CaptureSettingPage() {
         </div>
       </div>
 
-      <div className="bg-gray-800 rounded-xl border border-gray-700 overflow-hidden">
+      <div className="bg-gray-800 rounded-xl border border-gray-700">
         <div className="px-6 py-6 space-y-4">
           {FIELDS.filter((field) => !field.showIf || field.showIf(settings)).map((field) => (
             <div key={field.name} className="grid grid-cols-[220px_1fr] gap-4 items-center">
