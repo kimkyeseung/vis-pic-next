@@ -72,8 +72,8 @@ export function CompleteSection({
   const [qrExpiryDate, setQrExpiryDate] = useState<string | null>(preparedExpiryDate ?? null);
   const compositeRef = useRef(false);
 
-  // 가로 결과물(1컷·4컷 등 landscape)일 때, QR 카드 영역의 상·하단을 결과물 프레임과
-  // 정확히 일치시키기 위해 프레임 높이를 측정해 카드 블록에 강제한다(세로 결과물은 제외).
+  // 좌우 배치(미리보기|QR)일 때, QR 카드 영역의 상·하단을 결과물 프레임과 정확히
+  // 일치시키기 위해 프레임 높이를 측정해 카드 블록에 강제한다.
   const isLandscapeResult = (FRAME_INFO[selectedFrame]?.orientation ?? "landscape") !== "portrait";
   const sectionRef = useRef<HTMLElement>(null);
   const previewBoxRef = useRef<HTMLDivElement>(null);
@@ -105,7 +105,10 @@ export function CompleteSection({
     return () => { mq.removeEventListener("change", update); ro.disconnect(); };
   }, []);
 
-  const matchHeight = isLandscapeResult && !stacked && previewH != null;
+  const matchHeight = !stacked && previewH != null;
+  // 세로 프레임(2컷 등)은 사진 쪽이 지나치게 길어 QR 영역과 비율이 안 맞으므로, 좌우
+  // 배치일 때만 사진 쪽 상한을 더 낮춰 QR 카드와 비슷한 높이로 맞춘다.
+  const photoMaxHClass = !isLandscapeResult && !stacked ? "max-h-[550px]" : "max-h-[650px]";
 
   // QR 다운로드 카드 1개 렌더. matchHeight면 카드가 프레임 높이에 stretch되고 QR이 남은
   // 세로 공간에 맞춰 반응형으로 축소된다(라벨은 고정, QR 박스만 flex-1로 늘고 줆).
@@ -114,18 +117,24 @@ export function CompleteSection({
     <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-8 border border-white/20 text-center flex flex-col items-center min-w-0 portrait:flex-1">
       <div className="text-4xl portrait:text-5xl mb-2 shrink-0">{emoji}</div>
       <p className="text-white text-2xl portrait:text-3xl font-semibold mb-4 portrait:mb-6 shrink-0">{label}</p>
-      <div
-        className={`bg-white p-4 rounded-xl cursor-pointer ${matchHeight ? "flex-1 min-h-0 w-full flex items-center justify-center" : "portrait:w-full portrait:flex portrait:items-center portrait:justify-center"}`}
-        onDoubleClick={() => openDebugUrl(url)}
-      >
-        {matchHeight ? (
-          // 남은 세로 공간에 맞춰 축소(라벨은 고정). 과대·가로 오버플로 방지로 상한 260px.
-          <QRCodeSVG value={url} size={220} className="h-full w-auto max-h-[260px] max-w-full" style={{ aspectRatio: "1 / 1" }} />
-        ) : (
-          // 가로: 고정 220px. 세로: 카드 폭에 맞춰 확대(상한 300px).
+      {matchHeight ? (
+        // 남은 세로 공간 안에서 정사각형을 유지(폭·높이 둘 다 auto + max-h/max-w)해야
+        // 박스 여백이 상하좌우 고르게 보인다 — h-full처럼 한쪽을 고정하면 남는 공간만큼
+        // 박스가 직사각형이 되어 QR 주변 패딩이 불균일해진다.
+        <div className="flex-1 min-h-0 w-full flex items-center justify-center">
+          <div className="bg-white p-4 rounded-xl cursor-pointer aspect-square max-h-full max-w-full" onDoubleClick={() => openDebugUrl(url)}>
+            <QRCodeSVG value={url} size={220} className="h-full w-full" />
+          </div>
+        </div>
+      ) : (
+        <div
+          className="bg-white p-4 rounded-xl cursor-pointer portrait:w-full portrait:flex portrait:items-center portrait:justify-center"
+          onDoubleClick={() => openDebugUrl(url)}
+        >
+          {/* 가로: 고정 220px. 세로: 카드 폭에 맞춰 확대(상한 300px). */}
           <QRCodeSVG value={url} size={220} className="portrait:h-auto portrait:w-full portrait:max-w-[300px]" style={{ aspectRatio: "1 / 1" }} />
-        )}
-      </div>
+        </div>
+      )}
       <p className="text-gray-400 text-sm portrait:text-lg mt-3 shrink-0">{t("complete.qrScan")}</p>
     </div>
   );
@@ -562,7 +571,7 @@ export function CompleteSection({
               <div className="flex-1 flex justify-center min-w-0 portrait:w-full">
                 <div ref={previewBoxRef} className="rounded-2xl overflow-hidden" style={{ boxShadow: "0 20px 50px rgba(0,0,0,0.4)" }}>
                   {/* 스테이지 고정 높이(가로 1080·세로 1920) 기준 px 상한 — 레터박스(창≠스테이지)에서도 정확. */}
-                  <img src={compositeImage} alt="Composite" className="max-h-[650px] portrait:max-h-[883px] portrait:max-w-full w-auto object-contain block" />
+                  <img src={compositeImage} alt="Composite" className={`${photoMaxHClass} portrait:max-h-[883px] portrait:max-w-full w-auto object-contain block`} />
                 </div>
               </div>
 
