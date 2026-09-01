@@ -133,14 +133,14 @@ export function PaymentSection({
             {t("payment.selectQuantity")}
           </SectionTitle>
 
-          <div className="min-h-0 w-full flex flex-col items-center justify-start pt-8 portrait:pt-12 portrait:pb-28">
+          <div className="min-h-0 w-full flex flex-col items-center justify-start pt-16 portrait:pt-14 portrait:pb-28">
           <div className="w-full max-w-[1700px] flex flex-col items-center animate-fadeInUp portrait:flex-1 portrait:min-h-0">
           {/* 언어 선택 */}
           <div className="flex gap-5 portrait:gap-6 mb-12 portrait:mb-10 flex-wrap justify-center">
             {LOCALES.map(({ code, label }) => (
               <button
                 key={code}
-                className={`px-14 py-6 portrait:px-8 portrait:py-8 rounded-2xl text-4xl portrait:text-5xl font-semibold transition-all ${
+                className={`px-[5.25rem] py-9 portrait:px-8 portrait:py-8 rounded-2xl text-[3.375rem] portrait:text-5xl font-semibold transition-all ${
                   lang === code
                     ? "bg-white text-gray-900 shadow-lg"
                     : "bg-white/10 text-white/60 hover:bg-white/20 hover:text-white"

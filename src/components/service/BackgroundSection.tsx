@@ -22,7 +22,13 @@ export function BackgroundSection({
   const hasDbImages = backgroundImages.length > 0;
 
   return (
-    <SectionShell title={t("bg.title")} onPrev={onPrev} onNext={onNext} nextDisabled={selectedBackground === null}>
+    <SectionShell
+      title={t("bg.title")}
+      titleClassName="text-center portrait:whitespace-pre-line"
+      onPrev={onPrev}
+      onNext={onNext}
+      nextDisabled={selectedBackground === null}
+    >
       <div className="min-h-0 w-full flex items-center justify-center px-10 portrait:px-16">
       <div className="grid grid-cols-3 gap-6 w-full max-w-[1320px] animate-fadeInUp portrait:grid-cols-2 portrait:gap-6">
         {hasDbImages

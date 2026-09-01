@@ -102,7 +102,7 @@ const en: Record<MessageKey, string> = {
   "frame.title": "Please select the number of cuts",
   "frame.cut": "{n}-Cut",
 
-  "bg.title": "Please select a background",
+  "bg.title": "Please select\na background",
 
   "printbg.title": "Please select a frame",
 
