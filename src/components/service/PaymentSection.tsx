@@ -187,7 +187,7 @@ export function PaymentSection({
           </div>
 
           {/* 하단 고정 바 — 결제하기 버튼만 중앙에 배치(총액·이전 버튼 제거). */}
-          <div className="absolute bottom-16 left-1/2 -translate-x-1/2 z-20 flex items-center justify-center portrait:bottom-10">
+          <div className="absolute bottom-16 left-1/2 -translate-x-1/2 z-20 flex items-center justify-center">
             <button className={`service-button nav-next-lg ${SERVICE_BIG_BUTTON_CLASS}`} onClick={handlePay}>
               {t("payment.pay")}
             </button>

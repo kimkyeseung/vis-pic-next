@@ -635,7 +635,7 @@ export function CompleteSection({
         <ServiceNav onPrev={onPrev} onNext={handlePrint} nextKey="complete.print" />
       )}
       {compositeImage && printStatus === "done" && (
-        <div className="absolute bottom-16 left-1/2 -translate-x-1/2 z-20 portrait:bottom-10">
+        <div className="absolute bottom-16 left-1/2 -translate-x-1/2 z-20">
           <button className={`service-button nav-next-lg ${SERVICE_BIG_BUTTON_CLASS}`} onClick={onRestart}>
             {t("complete.restart")}
           </button>

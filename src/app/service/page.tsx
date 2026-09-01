@@ -226,7 +226,7 @@ function ServiceContent() {
           개발 환경(IS_DEV)에서만 렌더된다 — 배포된 키오스크에선 손님에게 아예 없는 버튼. */}
       {IS_DEV && prevHandlers[currentStep] && (
         <button
-          className="absolute bottom-16 right-16 z-20 w-[50px] h-[50px] portrait:bottom-10"
+          className="absolute bottom-16 right-16 z-20 w-[50px] h-[50px]"
           onClick={prevHandlers[currentStep]}
           aria-label={t("common.prev")}
         />

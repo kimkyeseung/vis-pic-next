@@ -16,4 +16,4 @@ export const SERVICE_SECTION_CLASS =
  * 버튼을 더 키우거나 줄일 땐 여기 한 곳만 고치면 두 버튼에 동시 반영된다.
  */
 export const SERVICE_BIG_BUTTON_CLASS =
-  "tracking-widest rounded-[22px] font-extrabold text-5xl px-28 py-8 portrait:px-20 portrait:py-12 min-w-[34rem] portrait:min-w-[46rem]";
+  "tracking-widest rounded-[22px] font-extrabold text-5xl px-28 py-8 portrait:px-20 portrait:py-[3.35rem] min-w-[34rem] portrait:min-w-[46rem]";

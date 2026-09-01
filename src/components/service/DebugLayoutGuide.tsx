@@ -18,7 +18,7 @@ import { useDebug } from "./DebugContext";
 // 실제 버튼 위치는 모든 단계·언어에서 페이지 하단으로부터 정확히 동일(가로 181 / 세로 189 design px)했다.
 const BANDS = {
   landscape: { titleH: 190, buttonH: 120 },
-  portrait: { titleH: 380, buttonH: 130 },
+  portrait: { titleH: 350, buttonH: 160 },
 } as const;
 
 const GAP = 32; // 타이틀↔본문, 본문↔버튼 사이 간격

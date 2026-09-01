@@ -27,7 +27,7 @@ export function ServiceNav({
   // 버튼을 절대배치 래퍼로 감싼다 — .service-button 자체가 position:relative(언레이어드)라
   // 버튼에 직접 Tailwind absolute를 걸면 무시된다.
   return (
-    <div className="absolute bottom-16 left-1/2 -translate-x-1/2 z-20 portrait:bottom-10">
+    <div className="absolute bottom-16 left-1/2 -translate-x-1/2 z-20">
       <button
         className={`service-button nav-next-lg ${SERVICE_BIG_BUTTON_CLASS}`}
         onClick={onNext}

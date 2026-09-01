@@ -63,6 +63,7 @@ export function CameraSection({
   imageBaseUrl,
   stickers,
   syncEnabled = false,
+  mockCamera = false,
   onCapture,
   onNext,
   onStickersChange,
@@ -77,6 +78,8 @@ export function CameraSection({
   imageBaseUrl: string;
   stickers: Sticker[];
   syncEnabled?: boolean;
+  /** 실제 카메라를 켜지 않고 곧바로 MOCK CAMERA 화면으로 대체(관리자 화면 미리보기용) */
+  mockCamera?: boolean;
   onCapture: (dataUrl: string, frames?: string[]) => void;
   onNext: () => void;
   onPrev: () => void;
@@ -804,6 +807,11 @@ export function CameraSection({
   }, []);
 
   const startCamera = useCallback(async () => {
+    // 관리자 화면 미리보기: 실제 장치에 접근하지 않고 곧바로 mock 화면으로 대체한다.
+    if (mockCamera) {
+      stopCamera();
+      return;
+    }
     for (let attempt = 0; ; attempt++) {
       // 기존 스트림 먼저 정리
       stopCamera();
@@ -853,13 +861,13 @@ export function CameraSection({
         return;
       }
     }
-  }, [stopCamera, config.cameraResolution]);
+  }, [stopCamera, config.cameraResolution, mockCamera]);
 
   // 카메라를 쓸 수 없는 브라우저(개발용 프리뷰 등)에서도 실제 카메라와 같은 크기의 mock
   // 화면을 표시 캔버스에 그려둔다 — 이러면 하단 "촬영하기" 버튼이 정상 플로우(카운트다운 →
   // captureHiRes 실패 → snapshotWithStickers 폴백)로 mock 사진을 캡처할 수 있다.
   useEffect(() => {
-    if (!cameraError) return;
+    if (!cameraError && !mockCamera) return;
     const canvas = displayCanvasRef.current;
     if (!canvas) return;
     const res = getCameraResolution(config.cameraResolution);
@@ -874,7 +882,7 @@ export function CameraSection({
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
     ctx.fillText("MOCK CAMERA", res.width / 2, res.height / 2);
-  }, [cameraError, config.cameraResolution]);
+  }, [cameraError, mockCamera, config.cameraResolution]);
 
   useEffect(() => {
     let active = true;
@@ -1801,8 +1809,8 @@ export function CameraSection({
           )}
         </div>
 
-      {/* 촬영하기 — 하단 중앙. 다른 단계의 다음 버튼(ServiceNav)과 같은 위치(가로 bottom-16 · 세로 bottom-10)에 맞춘다. */}
-      <div className="absolute bottom-16 left-1/2 -translate-x-1/2 z-20 portrait:bottom-10">
+      {/* 촬영하기 — 하단 중앙. 다른 단계의 다음 버튼(ServiceNav)과 같은 위치(bottom-16, 가로·세로 동일)에 맞춘다. */}
+      <div className="absolute bottom-16 left-1/2 -translate-x-1/2 z-20">
         <button
           className={`service-button ${SERVICE_BIG_BUTTON_CLASS}`}
           onClick={handleManualCapture}
