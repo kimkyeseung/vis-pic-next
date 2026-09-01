@@ -1820,7 +1820,7 @@ export function CameraSection({
             flex-shrink 배분 대상이 되면, 안의 그리드(shrink-0, aspect-ratio 고정 높이)는
             더 줄어들지 못하고 래퍼 밖으로 그대로 넘쳐(overflow) 아래 안내 박스와 겹쳐 보였다.
             래퍼를 shrink-0으로 고정해 공간 부족분이 전부 안내 박스(flex-1) 쪽으로만 가게 한다. */}
-        <div className="flex flex-col shrink-0 mb-2">
+        <div className="flex flex-col shrink-0 mb-2 portrait:mb-4">
           <div className="flex items-center justify-end mb-2 min-h-[22px]">
             {stickers.length > 0 && (
               <button
@@ -1880,7 +1880,7 @@ export function CameraSection({
             min-h-0을 주지 않아 내용(특히 영·일·중 등 문구가 길어지는 언어)보다 작게 찌그러들지
             않게 한다 — 예전엔 min-h-0 때문에 공간이 부족하면 이 박스가 눌려 아래 "남은 촬영
             횟수" 박스와 겹쳐 보이는 버그가 있었다. */}
-        <div className="flex-1 flex items-start mb-2">
+        <div className="flex-1 portrait:flex-0 flex items-start mb-2 portrait:mb-4">
           <div className="w-full rounded-2xl overflow-hidden border border-[var(--theme-primary,#6c6fb4)]/50 bg-[var(--theme-primary,#6c6fb4)]/10">
             {/* 세로 모드는 두 안내가 한 박스 안에 나란히 들어가 py-6이면 높이가 넘쳐 아래
                 박스와 겹쳤다 — 세로에서만 py-3으로 줄인다(가로는 원래대로 유지). */}
