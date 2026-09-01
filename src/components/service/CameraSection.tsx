@@ -1769,7 +1769,7 @@ export function CameraSection({
       </div>
 
       {/* 우측(가로)·우하단(세로): 스티커 패널 */}
-      <div className="flex flex-col min-h-0 pl-4" style={{ gridArea: "sticker" }}>
+      <div className="flex flex-col min-h-0 pl-4 overflow-y-auto" style={{ gridArea: "sticker" }}>
         <h3 className="text-white text-2xl font-bold text-center mb-4 shrink-0">{t("camera.stickerPrompt")}</h3>
 
         {/* 스티커 패널 (상시 노출) */}
@@ -1820,8 +1820,11 @@ export function CameraSection({
             items-start로 스티커 패널 바로 아래에 붙여 사이 간격을 좁힌다(남는 세로 공간은 아래로).
             현재 배경에 동작 트리거 이펙트가 설정돼 있으면, 같은 박스를 절반으로 나눠 아래쪽에
             그 제스처 안내를 추가한다(제스처에 매칭되는 이모지가 있으면 이모지로 표시).
-            두 안내가 함께 뜰 때는(칸이 좁아지므로) 이모지·문구를 가로로 나란히 배치한다. */}
-        <div className="flex-1 flex items-start min-h-0">
+            두 안내가 함께 뜰 때는(칸이 좁아지므로) 이모지·문구를 가로로 나란히 배치한다.
+            min-h-0을 주지 않아 내용(특히 영·일·중 등 문구가 길어지는 언어)보다 작게 찌그러들지
+            않게 한다 — 예전엔 min-h-0 때문에 공간이 부족하면 이 박스가 눌려 아래 "남은 촬영
+            횟수" 박스와 겹쳐 보이는 버그가 있었다. */}
+        <div className="flex-1 flex items-start mb-2">
           <div className="w-full rounded-2xl overflow-hidden border border-[var(--theme-primary,#6c6fb4)]/50 bg-[var(--theme-primary,#6c6fb4)]/10">
             <div className={currentBgEffect ? "flex items-center justify-center gap-4 px-6 py-6" : "text-center px-6 py-6"}>
               <div className={currentBgEffect ? "text-5xl shrink-0 animate-soft-blink select-none" : "text-5xl mb-2 animate-soft-blink select-none"} aria-hidden>✋</div>
