@@ -855,6 +855,27 @@ export function CameraSection({
     }
   }, [stopCamera, config.cameraResolution]);
 
+  // 카메라를 쓸 수 없는 브라우저(개발용 프리뷰 등)에서도 실제 카메라와 같은 크기의 mock
+  // 화면을 표시 캔버스에 그려둔다 — 이러면 하단 "촬영하기" 버튼이 정상 플로우(카운트다운 →
+  // captureHiRes 실패 → snapshotWithStickers 폴백)로 mock 사진을 캡처할 수 있다.
+  useEffect(() => {
+    if (!cameraError) return;
+    const canvas = displayCanvasRef.current;
+    if (!canvas) return;
+    const res = getCameraResolution(config.cameraResolution);
+    canvas.width = res.width;
+    canvas.height = res.height;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    ctx.fillStyle = "#2a2a2a";
+    ctx.fillRect(0, 0, res.width, res.height);
+    ctx.fillStyle = "rgba(255,255,255,0.25)";
+    ctx.font = `bold ${Math.round(res.width * 0.08)}px sans-serif`;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText("MOCK CAMERA", res.width / 2, res.height / 2);
+  }, [cameraError, config.cameraResolution]);
+
   useEffect(() => {
     let active = true;
     (async () => {
@@ -1619,22 +1640,29 @@ export function CameraSection({
             })}
           </div>
 
-          {cameraError ? (
-            <div className="absolute inset-0 flex flex-col items-center justify-center bg-gradient-to-br from-gray-700 to-gray-900">
-              <span className="text-6xl mb-5 opacity-30">&#128247;</span>
-              <p className="text-white/60 mb-2">{t(cameraError.key, { reason: cameraError.reason ?? "" })}</p>
-              <p className="text-white/40 text-xs mb-6 max-w-xs text-center min-h-[1em]">
+          {/* 카메라 정상/오류 관계없이 항상 마운트한다 — 오류 상태에선 위 useEffect가
+              여기에 mock 화면을 그려 넣어, 아래 "촬영하기" 버튼이 정상 캡처 폴백으로
+              동작하게 한다(카메라 없는 개발 환경에서도 실제 촬영 플로우를 그대로 테스트 가능). */}
+          <canvas ref={displayCanvasRef} className="camera-video" width={previewRes.width} height={previewRes.height} />
+          {/* 스티커 전용 레이어: 메인 합성 루프와 분리되어 60fps로 부드럽게 이동 */}
+          <canvas ref={stickerCanvasRef} className="camera-video absolute inset-0 pointer-events-none" />
+
+          {cameraError && (
+            // mock 화면이 아래 비치도록 전체를 덮지 않고, 상단에 작은 안내 배너만 띄운다.
+            <div className="absolute top-2 inset-x-2 flex flex-col items-center gap-2 bg-black/70 backdrop-blur-sm rounded-xl px-4 py-3 pointer-events-auto">
+              <p className="text-white/70 text-sm text-center">{t(cameraError.key, { reason: cameraError.reason ?? "" })}</p>
+              <p className="text-white/40 text-xs text-center min-h-[1em]">
                 {cameraDeviceDiag ?? "장치 확인 중..."}
               </p>
               <div className="flex gap-3">
                 <button
-                  className="px-6 py-3 bg-white/10 hover:bg-white/20 text-white rounded-xl transition-colors"
+                  className="px-4 py-1.5 text-sm bg-white/10 hover:bg-white/20 text-white rounded-lg transition-colors"
                   onClick={() => startCamera()}
                 >
                   {t("common.retry")}
                 </button>
                 <button
-                  className="px-6 py-3 bg-blue-600/80 hover:bg-blue-500 text-white rounded-xl transition-colors"
+                  className="px-4 py-1.5 text-sm bg-blue-600/80 hover:bg-blue-500 text-white rounded-lg transition-colors"
                   onClick={() => {
                     const c = document.createElement("canvas");
                     c.width = 640; c.height = 480;
@@ -1655,12 +1683,6 @@ export function CameraSection({
                 </button>
               </div>
             </div>
-          ) : (
-            <>
-              <canvas ref={displayCanvasRef} className="camera-video" width={previewRes.width} height={previewRes.height} />
-              {/* 스티커 전용 레이어: 메인 합성 루프와 분리되어 60fps로 부드럽게 이동 */}
-              <canvas ref={stickerCanvasRef} className="camera-video absolute inset-0 pointer-events-none" />
-            </>
           )}
           {/* 동작 트리거 이펙트 프레임 소스(dissolve/chromakey)는 crossOrigin이 필요해 JSX가 아니라
               명령형 <video>로 만든다(위 useEffect). 실제 표시는 합성 루프(drawEffectLayer)가 배경 위·사람 아래에 그린다. */}
