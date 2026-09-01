@@ -41,7 +41,7 @@ function ServiceContent() {
   }, []);
 
   const { config, backgroundImages, printBgImages, imageBaseUrl, printSettings, wallpaperUrl, wallpaperPortraitUrl, logoUrl } = useDeviceSetup(deviceId);
-  const flow = usePhotoFlow(deviceId, config, printBgImages.length > 0);
+  const flow = usePhotoFlow(deviceId, config, printBgImages);
   const { monitors, syncEnabled, setSyncEnabled, selectedMonitorIndex, setSelectedMonitorIndex } = useTauriMonitor();
   const { idleRemaining, clearIdleTimer, paused: idlePaused, togglePause: toggleIdlePause } = useIdleTimer(
     flow.currentStep,

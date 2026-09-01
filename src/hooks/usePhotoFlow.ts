@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import type { Step, DeviceConfig, Sticker } from "@/types";
+import type { Step, DeviceConfig, Sticker, BGImage } from "@/types";
 import { FRAME_INFO } from "@/constants/frames";
 
 const SESSION_KEY = "photobooth_session_v3";
@@ -10,7 +10,8 @@ const SESSION_KEY = "photobooth_session_v3";
 // 그 밖의 단계로 저장돼 있으면 촬영 단계로 되돌려 같은 프레임/배경으로 재촬영하게 한다.
 const RESTORABLE_STEPS: Step[] = ["payment", "frame", "background", "camera"];
 
-export function usePhotoFlow(deviceId: string, config: DeviceConfig, hasPrintBgImages = false) {
+export function usePhotoFlow(deviceId: string, config: DeviceConfig, printBgImages: BGImage[] = []) {
+  const hasPrintBgImages = printBgImages.length > 0;
   const [currentStep, setCurrentStep] = useState<Step>("start");
   const [orderId, setOrderId] = useState<string | null>(null);
   const [selectedFrame, setSelectedFrame] = useState<string | null>(null);
@@ -129,6 +130,10 @@ export function usePhotoFlow(deviceId: string, config: DeviceConfig, hasPrintBgI
         handleSelectNext(hasPrintBgImages);
         break;
       case "printbg":
+        if (selectedPrintBg === null) {
+          const first = printBgImages[0];
+          if (first) setSelectedPrintBg(first.id);
+        }
         goToStep("complete");
         break;
       case "complete":
