@@ -29,7 +29,7 @@ export function ServiceNav({
   return (
     <div className="absolute bottom-16 left-1/2 -translate-x-1/2 z-20">
       <button
-        className={`service-button nav-next-lg ${SERVICE_BIG_BUTTON_CLASS}`}
+        className={`service-button nav-next-lg btn-role-next ${SERVICE_BIG_BUTTON_CLASS}`}
         onClick={onNext}
         style={nextDisabled ? { opacity: 0.5, pointerEvents: "none" } : {}}
       >

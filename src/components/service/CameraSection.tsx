@@ -1799,7 +1799,7 @@ export function CameraSection({
       {/* 촬영하기 — 하단 중앙. 다른 단계의 다음 버튼(ServiceNav)과 같은 위치(bottom-16, 가로·세로 동일)에 맞춘다. */}
       <div className="absolute bottom-16 left-1/2 -translate-x-1/2 z-20">
         <button
-          className={`service-button ${SERVICE_BIG_BUTTON_CLASS}`}
+          className={`service-button btn-role-capture ${SERVICE_BIG_BUTTON_CLASS}`}
           onClick={handleManualCapture}
           style={countdown !== null || photos.length >= maxPhotos ? { opacity: 0.5, pointerEvents: "none" } : {}}
         >

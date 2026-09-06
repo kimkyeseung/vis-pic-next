@@ -312,7 +312,9 @@ body {
 }
 
 .service-button:hover {
-  background: #f8f8f8;
+  /* background(단축 속성)를 쓰면 아래 background-image(버튼 테마 이미지)가 none으로
+     리셋되어 hover 시 이미지가 사라진다 — background-color만 지정해 이미지를 보존한다. */
+  background-color: #f8f8f8;
   box-shadow: 0 24px 38px rgba(80, 55, 145, 0.34), 0 7px 16px rgba(255,255,255,0.18) inset;
 }
 
@@ -371,14 +373,17 @@ body {
   filter: brightness(1.08);
 }
 
-/* 대형 강조 버튼 이미지(테마관리 업로드) — 설정 시 위 단색 배경 위에 이미지로 덮어씌운다.
-   .service-button을 쓰는 모든 대형 버튼(촬영하기·다음·결제하기·다시 시작) 공통 적용.
-   미설정(변수 없음) 시 none이라 기존 단색 배경이 그대로 보인다. */
-.service-button {
-  background-image: var(--theme-btn-image, none);
+/* 대형 강조 버튼 이미지(테마관리 업로드) — 버튼별로 따로 업로드한 이미지를 단색 배경 위에
+   덮어씌운다. 미설정(변수 없음) 시 none이라 기존 단색 배경이 그대로 보인다. */
+.service-button.btn-role-capture,
+.service-button.btn-role-next,
+.service-button.btn-role-payment {
   background-size: cover;
   background-position: center;
 }
+.service-button.btn-role-capture { background-image: var(--theme-btn-capture-image, none); }
+.service-button.btn-role-next { background-image: var(--theme-btn-next-image, none); }
+.service-button.btn-role-payment { background-image: var(--theme-btn-payment-image, none); }
 @media (orientation: portrait) {
   .nav-button { min-height: 150px; padding: 32px 72px; font-size: 2.1em; }
 }

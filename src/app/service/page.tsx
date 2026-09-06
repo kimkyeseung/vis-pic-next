@@ -45,7 +45,7 @@ function ServiceContent() {
     return () => mq.removeEventListener("change", update);
   }, []);
 
-  const { config, backgroundImages, printBgImages, imageBaseUrl, printSettings, wallpaperUrl, wallpaperPortraitUrl, logoUrl, buttonImageUrl } = useDeviceSetup(deviceId);
+  const { config, backgroundImages, printBgImages, imageBaseUrl, printSettings, wallpaperUrl, wallpaperPortraitUrl, logoUrl, captureButtonImageUrl, nextButtonImageUrl, paymentButtonImageUrl } = useDeviceSetup(deviceId);
   const flow = usePhotoFlow(deviceId, config, printBgImages);
   const { monitors, syncEnabled, setSyncEnabled, selectedMonitorIndex, setSelectedMonitorIndex } = useTauriMonitor();
   const { idleRemaining, clearIdleTimer, paused: idlePaused, togglePause: toggleIdlePause } = useIdleTimer(
@@ -190,8 +190,11 @@ function ServiceContent() {
   const themeStyle: React.CSSProperties = {
     ...(config.themeTextColor ? { ["--theme-text"]: config.themeTextColor } : {}),
     ...(config.themePrimaryColor ? { ["--theme-primary"]: config.themePrimaryColor } : {}),
-    // 대형 강조 버튼(촬영하기·다음 등) 배경 이미지. 미설정 시 globals.css 폴백으로 기존 단색 유지.
-    ...(buttonImageUrl ? { ["--theme-btn-image"]: `url(${buttonImageUrl})` } : {}),
+    // 대형 강조 버튼(촬영하기·다음·결제하기) 배경 이미지. 버튼별 별도 업로드, 미설정 시
+    // globals.css 폴백으로 기존 단색 유지.
+    ...(captureButtonImageUrl ? { ["--theme-btn-capture-image"]: `url(${captureButtonImageUrl})` } : {}),
+    ...(nextButtonImageUrl ? { ["--theme-btn-next-image"]: `url(${nextButtonImageUrl})` } : {}),
+    ...(paymentButtonImageUrl ? { ["--theme-btn-payment-image"]: `url(${paymentButtonImageUrl})` } : {}),
     // 버튼 탭 글로우 (--btn-glow-*). 비활성 시 주입 안 함 → globals.css 폴백으로 글로우 없음.
     ...(config.btnGlowEnabled
       ? { ["--btn-glow-color"]: config.btnGlowColor, ["--btn-glow-size"]: `${config.btnGlowSize}px` }

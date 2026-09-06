@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import type { DeviceConfig, BGImage } from "@/types";
 import { parseIntSafe, parseBgRemovalMode, parsePaymentTerminalMode, parseCaptureModes, parseCameraResolution, clampPercent } from "@/lib/deviceConfig";
 import { DEFAULT_CAMERA_RESOLUTION } from "@/constants/camera";
-import { LOGO_IMAGE_TYPE, WALLPAPER_IMAGE_TYPE, BUTTON_IMAGE_TYPE, WALLPAPER_NAME_LANDSCAPE, WALLPAPER_NAME_PORTRAIT } from "@/constants/images";
+import { LOGO_IMAGE_TYPE, WALLPAPER_IMAGE_TYPE, BUTTON_IMAGE_TYPE, WALLPAPER_NAME_LANDSCAPE, WALLPAPER_NAME_PORTRAIT, BUTTON_NAME_CAPTURE, BUTTON_NAME_NEXT, BUTTON_NAME_PAYMENT } from "@/constants/images";
 
 // 결제 화면 인쇄 매수 선택지(고정). 가격 = 1장당 가격(PAYMENT_AMOUNT) × 수량.
 const PAYMENT_QUANTITIES = [1, 2, 4];
@@ -75,7 +75,9 @@ export function useDeviceSetup(deviceId: string) {
   const [wallpaperUrl, setWallpaperUrl] = useState<string | null>(null);
   const [wallpaperPortraitUrl, setWallpaperPortraitUrl] = useState<string | null>(null);
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
-  const [buttonImageUrl, setButtonImageUrl] = useState<string | null>(null);
+  const [captureButtonImageUrl, setCaptureButtonImageUrl] = useState<string | null>(null);
+  const [nextButtonImageUrl, setNextButtonImageUrl] = useState<string | null>(null);
+  const [paymentButtonImageUrl, setPaymentButtonImageUrl] = useState<string | null>(null);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -212,12 +214,13 @@ export function useDeviceSetup(deviceId: string) {
       });
     }
 
-    // 테마 버튼 이미지(imageType 7) — 대형 강조 버튼(촬영하기·다음 등) 배경. 첫 항목 한 장만 사용.
-    async function loadButtonImage(id: string, attempt = 0) {
+    // 테마 버튼 이미지(imageType 7) — 촬영하기·다음·결제하기 버튼별 배경. 같은 imageType 안에서
+    // name으로 구분한다(배경화면 가로/세로 슬롯과 동일한 패턴).
+    async function loadButtonImages(id: string, attempt = 0) {
       const MAX_RETRIES = 5;
       const retry = () => {
         if (signal.aborted || attempt >= MAX_RETRIES) return;
-        const timer = setTimeout(() => loadButtonImage(id, attempt + 1), 3000);
+        const timer = setTimeout(() => loadButtonImages(id, attempt + 1), 3000);
         signal.addEventListener("abort", () => clearTimeout(timer), { once: true });
       };
       try {
@@ -227,8 +230,14 @@ export function useDeviceSetup(deviceId: string) {
         });
         if (!res.ok) { retry(); return; }
         const data = await res.json();
-        const first = data.images?.[0];
-        setButtonImageUrl(first && data.baseUrl ? `${data.baseUrl}/${first.filename}` : null);
+        const list: Array<{ name: string; filename: string }> = data.images ?? [];
+        const pick = (name: string) => {
+          const img = list.find((i) => i.name === name);
+          return img && data.baseUrl ? `${data.baseUrl}/${img.filename}` : null;
+        };
+        setCaptureButtonImageUrl(pick(BUTTON_NAME_CAPTURE));
+        setNextButtonImageUrl(pick(BUTTON_NAME_NEXT));
+        setPaymentButtonImageUrl(pick(BUTTON_NAME_PAYMENT));
       } catch (err) {
         if ((err as Error).name === "AbortError") return;
         retry();
@@ -240,10 +249,10 @@ export function useDeviceSetup(deviceId: string) {
     loadPrintBackgrounds(deviceId);
     loadWallpaper(deviceId);
     loadLogo(deviceId);
-    loadButtonImage(deviceId);
+    loadButtonImages(deviceId);
 
     return () => controller.abort();
   }, [deviceId]);
 
-  return { config, backgroundImages, printBgImages, imageBaseUrl, printSettings, wallpaperUrl, wallpaperPortraitUrl, logoUrl, buttonImageUrl };
+  return { config, backgroundImages, printBgImages, imageBaseUrl, printSettings, wallpaperUrl, wallpaperPortraitUrl, logoUrl, captureButtonImageUrl, nextButtonImageUrl, paymentButtonImageUrl };
 }

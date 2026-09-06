@@ -18,6 +18,12 @@ export const BUTTON_IMAGE_TYPE = 7;
 export const WALLPAPER_NAME_LANDSCAPE = "wallpaper";
 export const WALLPAPER_NAME_PORTRAIT = "wallpaper_portrait";
 
+// 대형 강조 버튼(촬영하기·다음·결제하기) 배경 이미지도 같은 imageType(7) 안에서
+// name으로 구분해 버튼별로 따로 업로드한다.
+export const BUTTON_NAME_CAPTURE = "button_capture";
+export const BUTTON_NAME_NEXT = "button_next";
+export const BUTTON_NAME_PAYMENT = "button_payment";
+
 // 서비스 화면에 노출할 수 있는 활성 배경의 최대 개수.
 // 이 수를 초과해 활성화하려 하면 관리자에서 거부(invalid)된다.
 export const MAX_ACTIVE_BACKGROUNDS = 6;

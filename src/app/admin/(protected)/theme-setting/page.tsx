@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { HexColorPicker } from "react-colorful";
 import { useAdmin } from "@/app/admin/AdminContext";
-import { WALLPAPER_NAME_LANDSCAPE, WALLPAPER_NAME_PORTRAIT } from "@/constants/images";
+import { WALLPAPER_NAME_LANDSCAPE, WALLPAPER_NAME_PORTRAIT, BUTTON_NAME_CAPTURE, BUTTON_NAME_NEXT, BUTTON_NAME_PAYMENT } from "@/constants/images";
 
 const WALLPAPER_TYPE = 5;
 const LOGO_TYPE = 6;
@@ -136,13 +136,17 @@ export default function ThemeSettingPage() {
   const [wallpaperLs, setWallpaperLs] = useState<Asset>(null);
   const [wallpaperPt, setWallpaperPt] = useState<Asset>(null);
   const [logo, setLogo] = useState<Asset>(null);
-  const [buttonImage, setButtonImage] = useState<Asset>(null);
+  const [captureButtonImage, setCaptureButtonImage] = useState<Asset>(null);
+  const [nextButtonImage, setNextButtonImage] = useState<Asset>(null);
+  const [paymentButtonImage, setPaymentButtonImage] = useState<Asset>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [wallpaperLsBusy, setWallpaperLsBusy] = useState(false);
   const [wallpaperPtBusy, setWallpaperPtBusy] = useState(false);
   const [logoBusy, setLogoBusy] = useState(false);
-  const [buttonImageBusy, setButtonImageBusy] = useState(false);
+  const [captureButtonImageBusy, setCaptureButtonImageBusy] = useState(false);
+  const [nextButtonImageBusy, setNextButtonImageBusy] = useState(false);
+  const [paymentButtonImageBusy, setPaymentButtonImageBusy] = useState(false);
   const [message, setMessage] = useState("");
 
   const flash = (msg: string) => {
@@ -168,13 +172,15 @@ export default function ThemeSettingPage() {
       setLoading(true);
       try {
         // 색상: 전역 기본값 ← 이 지점 오버라이드 병합
-        const [g, d, wpLs, wpPt, lg, btn] = await Promise.all([
+        const [g, d, wpLs, wpPt, lg, btnCapture, btnNext, btnPayment] = await Promise.all([
           fetch("/api/setting/").then((r) => r.json()).catch(() => ({})),
           fetch(`/api/device/${deviceId}/settings/`).then((r) => r.json()).catch(() => ({})),
           loadAsset(WALLPAPER_TYPE, WALLPAPER_NAME_LANDSCAPE),
           loadAsset(WALLPAPER_TYPE, WALLPAPER_NAME_PORTRAIT),
           loadAsset(LOGO_TYPE),
-          loadAsset(BUTTON_TYPE),
+          loadAsset(BUTTON_TYPE, BUTTON_NAME_CAPTURE),
+          loadAsset(BUTTON_TYPE, BUTTON_NAME_NEXT),
+          loadAsset(BUTTON_TYPE, BUTTON_NAME_PAYMENT),
         ]);
         if (cancelled) return;
         const s = { ...(g.settings || {}), ...(d.settings || {}) };
@@ -187,7 +193,9 @@ export default function ThemeSettingPage() {
         setWallpaperLs(wpLs);
         setWallpaperPt(wpPt);
         setLogo(lg);
-        setButtonImage(btn);
+        setCaptureButtonImage(btnCapture);
+        setNextButtonImage(btnNext);
+        setPaymentButtonImage(btnPayment);
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -326,12 +334,36 @@ export default function ThemeSettingPage() {
       />
 
       <AssetUploader
-        title="버튼 이미지"
-        description="촬영하기·다음·결제하기·다시 시작 등 대형 강조 버튼의 배경으로 쓰이는 이미지입니다. 버튼 비율(가로로 넓은 사각형)에 맞춰 꽉 채워지므로(cover) 좌우로 넉넉한 이미지를 권장합니다. 미설정 시 기본 단색 버튼이 사용됩니다."
-        asset={buttonImage}
-        onUpload={uploadAsset(BUTTON_TYPE, "button", buttonImage, setButtonImage, setButtonImageBusy)}
-        onRemove={removeAsset(buttonImage, setButtonImage, setButtonImageBusy)}
-        busy={buttonImageBusy}
+        title="버튼 이미지 · 촬영하기"
+        description="촬영 화면의 '촬영하기' 버튼 배경으로 쓰이는 이미지입니다. 버튼 비율(가로로 넓은 사각형)에 맞춰 꽉 채워지므로(cover) 좌우로 넉넉한 이미지를 권장합니다. 미설정 시 기본 단색 버튼이 사용됩니다."
+        asset={captureButtonImage}
+        onUpload={uploadAsset(BUTTON_TYPE, BUTTON_NAME_CAPTURE, captureButtonImage, setCaptureButtonImage, setCaptureButtonImageBusy)}
+        onRemove={removeAsset(captureButtonImage, setCaptureButtonImage, setCaptureButtonImageBusy)}
+        busy={captureButtonImageBusy}
+        previewClass="w-64 h-24"
+        imageFit="cover"
+        emptyLabel="기본 단색 버튼"
+      />
+
+      <AssetUploader
+        title="버튼 이미지 · 다음으로"
+        description="각 단계 화면의 '다음으로' 버튼 배경으로 쓰이는 이미지입니다. 버튼 비율(가로로 넓은 사각형)에 맞춰 꽉 채워지므로(cover) 좌우로 넉넉한 이미지를 권장합니다. 미설정 시 기본 단색 버튼이 사용됩니다."
+        asset={nextButtonImage}
+        onUpload={uploadAsset(BUTTON_TYPE, BUTTON_NAME_NEXT, nextButtonImage, setNextButtonImage, setNextButtonImageBusy)}
+        onRemove={removeAsset(nextButtonImage, setNextButtonImage, setNextButtonImageBusy)}
+        busy={nextButtonImageBusy}
+        previewClass="w-64 h-24"
+        imageFit="cover"
+        emptyLabel="기본 단색 버튼"
+      />
+
+      <AssetUploader
+        title="버튼 이미지 · 결제하기"
+        description="결제 화면의 '결제하기' 버튼 배경으로 쓰이는 이미지입니다. 버튼 비율(가로로 넓은 사각형)에 맞춰 꽉 채워지므로(cover) 좌우로 넉넉한 이미지를 권장합니다. 미설정 시 기본 단색 버튼이 사용됩니다."
+        asset={paymentButtonImage}
+        onUpload={uploadAsset(BUTTON_TYPE, BUTTON_NAME_PAYMENT, paymentButtonImage, setPaymentButtonImage, setPaymentButtonImageBusy)}
+        onRemove={removeAsset(paymentButtonImage, setPaymentButtonImage, setPaymentButtonImageBusy)}
+        busy={paymentButtonImageBusy}
         previewClass="w-64 h-24"
         imageFit="cover"
         emptyLabel="기본 단색 버튼"
