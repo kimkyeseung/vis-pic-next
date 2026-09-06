@@ -370,6 +370,15 @@ body {
   background: var(--theme-primary, var(--color-brand));
   filter: brightness(1.08);
 }
+
+/* 대형 강조 버튼 이미지(테마관리 업로드) — 설정 시 위 단색 배경 위에 이미지로 덮어씌운다.
+   .service-button을 쓰는 모든 대형 버튼(촬영하기·다음·결제하기·다시 시작) 공통 적용.
+   미설정(변수 없음) 시 none이라 기존 단색 배경이 그대로 보인다. */
+.service-button {
+  background-image: var(--theme-btn-image, none);
+  background-size: cover;
+  background-position: center;
+}
 @media (orientation: portrait) {
   .nav-button { min-height: 150px; padding: 32px 72px; font-size: 2.1em; }
 }

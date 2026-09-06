@@ -7,6 +7,7 @@ import { WALLPAPER_NAME_LANDSCAPE, WALLPAPER_NAME_PORTRAIT } from "@/constants/i
 
 const WALLPAPER_TYPE = 5;
 const LOGO_TYPE = 6;
+const BUTTON_TYPE = 7;
 
 type Asset = { id: number; url: string; filename: string } | null;
 
@@ -135,11 +136,13 @@ export default function ThemeSettingPage() {
   const [wallpaperLs, setWallpaperLs] = useState<Asset>(null);
   const [wallpaperPt, setWallpaperPt] = useState<Asset>(null);
   const [logo, setLogo] = useState<Asset>(null);
+  const [buttonImage, setButtonImage] = useState<Asset>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [wallpaperLsBusy, setWallpaperLsBusy] = useState(false);
   const [wallpaperPtBusy, setWallpaperPtBusy] = useState(false);
   const [logoBusy, setLogoBusy] = useState(false);
+  const [buttonImageBusy, setButtonImageBusy] = useState(false);
   const [message, setMessage] = useState("");
 
   const flash = (msg: string) => {
@@ -165,12 +168,13 @@ export default function ThemeSettingPage() {
       setLoading(true);
       try {
         // 색상: 전역 기본값 ← 이 지점 오버라이드 병합
-        const [g, d, wpLs, wpPt, lg] = await Promise.all([
+        const [g, d, wpLs, wpPt, lg, btn] = await Promise.all([
           fetch("/api/setting/").then((r) => r.json()).catch(() => ({})),
           fetch(`/api/device/${deviceId}/settings/`).then((r) => r.json()).catch(() => ({})),
           loadAsset(WALLPAPER_TYPE, WALLPAPER_NAME_LANDSCAPE),
           loadAsset(WALLPAPER_TYPE, WALLPAPER_NAME_PORTRAIT),
           loadAsset(LOGO_TYPE),
+          loadAsset(BUTTON_TYPE),
         ]);
         if (cancelled) return;
         const s = { ...(g.settings || {}), ...(d.settings || {}) };
@@ -183,6 +187,7 @@ export default function ThemeSettingPage() {
         setWallpaperLs(wpLs);
         setWallpaperPt(wpPt);
         setLogo(lg);
+        setButtonImage(btn);
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -280,7 +285,7 @@ export default function ThemeSettingPage() {
       <div className="mb-6">
         <h2 className="text-2xl font-bold text-white">테마 관리</h2>
         <p className="mt-1 text-sm text-gray-500">
-          <span className="text-white font-medium">{selectedDevice.name}</span> 지점 테마입니다. (배경화면·로고·색상)
+          <span className="text-white font-medium">{selectedDevice.name}</span> 지점 테마입니다. (배경화면·로고·버튼 이미지·색상)
         </p>
       </div>
 
@@ -318,6 +323,18 @@ export default function ThemeSettingPage() {
         previewClass="w-64 h-28 p-3"
         imageFit="contain"
         emptyLabel="기본 로고 (AR-pic)"
+      />
+
+      <AssetUploader
+        title="버튼 이미지"
+        description="촬영하기·다음·결제하기·다시 시작 등 대형 강조 버튼의 배경으로 쓰이는 이미지입니다. 버튼 비율(가로로 넓은 사각형)에 맞춰 꽉 채워지므로(cover) 좌우로 넉넉한 이미지를 권장합니다. 미설정 시 기본 단색 버튼이 사용됩니다."
+        asset={buttonImage}
+        onUpload={uploadAsset(BUTTON_TYPE, "button", buttonImage, setButtonImage, setButtonImageBusy)}
+        onRemove={removeAsset(buttonImage, setButtonImage, setButtonImageBusy)}
+        busy={buttonImageBusy}
+        previewClass="w-64 h-24"
+        imageFit="cover"
+        emptyLabel="기본 단색 버튼"
       />
 
       {/* 배경 단색 */}

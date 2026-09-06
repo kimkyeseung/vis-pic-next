@@ -7,9 +7,10 @@ export const FRAME_IMAGE_TYPE = 2;
 // 스티커 이미지 타입 id (prisma seed: ImageType id 3 = sticker)
 export const STICKER_IMAGE_TYPE = 3;
 
-// 테마 배경화면(wallpaper) / 로고 이미지 타입 id (prisma seed)
+// 테마 배경화면(wallpaper) / 로고 / 버튼 이미지 타입 id (prisma seed)
 export const WALLPAPER_IMAGE_TYPE = 5;
 export const LOGO_IMAGE_TYPE = 6;
+export const BUTTON_IMAGE_TYPE = 7;
 
 // 첫(대기) 화면 배경화면은 가로/세로 두 장을 따로 업로드한다.
 // 같은 imageType(5) 안에서 name으로 구분한다. 기존 단일 배경화면은 name "wallpaper"였으므로

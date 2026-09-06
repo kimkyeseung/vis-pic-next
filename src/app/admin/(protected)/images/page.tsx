@@ -5,10 +5,10 @@ import Link from "next/link";
 import EditDialog from "./EditDialog";
 import ImageBankPanel from "./ImageBankPanel";
 import { useAdmin } from "@/app/admin/AdminContext";
-import { BACKGROUND_IMAGE_TYPE, MAX_ACTIVE_BACKGROUNDS, FRAME_IMAGE_TYPE, MAX_ACTIVE_FRAMES, STICKER_IMAGE_TYPE, MAX_ACTIVE_STICKERS, WALLPAPER_IMAGE_TYPE, LOGO_IMAGE_TYPE } from "@/constants/images";
+import { BACKGROUND_IMAGE_TYPE, MAX_ACTIVE_BACKGROUNDS, FRAME_IMAGE_TYPE, MAX_ACTIVE_FRAMES, STICKER_IMAGE_TYPE, MAX_ACTIVE_STICKERS, WALLPAPER_IMAGE_TYPE, LOGO_IMAGE_TYPE, BUTTON_IMAGE_TYPE } from "@/constants/images";
 
-// 테마관리에서 다루는 타입(배경화면·로고)은 이미지 관리 탭에서 숨긴다.
-const THEME_MANAGED_TYPES = new Set<number>([WALLPAPER_IMAGE_TYPE, LOGO_IMAGE_TYPE]);
+// 테마관리에서 다루는 타입(배경화면·로고·버튼 이미지)은 이미지 관리 탭에서 숨긴다.
+const THEME_MANAGED_TYPES = new Set<number>([WALLPAPER_IMAGE_TYPE, LOGO_IMAGE_TYPE, BUTTON_IMAGE_TYPE]);
 
 interface Image {
   id: number;

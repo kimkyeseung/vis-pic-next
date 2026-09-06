@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import type { DeviceConfig, BGImage } from "@/types";
 import { parseIntSafe, parseBgRemovalMode, parsePaymentTerminalMode, parseCaptureModes, parseCameraResolution, clampPercent } from "@/lib/deviceConfig";
 import { DEFAULT_CAMERA_RESOLUTION } from "@/constants/camera";
-import { LOGO_IMAGE_TYPE, WALLPAPER_IMAGE_TYPE, WALLPAPER_NAME_LANDSCAPE, WALLPAPER_NAME_PORTRAIT } from "@/constants/images";
+import { LOGO_IMAGE_TYPE, WALLPAPER_IMAGE_TYPE, BUTTON_IMAGE_TYPE, WALLPAPER_NAME_LANDSCAPE, WALLPAPER_NAME_PORTRAIT } from "@/constants/images";
 
 // 결제 화면 인쇄 매수 선택지(고정). 가격 = 1장당 가격(PAYMENT_AMOUNT) × 수량.
 const PAYMENT_QUANTITIES = [1, 2, 4];
@@ -51,6 +51,7 @@ export function useDeviceSetup(deviceId: string) {
   const [wallpaperUrl, setWallpaperUrl] = useState<string | null>(null);
   const [wallpaperPortraitUrl, setWallpaperPortraitUrl] = useState<string | null>(null);
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
+  const [buttonImageUrl, setButtonImageUrl] = useState<string | null>(null);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -231,14 +232,38 @@ export function useDeviceSetup(deviceId: string) {
       }
     }
 
+    // 테마 버튼 이미지(imageType 7) — 대형 강조 버튼(촬영하기·다음 등) 배경. 첫 항목 한 장만 사용.
+    async function loadButtonImage(id: string, attempt = 0) {
+      const MAX_RETRIES = 5;
+      const retry = () => {
+        if (signal.aborted || attempt >= MAX_RETRIES) return;
+        const timer = setTimeout(() => loadButtonImage(id, attempt + 1), 3000);
+        signal.addEventListener("abort", () => clearTimeout(timer), { once: true });
+      };
+      try {
+        const res = await fetch(`/api/image/list/${BUTTON_IMAGE_TYPE}/?device_id=${id}&linked=1`, {
+          signal,
+          cache: "no-store",
+        });
+        if (!res.ok) { retry(); return; }
+        const data = await res.json();
+        const first = data.images?.[0];
+        setButtonImageUrl(first && data.baseUrl ? `${data.baseUrl}/${first.filename}` : null);
+      } catch (err) {
+        if ((err as Error).name === "AbortError") return;
+        retry();
+      }
+    }
+
     loadSettings(deviceId);
     loadBackgrounds(deviceId);
     loadPrintBackgrounds(deviceId);
     loadWallpaper(deviceId);
     loadLogo(deviceId);
+    loadButtonImage(deviceId);
 
     return () => controller.abort();
   }, [deviceId]);
 
-  return { config, backgroundImages, printBgImages, imageBaseUrl, printSettings, wallpaperUrl, wallpaperPortraitUrl, logoUrl };
+  return { config, backgroundImages, printBgImages, imageBaseUrl, printSettings, wallpaperUrl, wallpaperPortraitUrl, logoUrl, buttonImageUrl };
 }

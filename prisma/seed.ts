@@ -50,7 +50,14 @@ async function main() {
     create: { id: 6, name: "logo" },
   });
 
-  console.log("Created image types:", { backgroundType, imageType, stickerType, wallpaperType, logoType });
+  // 테마관리용 버튼 이미지(button) — 서비스 화면 대형 강조 버튼(촬영하기·다음 등) 배경
+  const buttonType = await prisma.imageType.upsert({
+    where: { id: 7 },
+    update: {},
+    create: { id: 7, name: "button" },
+  });
+
+  console.log("Created image types:", { backgroundType, imageType, stickerType, wallpaperType, logoType, buttonType });
 
   // Create default admin account
   const hashedPassword = await bcrypt.hash("admin", 10);
