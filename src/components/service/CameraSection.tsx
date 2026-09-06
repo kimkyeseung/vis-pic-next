@@ -285,21 +285,8 @@ export function CameraSection({
     const cx = c.getContext("2d", { willReadFrequently: true });
     if (!cx || !drawCoverSource(cx, v, EFFECT_CHROMA_W, EFFECT_CHROMA_H)) return;
     const img = cx.getImageData(0, 0, EFFECT_CHROMA_W, EFFECT_CHROMA_H);
-    const d = img.data;
     const [kr, kg, kb] = info.chromaRgb;
-    const simDist = Math.max(1, info.chromaSimilarity);
-    const softDist = simDist * (1 + Math.max(0, info.chromaSmoothness) / 50);
-    const softBand = Math.max(1e-6, softDist - simDist);
-    const HARD = simDist * simDist;
-    const SOFT = softDist * softDist;
-    for (let i = 0; i < d.length; i += 4) {
-      const dr = d[i] - kr;
-      const dg = d[i + 1] - kg;
-      const db = d[i + 2] - kb;
-      const distSq = dr * dr + dg * dg + db * db;
-      if (distSq < HARD) d[i + 3] = 0;
-      else if (distSq < SOFT) d[i + 3] = Math.round(((Math.sqrt(distSq) - simDist) / softBand) * 255);
-    }
+    applyChromaKey(img.data, EFFECT_CHROMA_W, EFFECT_CHROMA_H, { r: kr, g: kg, b: kb }, info.chromaSimilarity, info.chromaSmoothness);
     cx.putImageData(img, 0, 0);
   }, []);
 

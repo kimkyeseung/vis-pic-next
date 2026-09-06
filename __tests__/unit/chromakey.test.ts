@@ -83,7 +83,7 @@ describe("applyChromaKey — 경계 침식(choke)", () => {
 describe("applyChromaKey — 밝기 무시 키잉", () => {
   it("그늘진 초록(어두운 같은 색)은 RGB 모드에선 안 빠지지만 밝기 무시 모드에선 빠진다", () => {
     // 어두운 초록: 밝은 키(0,255,0)와 색은 같지만 밝기가 낮다.
-    const rgb = () => new Uint8ClampedArray([0, 120, 0, 255]);
+    const rgb = () => new Uint8ClampedArray([0, 40, 0, 255]);
 
     const off = rgb();
     applyChromaKey(off, 1, 1, GREEN, 50, 50, 0, 0, false);

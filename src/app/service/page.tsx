@@ -276,6 +276,9 @@ function ServiceContent() {
           chromakeyRgb={config.chromakeyRgb}
           chromakeySimilarity={config.chromakeySimilarity}
           chromakeySmoothness={config.chromakeySmoothness}
+          chromakeySpill={config.chromakeySpill}
+          chromakeyChoke={config.chromakeyChoke}
+          chromakeyLumaIndependent={config.chromakeyLumaIndependent}
           segmentThreshold={config.segmentThreshold}
           segmentFeather={config.segmentFeather}
         />

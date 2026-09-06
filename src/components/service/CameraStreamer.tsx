@@ -5,6 +5,7 @@ import { useFrameSender } from "@/hooks/useSceneSync";
 import { fillGradientFromCSS } from "@/lib/canvas";
 import { FALLBACK_BACKGROUNDS } from "@/constants/frames";
 import { suppressMediapipeLogs } from "@/lib/suppressMediapipeLogs";
+import { applyChromaKey } from "@/lib/chromakey";
 import type { BGImage, BgRemovalMode } from "@/types";
 
 type Segmenter = {
@@ -35,6 +36,9 @@ export function CameraStreamer({
   chromakeyRgb = "0,255,0",
   chromakeySimilarity = 50,
   chromakeySmoothness = 50,
+  chromakeySpill = 0,
+  chromakeyChoke = 0,
+  chromakeyLumaIndependent = false,
   segmentThreshold = 15,
   segmentFeather = 35,
 }: {
@@ -45,10 +49,16 @@ export function CameraStreamer({
   imageBaseUrl?: string;
   bgRemovalMode?: BgRemovalMode;
   chromakeyRgb?: string;
-  /** 크로마키 감도(색상 허용 거리, 1-100). 메인 촬영 화면과 동일한 관리자 설정값. */
+  /** 크로마키 감도(1-100). 메인 촬영 화면과 동일한 관리자 설정값. */
   chromakeySimilarity?: number;
   /** 크로마키 경계 부드러움(0-100). 메인 촬영 화면과 동일한 관리자 설정값. */
   chromakeySmoothness?: number;
+  /** 크로마키 스필 제거(0-100). 메인 촬영 화면과 동일한 관리자 설정값. */
+  chromakeySpill?: number;
+  /** 크로마키 경계 침식(0-100). 메인 촬영 화면과 동일한 관리자 설정값. */
+  chromakeyChoke?: number;
+  /** 크로마키 밝기 무시 키잉. 메인 촬영 화면과 동일한 관리자 설정값. */
+  chromakeyLumaIndependent?: boolean;
   /** AI 배경제거 경계 침식 (0-100%). 메인 촬영 화면과 동일한 관리자 설정값. */
   segmentThreshold?: number;
   /** AI 배경제거 경계 부드러움 (0-100%). 메인 촬영 화면과 동일한 관리자 설정값. */
@@ -68,6 +78,9 @@ export function CameraStreamer({
   const chromakeyRgbRef = useRef(chromakeyRgb);
   const chromakeySimilarityRef = useRef(chromakeySimilarity);
   const chromakeySmoothnessRef = useRef(chromakeySmoothness);
+  const chromakeySpillRef = useRef(chromakeySpill);
+  const chromakeyChokeRef = useRef(chromakeyChoke);
+  const chromakeyLumaIndependentRef = useRef(chromakeyLumaIndependent);
   // 관리자 설정(0-100%)을 confidence 스케일(0-1)로 변환해 보관. FEATHER는 0으로 나누기 방지를 위해 최소 1%.
   const segmentThreshRef = useRef(segmentThreshold / 100);
   const segmentFeatherRef = useRef(Math.max(segmentFeather, 1) / 100);
@@ -76,6 +89,9 @@ export function CameraStreamer({
   useEffect(() => { chromakeyRgbRef.current = chromakeyRgb; }, [chromakeyRgb]);
   useEffect(() => { chromakeySimilarityRef.current = chromakeySimilarity; }, [chromakeySimilarity]);
   useEffect(() => { chromakeySmoothnessRef.current = chromakeySmoothness; }, [chromakeySmoothness]);
+  useEffect(() => { chromakeySpillRef.current = chromakeySpill; }, [chromakeySpill]);
+  useEffect(() => { chromakeyChokeRef.current = chromakeyChoke; }, [chromakeyChoke]);
+  useEffect(() => { chromakeyLumaIndependentRef.current = chromakeyLumaIndependent; }, [chromakeyLumaIndependent]);
   useEffect(() => { segmentThreshRef.current = segmentThreshold / 100; }, [segmentThreshold]);
   useEffect(() => { segmentFeatherRef.current = Math.max(segmentFeather, 1) / 100; }, [segmentFeather]);
 
@@ -252,23 +268,16 @@ export function CameraStreamer({
           } else if (mode === "chromakey") {
             offCtx.drawImage(video, 0, 0, pw, ph);
             const imgData = offCtx.getImageData(0, 0, pw, ph);
-            const d = imgData.data;
             const [kr, kg, kb] = chromakeyRgbRef.current.split(",").map(Number);
-            const simDist = Math.max(1, chromakeySimilarityRef.current);
-            // 경계 부드러움(0-100): soft 페더 바깥 경계 = simDist×(1+smooth/50).
-            // 50이면 softDist=2×simDist(예전 하드코딩과 동일), 0이면 SOFT=HARD로 딱 잘림.
-            const softDist = simDist * (1 + Math.max(0, chromakeySmoothnessRef.current) / 50);
-            const softBand = Math.max(1e-6, softDist - simDist);
-            const HARD = simDist * simDist;
-            const SOFT = softDist * softDist;
-            for (let i = 0; i < d.length; i += 4) {
-              const dr = d[i] - (kr ?? 0);
-              const dg = d[i + 1] - (kg ?? 255);
-              const db = d[i + 2] - (kb ?? 0);
-              const distSq = dr * dr + dg * dg + db * db;
-              if (distSq < HARD) d[i + 3] = 0;
-              else if (distSq < SOFT) d[i + 3] = Math.round(((Math.sqrt(distSq) - simDist) / softBand) * 255);
-            }
+            applyChromaKey(
+              imgData.data, pw, ph,
+              { r: kr ?? 0, g: kg ?? 255, b: kb ?? 0 },
+              chromakeySimilarityRef.current,
+              chromakeySmoothnessRef.current,
+              chromakeySpillRef.current,
+              chromakeyChokeRef.current,
+              chromakeyLumaIndependentRef.current,
+            );
             offCtx.putImageData(imgData, 0, 0);
             drawBg(cw, ch);
             ctx.save();

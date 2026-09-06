@@ -1,15 +1,22 @@
 // 크로마키 키잉 공용 로직 — 촬영 프리뷰(CameraSection)·고해상도 캡처·관리자 미리보기
 // 다이얼로그가 동일한 픽셀 처리를 공유하도록 한 곳에 모은다.
 //
-//  · similarity(1-100) : 키 색 허용 거리. 이 거리(제곱) 안이면 완전 투명(HARD).
-//  · smoothness(0-100) : 경계 페더 폭. softDist = simDist×(1+smoothness/50), 그 사이는 부드럽게.
-//  · spill(0-100)      : 스필 제거 강도. 남은 인물 픽셀에서 키 색이 우세한 채널(그린스크린=G,
-//                        블루스크린=B)을 나머지 두 채널 수준으로 눌러 초록/파랑 번짐(테두리)을 없앤다.
-//  · choke(0-100)      : 경계 침식. 알파 마스크를 안쪽으로 깎아 가장자리 프린지를 제거(분리형 min 필터).
-//  · lumaIndependent   : 밝기 무시 키잉. 픽셀 밝기를 키 색 밝기에 맞춰 정규화한 뒤 거리를 재서,
-//                        그늘지거나 밝게 반사된 같은 색(불균일 조명 그린스크린)도 한 감도로 함께 빠지게 한다.
+// 판정 기준은 키 색 방향으로의 "채널 우세도"(chroma difference)다 — 키 색의 우세 채널(그린스크린=G,
+// 블루스크린=B)이 나머지 두 채널의 최댓값보다 얼마나 큰지(diff = dom - max(other1, other2))만 본다.
+// 키 색까지의 RGB 유클리드 거리로 판정하면, 카키색 옷이나 그늘진 피부·초록 스필을 받은 살구색처럼
+// "우연히 키 색과 가까운" 색까지 같은 반경 안에 들어와 인물과 함께 지워진다 — 거리는 방향을 구분하지
+// 못하기 때문이다. 채널 우세도는 방향성이 있어서, 피부(대개 R이 G보다 큼)나 대부분의 의상은 diff가
+// 낮게(음수로) 나와 그대로 남고, 실제 그린/블루스크린만 강하게 반응한다.
 //
-// spill=0·choke=0·lumaIndependent=false면 기존(감도/부드러움만) 동작과 픽셀 단위로 동일하다.
+//  · similarity(1-100) : 키잉 강도. 클수록 더 약한 채널 우세만으로도 완전 투명(HARD) 처리한다.
+//                        HARD = 255×(1 - similarity/100).
+//  · smoothness(0-100) : 경계 페더 폭(diff 단위). 0이면 HARD에서 딱 잘리고, 클수록 그 아래로
+//                        넓은 구간에 걸쳐 부드럽게 불투명해진다.
+//  · spill(0-100)      : 스필 제거 강도. 남은 인물 픽셀에서 키 색이 우세한 채널을
+//                        나머지 두 채널 수준으로 눌러 초록/파랑 번짐(테두리)을 없앤다.
+//  · choke(0-100)      : 경계 침식. 알파 마스크를 안쪽으로 깎아 가장자리 프린지를 제거(분리형 min 필터).
+//  · lumaIndependent   : 밝기 무시 키잉. 픽셀 밝기를 키 색 밝기에 맞춰 정규화한 뒤 diff를 재서,
+//                        그늘지거나 밝게 반사된 같은 색(불균일 조명 그린스크린)도 한 감도로 함께 빠지게 한다.
 
 // BT.601 휘도(밝기) 가중치 — 밝기 무시 키잉에서 픽셀/키 색의 밝기를 계산할 때 쓴다.
 function luma(r: number, g: number, b: number): number {
@@ -59,45 +66,44 @@ export function applyChromaKey(
 ): void {
   const kr = key.r, kg = key.g, kb = key.b;
   const keyLuma = luma(kr, kg, kb);
-  const simDist = Math.max(1, similarity);
-  const softDist = simDist * (1 + Math.max(0, smoothness) / 50);
-  const softBand = Math.max(1e-6, softDist - simDist);
-  const HARD = simDist * simDist;
-  const SOFT = softDist * softDist;
 
-  // 스필 제거용: 키 색에서 가장 큰(우세) 채널 오프셋과 나머지 두 채널 오프셋을 미리 정한다.
-  const spillAmt = Math.max(0, Math.min(100, spill)) / 100;
+  // 키 색에서 가장 큰(우세) 채널 오프셋과 나머지 두 채널 오프셋 — 판정과 스필 제거가 함께 쓴다.
   let domOff = 1, o1 = 0, o2 = 2; // 기본 그린(1) 우세
   if (kr >= kg && kr >= kb) { domOff = 0; o1 = 1; o2 = 2; }
   else if (kb >= kg && kb >= kr) { domOff = 2; o1 = 0; o2 = 1; }
 
+  const sim = Math.max(1, Math.min(100, similarity));
+  const HARD = 255 * (1 - sim / 100);
+  // smoothness(0-100): HARD 아래로 이 폭(diff 단위)만큼 페더 구간을 둔다. 0이면 경계 없이 딱 잘림.
+  const band = Math.max(1e-6, (Math.max(0, smoothness) / 100) * 150);
+  const SOFT = HARD - band;
+
+  const spillAmt = Math.max(0, Math.min(100, spill)) / 100;
+
   for (let i = 0; i < data.length; i += 4) {
-    const r = data[i], g = data[i + 1], b = data[i + 2];
-    let dr: number, dg: number, db: number;
+    let r = data[i], g = data[i + 1], b = data[i + 2];
     if (lumaIndependent) {
-      // 픽셀을 키 색과 같은 밝기로 스케일한 뒤 거리를 잰다 → 밝기 차이는 무시되고 색(방향)만 비교.
+      // 픽셀을 키 색과 같은 밝기로 스케일한 뒤 채널 우세도를 잰다 → 밝기 차이는 무시되고 색(방향)만 비교.
       const f = keyLuma / Math.max(1, luma(r, g, b));
-      dr = r * f - kr;
-      dg = g * f - kg;
-      db = b * f - kb;
-    } else {
-      dr = r - kr;
-      dg = g - kg;
-      db = b - kb;
+      r *= f; g *= f; b *= f;
     }
-    const distSq = dr * dr + dg * dg + db * db;
-    if (distSq < HARD) {
+    const dom = domOff === 0 ? r : domOff === 1 ? g : b;
+    const other1 = o1 === 0 ? r : o1 === 1 ? g : b;
+    const other2 = o2 === 0 ? r : o2 === 1 ? g : b;
+    const diff = dom - (other1 > other2 ? other1 : other2);
+
+    if (diff >= HARD) {
       data[i + 3] = 0;
       continue;
     }
-    if (distSq < SOFT) {
-      data[i + 3] = Math.round(((Math.sqrt(distSq) - simDist) / softBand) * 255);
+    if (diff > SOFT) {
+      data[i + 3] = Math.round(((HARD - diff) / band) * 255);
     }
     // 남아 보이는 픽셀에만 스필 제거 적용.
     if (spillAmt > 0 && data[i + 3] > 0) {
       const a = data[i + o1];
-      const b = data[i + o2];
-      const otherMax = a > b ? a : b;
+      const b2 = data[i + o2];
+      const otherMax = a > b2 ? a : b2;
       const dv = data[i + domOff];
       if (dv > otherMax) data[i + domOff] = otherMax + (dv - otherMax) * (1 - spillAmt);
     }
