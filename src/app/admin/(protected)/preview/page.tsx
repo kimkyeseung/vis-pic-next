@@ -135,6 +135,7 @@ export default function PreviewPage() {
   const [selectedPrintBg, setSelectedPrintBg] = useState<number | null>(null);
   const [printQuantity, setPrintQuantity] = useState(1);
   const [stickers, setStickers] = useState<Sticker[]>([]);
+  const [gesturePreviewOn, setGesturePreviewOn] = useState(false);
   const slots = FRAME_INFO[selectedFrame]?.count ?? 4;
   const [selectedPhotos, setSelectedPhotos] = useState<number[]>([0, 1, 2, 3]);
   // 프레임을 바꾸면 선택 사진 수도 슬롯 수에 맞춰 초기화한다.
@@ -244,6 +245,7 @@ export default function PreviewPage() {
             stickers={stickers}
             syncEnabled={false}
             mockCamera
+            previewForceGestureHint={gesturePreviewOn}
             onCapture={noop}
             onNext={noop}
             onPrev={noop}
@@ -368,6 +370,10 @@ export default function PreviewPage() {
           <label className="flex items-center gap-2 text-sm text-gray-300">
             <input type="checkbox" checked={wallpaper} onChange={(e) => setWallpaper(e.target.checked)} className="h-4 w-4 accent-blue-500" />
             배경화면
+          </label>
+          <label className="flex items-center gap-2 text-sm text-gray-300">
+            <input type="checkbox" checked={gesturePreviewOn} onChange={(e) => setGesturePreviewOn(e.target.checked)} className="h-4 w-4 accent-blue-500" />
+            제스처 트리거
           </label>
           <button
             onClick={() => { setThemeText("#ffffff"); setThemePrimary("#6c6fb4"); setWallpaper(false); }}

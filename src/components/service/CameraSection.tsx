@@ -64,6 +64,7 @@ export function CameraSection({
   stickers,
   syncEnabled = false,
   mockCamera = false,
+  previewForceGestureHint = false,
   onCapture,
   onNext,
   onStickersChange,
@@ -80,6 +81,9 @@ export function CameraSection({
   syncEnabled?: boolean;
   /** 실제 카메라를 켜지 않고 곧바로 MOCK CAMERA 화면으로 대체(관리자 화면 미리보기용) */
   mockCamera?: boolean;
+  /** 실제 배경/이펙트 설정 없이 제스처 트리거 안내 UI(2단 안내 박스)만 강제로 보여준다
+   * (관리자 화면 미리보기 전용 — 배경 목록·실제 이펙트 재생 로직에는 영향 없음). */
+  previewForceGestureHint?: boolean;
   onCapture: (dataUrl: string, frames?: string[]) => void;
   onNext: () => void;
   onPrev: () => void;
@@ -1500,6 +1504,11 @@ export function CameraSection({
   // 카메라 실행 시엔 canvas가 영상 해상도(4:3)로 커지지만, 실행 전엔 canvas 기본값(300×150)이라
   // 컨테이너가 작게 나온다. 실행 전에도 같은 크기가 되도록 초기 canvas 크기를 촬영 해상도로 지정한다.
   const previewRes = getCameraResolution(config.cameraResolution);
+  // previewForceGestureHint(관리자 미리보기 전용)는 실제 배경/이펙트 설정과 무관하게
+  // 안내 박스(2단 레이아웃)만 강제로 보여준다 — currentBgEffect 자체(영상 로드·제스처
+  // 감지 등 실제 동작)는 건드리지 않고 표시용 파생값만 대체한다.
+  const showGestureHint = !!currentBgEffect || previewForceGestureHint;
+  const gestureHintEmoji = getGestureEmoji(currentBgEffect?.gesture ?? DEFAULT_EFFECT_GESTURE) ?? "🤚";
 
   return (
     <section
@@ -1883,8 +1892,8 @@ export function CameraSection({
           <div className="w-full rounded-2xl overflow-hidden border border-[var(--theme-primary,#6c6fb4)]/50 bg-[var(--theme-primary,#6c6fb4)]/10">
             {/* 세로 모드는 두 안내가 한 박스 안에 나란히 들어가 py-6이면 높이가 넘쳐 아래
                 박스와 겹쳤다 — 세로에서만 py-3으로 줄인다(가로는 원래대로 유지). */}
-            <div className={currentBgEffect ? "flex items-center justify-center gap-4 px-6 py-6 portrait:py-3" : "text-center px-6 py-6 portrait:py-3"}>
-              <div className={currentBgEffect ? "text-5xl shrink-0 animate-soft-blink select-none" : "text-5xl mb-2 animate-soft-blink select-none"} aria-hidden>✋</div>
+            <div className={showGestureHint ? "flex items-center justify-center gap-4 px-6 py-6 portrait:py-3" : "text-center px-6 py-6 portrait:py-3"}>
+              <div className={showGestureHint ? "text-5xl leading-none shrink-0 animate-soft-blink select-none" : "text-5xl leading-none mb-2 animate-soft-blink select-none"} aria-hidden>✋</div>
               {/* break-keep(word-break: keep-all)를 쓰지 않는다 — 한국어/영어는 공백 기준으로
                   잘 줄바꿈되지만, 일본어·중국어 문구는 공백이 없어 keep-all이면 줄바꿈 지점을
                   못 찾아 박스 밖으로 넘쳐 overflow-hidden에 잘려 보이는 문제가 있었다. */}
@@ -1893,14 +1902,14 @@ export function CameraSection({
                   \n을 미리 넣어 항상 깔끔하게 2줄로 보이게 한다. */}
               {/* 이모지 글리프 자체의 좌우 여백이 비대칭이라(폰트 내장), justify-center로
                   그룹을 중앙 정렬해도 텍스트가 한쪽으로 쏠려 보인다 — px-4로 상쇄. */}
-              <p className={`text-white font-extrabold text-xl leading-snug whitespace-pre-line ${currentBgEffect ? "text-left px-4" : ""}`}>
+              <p className={`text-white font-extrabold text-xl leading-snug whitespace-pre-line ${showGestureHint ? "text-left px-4" : ""}`}>
                 {t("camera.palmHint")}
               </p>
             </div>
-            {currentBgEffect && (
+            {showGestureHint && (
               <div className="flex items-center justify-center gap-4 px-6 py-6 portrait:py-3 border-t border-[var(--theme-primary,#6c6fb4)]/30">
-                <div className="text-5xl shrink-0 select-none" aria-hidden>
-                  {getGestureEmoji(currentBgEffect.gesture) ?? "🤚"}
+                <div className="text-5xl leading-none shrink-0 select-none" aria-hidden>
+                  {gestureHintEmoji}
                 </div>
                 {/* 영어 번역문은 \n으로 2줄에 균형 있게 나뉘도록 강제한다 — 그냥 두면 자동
                     줄바꿈이 3줄로 떨어져(위 손바닥 안내는 2줄인데) 박스 높이가 들쭉날쭉해 보였다. */}
