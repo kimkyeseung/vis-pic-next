@@ -81,6 +81,12 @@ export interface DeviceConfig {
   btnGlowColor: string;
   /** 버튼 글로우 세기(번짐 px). */
   btnGlowSize: number;
+  /** '촬영하기' 버튼 텍스트 색상. 미설정 시 #2a2a2a(어두운 글자, 기본 흰 버튼 배경 기준). */
+  btnCaptureTextColor: string;
+  /** '다음으로' 버튼 텍스트 색상. 미설정 시 #ffffff. */
+  btnNextTextColor: string;
+  /** '결제하기' 버튼 텍스트 색상. 미설정 시 #ffffff. */
+  btnPaymentTextColor: string;
 }
 
 export interface BGImage {

@@ -83,6 +83,79 @@ function AssetUploader({
   );
 }
 
+// 버튼 이미지 업로드 + 텍스트 색상을 한 행에 묶은 카드 내부 섹션 (촬영하기/다음으로/결제하기 공용)
+function ButtonThemeRow({
+  title,
+  description,
+  asset,
+  onUpload,
+  onRemove,
+  busy,
+  textColor,
+  onTextColorChange,
+}: {
+  title: string;
+  description: string;
+  asset: Asset;
+  onUpload: (file: File) => void;
+  onRemove: () => void;
+  busy: boolean;
+  textColor: string;
+  onTextColorChange: (c: string) => void;
+}) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  return (
+    <div className="px-6 py-5">
+      <h4 className="text-white font-semibold text-sm mb-1">{title}</h4>
+      <p className="text-gray-500 text-xs mb-4">{description}</p>
+      <div className="flex items-start gap-5 mb-4">
+        <div className="w-64 h-24 rounded-lg border border-gray-600 overflow-hidden bg-[#2a2a2a] flex items-center justify-center shrink-0">
+          {asset ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={asset.url} alt={title} className="w-full h-full object-cover" />
+          ) : (
+            <span className="text-sm px-2 text-center font-bold" style={{ color: textColor }}>{title}</span>
+          )}
+        </div>
+        <div className="flex flex-col gap-2">
+          <input
+            ref={inputRef}
+            type="file"
+            accept="image/png,image/jpeg,image/webp,image/gif"
+            className="hidden"
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              if (f) onUpload(f);
+              if (inputRef.current) inputRef.current.value = "";
+            }}
+          />
+          <button
+            onClick={() => inputRef.current?.click()}
+            disabled={busy}
+            className="px-5 py-2.5 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors disabled:opacity-50"
+          >
+            {busy ? "처리 중..." : asset ? "이미지 변경" : "이미지 업로드"}
+          </button>
+          {asset && (
+            <button
+              onClick={onRemove}
+              disabled={busy}
+              className="px-5 py-2.5 bg-gray-700 text-gray-300 rounded-lg text-sm font-medium hover:bg-gray-600 transition-colors disabled:opacity-50"
+            >
+              제거 (기본값 사용)
+            </button>
+          )}
+        </div>
+      </div>
+      <ColorRow color={textColor} onChange={onTextColorChange}>
+        <span className="ml-2 px-3 py-1.5 rounded-lg text-xs font-bold bg-[#2a2a2a] border border-gray-600" style={{ color: textColor }}>
+          텍스트 색상 미리보기
+        </span>
+      </ColorRow>
+    </div>
+  );
+}
+
 // 색상 선택 행 (스와치 + 팝오버 피커 + hex 입력)
 function ColorRow({
   color,
@@ -139,6 +212,9 @@ export default function ThemeSettingPage() {
   const [captureButtonImage, setCaptureButtonImage] = useState<Asset>(null);
   const [nextButtonImage, setNextButtonImage] = useState<Asset>(null);
   const [paymentButtonImage, setPaymentButtonImage] = useState<Asset>(null);
+  const [captureTextColor, setCaptureTextColor] = useState("#2a2a2a");
+  const [nextTextColor, setNextTextColor] = useState("#ffffff");
+  const [paymentTextColor, setPaymentTextColor] = useState("#ffffff");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [wallpaperLsBusy, setWallpaperLsBusy] = useState(false);
@@ -190,6 +266,9 @@ export default function ThemeSettingPage() {
         setGlowEnabled(s.THEME_BTN_GLOW_ENABLED !== "0");
         setGlowColor(s.THEME_BTN_GLOW_COLOR || "#6c6fb4");
         setGlowSize(parseInt(s.THEME_BTN_GLOW_SIZE || "", 10) || 28);
+        setCaptureTextColor(s.THEME_BTN_TEXT_COLOR_CAPTURE || "#2a2a2a");
+        setNextTextColor(s.THEME_BTN_TEXT_COLOR_NEXT || "#ffffff");
+        setPaymentTextColor(s.THEME_BTN_TEXT_COLOR_PAYMENT || "#ffffff");
         setWallpaperLs(wpLs);
         setWallpaperPt(wpPt);
         setLogo(lg);
@@ -218,6 +297,9 @@ export default function ThemeSettingPage() {
           THEME_BTN_GLOW_ENABLED: glowEnabled ? "1" : "0",
           THEME_BTN_GLOW_COLOR: glowColor,
           THEME_BTN_GLOW_SIZE: String(glowSize),
+          THEME_BTN_TEXT_COLOR_CAPTURE: captureTextColor,
+          THEME_BTN_TEXT_COLOR_NEXT: nextTextColor,
+          THEME_BTN_TEXT_COLOR_PAYMENT: paymentTextColor,
         }),
       });
       flash(res.ok ? "색상이 저장되었습니다." : "저장 실패");
@@ -333,41 +415,48 @@ export default function ThemeSettingPage() {
         emptyLabel="기본 로고 (AR-pic)"
       />
 
-      <AssetUploader
-        title="버튼 이미지 · 촬영하기"
-        description="촬영 화면의 '촬영하기' 버튼 배경으로 쓰이는 이미지입니다. 버튼 비율(가로로 넓은 사각형)에 맞춰 꽉 채워지므로(cover) 좌우로 넉넉한 이미지를 권장합니다. 미설정 시 기본 단색 버튼이 사용됩니다."
-        asset={captureButtonImage}
-        onUpload={uploadAsset(BUTTON_TYPE, BUTTON_NAME_CAPTURE, captureButtonImage, setCaptureButtonImage, setCaptureButtonImageBusy)}
-        onRemove={removeAsset(captureButtonImage, setCaptureButtonImage, setCaptureButtonImageBusy)}
-        busy={captureButtonImageBusy}
-        previewClass="w-64 h-24"
-        imageFit="cover"
-        emptyLabel="기본 단색 버튼"
-      />
+      {/* 버튼 이미지 · 텍스트 색상 (촬영하기/다음으로/결제하기 통합) */}
+      <div className="bg-gray-800 rounded-xl border border-gray-700 divide-y divide-gray-700">
+        <div className="px-6 pt-5 pb-1">
+          <h3 className="text-white font-semibold text-base">버튼 이미지 · 텍스트 색상</h3>
+          <p className="text-gray-500 text-xs mt-1">
+            촬영·다음·결제 버튼의 배경 이미지와 글자 색상입니다. 이미지는 버튼 비율(가로로 넓은 사각형)에 맞춰 꽉 채워지므로(cover) 좌우로 넉넉한 이미지를 권장합니다. 미설정 시 기본 단색 버튼이 사용됩니다.
+          </p>
+        </div>
 
-      <AssetUploader
-        title="버튼 이미지 · 다음으로"
-        description="각 단계 화면의 '다음으로' 버튼 배경으로 쓰이는 이미지입니다. 버튼 비율(가로로 넓은 사각형)에 맞춰 꽉 채워지므로(cover) 좌우로 넉넉한 이미지를 권장합니다. 미설정 시 기본 단색 버튼이 사용됩니다."
-        asset={nextButtonImage}
-        onUpload={uploadAsset(BUTTON_TYPE, BUTTON_NAME_NEXT, nextButtonImage, setNextButtonImage, setNextButtonImageBusy)}
-        onRemove={removeAsset(nextButtonImage, setNextButtonImage, setNextButtonImageBusy)}
-        busy={nextButtonImageBusy}
-        previewClass="w-64 h-24"
-        imageFit="cover"
-        emptyLabel="기본 단색 버튼"
-      />
+        <ButtonThemeRow
+          title="촬영하기"
+          description="촬영 화면의 '촬영하기' 버튼."
+          asset={captureButtonImage}
+          onUpload={uploadAsset(BUTTON_TYPE, BUTTON_NAME_CAPTURE, captureButtonImage, setCaptureButtonImage, setCaptureButtonImageBusy)}
+          onRemove={removeAsset(captureButtonImage, setCaptureButtonImage, setCaptureButtonImageBusy)}
+          busy={captureButtonImageBusy}
+          textColor={captureTextColor}
+          onTextColorChange={setCaptureTextColor}
+        />
 
-      <AssetUploader
-        title="버튼 이미지 · 결제하기"
-        description="결제 화면의 '결제하기' 버튼 배경으로 쓰이는 이미지입니다. 버튼 비율(가로로 넓은 사각형)에 맞춰 꽉 채워지므로(cover) 좌우로 넉넉한 이미지를 권장합니다. 미설정 시 기본 단색 버튼이 사용됩니다."
-        asset={paymentButtonImage}
-        onUpload={uploadAsset(BUTTON_TYPE, BUTTON_NAME_PAYMENT, paymentButtonImage, setPaymentButtonImage, setPaymentButtonImageBusy)}
-        onRemove={removeAsset(paymentButtonImage, setPaymentButtonImage, setPaymentButtonImageBusy)}
-        busy={paymentButtonImageBusy}
-        previewClass="w-64 h-24"
-        imageFit="cover"
-        emptyLabel="기본 단색 버튼"
-      />
+        <ButtonThemeRow
+          title="다음으로"
+          description="각 단계 화면의 '다음으로' 버튼."
+          asset={nextButtonImage}
+          onUpload={uploadAsset(BUTTON_TYPE, BUTTON_NAME_NEXT, nextButtonImage, setNextButtonImage, setNextButtonImageBusy)}
+          onRemove={removeAsset(nextButtonImage, setNextButtonImage, setNextButtonImageBusy)}
+          busy={nextButtonImageBusy}
+          textColor={nextTextColor}
+          onTextColorChange={setNextTextColor}
+        />
+
+        <ButtonThemeRow
+          title="결제하기"
+          description="결제 화면의 '결제하기' 버튼."
+          asset={paymentButtonImage}
+          onUpload={uploadAsset(BUTTON_TYPE, BUTTON_NAME_PAYMENT, paymentButtonImage, setPaymentButtonImage, setPaymentButtonImageBusy)}
+          onRemove={removeAsset(paymentButtonImage, setPaymentButtonImage, setPaymentButtonImageBusy)}
+          busy={paymentButtonImageBusy}
+          textColor={paymentTextColor}
+          onTextColorChange={setPaymentTextColor}
+        />
+      </div>
 
       {/* 배경 단색 */}
       <div className="bg-gray-800 rounded-xl border border-gray-700">

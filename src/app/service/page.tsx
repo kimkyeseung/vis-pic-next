@@ -195,6 +195,10 @@ function ServiceContent() {
     ...(captureButtonImageUrl ? { ["--theme-btn-capture-image"]: `url(${captureButtonImageUrl})` } : {}),
     ...(nextButtonImageUrl ? { ["--theme-btn-next-image"]: `url(${nextButtonImageUrl})` } : {}),
     ...(paymentButtonImageUrl ? { ["--theme-btn-payment-image"]: `url(${paymentButtonImageUrl})` } : {}),
+    // 버튼별 텍스트 색상. 버튼 배경(단색/이미지)에 맞춰 관리자가 지정.
+    ...(config.btnCaptureTextColor ? { ["--theme-btn-capture-text"]: config.btnCaptureTextColor } : {}),
+    ...(config.btnNextTextColor ? { ["--theme-btn-next-text"]: config.btnNextTextColor } : {}),
+    ...(config.btnPaymentTextColor ? { ["--theme-btn-payment-text"]: config.btnPaymentTextColor } : {}),
     // 버튼 탭 글로우 (--btn-glow-*). 비활성 시 주입 안 함 → globals.css 폴백으로 글로우 없음.
     ...(config.btnGlowEnabled
       ? { ["--btn-glow-color"]: config.btnGlowColor, ["--btn-glow-size"]: `${config.btnGlowSize}px` }

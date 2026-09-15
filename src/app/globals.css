@@ -384,6 +384,11 @@ body {
 .service-button.btn-role-capture { background-image: var(--theme-btn-capture-image, none); }
 .service-button.btn-role-next { background-image: var(--theme-btn-next-image, none); }
 .service-button.btn-role-payment { background-image: var(--theme-btn-payment-image, none); }
+
+/* 버튼별 텍스트 색상(테마관리 설정). 미설정 시 기존 기본 글자색 유지. */
+.service-button.btn-role-capture { color: var(--theme-btn-capture-text, var(--color-surface)); }
+.service-button.btn-role-next { color: var(--theme-btn-next-text, #ffffff); }
+.service-button.btn-role-payment { color: var(--theme-btn-payment-text, #ffffff); }
 @media (orientation: portrait) {
   .nav-button { min-height: 150px; padding: 32px 72px; font-size: 2.1em; }
 }

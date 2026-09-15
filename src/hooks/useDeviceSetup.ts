@@ -64,6 +64,9 @@ const DEFAULT_CONFIG: DeviceConfig = {
   btnGlowEnabled: true,
   btnGlowColor: "#6c6fb4",
   btnGlowSize: 28,
+  btnCaptureTextColor: "#2a2a2a",
+  btnNextTextColor: "#ffffff",
+  btnPaymentTextColor: "#ffffff",
 };
 
 export function useDeviceSetup(deviceId: string) {
@@ -143,6 +146,9 @@ export function useDeviceSetup(deviceId: string) {
           btnGlowEnabled: s.THEME_BTN_GLOW_ENABLED !== "0",
           btnGlowColor: s.THEME_BTN_GLOW_COLOR || "#6c6fb4",
           btnGlowSize: parseIntSafe(s.THEME_BTN_GLOW_SIZE || "", 28),
+          btnCaptureTextColor: s.THEME_BTN_TEXT_COLOR_CAPTURE || "#2a2a2a",
+          btnNextTextColor: s.THEME_BTN_TEXT_COLOR_NEXT || "#ffffff",
+          btnPaymentTextColor: s.THEME_BTN_TEXT_COLOR_PAYMENT || "#ffffff",
         });
         return true;
       });

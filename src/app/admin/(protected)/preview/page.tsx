@@ -106,6 +106,9 @@ function makeConfig(paymentEnabled: boolean): DeviceConfig {
     btnGlowEnabled: true,
     btnGlowColor: "#6c6fb4",
     btnGlowSize: 28,
+    btnCaptureTextColor: "#2a2a2a",
+    btnNextTextColor: "#ffffff",
+    btnPaymentTextColor: "#ffffff",
   };
 }
 
