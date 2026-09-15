@@ -392,7 +392,7 @@ export default function PreviewPage() {
         </div>
         <p className="text-xs text-gray-500">
           * 촬영 화면은 실제 <code>CameraSection</code>을 그대로 렌더하되, 실제 카메라는 켜지 않고
-          곧바로 MOCK CAMERA 화면으로 대체합니다("촬영하기"로 찍는 사진도 mock). 3단 레이아웃은
+          곧바로 MOCK CAMERA 화면으로 대체합니다(&quot;촬영하기&quot;로 찍는 사진도 mock). 3단 레이아웃은
           실제와 동일합니다. 세로 방향은 스테이지에 <code>.force-portrait</code>를 부여해
           <code>portrait:</code> 전용 스타일을 실제 세로 화면과 동일하게 적용합니다.
         </p>
