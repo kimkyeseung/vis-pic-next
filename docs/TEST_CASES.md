@@ -21,7 +21,7 @@
 - [ ] 테스트 지점에 촬영 배경(type 1) 1~6개 연결·정렬 완료
 - [ ] 인쇄 배경/프레임(type 2) 유·무 두 케이스 모두 준비 (PBG 단계 분기 확인용)
 - [ ] `PAYMENT_ENABLED` on/off 두 지점 준비
-- [ ] `CHROMAKEY_MODE` = mediapipe / chromakey / off 전환 가능하도록 확인
+- [ ] `CHROMAKEY_MODE` = mediapipe / chromakey / chromakey-yuv / off 전환 가능하도록 확인
 
 ---
 
@@ -122,6 +122,7 @@
 | CAM-15 | P1 | 권한 거부 | 권한 차단 상태 진입 | "카메라 접근 권한이 필요합니다" | ☐ | NotAllowedError |
 | CAM-16 | P2 | — | 이전 버튼 | 촬영본 초기화 후 배경 화면으로 | ☐ | |
 | CAM-17 | P2 | AI 모드 성능 | mediapipe+제스처 동시 구동 | 프레임 드롭 없이 렌더링 유지(추론 200ms 스로틀) | ☐ | |
+| CAM-18 | P1 | `bgRemovalMode=chromakey-yuv` | 녹색 배경 앞 촬영 | 크로마키(OBS 방식) 색 제거 + 선택 배경 합성 | ☐ | CHROMAKEY_YUV_RGB, applyChromaKeyYuv |
 
 ### 3.7 사진 선택 (SELECT) — `SelectSection`
 
@@ -276,11 +277,12 @@
 | TC-ID | P | 절차 | 기대결과 | 결과 | 비고 |
 |-------|:-:|------|------|:--:|----|
 | ADM-CAP-01 | P0 | 카운트다운·촬영 횟수 저장 | 서비스 촬영에 반영 | ☐ | CAM-06/11 |
-| ADM-CAP-02 | P0 | 배경 제거 모드 AI/크로마키/off 전환 | 서비스에 반영, 레거시 값도 정상 표시 | ☐ | |
+| ADM-CAP-02 | P0 | 배경 제거 모드 AI/크로마키/크로마키(OBS 방식)/off 전환 | 서비스에 반영, 레거시 값도 정상 표시 | ☐ | |
 | ADM-CAP-03 | P1 | 크로마키 색상(컬러피커) 변경 | `CHROMAKEY_RGB` 반영 | ☐ | |
 | ADM-CAP-04 | P0 | AI 경계 침식/부드러움 조정 | 메인·미리보기·**보조 모니터** 결과 모두 반영 | ☐ | SUB-03 연계 |
 | ADM-CAP-05 | P1 | 크로마키 감도·부드러움·**스필 제거·경계 침식·밝기 무시** 조정 | 각 값이 메인·미리보기 키잉에 반영(테두리 초록기·조명 불균일 개선) | ☐ | applyChromaKey |
 | ADM-CAP-06 | P1 | "카메라로 미리보기" | 현재 모드로 실시간 처리, 제거영역 체커보드, 슬라이더/토글·스포이드 조정 즉시 반영·저장 | ☐ | |
+| ADM-CAP-07 | P1 | 크로마키(OBS 방식) 감도·부드러움·스필 제거·**투명도·대비·명암·감마** 조정 | 각 값이 메인·미리보기 키잉에 반영, 기존 크로마키 모드 동작은 불변 | ☐ | applyChromaKeyYuv |
 
 ### 6.7 인화 설정 — `ADM-PRT` (`/admin/print-setting`)
 

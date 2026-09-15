@@ -288,6 +288,14 @@ function ServiceContent() {
           chromakeySpill={config.chromakeySpill}
           chromakeyChoke={config.chromakeyChoke}
           chromakeyLumaIndependent={config.chromakeyLumaIndependent}
+          chromakeyYuvRgb={config.chromakeyYuvRgb}
+          chromakeyYuvSimilarity={config.chromakeyYuvSimilarity}
+          chromakeyYuvSmoothness={config.chromakeyYuvSmoothness}
+          chromakeyYuvSpill={config.chromakeyYuvSpill}
+          chromakeyYuvOpacity={config.chromakeyYuvOpacity}
+          chromakeyYuvContrast={config.chromakeyYuvContrast}
+          chromakeyYuvBrightness={config.chromakeyYuvBrightness}
+          chromakeyYuvGamma={config.chromakeyYuvGamma}
           segmentThreshold={config.segmentThreshold}
           segmentFeather={config.segmentFeather}
         />

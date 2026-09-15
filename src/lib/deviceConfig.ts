@@ -10,6 +10,7 @@ export function parseIntSafe(value: string, defaultValue: number): number {
 export function parseBgRemovalMode(modeRaw: string): BgRemovalMode {
   if (modeRaw === "0" || modeRaw === "off") return "off";
   if (modeRaw === "1" || modeRaw === "chromakey") return "chromakey";
+  if (modeRaw === "chromakey-yuv") return "chromakey-yuv";
   return "mediapipe";
 }
 
@@ -59,4 +60,9 @@ export function parsePaymentTiers(raw: string): PaymentTier[] {
 /** 0-100 범위로 고정. min을 주면 0으로 나누기 등을 막기 위한 하한을 별도로 지정할 수 있다. */
 export function clampPercent(value: number, min = 0): number {
   return Math.min(100, Math.max(min, value));
+}
+
+/** -100~100 범위로 고정. 대비/명암/감마처럼 0을 중심으로 양쪽 조정이 필요한 값에 사용. */
+export function clampSigned(value: number, min = -100, max = 100): number {
+  return Math.min(max, Math.max(min, value));
 }

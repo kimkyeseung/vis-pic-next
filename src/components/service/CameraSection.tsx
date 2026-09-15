@@ -18,6 +18,7 @@ import {
 import { getCameraResolution } from "@/constants/camera";
 import { fillGradientFromCSS, computeCaptureSize, drawCoverSource } from "@/lib/canvas";
 import { applyChromaKey } from "@/lib/chromakey";
+import { applyChromaKeyYuv } from "@/lib/chromakeyYuv";
 import { useFrameSender } from "@/hooks/useSceneSync";
 import { useAutoCaptureTimer } from "@/hooks/useAutoCaptureTimer";
 import { createSoundPlayer, type SoundPlayer } from "@/lib/sounds";
@@ -440,6 +441,11 @@ export function CameraSection({
     const [r, g, b] = config.chromakeyRgb.split(",").map(Number);
     return { r: r ?? 0, g: g ?? 255, b: b ?? 0 };
   }, [config.chromakeyRgb]);
+
+  const chromaKeyYuv = useMemo(() => {
+    const [r, g, b] = config.chromakeyYuvRgb.split(",").map(Number);
+    return { r: r ?? 0, g: g ?? 255, b: b ?? 0 };
+  }, [config.chromakeyYuvRgb]);
 
   // MediaPipe/TFLite 내부 로그(console.error로 나오는 INFO 등)가 Next dev 에러 오버레이를
   // 띄워 화면을 가리는 것을 방지한다.
@@ -1004,7 +1010,7 @@ export function CameraSection({
       let person = capturePersonCanvasRef.current;
       if (!person) { person = document.createElement("canvas"); capturePersonCanvasRef.current = person; }
       person.width = TW; person.height = TH;
-      const pctx = person.getContext("2d", { willReadFrequently: bgRemovalMode === "chromakey" });
+      const pctx = person.getContext("2d", { willReadFrequently: bgRemovalMode === "chromakey" || bgRemovalMode === "chromakey-yuv" });
       let built = false;
       if (pctx) {
         pctx.imageSmoothingEnabled = true;
@@ -1021,6 +1027,11 @@ export function CameraSection({
         } else if (bgRemovalMode === "chromakey") {
           const img = pctx.getImageData(0, 0, TW, TH);
           applyChromaKey(img.data, TW, TH, chromaKey, config.chromakeySimilarity, config.chromakeySmoothness, config.chromakeySpill, config.chromakeyChoke, config.chromakeyLumaIndependent);
+          pctx.putImageData(img, 0, 0);
+          built = true;
+        } else if (bgRemovalMode === "chromakey-yuv") {
+          const img = pctx.getImageData(0, 0, TW, TH);
+          applyChromaKeyYuv(img.data, TW, TH, chromaKeyYuv, config.chromakeyYuvSimilarity, config.chromakeyYuvSmoothness, config.chromakeyYuvSpill, config.chromakeyYuvOpacity, config.chromakeyYuvContrast, config.chromakeyYuvBrightness, config.chromakeyYuvGamma);
           pctx.putImageData(img, 0, 0);
           built = true;
         }
@@ -1041,7 +1052,7 @@ export function CameraSection({
     // 스티커: 프리뷰(display) 대비 배율로 크기를 맞춘다(위치는 정규화라 무관).
     drawStickers(ctx, TW, TH, TW / display.width);
     return c.toDataURL("image/jpeg", 0.92);
-  }, [bgRemovalMode, chromaKey, config.chromakeySimilarity, config.chromakeySmoothness, config.chromakeySpill, config.chromakeyChoke, config.chromakeyLumaIndependent, maskSmoothQuality, drawBackground, drawEffectLayer, drawStickers]);
+  }, [bgRemovalMode, chromaKey, config.chromakeySimilarity, config.chromakeySmoothness, config.chromakeySpill, config.chromakeyChoke, config.chromakeyLumaIndependent, chromaKeyYuv, config.chromakeyYuvSimilarity, config.chromakeyYuvSmoothness, config.chromakeyYuvSpill, config.chromakeyYuvOpacity, config.chromakeyYuvContrast, config.chromakeyYuvBrightness, config.chromakeyYuvGamma, maskSmoothQuality, drawBackground, drawEffectLayer, drawStickers]);
 
   // 스티커 전용 오버레이 캔버스 루프 — 메인 합성 루프와 독립적으로 60fps 렌더
   useEffect(() => {
@@ -1223,6 +1234,11 @@ export function CameraSection({
         applyChromaKey(imageData.data, pw, ph, chromaKey, config.chromakeySimilarity, config.chromakeySmoothness, config.chromakeySpill, config.chromakeyChoke, config.chromakeyLumaIndependent);
         offCtx.putImageData(imageData, 0, 0);
         processed = true;
+      } else if (bgRemovalMode === "chromakey-yuv") {
+        const imageData = offCtx.getImageData(0, 0, pw, ph);
+        applyChromaKeyYuv(imageData.data, pw, ph, chromaKeyYuv, config.chromakeyYuvSimilarity, config.chromakeyYuvSmoothness, config.chromakeyYuvSpill, config.chromakeyYuvOpacity, config.chromakeyYuvContrast, config.chromakeyYuvBrightness, config.chromakeyYuvGamma);
+        offCtx.putImageData(imageData, 0, 0);
+        processed = true;
       }
 
       if (processed) {
@@ -1266,7 +1282,7 @@ export function CameraSection({
 
     animFrameRef.current = requestAnimationFrame(processFrame);
     return () => cancelAnimationFrame(animFrameRef.current);
-  }, [selectedBackground, chromaKey, config.chromakeySimilarity, config.chromakeySmoothness, config.chromakeySpill, config.chromakeyChoke, config.chromakeyLumaIndependent, bgRemovalMode, segmentThresh, segmentFeather, useGpuDelegate, drawBackground, drawEffectLayer, frameChannelRef, snapshotWithStickers]);
+  }, [selectedBackground, chromaKey, config.chromakeySimilarity, config.chromakeySmoothness, config.chromakeySpill, config.chromakeyChoke, config.chromakeyLumaIndependent, chromaKeyYuv, config.chromakeyYuvSimilarity, config.chromakeyYuvSmoothness, config.chromakeyYuvSpill, config.chromakeyYuvOpacity, config.chromakeyYuvContrast, config.chromakeyYuvBrightness, config.chromakeyYuvGamma, bgRemovalMode, segmentThresh, segmentFeather, useGpuDelegate, drawBackground, drawEffectLayer, frameChannelRef, snapshotWithStickers]);
 
   // 카운트다운 도중 언마운트(이전/다음 이동 등) 시 타이머가 살아남아
   // onCapture가 화면 전환 후에 실행되는 것을 막는다.

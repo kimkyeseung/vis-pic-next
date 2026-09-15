@@ -21,7 +21,7 @@ export interface MonitorInfo {
 
 export type Step = "start" | "payment" | "frame" | "background" | "camera" | "select" | "printbg" | "complete";
 
-export type BgRemovalMode = "mediapipe" | "chromakey" | "off";
+export type BgRemovalMode = "mediapipe" | "chromakey" | "chromakey-yuv" | "off";
 
 export type PaymentTerminalMode = "manual" | "payapp_lite";
 
@@ -60,6 +60,22 @@ export interface DeviceConfig {
   chromakeyChoke: number;
   /** 밝기 무시 키잉. 켜면 밝기 차이를 무시하고 색만 비교해 그늘/얼룩진 그린스크린도 고르게 제거. 기본 false. */
   chromakeyLumaIndependent: boolean;
+  /** OBS 방식(YUV) 크로마키 색상. bgRemovalMode가 "chromakey-yuv"일 때 사용. */
+  chromakeyYuvRgb: string;
+  /** OBS 방식 크로마키 감도(1-100). 높을수록 키 색과 더 먼 색까지 제거. 기본 50. */
+  chromakeyYuvSimilarity: number;
+  /** OBS 방식 크로마키 경계 부드러움(0-100). 기본 50. */
+  chromakeyYuvSmoothness: number;
+  /** OBS 방식 크로마키 스필 제거(0-100). 기본 0(끔). */
+  chromakeyYuvSpill: number;
+  /** OBS 방식 크로마키 결과 전체 투명도 배율(0-100). 100=원본 그대로. */
+  chromakeyYuvOpacity: number;
+  /** OBS 방식 크로마키 결과 대비 보정(-100~100). 0=변화 없음. */
+  chromakeyYuvContrast: number;
+  /** OBS 방식 크로마키 결과 명암(밝기) 보정(-100~100). 0=변화 없음. */
+  chromakeyYuvBrightness: number;
+  /** OBS 방식 크로마키 결과 감마 보정(-100~100). 0=변화 없음. */
+  chromakeyYuvGamma: number;
   captureModes: string[];
   bgRemovalMode: BgRemovalMode;
   idleTimeoutSeconds: number;

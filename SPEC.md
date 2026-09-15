@@ -271,7 +271,7 @@
   배경제거 `off` 모드에서는 숨김)
 - 30fps 캔버스 렌더링 루프:
   1. 영상 프레임을 캔버스에 그리기
-  2. 배경 제거 적용 (mediapipe / chromakey / off)
+  2. 배경 제거 적용 (mediapipe / chromakey / chromakey-yuv / off)
   3. 스티커 오버레이
   4. 서브 모니터 동기화 (활성 시 `/api/camera-frame` POST)
   5. 카운트다운 타이머 표시
@@ -682,7 +682,7 @@ requestAnimationFrame loop (≈30fps)
   ↓
 drawImage(videoElement) → canvas
   ↓
-배경 제거 적용 (mediapipe / chromakey / off)
+배경 제거 적용 (mediapipe / chromakey / chromakey-yuv / off)
   ↓
 sticker 오버레이 (canvas.drawImage / fillText)
   ↓
@@ -745,11 +745,27 @@ sticker 오버레이 (canvas.drawImage / fillText)
   - `CHROMAKEY_SIMILARITY`(감도, 1-100, 기본 50) · `CHROMAKEY_SMOOTHNESS`(경계 부드러움, 0-100, 기본 50)
   - `CHROMAKEY_SPILL`(스필 제거, 0-100, 기본 0) · `CHROMAKEY_CHOKE`(경계 침식, 0-100, 기본 0) · `CHROMAKEY_LUMA`(밝기 무시 키잉, on/off, 기본 off)
 - 키잉 로직은 **공용 `src/lib/chromakey.applyChromaKey`**로 통합 — 촬영 프리뷰·고해상도 캡처·관리자 미리보기가 동일 픽셀 처리를 공유
-  - **색상거리/임계값**: `distSq = dr²+dg²+db²`. `HARD = 감도²`(완전 투명), `softDist = 감도×(1+부드러움/50)`, `SOFT = softDist²`(그 사이 부드럽게 페이드). 부드러움 50 → `softDist=감도×2`(예전 고정값), 0 → `SOFT=HARD`(딱 잘림)
-  - **밝기 무시 키잉**(`CHROMAKEY_LUMA=on`): 픽셀 밝기를 키 색 밝기에 맞춰 정규화한 뒤 거리를 재, 그늘지거나 밝게 반사된 같은 색(불균일 조명 그린스크린)도 한 감도로 함께 제거
+  - **채널 우세도(chroma difference) 판정**: 키 색의 우세 채널(그린스크린=G, 블루스크린=B)이 나머지 두 채널의 최댓값보다 얼마나 큰지(`diff = dom - max(other1, other2)`)만 본다. RGB 유클리드 거리로 판정하면 카키색 옷이나 그늘진 피부처럼 "우연히 키 색과 가까운" 색까지 같은 반경에 들어와 함께 지워지지만, 채널 우세도는 방향성이 있어 실제 그린/블루스크린만 강하게 반응한다
+  - **임계값**: `HARD = 255×(1 - 감도/100)`(`diff`가 이 값 이상이면 완전 투명), `band = (부드러움/100)×150`, `SOFT = HARD - band`(그 사이 부드럽게 페이드). 부드러움 0 → 경계 없이 딱 잘림
+  - **밝기 무시 키잉**(`CHROMAKEY_LUMA=on`): 픽셀 밝기를 키 색 밝기에 맞춰 정규화한 뒤 채널 우세도를 다시 재, 그늘지거나 밝게 반사된 같은 색(불균일 조명 그린스크린)도 한 감도로 함께 제거
   - **스필 제거**(`CHROMAKEY_SPILL`): 남은 인물 픽셀에서 키 색 우세 채널(그린=G, 블루=B)을 나머지 두 채널 최댓값으로 눌러 테두리 초록/파랑 번짐 제거
   - **경계 침식**(`CHROMAKEY_CHOKE`): 알파 마스크를 분리형 min 필터로 안쪽으로 깎아 가장자리 프린지 제거(반경은 이미지 폭에 비례)
   - spill·choke=0, luma=off면 감도/부드러움만 쓰던 기존 동작과 픽셀 단위로 동일
+
+### Chromakey — OBS 방식 (`bgRemovalMode: "chromakey-yuv"`)
+
+- 위 채널 우세도 방식과 **완전히 독립된 별도 알고리즘·별도 설정 키 세트**(`CHROMAKEY_YUV_*`). 이 모드를 추가해도 기존 `chromakey` 모드 선택 시 동작에는 전혀 영향 없음
+- 로직은 **신규 파일 `src/lib/chromakeyYuv.applyChromaKeyYuv`**(`chromakey.ts`는 수정하지 않음) — OBS 등 방송 소프트웨어의 크로마키 필터(유사성/매끄러움/스필 제거 + 투명도/대비/명암/감마)와 비슷한 조작감을 제공하는 자체 구현이며, 바이트 단위 재현이 아니다(OBS 소스 비공개)
+- 설정(관리자 촬영 설정 페이지·미리보기에서 조정):
+  - `CHROMAKEY_YUV_RGB`(키 색상, 기본 "0,255,0")
+  - `CHROMAKEY_YUV_SIMILARITY`(감도, 1-100, 기본 50) · `CHROMAKEY_YUV_SMOOTHNESS`(경계 부드러움, 0-100, 기본 50)
+  - `CHROMAKEY_YUV_SPILL`(스필 제거, 0-100, 기본 0) · `CHROMAKEY_YUV_OPACITY`(결과 전체 투명도 배율, 0-100, 기본 100)
+  - `CHROMAKEY_YUV_CONTRAST` · `CHROMAKEY_YUV_BRIGHTNESS` · `CHROMAKEY_YUV_GAMMA`(대비/명암/감마, -100~100, 기본 0)
+- **판정 방식**: RGB를 BT.601 YUV로 변환해 **색차(U,V)만 비교**하고 밝기(Y)는 무시한다 — 그늘지거나 밝게 반사된 같은 키 색도 한 감도로 함께 잡힌다(`chromakey` 모드의 `CHROMAKEY_LUMA=on`과 비슷한 효과가 기본 내장돼 있으며, 이 모드엔 별도 토글이 없다)
+  - `dist` = 픽셀·키 색의 UV 유클리드 거리. `threshold = (감도/100)×200`, `band = (부드러움/100)×200`. `dist ≤ threshold` → 완전 투명, `threshold < dist < threshold+band` → 선형 페이드, 그 이상은 원본 alpha 유지
+- **스필 제거**: 남은(alpha>0) 픽셀의 UV 벡터를 키 색 방향으로 투영해, 그 성분만 `스필/100` 비율로 원점 쪽으로 당긴 뒤 RGB로 역변환(밝기 Y는 그대로 유지) — 초록/파랑 번짐만 줄고 밝기는 바뀌지 않는다
+- **색보정**(결과 프레임 전체에 적용, 0=변화 없음): 표준 대비 보정 계수(`(259×(c+255))/(255×(259-c))`, `c`는 대비값을 -255~255로 사상), 가산 밝기(`brightness/100×127`), 감마 커브(`255×(c/255)^(2^(-감마/100))`)를 RGB에 순서대로 적용한 뒤, 계산된 alpha에 `투명도/100`을 최종으로 곱한다
+- 경계 침식(choke)·밝기 무시 토글은 이 모드에 없음 — OBS 필터 UI에도 없는 옵션이라 1:1 대응이 없으며, 필요해지면 추후 추가
 
 ### 없음 (`bgRemovalMode: "off"`)
 
@@ -758,12 +774,15 @@ sticker 오버레이 (canvas.drawImage / fillText)
 ### 관리자 미리보기 (`BackgroundRemovalPreviewDialog`)
 
 - 관리자 촬영 설정 페이지의 "카메라로 미리보기" 버튼으로 실행. 카메라를 켜서 현재
-  `CHROMAKEY_MODE`에 맞는 처리(AI 또는 크로마키)를 실시간으로 보여주며, 다이얼로그 내
-  컬러피커·슬라이더(감도·부드러움·**스필 제거·경계 침식**)와 **밝기 무시 키잉 토글**로 값을 조정하면
-  미리보기와 뒤쪽 설정 폼에 동시 반영되어 바로 저장 가능
+  `CHROMAKEY_MODE`에 맞는 처리(AI·크로마키·크로마키 OBS 방식 3종)를 실시간으로 보여주며, 다이얼로그 내
+  컬러피커·슬라이더와 모드별 컨트롤(크로마키: 감도·부드러움·**스필 제거·경계 침식**·**밝기 무시 키잉 토글** /
+  크로마키 OBS 방식: 감도·부드러움·스필 제거·**투명도·대비·명암·감마**)로 값을 조정하면 미리보기와
+  뒤쪽 설정 폼에 동시 반영되어 바로 저장 가능
 - 제거되는 영역은 체커보드 패턴으로 표시
-- **크로마키 스포이드**: "스포이드" 버튼 → 미리보기 클릭 지점의 **원본 카메라 색**을 키 색상(`CHROMAKEY_RGB`)으로 추출(표시 미러 보정, 제거된 영역을 찍어도 원본 색). 한 번 추출 후 자동 해제
-- 크로마키 키잉은 `CameraSection.tsx`와 **공용 `lib/chromakey.applyChromaKey`**를 재사용해 실제 서비스 화면과 결과가 일치함
+- **크로마키 스포이드**: "스포이드" 버튼 → 미리보기 클릭 지점의 **원본 카메라 색**을 현재 모드의 키
+  색상(`CHROMAKEY_RGB` 또는 `CHROMAKEY_YUV_RGB`)으로 추출(표시 미러 보정, 제거된 영역을 찍어도 원본 색). 한 번 추출 후 자동 해제
+- 크로마키 키잉은 `CameraSection.tsx`와 동일한 공용 함수(`lib/chromakey.applyChromaKey` 또는
+  OBS 방식은 `lib/chromakeyYuv.applyChromaKeyYuv`)를 재사용해 실제 서비스 화면과 결과가 일치함
 
 ---
 
@@ -872,7 +891,7 @@ interface Sticker {
 CameraStreamer (헤드리스, 메인 윈도우) — 항상 마운트
     ↓ enabled=true: 앱 진입 즉시 getUserMedia로 카메라 상시 점유 (웜업)
     ↓ sendFrames=syncEnabled: 서브 모니터 출력이 켜진 경우에만
-    ↓   배경 합성 후 JPEG (chromakey / mediapipe / raw)
+    ↓   배경 합성 후 JPEG (chromakey / chromakey-yuv / mediapipe / raw)
     ↓   (전송 대상 없으면 픽셀 합성 연산 생략, 카메라만 유지)
     POST /api/camera-frame
     ↓ SSE 브로드캐스트
@@ -899,6 +918,8 @@ CameraSection (메인 윈도우) — CameraStreamer는 언마운트되고 카메
 | `"off"` | — | 원본 카메라 (미러) |
 | `"chromakey"` | 없음 | 원본 카메라 |
 | `"chromakey"` | 있음 | 크로마키 배경 제거 + 선택 배경 합성 |
+| `"chromakey-yuv"` | 없음 | 원본 카메라 |
+| `"chromakey-yuv"` | 있음 | 크로마키(OBS 방식) 배경 제거 + 선택 배경 합성 |
 | `"mediapipe"` | 없음 | 원본 카메라 |
 | `"mediapipe"` | 있음 (세그멘터 준비 전) | 원본 카메라 (폴백) |
 | `"mediapipe"` | 있음 (세그멘터 준비 후) | MediaPipe 배경 제거 + 선택 배경 합성 |
@@ -1151,9 +1172,9 @@ mediapipe 파일은 웹 빌드에 없으므로 프리캐시하지 않고, 존재
 | `CAPTURE_SECONDS` | 3 | 촬영 카운트다운 초 |
 | `CAPTURE_COUNT_UNIFORM` | 4 | 슬롯당 촬영 수 |
 | `CAPTURE_MODES` | "1x1,2x2" | 활성 프레임 모드 |
-| `CHROMAKEY_MODE` | "mediapipe" | 배경 제거 모드 |
+| `CHROMAKEY_MODE` | "mediapipe" | 배경 제거 모드 (mediapipe/chromakey/chromakey-yuv/off) |
 | `CHROMAKEY_RGB` | "0,255,0" | 크로마키 색상 |
-| `CHROMAKEY_SIMILARITY` | "50" | 크로마키 감도(색상 허용 거리, 1-100). 높을수록 키 색과 더 먼 색까지 제거. 그 외 크로마키 키(`CHROMAKEY_SMOOTHNESS`·`CHROMAKEY_SPILL`·`CHROMAKEY_CHOKE`·`CHROMAKEY_LUMA`)는 §12 |
+| `CHROMAKEY_SIMILARITY` | "50" | 크로마키 감도(색상 허용 거리, 1-100). 높을수록 키 색과 더 먼 색까지 제거. 그 외 크로마키 키(`CHROMAKEY_SMOOTHNESS`·`CHROMAKEY_SPILL`·`CHROMAKEY_CHOKE`·`CHROMAKEY_LUMA`)와 크로마키 OBS 방식 키(`CHROMAKEY_YUV_*`)는 §12 |
 | `PAYMENT_ENABLED` | "0" | 결제 활성화 |
 | `PAYMENT_AMOUNT` | "5000" | **1장당 가격**(원). 결제 화면 매수는 1/2/4장 고정, 총액 = 가격 × 매수 |
 | `PAYMENT_TERMINAL_MODE` | "manual" | 결제 모드 |
@@ -1302,7 +1323,7 @@ npm run tauri:build
 | 이미지 관리 | `/admin/images`, `/images/upload` | 배경/프레임/스티커 탭별 조회·삭제·업로드(프레임·스티커는 PNG·JPG만), MP4/WebM 영상 미리보기. 배경·프레임·스티커는 지점별 뱅크 UI로 노출 선택 |
 | 테마 관리 | `/admin/theme-setting` | 지점별 배경화면·로고, 글자색·강조(primary)색, **버튼 탭 글로우**(on/off·색·세기) 설정 (§25) |
 | 인화 설정 | `/admin/print-setting` | 인화지 크기, 모드별 사진 크기·간격·4방향 여백, 배경 이미지, 프린터 선택. 설정값 실시간 미리보기 + 용지 초과 경고 |
-| 촬영 설정 | `/admin/capture-setting` | 카운트다운, 촬영 횟수, 배경 제거 모드(AI/크로마키/off), 크로마키 색상(컬러피커), AI 배경제거 경계 침식/부드러움, 카메라 실시간 미리보기 (§12 참고) |
+| 촬영 설정 | `/admin/capture-setting` | 카운트다운, 촬영 횟수, 배경 제거 모드(AI/크로마키/크로마키 OBS 방식/off), 크로마키 색상(컬러피커), AI 배경제거 경계 침식/부드러움, 카메라 실시간 미리보기 (§12 참고) |
 | 타이머 설정 | `/admin/timer-setting` | 유휴 타임아웃, 촬영 자동 타이머, 인화 자동 복귀 타이머 |
 | 결제 설정 | `/admin/payment` | PayApp 활성화, 금액, 단말 모드 설정 (전역 적용, 디바이스 설정이 우선) |
 | 결제 내역 | `/admin/payment-history` | 거래 이력 조회 |
@@ -1432,7 +1453,7 @@ npm run tauri:build
 - **재생 모드(3종)** — 관리자 배경 편집에서 선택(`EFFECT_MODES`):
   - **dissolve**(기본): 배경 위에 이펙트 영상을 캔버스 `globalCompositeOperation`(`effectBlendMode`, 기본 screen; `normal`=source-over)로 블렌드해 1회 재생. `effectDuration`(초) 경과 또는 영상 종료 시 정지. `<video>`는 숨김 프레임 소스로만 쓰고 표시는 `drawEffectLayer`가 담당.
   - **transition**: 트리거 시 배경이 이펙트 영상으로 전환되고, **다시 트리거하면 원배경으로 복귀**(제스처 토글, `effectDuration` 무시). 전환 효과 `effectTransition`(`fade` 크로스페이드 / `cut` 즉시), 페이드 시간 `effectTransitionMs`. 배경 소스 자체를 바꾼다(`drawBackground`의 크로스페이드 합성).
-  - **chromakey**: 키 색상(`effectChromaColor`)을 제거한 프레임을 오프스크린 캔버스에 굽고 배경 위·사람 아래에 그린다. 감도·부드러움(`effectChromaSimilarity`/`effectChromaSmoothness`)은 메인 크로마키(§Chromakey)와 동일한 파생식(`softDist=감도×(1+부드러움/50)`).
+  - **chromakey**: 키 색상(`effectChromaColor`)을 제거한 프레임을 오프스크린 캔버스에 굽고 배경 위·사람 아래에 그린다. 감도·부드러움(`effectChromaSimilarity`/`effectChromaSmoothness`)은 메인 크로마키(§12 Chromakey)와 동일한 `applyChromaKey`(채널 우세도 판정)를 그대로 재사용.
 - 관리자: 이미지 관리 → 배경 편집(EditDialog)에서 이펙트 영상 업로드/제거 + **트리거 제스처(select)** + **재생 방식(모드)** + 모드별 파라미터 지정
   (`POST/DELETE /api/admin/images/[id]/effect`로 파일, PATCH로 제스처·시간·모드·모드별 값 저장, §8).
 - 제스처 옵션은 `EFFECT_TRIGGER_GESTURES`(Victory·Thumb_Up·Thumb_Down·Pointing_Up·ILoveYou·Closed_Fist — 손바닥은 촬영 트리거라 제외), 기본 `DEFAULT_EFFECT_GESTURE`(`src/constants/images.ts`).

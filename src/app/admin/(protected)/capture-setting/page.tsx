@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { HexColorPicker } from "react-colorful";
 import { BackgroundRemovalPreviewDialog } from "@/components/admin/BackgroundRemovalPreviewDialog";
-import { parseIntSafe, clampPercent } from "@/lib/deviceConfig";
+import { parseIntSafe, clampPercent, clampSigned } from "@/lib/deviceConfig";
 import { useAdminDeviceSettings } from "@/hooks/useAdminDeviceSettings";
 import { CAMERA_RESOLUTIONS } from "@/constants/camera";
 
@@ -51,7 +51,7 @@ const FIELDS: { name: string; label: string; type?: "text" | "number" | "select"
     options: CAMERA_RESOLUTIONS.map((r) => ({ value: r.id, label: r.label })),
     hint: "촬영 카메라 해상도. 높을수록 화질이 좋지만, 실제 적용 해상도는 카메라·기기 성능에 따라 가장 가까운 값으로 조정됩니다. 기본 FHD.",
   },
-  { name: "CHROMAKEY_MODE", label: "배경 제거 모드", type: "select", options: [{ value: "mediapipe", label: "AI 배경 제거 (기본)" }, { value: "chromakey", label: "크로마키 (그린스크린)" }, { value: "off", label: "비활성" }] },
+  { name: "CHROMAKEY_MODE", label: "배경 제거 모드", type: "select", options: [{ value: "mediapipe", label: "AI 배경 제거 (기본)" }, { value: "chromakey", label: "크로마키 (그린스크린)" }, { value: "chromakey-yuv", label: "크로마키 (OBS 방식, 신규)" }, { value: "off", label: "비활성" }] },
   {
     name: "CHROMAKEY_RGB",
     label: "크로마키 색상",
@@ -101,6 +101,75 @@ const FIELDS: { name: string; label: string; type?: "text" | "number" | "select"
     options: [{ value: "off", label: "끔 (기본)" }, { value: "on", label: "켬 — 그늘/얼룩 보정" }],
     hint: "켜면 밝기 차이를 무시하고 색만 비교합니다. 그린스크린 조명이 불균일해 그늘/밝은 부분이 한 감도로 안 빠질 때 켜세요.",
     showIf: (s) => s.CHROMAKEY_MODE === "chromakey",
+  },
+  {
+    name: "CHROMAKEY_YUV_RGB",
+    label: "크로마키(OBS) 색상",
+    type: "color",
+    showIf: (s) => s.CHROMAKEY_MODE === "chromakey-yuv",
+  },
+  {
+    name: "CHROMAKEY_YUV_SIMILARITY",
+    label: "크로마키(OBS) 감도",
+    type: "number",
+    min: 1,
+    max: 100,
+    hint: "높일수록 키 색과 더 먼 색까지 제거됩니다. 기본값 50.",
+    showIf: (s) => s.CHROMAKEY_MODE === "chromakey-yuv",
+  },
+  {
+    name: "CHROMAKEY_YUV_SMOOTHNESS",
+    label: "크로마키(OBS) 경계 부드러움",
+    type: "number",
+    min: 0,
+    max: 100,
+    hint: "낮을수록 경계가 딱딱하게 잘리고, 높을수록 부드럽게 번집니다. 기본값 50.",
+    showIf: (s) => s.CHROMAKEY_MODE === "chromakey-yuv",
+  },
+  {
+    name: "CHROMAKEY_YUV_SPILL",
+    label: "크로마키(OBS) 스필 제거",
+    type: "number",
+    min: 0,
+    max: 100,
+    hint: "인물 테두리에 남는 키 색 번짐(초록/파랑기)을 제거합니다. 기본값 0(끔).",
+    showIf: (s) => s.CHROMAKEY_MODE === "chromakey-yuv",
+  },
+  {
+    name: "CHROMAKEY_YUV_OPACITY",
+    label: "크로마키(OBS) 투명도",
+    type: "number",
+    min: 0,
+    max: 100,
+    hint: "결과 전체의 투명도 배율입니다. 기본값 100(원본 그대로).",
+    showIf: (s) => s.CHROMAKEY_MODE === "chromakey-yuv",
+  },
+  {
+    name: "CHROMAKEY_YUV_CONTRAST",
+    label: "크로마키(OBS) 대비",
+    type: "number",
+    min: -100,
+    max: 100,
+    hint: "결과 화면의 대비를 보정합니다. 기본값 0(변화 없음).",
+    showIf: (s) => s.CHROMAKEY_MODE === "chromakey-yuv",
+  },
+  {
+    name: "CHROMAKEY_YUV_BRIGHTNESS",
+    label: "크로마키(OBS) 명암",
+    type: "number",
+    min: -100,
+    max: 100,
+    hint: "결과 화면의 밝기를 보정합니다. 기본값 0(변화 없음).",
+    showIf: (s) => s.CHROMAKEY_MODE === "chromakey-yuv",
+  },
+  {
+    name: "CHROMAKEY_YUV_GAMMA",
+    label: "크로마키(OBS) 감마",
+    type: "number",
+    min: -100,
+    max: 100,
+    hint: "결과 화면의 감마(중간톤)를 보정합니다. 기본값 0(변화 없음).",
+    showIf: (s) => s.CHROMAKEY_MODE === "chromakey-yuv",
   },
   {
     name: "CAPTURE_THRESHOLD",
@@ -241,7 +310,13 @@ export default function CaptureSettingPage() {
 
       {previewOpen && (
         <BackgroundRemovalPreviewDialog
-          mode={(settings.CHROMAKEY_MODE || "mediapipe") === "chromakey" ? "chromakey" : "mediapipe"}
+          mode={
+            (settings.CHROMAKEY_MODE || "mediapipe") === "chromakey"
+              ? "chromakey"
+              : settings.CHROMAKEY_MODE === "chromakey-yuv"
+              ? "chromakey-yuv"
+              : "mediapipe"
+          }
           chromaColor={parseRgbString(settings.CHROMAKEY_RGB || "0,255,0")}
           onChromaColorChange={(rgb) => updateSetting("CHROMAKEY_RGB", rgb)}
           similarity={clampPercent(parseIntSafe(settings.CHROMAKEY_SIMILARITY || "", 50), 1)}
@@ -254,6 +329,22 @@ export default function CaptureSettingPage() {
           onChokeChange={(n) => updateSetting("CHROMAKEY_CHOKE", String(n))}
           lumaIndependent={settings.CHROMAKEY_LUMA === "on"}
           onLumaIndependentChange={(v) => updateSetting("CHROMAKEY_LUMA", v ? "on" : "off")}
+          yuvChromaColor={parseRgbString(settings.CHROMAKEY_YUV_RGB || "0,255,0")}
+          onYuvChromaColorChange={(rgb) => updateSetting("CHROMAKEY_YUV_RGB", rgb)}
+          yuvSimilarity={clampPercent(parseIntSafe(settings.CHROMAKEY_YUV_SIMILARITY || "", 50), 1)}
+          onYuvSimilarityChange={(n) => updateSetting("CHROMAKEY_YUV_SIMILARITY", String(n))}
+          yuvSmoothness={clampPercent(parseIntSafe(settings.CHROMAKEY_YUV_SMOOTHNESS || "", 50))}
+          onYuvSmoothnessChange={(n) => updateSetting("CHROMAKEY_YUV_SMOOTHNESS", String(n))}
+          yuvSpill={clampPercent(parseIntSafe(settings.CHROMAKEY_YUV_SPILL || "", 0))}
+          onYuvSpillChange={(n) => updateSetting("CHROMAKEY_YUV_SPILL", String(n))}
+          yuvOpacity={clampPercent(parseIntSafe(settings.CHROMAKEY_YUV_OPACITY || "", 100))}
+          onYuvOpacityChange={(n) => updateSetting("CHROMAKEY_YUV_OPACITY", String(n))}
+          yuvContrast={clampSigned(parseIntSafe(settings.CHROMAKEY_YUV_CONTRAST || "", 0))}
+          onYuvContrastChange={(n) => updateSetting("CHROMAKEY_YUV_CONTRAST", String(n))}
+          yuvBrightness={clampSigned(parseIntSafe(settings.CHROMAKEY_YUV_BRIGHTNESS || "", 0))}
+          onYuvBrightnessChange={(n) => updateSetting("CHROMAKEY_YUV_BRIGHTNESS", String(n))}
+          yuvGamma={clampSigned(parseIntSafe(settings.CHROMAKEY_YUV_GAMMA || "", 0))}
+          onYuvGammaChange={(n) => updateSetting("CHROMAKEY_YUV_GAMMA", String(n))}
           threshold={clampPercent(parseIntSafe(settings.CAPTURE_THRESHOLD || "", 15))}
           onThresholdChange={(n) => updateSetting("CAPTURE_THRESHOLD", String(n))}
           feather={clampPercent(parseIntSafe(settings.CAPTURE_SMOOTHNESS || "", 35), 1)}

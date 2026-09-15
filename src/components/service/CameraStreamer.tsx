@@ -4,6 +4,7 @@ import { useEffect, useRef } from "react";
 import { useFrameSender } from "@/hooks/useSceneSync";
 import { fillGradientFromCSS } from "@/lib/canvas";
 import { applyChromaKey } from "@/lib/chromakey";
+import { applyChromaKeyYuv } from "@/lib/chromakeyYuv";
 import { FALLBACK_BACKGROUNDS } from "@/constants/frames";
 import { suppressMediapipeLogs } from "@/lib/suppressMediapipeLogs";
 import type { BGImage, BgRemovalMode } from "@/types";
@@ -39,6 +40,14 @@ export function CameraStreamer({
   chromakeySpill = 0,
   chromakeyChoke = 0,
   chromakeyLumaIndependent = false,
+  chromakeyYuvRgb = "0,255,0",
+  chromakeyYuvSimilarity = 50,
+  chromakeyYuvSmoothness = 50,
+  chromakeyYuvSpill = 0,
+  chromakeyYuvOpacity = 100,
+  chromakeyYuvContrast = 0,
+  chromakeyYuvBrightness = 0,
+  chromakeyYuvGamma = 0,
   segmentThreshold = 15,
   segmentFeather = 35,
 }: {
@@ -59,6 +68,22 @@ export function CameraStreamer({
   chromakeyChoke?: number;
   /** 크로마키 밝기 무시 키잉. 메인 촬영 화면과 동일한 관리자 설정값. */
   chromakeyLumaIndependent?: boolean;
+  /** OBS 방식(YUV) 크로마키 색상. 메인 촬영 화면과 동일한 관리자 설정값. */
+  chromakeyYuvRgb?: string;
+  /** OBS 방식 크로마키 감도(1-100). */
+  chromakeyYuvSimilarity?: number;
+  /** OBS 방식 크로마키 경계 부드러움(0-100). */
+  chromakeyYuvSmoothness?: number;
+  /** OBS 방식 크로마키 스필 제거(0-100). */
+  chromakeyYuvSpill?: number;
+  /** OBS 방식 크로마키 결과 전체 투명도 배율(0-100). */
+  chromakeyYuvOpacity?: number;
+  /** OBS 방식 크로마키 결과 대비 보정(-100~100). */
+  chromakeyYuvContrast?: number;
+  /** OBS 방식 크로마키 결과 명암(밝기) 보정(-100~100). */
+  chromakeyYuvBrightness?: number;
+  /** OBS 방식 크로마키 결과 감마 보정(-100~100). */
+  chromakeyYuvGamma?: number;
   /** AI 배경제거 경계 침식 (0-100%). 메인 촬영 화면과 동일한 관리자 설정값. */
   segmentThreshold?: number;
   /** AI 배경제거 경계 부드러움 (0-100%). 메인 촬영 화면과 동일한 관리자 설정값. */
@@ -81,6 +106,14 @@ export function CameraStreamer({
   const chromakeySpillRef = useRef(chromakeySpill);
   const chromakeyChokeRef = useRef(chromakeyChoke);
   const chromakeyLumaIndependentRef = useRef(chromakeyLumaIndependent);
+  const chromakeyYuvRgbRef = useRef(chromakeyYuvRgb);
+  const chromakeyYuvSimilarityRef = useRef(chromakeyYuvSimilarity);
+  const chromakeyYuvSmoothnessRef = useRef(chromakeyYuvSmoothness);
+  const chromakeyYuvSpillRef = useRef(chromakeyYuvSpill);
+  const chromakeyYuvOpacityRef = useRef(chromakeyYuvOpacity);
+  const chromakeyYuvContrastRef = useRef(chromakeyYuvContrast);
+  const chromakeyYuvBrightnessRef = useRef(chromakeyYuvBrightness);
+  const chromakeyYuvGammaRef = useRef(chromakeyYuvGamma);
   // 관리자 설정(0-100%)을 confidence 스케일(0-1)로 변환해 보관. FEATHER는 0으로 나누기 방지를 위해 최소 1%.
   const segmentThreshRef = useRef(segmentThreshold / 100);
   const segmentFeatherRef = useRef(Math.max(segmentFeather, 1) / 100);
@@ -92,6 +125,14 @@ export function CameraStreamer({
   useEffect(() => { chromakeySpillRef.current = chromakeySpill; }, [chromakeySpill]);
   useEffect(() => { chromakeyChokeRef.current = chromakeyChoke; }, [chromakeyChoke]);
   useEffect(() => { chromakeyLumaIndependentRef.current = chromakeyLumaIndependent; }, [chromakeyLumaIndependent]);
+  useEffect(() => { chromakeyYuvRgbRef.current = chromakeyYuvRgb; }, [chromakeyYuvRgb]);
+  useEffect(() => { chromakeyYuvSimilarityRef.current = chromakeyYuvSimilarity; }, [chromakeyYuvSimilarity]);
+  useEffect(() => { chromakeyYuvSmoothnessRef.current = chromakeyYuvSmoothness; }, [chromakeyYuvSmoothness]);
+  useEffect(() => { chromakeyYuvSpillRef.current = chromakeyYuvSpill; }, [chromakeyYuvSpill]);
+  useEffect(() => { chromakeyYuvOpacityRef.current = chromakeyYuvOpacity; }, [chromakeyYuvOpacity]);
+  useEffect(() => { chromakeyYuvContrastRef.current = chromakeyYuvContrast; }, [chromakeyYuvContrast]);
+  useEffect(() => { chromakeyYuvBrightnessRef.current = chromakeyYuvBrightness; }, [chromakeyYuvBrightness]);
+  useEffect(() => { chromakeyYuvGammaRef.current = chromakeyYuvGamma; }, [chromakeyYuvGamma]);
   useEffect(() => { segmentThreshRef.current = segmentThreshold / 100; }, [segmentThreshold]);
   useEffect(() => { segmentFeatherRef.current = Math.max(segmentFeather, 1) / 100; }, [segmentFeather]);
 
@@ -279,6 +320,30 @@ export function CameraStreamer({
               chromakeySpillRef.current,
               chromakeyChokeRef.current,
               chromakeyLumaIndependentRef.current,
+            );
+            offCtx.putImageData(imgData, 0, 0);
+            drawBg(cw, ch);
+            ctx.save();
+            ctx.translate(cw, 0);
+            ctx.scale(-1, 1);
+            ctx.drawImage(offscreen, 0, 0, cw, ch);
+            ctx.restore();
+          } else if (mode === "chromakey-yuv") {
+            offCtx.drawImage(video, 0, 0, pw, ph);
+            const imgData = offCtx.getImageData(0, 0, pw, ph);
+            const [kr, kg, kb] = chromakeyYuvRgbRef.current.split(",").map(Number);
+            applyChromaKeyYuv(
+              imgData.data,
+              pw,
+              ph,
+              { r: kr ?? 0, g: kg ?? 255, b: kb ?? 0 },
+              chromakeyYuvSimilarityRef.current,
+              chromakeyYuvSmoothnessRef.current,
+              chromakeyYuvSpillRef.current,
+              chromakeyYuvOpacityRef.current,
+              chromakeyYuvContrastRef.current,
+              chromakeyYuvBrightnessRef.current,
+              chromakeyYuvGammaRef.current,
             );
             offCtx.putImageData(imgData, 0, 0);
             drawBg(cw, ch);

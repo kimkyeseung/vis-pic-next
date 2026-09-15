@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import type { DeviceConfig, BGImage } from "@/types";
-import { parseIntSafe, parseBgRemovalMode, parsePaymentTerminalMode, parseCaptureModes, parseCameraResolution, clampPercent } from "@/lib/deviceConfig";
+import { parseIntSafe, parseBgRemovalMode, parsePaymentTerminalMode, parseCaptureModes, parseCameraResolution, clampPercent, clampSigned } from "@/lib/deviceConfig";
 import { DEFAULT_CAMERA_RESOLUTION } from "@/constants/camera";
 import { LOGO_IMAGE_TYPE, WALLPAPER_IMAGE_TYPE, BUTTON_IMAGE_TYPE, WALLPAPER_NAME_LANDSCAPE, WALLPAPER_NAME_PORTRAIT, BUTTON_NAME_CAPTURE, BUTTON_NAME_NEXT, BUTTON_NAME_PAYMENT } from "@/constants/images";
 
@@ -51,6 +51,14 @@ const DEFAULT_CONFIG: DeviceConfig = {
   chromakeySpill: 0,
   chromakeyChoke: 0,
   chromakeyLumaIndependent: false,
+  chromakeyYuvRgb: "0,255,0",
+  chromakeyYuvSimilarity: 50,
+  chromakeyYuvSmoothness: 50,
+  chromakeyYuvSpill: 0,
+  chromakeyYuvOpacity: 100,
+  chromakeyYuvContrast: 0,
+  chromakeyYuvBrightness: 0,
+  chromakeyYuvGamma: 0,
   captureModes: ["1x1", "2x1", "2x2"],
   bgRemovalMode: "mediapipe",
   idleTimeoutSeconds: 30,
@@ -132,6 +140,14 @@ export function useDeviceSetup(deviceId: string) {
           chromakeySpill: clampPercent(parseIntSafe(s.CHROMAKEY_SPILL || "", 0)),
           chromakeyChoke: clampPercent(parseIntSafe(s.CHROMAKEY_CHOKE || "", 0)),
           chromakeyLumaIndependent: s.CHROMAKEY_LUMA === "on",
+          chromakeyYuvRgb: s.CHROMAKEY_YUV_RGB || "0,255,0",
+          chromakeyYuvSimilarity: clampPercent(parseIntSafe(s.CHROMAKEY_YUV_SIMILARITY || "", 50), 1),
+          chromakeyYuvSmoothness: clampPercent(parseIntSafe(s.CHROMAKEY_YUV_SMOOTHNESS || "", 50)),
+          chromakeyYuvSpill: clampPercent(parseIntSafe(s.CHROMAKEY_YUV_SPILL || "", 0)),
+          chromakeyYuvOpacity: clampPercent(parseIntSafe(s.CHROMAKEY_YUV_OPACITY || "", 100)),
+          chromakeyYuvContrast: clampSigned(parseIntSafe(s.CHROMAKEY_YUV_CONTRAST || "", 0)),
+          chromakeyYuvBrightness: clampSigned(parseIntSafe(s.CHROMAKEY_YUV_BRIGHTNESS || "", 0)),
+          chromakeyYuvGamma: clampSigned(parseIntSafe(s.CHROMAKEY_YUV_GAMMA || "", 0)),
           captureModes: modes,
           bgRemovalMode,
           idleTimeoutSeconds: parseIntSafe(s.IDLE_TIMEOUT_SECONDS || "", 30),

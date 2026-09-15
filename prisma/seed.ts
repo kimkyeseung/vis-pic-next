@@ -95,7 +95,7 @@ async function main() {
     { name: "CAPTURE_SECONDS", value: "3", description: "촬영 카운트다운" },
     { name: "CAPTURE_COUNT_MODE", value: "uniform", description: "촬영 횟수 모드 (uniform/custom)" },
     { name: "CAPTURE_COUNT_UNIFORM", value: "4", description: "슬롯당 촬영 횟수" },
-    { name: "CHROMAKEY_MODE", value: "mediapipe", description: "배경 제거 모드 (mediapipe/chromakey/off)" },
+    { name: "CHROMAKEY_MODE", value: "mediapipe", description: "배경 제거 모드 (mediapipe/chromakey/chromakey-yuv/off)" },
     { name: "CHROMAKEY_RGB", value: "0,255,0", description: "크로마키 색상" },
   ];
 
