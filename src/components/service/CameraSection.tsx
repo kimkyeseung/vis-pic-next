@@ -182,6 +182,26 @@ export function CameraSection({
     setInferenceInterval(ms);
     try { localStorage.setItem("photobooth_seg_interval", String(ms)); } catch {}
   }, []);
+  // 마스크 업스케일 스무딩 품질: 256×256 confidence mask를 프리뷰/촬영 해상도로 확대해
+  // destination-in 합성할 때 쓰는 imageSmoothingQuality. 명시하지 않으면 브라우저 기본값인
+  // "low"로 동작해 경계가 거칠어 보인다("high" 기본 적용, 필요시 디버그 토글로 비교).
+  const [maskSmoothQuality, setMaskSmoothQualityState] = useState<"high" | "low">("high");
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      try {
+        const v = localStorage.getItem("photobooth_seg_smoothquality");
+        if (v === "high" || v === "low") setMaskSmoothQualityState(v);
+      } catch {}
+    }, 0);
+    return () => clearTimeout(timer);
+  }, []);
+  const setMaskSmoothQuality = useCallback((q: "high" | "low") => {
+    setMaskSmoothQualityState(q);
+    try { localStorage.setItem("photobooth_seg_smoothquality", q); } catch {}
+  }, []);
+  // 무-deps rAF 표시 루프(processFrame)가 최신 값을 읽도록 ref로도 보관.
+  const maskSmoothQualityRef = useRef<"high" | "low">("high");
+  useEffect(() => { maskSmoothQualityRef.current = maskSmoothQuality; }, [maskSmoothQuality]);
   // 프레임 레이트(표시 루프)와 추론/마스크 생성 시간(ms)을 perfRef에 누적하고 0.5초마다 표시 상태로 flush.
   const perfRef = useRef({ frames: 0, lastFlush: 0, inferMs: 0, maskMs: 0, sentAt: 0 });
   const [perf, setPerf] = useState({ fps: 0, inferMs: 0, maskMs: 0 });
@@ -966,6 +986,8 @@ export function CameraSection({
     c.width = TW; c.height = TH;
     const ctx = c.getContext("2d");
     if (!ctx) return null;
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = maskSmoothQuality;
 
     const drawRawMirrored = () => {
       ctx.save();
@@ -985,6 +1007,8 @@ export function CameraSection({
       const pctx = person.getContext("2d", { willReadFrequently: bgRemovalMode === "chromakey" });
       let built = false;
       if (pctx) {
+        pctx.imageSmoothingEnabled = true;
+        pctx.imageSmoothingQuality = maskSmoothQuality;
         pctx.clearRect(0, 0, TW, TH);
         pctx.drawImage(video, 0, 0, TW, TH);
         if (bgRemovalMode === "mediapipe" && maskReadyRef.current && maskCanvasRef.current) {
@@ -1017,7 +1041,7 @@ export function CameraSection({
     // 스티커: 프리뷰(display) 대비 배율로 크기를 맞춘다(위치는 정규화라 무관).
     drawStickers(ctx, TW, TH, TW / display.width);
     return c.toDataURL("image/jpeg", 0.92);
-  }, [bgRemovalMode, chromaKey, config.chromakeySimilarity, config.chromakeySmoothness, config.chromakeySpill, config.chromakeyChoke, config.chromakeyLumaIndependent, drawBackground, drawEffectLayer, drawStickers]);
+  }, [bgRemovalMode, chromaKey, config.chromakeySimilarity, config.chromakeySmoothness, config.chromakeySpill, config.chromakeyChoke, config.chromakeyLumaIndependent, maskSmoothQuality, drawBackground, drawEffectLayer, drawStickers]);
 
   // 스티커 전용 오버레이 캔버스 루프 — 메인 합성 루프와 독립적으로 60fps 렌더
   useEffect(() => {
@@ -1091,6 +1115,8 @@ export function CameraSection({
       if (display.height !== dh) display.height = dh;
 
       const ctx = display.getContext("2d")!;
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = maskSmoothQualityRef.current;
 
       if (bgRemovalMode === "off") {
         ctx.save();
@@ -1117,6 +1143,8 @@ export function CameraSection({
       if (offscreen.width !== pw) offscreen.width = pw;
       if (offscreen.height !== ph) offscreen.height = ph;
       const offCtx = offscreen.getContext("2d")!;
+      offCtx.imageSmoothingEnabled = true;
+      offCtx.imageSmoothingQuality = maskSmoothQualityRef.current;
 
       offCtx.drawImage(video, 0, 0, pw, ph);
 
@@ -1755,6 +1783,18 @@ export function CameraSection({
                 <span>Web Worker {useWorker ? "(분리)" : "(끔 · 메인 스레드)"}</span>
                 <span className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors ${useWorker ? "bg-emerald-500" : "bg-slate-500"}`}>
                   <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${useWorker ? "translate-x-4" : "translate-x-0.5"}`} />
+                </span>
+              </button>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={maskSmoothQuality === "high"}
+                onClick={() => setMaskSmoothQuality(maskSmoothQuality === "high" ? "low" : "high")}
+                className="flex items-center justify-between gap-3 w-full"
+              >
+                <span>마스크 업스케일 {maskSmoothQuality === "high" ? "(고품질)" : "(기본 · 거칠음)"}</span>
+                <span className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors ${maskSmoothQuality === "high" ? "bg-emerald-500" : "bg-slate-500"}`}>
+                  <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${maskSmoothQuality === "high" ? "translate-x-4" : "translate-x-0.5"}`} />
                 </span>
               </button>
               {/* 메인 스레드 추론 스로틀 간격(ms). 워커 경로에선 무시되므로 흐리게 표시. */}
