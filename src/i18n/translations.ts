@@ -113,7 +113,9 @@ const en: Record<MessageKey, string> = {
   "camera.bgChange": "You can change the background!",
   "camera.stickerPrompt": "Try adding stickers!",
   "camera.remaining": "Shots left: {n}",
-  "camera.palmHint": "Open your palm to capture automatically!",
+  // 자동 줄바꿈에 맡기면 "Open your palm to capture" / "automatically!"로 어절 균형이
+  // 안 맞게 갈린다 — 아래 effectHint와 동일하게 \n으로 2줄 균형을 맞춘다.
+  "camera.palmHint": "Open your palm to\ncapture automatically!",
   // 자동 줄바꿈에 맡기면 안내 박스 폭에서 3줄로 떨어져(손바닥 안내는 2줄) 높이가 들쭉날쭉해
   // 보인다. 두 줄 중 아래쪽 줄 길이를 손바닥 안내 첫 줄과 비슷하게(25자 안팎) 맞춰 균형 잡았다.
   "camera.effectHint": "Do this gesture to\ntrigger a special effect!",
