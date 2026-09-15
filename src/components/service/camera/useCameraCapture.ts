@@ -40,6 +40,8 @@ export function useCameraCapture({
   onNext,
   bgRemovalMode,
   selectedBackground,
+  segmentThresh,
+  segmentFeather,
   debug,
   countdown,
   setCountdown,
@@ -78,6 +80,10 @@ export function useCameraCapture({
   onNext: () => void;
   bgRemovalMode: BgRemovalMode;
   selectedBackground: number | null;
+  /** AI 배경제거 경계 침식/부드러움(0-1 스케일, config.segmentThreshold/Feather÷100) — 호출부가
+   * 한 번만 계산해 둔 값을 그대로 받는다(매 프레임 재계산 방지). */
+  segmentThresh: number;
+  segmentFeather: number;
   debug: boolean;
   countdown: number | null;
   setCountdown: (n: number | null) => void;
@@ -370,8 +376,8 @@ export function useCameraCapture({
                 const fgIsMask0 = lightModelRef.current;
                 const mImg = mctx.createImageData(mw, mh);
                 const md = mImg.data;
-                const THRESH = config.segmentThreshold / 100;
-                const FEATHER = config.segmentFeather / 100;
+                const THRESH = segmentThresh;
+                const FEATHER = segmentFeather;
                 for (let i = 0; i < arr.length; i++) {
                   const fgConf = fgIsMask0 ? arr[i] : 1 - arr[i];
                   const softAlpha = Math.max(0, Math.min(1, (fgConf - THRESH) / FEATHER));
@@ -453,7 +459,7 @@ export function useCameraCapture({
 
     animFrameRef.current = requestAnimationFrame(processFrame);
     return () => cancelAnimationFrame(animFrameRef.current);
-  }, [selectedBackground, chromaKey, config.chromakeySimilarity, config.chromakeySmoothness, config.chromakeySpill, config.chromakeyChoke, config.chromakeyLumaIndependent, chromaKeyYuv, config.chromakeyYuvSimilarity, config.chromakeyYuvSmoothness, config.chromakeyYuvSpill, config.chromakeyYuvOpacity, config.chromakeyYuvContrast, config.chromakeyYuvBrightness, config.chromakeyYuvGamma, bgRemovalMode, config.segmentThreshold, config.segmentFeather, useGpuDelegate, lightModelRef, inferenceIntervalRef, maskSmoothQualityRef, perfRef, segmenterRef, maskCanvasRef, maskReadyRef, lastInferenceTimeRef, workerRef, workerBusyRef, workerActiveRef, currentBgEffectRef, effectVisibleRef, effectAlphaRef, drawBackground, drawEffectLayer, frameChannelRef, snapshotWithStickers, videoRef, displayCanvasRef]);
+  }, [selectedBackground, chromaKey, config.chromakeySimilarity, config.chromakeySmoothness, config.chromakeySpill, config.chromakeyChoke, config.chromakeyLumaIndependent, chromaKeyYuv, config.chromakeyYuvSimilarity, config.chromakeyYuvSmoothness, config.chromakeyYuvSpill, config.chromakeyYuvOpacity, config.chromakeyYuvContrast, config.chromakeyYuvBrightness, config.chromakeyYuvGamma, bgRemovalMode, segmentThresh, segmentFeather, useGpuDelegate, lightModelRef, inferenceIntervalRef, maskSmoothQualityRef, perfRef, segmenterRef, maskCanvasRef, maskReadyRef, lastInferenceTimeRef, workerRef, workerBusyRef, workerActiveRef, currentBgEffectRef, effectVisibleRef, effectAlphaRef, drawBackground, drawEffectLayer, frameChannelRef, snapshotWithStickers, videoRef, displayCanvasRef]);
 
   // 카운트다운 도중 언마운트(이전/다음 이동 등) 시 타이머가 살아남아
   // onCapture가 화면 전환 후에 실행되는 것을 막는다.

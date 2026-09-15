@@ -156,7 +156,7 @@ export function CameraSection({
     autoTimer, autoTimerPaused, toggleAutoTimerPause, handleManualCapture,
   } = useCameraCapture({
     videoRef, displayCanvasRef, config, photos, maxPhotos, onCapture, onNext,
-    bgRemovalMode, selectedBackground, debug,
+    bgRemovalMode, selectedBackground, segmentThresh, segmentFeather, debug,
     countdown, setCountdown,
     maskSmoothQuality, maskSmoothQualityRef, useGpuDelegate, lightModelRef, inferenceIntervalRef,
     perfRef, segmenterRef, maskCanvasRef, maskReadyRef, lastInferenceTimeRef,
