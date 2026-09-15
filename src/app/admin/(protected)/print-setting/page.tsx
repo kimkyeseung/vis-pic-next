@@ -24,6 +24,29 @@ interface PrintBgImage {
  * 사진은 4:3(가로:세로)이므로, 가로 크기(cm 문자열)로 세로 크기를 계산한다(세로 = 가로 × 3/4).
  * 값이 비었거나 유효하지 않으면 빈 문자열. 소수 둘째 자리에서 반올림.
  */
+/**
+ * 인쇄 배경 이미지는 가로(landscape) 기준으로 제작되므로, 세로 용지 모드(2컷 등
+ * orientation="portrait")의 미리보기에서는 90° 회전해 용지 방향에 맞춘다
+ * (CompleteSection.tsx의 drawFrameCover와 동일 규칙).
+ */
+function drawBgCover(
+  ctx: CanvasRenderingContext2D,
+  img: HTMLImageElement,
+  ox: number, oy: number, drawW: number, drawH: number,
+  isPortrait: boolean,
+  focalX = 0.5, focalY = 0.5,
+) {
+  if (isPortrait) {
+    ctx.save();
+    ctx.translate(ox + drawW / 2, oy + drawH / 2);
+    ctx.rotate(Math.PI / 2);
+    drawImageCover(ctx, img, -drawH / 2, -drawW / 2, drawH, drawW, focalX, focalY);
+    ctx.restore();
+  } else {
+    drawImageCover(ctx, img, ox, oy, drawW, drawH, focalX, focalY);
+  }
+}
+
 function heightFor43(wStr: string): string {
   const w = parseFloat(wStr);
   if (!Number.isFinite(w) || w <= 0) return "";
@@ -387,9 +410,10 @@ export default function PrintSettingPage() {
     // Show first print bg image in preview if available
     const firstBg = printBgImages[0];
     if (firstBg) {
+      const isPortrait = previewMode ? effectiveModeInfo[previewMode]?.orientation === "portrait" : false;
       const img = new Image();
       img.crossOrigin = "anonymous";
-      img.onload = () => { drawImageCover(ctx, img, ox, oy, drawW, drawH, firstBg.focalX, firstBg.focalY); ctx.restore(); finishDraw(); };
+      img.onload = () => { drawBgCover(ctx, img, ox, oy, drawW, drawH, isPortrait, firstBg.focalX, firstBg.focalY); ctx.restore(); finishDraw(); };
       img.onerror = () => { ctx.restore(); finishDraw(); };
       img.src = resolveUrl(firstBg.filename);
       return;
@@ -397,7 +421,7 @@ export default function PrintSettingPage() {
 
     ctx.restore();
     finishDraw();
-  }, [previewMode, printBgImages, getPaperDimensions, resolveUrl, drawSlots, drawLabels]);
+  }, [previewMode, printBgImages, effectiveModeInfo, getPaperDimensions, resolveUrl, drawSlots, drawLabels]);
 
   useEffect(() => {
     drawPreview();
@@ -443,9 +467,10 @@ export default function PrintSettingPage() {
 
     const firstBg = printBgImages[0];
     if (firstBg) {
+      const isPortrait = previewMode ? effectiveModeInfo[previewMode]?.orientation === "portrait" : false;
       const img = new Image();
       img.crossOrigin = "anonymous";
-      img.onload = () => { drawImageCover(ctx, img, ox, oy, drawW, drawH, firstBg.focalX, firstBg.focalY); ctx.restore(); finishDraw(); };
+      img.onload = () => { drawBgCover(ctx, img, ox, oy, drawW, drawH, isPortrait, firstBg.focalX, firstBg.focalY); ctx.restore(); finishDraw(); };
       img.onerror = () => { ctx.restore(); finishDraw(); };
       img.src = resolveUrl(firstBg.filename);
       return;
@@ -453,7 +478,7 @@ export default function PrintSettingPage() {
 
     ctx.restore();
     finishDraw();
-  }, [previewMode, printBgImages, getPaperDimensions, resolveUrl, drawSlots, drawLabels]);
+  }, [previewMode, printBgImages, effectiveModeInfo, getPaperDimensions, resolveUrl, drawSlots, drawLabels]);
 
   useEffect(() => {
     if (showBigPreview) drawBigPreview();
