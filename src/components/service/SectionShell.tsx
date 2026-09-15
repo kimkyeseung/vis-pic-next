@@ -1,7 +1,8 @@
 import type { ReactNode } from "react";
 import type { MessageKey } from "@/i18n/translations";
+import { useLanguage } from "@/i18n/LanguageContext";
 import { ServiceNav } from "./ServiceNav";
-import { SERVICE_SECTION_CLASS } from "./sectionLayout";
+import { getServiceSectionClass } from "./sectionLayout";
 
 /**
  * 서비스 화면 공통 타이틀(h2). 모든 단계의 큰 제목 스타일을 여기 한 곳에 모은다.
@@ -37,7 +38,7 @@ const ROWS_CLASS = {
 
 /**
  * 서비스 화면 공통 3단 껍데기: [타이틀] · [본문(children)] · [하단 다음 버튼].
- * - 외곽 여백/그리드 뼈대는 SERVICE_SECTION_CLASS + rows 로 통일한다.
+ * - 외곽 여백/그리드 뼈대는 getServiceSectionClass(lang) + rows 로 통일한다.
  * - 본문은 단계마다 완전히 달라 children으로 각 섹션이 직접 넘긴다.
  * - 하단 버튼은 ServiceNav 하나로 공통.
  *
@@ -68,8 +69,9 @@ export function SectionShell({
   nextKey?: MessageKey;
   nextDisabled?: boolean;
 }) {
+  const { lang } = useLanguage();
   return (
-    <section className={`${SERVICE_SECTION_CLASS} ${ROWS_CLASS[rows]} ${className}`}>
+    <section className={`${getServiceSectionClass(lang)} ${ROWS_CLASS[rows]} ${className}`}>
       <SectionTitle className={titleClassName}>{title}</SectionTitle>
       {children}
       <ServiceNav onNext={onNext} onPrev={onPrev} nextKey={nextKey} nextDisabled={nextDisabled} />

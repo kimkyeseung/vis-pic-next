@@ -562,7 +562,7 @@ export function CompleteSection({
   return (
     <section ref={sectionRef} className="w-full h-full flex flex-col items-center justify-start pt-14 pb-52 portrait:justify-center portrait:pt-0 portrait:pb-0 relative z-10">
       <div className="w-full flex-1 flex flex-col text-center animate-fadeInUp portrait:flex-none portrait:px-16">
-        {/* 타이틀은 다른 페이지처럼 상단 고정(pt-14 — SERVICE_SECTION_CLASS와 동일). 본문은 아래 flex-1 영역에서 중앙 정렬한다. */}
+        {/* 타이틀은 다른 페이지처럼 상단 고정(pt-14 — getServiceSectionClass와 동일). 본문은 아래 flex-1 영역에서 중앙 정렬한다. */}
         {(printStatus === "ready" || printStatus === "done") && compositeImage && (
           <SectionTitle className="portrait:text-5xl break-keep mb-16 portrait:mb-8">
             {printStatus === "done" ? t("complete.done") : t("complete.ready")}

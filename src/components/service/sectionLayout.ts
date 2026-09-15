@@ -1,14 +1,24 @@
+import type { Locale } from "@/i18n/translations";
+
 /**
  * 서비스 화면 각 섹션 래퍼의 공통 레이아웃 + 외곽 여백 클래스.
  * grid-rows(제목/콘텐츠 행 구성)는 섹션마다 달라 별도로 덧붙인다.
- * 예: `${SERVICE_SECTION_CLASS} grid-rows-[auto_1fr]`
- *     `${SERVICE_SECTION_CLASS} grid-rows-[auto_auto_1fr]`
+ * 예: `${getServiceSectionClass(lang)} grid-rows-[auto_1fr]`
+ *     `${getServiceSectionClass(lang)} grid-rows-[auto_auto_1fr]`
  *
  * 외곽 여백을 조정할 땐 여기 한 곳만 고치면 모든 섹션에 반영된다.
+ * pt-[245px]/pt-[173px]/pt-[202px]는 리터럴로 남겨야 Tailwind가 정적 스캔으로 클래스를
+ * 인식한다(동적 조합 `pt-[${n}px]` 금지 — ROWS_CLASS와 동일한 이유, SectionShell.tsx 참고).
  */
-export const SERVICE_SECTION_CLASS =
-  // 세로(1080×1920)에서 타이틀 세로 중심을 상단 ≈15%(≈288px)에 맞추려 pt-[245px]로 키움.
-  "w-full h-full grid justify-items-center relative z-10 pt-14 portrait:pt-[245px] pb-52 portrait:pb-40";
+export function getServiceSectionClass(lang: Locale): string {
+  // 언어별 타이틀 길이/줄바꿈 차이에 맞춰 세로(1080×1920) 상단 여백을 보정한다.
+  // 영문 ≈9%(≈173px), 일본어 ≈10.5%(≈202px), 그 외(한국어·중국어)는 ≈15% 중심(≈245px 여백).
+  const pt =
+    lang === "en" ? "portrait:pt-[173px]" :
+    lang === "ja" ? "portrait:pt-[202px]" :
+    "portrait:pt-[245px]";
+  return `w-full h-full grid justify-items-center relative z-10 pt-14 ${pt} pb-52 portrait:pb-40`;
+}
 
 /**
  * 대형 강조 버튼(촬영하기 · 다음)의 크기/모양 공용 클래스 — 색상은 각 버튼이 별도 지정한다.

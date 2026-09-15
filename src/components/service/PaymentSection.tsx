@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import type { DeviceConfig } from "@/types";
 import { useLanguage } from "@/i18n/LanguageContext";
 import { LOCALES, type MessageKey } from "@/i18n/translations";
-import { SERVICE_SECTION_CLASS, SERVICE_BIG_BUTTON_CLASS } from "./sectionLayout";
+import { getServiceSectionClass, SERVICE_BIG_BUTTON_CLASS } from "./sectionLayout";
 import { SectionTitle } from "./SectionShell";
 
 export function PaymentSection({
@@ -126,7 +126,7 @@ export function PaymentSection({
   const fmt = (n: number) => n.toLocaleString();
 
   return (
-    <section className={`${SERVICE_SECTION_CLASS} grid-rows-[auto_1fr] px-16`}>
+    <section className={`${getServiceSectionClass(lang)} grid-rows-[auto_1fr] px-16`}>
       {status === "idle" ? (
         <>
           <SectionTitle className="text-center whitespace-pre-line">
