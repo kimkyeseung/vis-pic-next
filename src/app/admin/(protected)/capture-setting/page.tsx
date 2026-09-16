@@ -41,7 +41,7 @@ function normalizeSelectValue(name: string, val: string | undefined): string {
   return val || "";
 }
 
-const FIELDS: { name: string; label: string; type?: "text" | "number" | "select" | "color"; options?: { value: string; label: string }[]; min?: number; max?: number; hint?: string; showIf?: (settings: Record<string, string>) => boolean }[] = [
+const FIELDS: { name: string; label: string; type?: "text" | "number" | "range" | "select" | "color"; options?: { value: string; label: string }[]; min?: number; max?: number; default?: number; hint?: string; showIf?: (settings: Record<string, string>) => boolean }[] = [
   { name: "CAPTURE_SECONDS", label: "카운트다운 (초)", type: "number" },
   { name: "CAPTURE_COUNT_UNIFORM", label: "슬롯당 촬영 횟수", type: "number", hint: "각 슬롯당 촬영할 장수. 예: 2 → 4컷은 8장 촬영 후 4장 선택." },
   {
@@ -61,36 +61,40 @@ const FIELDS: { name: string; label: string; type?: "text" | "number" | "select"
   {
     name: "CHROMAKEY_SIMILARITY",
     label: "크로마키 감도",
-    type: "number",
+    type: "range",
     min: 1,
     max: 100,
+    default: 50,
     hint: "높일수록 키 색과 더 먼 색까지 제거됩니다. 기본값 50.",
     showIf: (s) => s.CHROMAKEY_MODE === "chromakey",
   },
   {
     name: "CHROMAKEY_SMOOTHNESS",
     label: "크로마키 경계 부드러움",
-    type: "number",
+    type: "range",
     min: 0,
     max: 100,
+    default: 50,
     hint: "낮을수록 경계가 딱딱하게 잘리고, 높을수록 부드럽게 번집니다. 기본값 50.",
     showIf: (s) => s.CHROMAKEY_MODE === "chromakey",
   },
   {
     name: "CHROMAKEY_SPILL",
     label: "크로마키 스필 제거",
-    type: "number",
+    type: "range",
     min: 0,
     max: 100,
+    default: 0,
     hint: "인물 테두리에 남는 키 색 번짐(초록/파랑기)을 제거합니다. 높일수록 강하게 눌러냅니다. 기본값 0(끔).",
     showIf: (s) => s.CHROMAKEY_MODE === "chromakey",
   },
   {
     name: "CHROMAKEY_CHOKE",
     label: "크로마키 경계 침식",
-    type: "number",
+    type: "range",
     min: 0,
     max: 100,
+    default: 0,
     hint: "인물 마스크 경계를 안쪽으로 깎아 가장자리 초록/파랑 프린지를 제거합니다. 기본값 0(끔).",
     showIf: (s) => s.CHROMAKEY_MODE === "chromakey",
   },
@@ -111,80 +115,89 @@ const FIELDS: { name: string; label: string; type?: "text" | "number" | "select"
   {
     name: "CHROMAKEY_YUV_SIMILARITY",
     label: "크로마키(OBS) 감도",
-    type: "number",
+    type: "range",
     min: 1,
     max: 100,
+    default: 50,
     hint: "높일수록 키 색과 더 먼 색까지 제거됩니다. 기본값 50.",
     showIf: (s) => s.CHROMAKEY_MODE === "chromakey-yuv",
   },
   {
     name: "CHROMAKEY_YUV_SMOOTHNESS",
     label: "크로마키(OBS) 경계 부드러움",
-    type: "number",
+    type: "range",
     min: 0,
     max: 100,
+    default: 50,
     hint: "낮을수록 경계가 딱딱하게 잘리고, 높을수록 부드럽게 번집니다. 기본값 50.",
     showIf: (s) => s.CHROMAKEY_MODE === "chromakey-yuv",
   },
   {
     name: "CHROMAKEY_YUV_SPILL",
     label: "크로마키(OBS) 스필 제거",
-    type: "number",
+    type: "range",
     min: 0,
     max: 100,
+    default: 0,
     hint: "인물 테두리에 남는 키 색 번짐(초록/파랑기)을 제거합니다. 기본값 0(끔).",
     showIf: (s) => s.CHROMAKEY_MODE === "chromakey-yuv",
   },
   {
     name: "CHROMAKEY_YUV_OPACITY",
     label: "크로마키(OBS) 투명도",
-    type: "number",
+    type: "range",
     min: 0,
     max: 100,
+    default: 100,
     hint: "결과 전체의 투명도 배율입니다. 기본값 100(원본 그대로).",
     showIf: (s) => s.CHROMAKEY_MODE === "chromakey-yuv",
   },
   {
     name: "CHROMAKEY_YUV_CONTRAST",
     label: "크로마키(OBS) 대비",
-    type: "number",
+    type: "range",
     min: -100,
     max: 100,
+    default: 0,
     hint: "결과 화면의 대비를 보정합니다. 기본값 0(변화 없음).",
     showIf: (s) => s.CHROMAKEY_MODE === "chromakey-yuv",
   },
   {
     name: "CHROMAKEY_YUV_BRIGHTNESS",
     label: "크로마키(OBS) 명암",
-    type: "number",
+    type: "range",
     min: -100,
     max: 100,
+    default: 0,
     hint: "결과 화면의 밝기를 보정합니다. 기본값 0(변화 없음).",
     showIf: (s) => s.CHROMAKEY_MODE === "chromakey-yuv",
   },
   {
     name: "CHROMAKEY_YUV_GAMMA",
     label: "크로마키(OBS) 감마",
-    type: "number",
+    type: "range",
     min: -100,
     max: 100,
+    default: 0,
     hint: "결과 화면의 감마(중간톤)를 보정합니다. 기본값 0(변화 없음).",
     showIf: (s) => s.CHROMAKEY_MODE === "chromakey-yuv",
   },
   {
     name: "CAPTURE_THRESHOLD",
     label: "AI 배경제거 경계 침식 (%)",
-    type: "number",
+    type: "range",
     min: 0,
     max: 100,
+    default: 15,
     hint: "높일수록 인물 가장자리를 안쪽으로 더 깎아내 배경과의 경계가 또렷해집니다. 기본값 15.",
   },
   {
     name: "CAPTURE_SMOOTHNESS",
     label: "AI 배경제거 경계 부드러움 (%)",
-    type: "number",
+    type: "range",
     min: 1,
     max: 100,
+    default: 35,
     hint: "낮을수록 경계가 딱딱하게 잘리고, 높을수록 부드럽게 번집니다. 기본값 35.",
   },
 ];
@@ -255,6 +268,26 @@ export default function CaptureSettingPage() {
                         </div>
                       </>
                     )}
+                  </div>
+                ) : field.type === "range" ? (
+                  <div className="flex items-center gap-3">
+                    <input
+                      type="range"
+                      min={field.min}
+                      max={field.max}
+                      value={settings[field.name] || String(field.default ?? field.min ?? 0)}
+                      onChange={(e) => updateSetting(field.name, e.target.value)}
+                      className="flex-1 accent-blue-500"
+                    />
+                    <input
+                      type="number"
+                      min={field.min}
+                      max={field.max}
+                      value={settings[field.name] || ""}
+                      onChange={(e) => updateSetting(field.name, e.target.value)}
+                      placeholder={String(field.default ?? "")}
+                      className="w-16 px-2 py-1 bg-gray-700 border border-gray-600 rounded-lg text-white text-sm text-right focus:outline-none focus:border-blue-500"
+                    />
                   </div>
                 ) : (
                   <input
