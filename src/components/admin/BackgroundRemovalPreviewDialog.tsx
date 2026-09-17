@@ -1,6 +1,7 @@
 "use client";
 
-import { usePreviewCamera } from "./backgroundRemovalPreview/usePreviewCamera";
+import { useState } from "react";
+import { usePreviewCamera, DEFAULT_INFERENCE_INTERVAL_MS } from "./backgroundRemovalPreview/usePreviewCamera";
 import { ChromaKeyControls } from "./backgroundRemovalPreview/ChromaKeyControls";
 import { ChromaKeyYuvControls } from "./backgroundRemovalPreview/ChromaKeyYuvControls";
 import { MediapipeControls } from "./backgroundRemovalPreview/MediapipeControls";
@@ -76,6 +77,9 @@ export function BackgroundRemovalPreviewDialog({
   onFeatherChange: (n: number) => void;
   onClose: () => void;
 }) {
+  // AI 추론 스로틀 간격(ms). 저장되는 촬영 설정이 아니라 미리보기 전용 값이라 다이얼로그가 들고 있는다.
+  const [inferenceInterval, setInferenceInterval] = useState(DEFAULT_INFERENCE_INTERVAL_MS);
+
   // 카메라 캡처·실시간 키잉 루프 + 스포이드 — usePreviewCamera 참고.
   const { videoRef, canvasRef, status, errorMessage, eyedropper, setEyedropper, handleEyedrop } = usePreviewCamera({
     mode,
@@ -83,7 +87,7 @@ export function BackgroundRemovalPreviewDialog({
     similarity, smoothness, spill, choke, lumaIndependent,
     yuvChromaColor, onYuvChromaColorChange,
     yuvSimilarity, yuvSmoothness, yuvSpill, yuvOpacity, yuvContrast, yuvBrightness, yuvGamma,
-    threshold, feather,
+    threshold, feather, inferenceInterval,
   });
 
   return (
@@ -176,6 +180,8 @@ export function BackgroundRemovalPreviewDialog({
             onThresholdChange={onThresholdChange}
             feather={feather}
             onFeatherChange={onFeatherChange}
+            inferenceInterval={inferenceInterval}
+            onInferenceIntervalChange={setInferenceInterval}
           />
         )}
       </div>

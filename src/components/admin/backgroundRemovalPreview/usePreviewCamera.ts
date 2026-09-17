@@ -7,8 +7,14 @@ import { applyChromaKeyYuv } from "@/lib/chromakeyYuv";
 // 크로마키 임계값은 감도(similarity)에서 파생한다 — CameraSection.tsx와 동일 규칙.
 // 배경제거 처리 해상도를 낮춰 프레임 드롭을 줄인다 (CameraSection.tsx와 동일한 이유).
 const PROCESS_SCALE = 0.5;
-// mediapipe 추론은 화면 갱신보다 훨씬 무거우므로 이 간격으로만 실행하고 재사용한다.
-const INFERENCE_INTERVAL_MS = 200;
+/**
+ * mediapipe 추론 스로틀 간격(ms) 선택지 — 이 간격이 지나지 않으면 직전 마스크를 재사용한다.
+ * 서비스 화면의 추론 스로틀(useSegmentationDebugSettings / SegmentationDebugPanel)과 같은 값을
+ * 써서, 미리보기에서 고른 간격을 실제 촬영 화면에 그대로 대응시킬 수 있게 한다.
+ */
+export const INFERENCE_INTERVAL_OPTIONS = [10, 20, 50, 100, 150, 200];
+/** 기본 간격 — rAF 주기(≈16.7ms)보다 짧아 사실상 매 프레임 추론한다. */
+export const DEFAULT_INFERENCE_INTERVAL_MS = 10;
 
 // 제거된 영역이 잘 보이도록 체커보드 패턴을 배경으로 그린다
 const CHECKER_SIZE = 20;
@@ -54,6 +60,7 @@ export function usePreviewCamera({
   yuvGamma,
   threshold,
   feather,
+  inferenceInterval,
 }: {
   mode: "mediapipe" | "chromakey" | "chromakey-yuv";
   chromaColor: { r: number; g: number; b: number };
@@ -74,6 +81,8 @@ export function usePreviewCamera({
   yuvGamma: number;
   threshold: number;
   feather: number;
+  /** mediapipe 추론 스로틀 간격(ms) — INFERENCE_INTERVAL_OPTIONS 중 하나 */
+  inferenceInterval: number;
 }) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -102,6 +111,7 @@ export function usePreviewCamera({
   const yuvGammaRef = useRef(yuvGamma);
   const thresholdRef = useRef(threshold);
   const featherRef = useRef(feather);
+  const inferenceIntervalRef = useRef(inferenceInterval);
   useEffect(() => { chromaColorRef.current = chromaColor; }, [chromaColor]);
   useEffect(() => { similarityRef.current = similarity; }, [similarity]);
   useEffect(() => { smoothnessRef.current = smoothness; }, [smoothness]);
@@ -118,6 +128,7 @@ export function usePreviewCamera({
   useEffect(() => { yuvGammaRef.current = yuvGamma; }, [yuvGamma]);
   useEffect(() => { thresholdRef.current = threshold; }, [threshold]);
   useEffect(() => { featherRef.current = feather; }, [feather]);
+  useEffect(() => { inferenceIntervalRef.current = inferenceInterval; }, [inferenceInterval]);
 
   const [eyedropper, setEyedropper] = useState(false);
   const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
@@ -174,7 +185,12 @@ export function usePreviewCamera({
             const vision = await FilesetResolver.forVisionTasks("/static/mediapipe/wasm");
             if (cancelled) return;
             const segmenter = await ImageSegmenter.createFromOptions(vision, {
-              baseOptions: { modelAssetPath: "/static/mediapipe/model/selfie_multiclass_256x256.tflite" },
+              baseOptions: {
+                modelAssetPath: "/static/mediapipe/model/selfie_multiclass_256x256.tflite",
+                // 서비스 화면 기본값(useSegmentationDebugSettings)과 동일하게 GPU(WebGL) 델리게이트를 쓴다.
+                // 생략하면 MediaPipe 기본값인 CPU(XNNPACK)로 떨어져 미리보기만 훨씬 느려진다.
+                delegate: "GPU",
+              },
               runningMode: "VIDEO",
               outputCategoryMask: false,
               outputConfidenceMasks: true,
@@ -225,7 +241,7 @@ export function usePreviewCamera({
 
           if (mode === "mediapipe" && segmenterRef.current) {
             const now = performance.now();
-            if (now - lastInferenceTimeRef.current >= INFERENCE_INTERVAL_MS || !lastMaskRef.current) {
+            if (now - lastInferenceTimeRef.current >= inferenceIntervalRef.current || !lastMaskRef.current) {
               // 다운스케일된 offscreen을 입력으로 넘겨 마스크 자체를 더 작게 받는다
               const result = segmenterRef.current.segmentForVideo(offscreen, now);
               const masks = result.confidenceMasks;
