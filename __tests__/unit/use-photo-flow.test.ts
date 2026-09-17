@@ -49,6 +49,7 @@ const baseConfig: DeviceConfig = {
   segmentRoi: true,
   segmentRoiMargin: 22,
   segmentProcessScale: "auto",
+  segmentHandRescue: 50,
   themeTextColor: "#ffffff",
   themePrimaryColor: "#6c6fb4",
   themeBgColor: "#2a2a2a",

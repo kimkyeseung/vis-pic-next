@@ -9,8 +9,10 @@ import {
   bboxToFrame,
   createMaskBaker,
   nextRoi,
+  rectsToCrop,
   ROI_INPUT_SIZE,
   type MaskTuning,
+  type NormRect,
   type Roi,
 } from "@/lib/segmentMask";
 import { segmentProcessScaleFor } from "@/lib/deviceConfig";
@@ -65,6 +67,7 @@ export function useCameraCapture({
   maskCanvasRef,
   maskReadyRef,
   roiRef,
+  handRectsRef,
   lastInferenceTimeRef,
   workerRef,
   workerBusyRef,
@@ -109,6 +112,8 @@ export function useCameraCapture({
   maskReadyRef: React.RefObject<boolean>;
   /** 다음 추론에 쓸 인물 주변 크롭(전체 프레임 픽셀 좌표). null이면 프레임 전체. */
   roiRef: React.RefObject<Roi | null>;
+  /** 제스처 인식기가 찾은 손 영역(프레임 정규화). 손 구제에 쓴다 — useHandGestureCapture 참고. */
+  handRectsRef: React.RefObject<NormRect[]>;
   lastInferenceTimeRef: React.RefObject<number>;
   workerRef: React.RefObject<Worker | null>;
   workerBusyRef: React.RefObject<boolean>;
@@ -158,7 +163,8 @@ export function useCameraCapture({
     temporal: config.segmentTemporal,
     roi: config.segmentRoi,
     roiMargin: config.segmentRoiMargin,
-  }), [config.segmentMaskBlur, config.segmentEdgeShift, config.segmentTemporal, config.segmentRoi, config.segmentRoiMargin]);
+    handRescue: config.segmentHandRescue,
+  }), [config.segmentMaskBlur, config.segmentEdgeShift, config.segmentTemporal, config.segmentRoi, config.segmentRoiMargin, config.segmentHandRescue]);
   const maskTuningRef = useRef(maskTuning);
   useEffect(() => { maskTuningRef.current = maskTuning; }, [maskTuning]);
   const processScaleRef = useRef(config.segmentProcessScale);
@@ -384,6 +390,11 @@ export function useCameraCapture({
           const dest = crop
             ? { x: (crop.x * pw) / w, y: (crop.y * ph) / h, w: (crop.w * pw) / w, h: (crop.h * ph) / h }
             : null;
+          // 손 구제 영역을 "모델이 본 것"과 같은 좌표계(크롭 정규화)로 옮겨 둔다.
+          const rescueStrength = maskTuningRef.current.handRescue / 100;
+          const rescue = rescueStrength > 0
+            ? { rects: rectsToCrop(handRectsRef.current, w, h, crop), strength: rescueStrength }
+            : undefined;
 
           if (workerActiveRef.current && workerRef.current) {
             // 워커 경로: 무거운 추론+readback을 워커가 담당하므로 메인 스레드(표시 루프)는 안 막힌다.
@@ -401,7 +412,7 @@ export function useCameraCapture({
                   const worker = workerRef.current;
                   // 크롭/치수를 함께 실어 보낸다 — 마스크가 돌아올 때 어느 자리에 되붙일지는
                   // 그 사이 바뀌었을 수 있는 현재 ROI가 아니라 "보낼 때의 크롭"이 정한다.
-                  if (worker) worker.postMessage({ type: "frame", bitmap: bmp, timestamp: performance.now(), roi: crop, maskW: pw, maskH: ph, frameW: w, frameH: h }, [bmp]);
+                  if (worker) worker.postMessage({ type: "frame", bitmap: bmp, timestamp: performance.now(), roi: crop, maskW: pw, maskH: ph, frameW: w, frameH: h, rescue }, [bmp]);
                   else bmp.close();
                 })
                 .catch(() => { workerBusyRef.current = false; });
@@ -433,6 +444,7 @@ export function useCameraCapture({
                   fgIsMask0: lightModelRef.current,
                   thresh: segmentThresh,
                   feather: segmentFeather,
+                  rescue,
                 });
                 let mc = maskCanvasRef.current;
                 if (!mc) { mc = document.createElement("canvas"); maskCanvasRef.current = mc; }
@@ -517,7 +529,7 @@ export function useCameraCapture({
 
     animFrameRef.current = requestAnimationFrame(processFrame);
     return () => cancelAnimationFrame(animFrameRef.current);
-  }, [selectedBackground, chromaKey, config.chromakeySimilarity, config.chromakeySmoothness, config.chromakeySpill, config.chromakeyChoke, config.chromakeyLumaIndependent, chromaKeyYuv, config.chromakeyYuvSimilarity, config.chromakeyYuvSmoothness, config.chromakeyYuvSpill, config.chromakeyYuvOpacity, config.chromakeyYuvContrast, config.chromakeyYuvBrightness, config.chromakeyYuvGamma, bgRemovalMode, segmentThresh, segmentFeather, useGpuDelegate, lightModelRef, inferenceIntervalRef, maskSmoothQualityRef, perfRef, segmenterRef, maskCanvasRef, maskReadyRef, roiRef, lastInferenceTimeRef, workerRef, workerBusyRef, workerActiveRef, currentBgEffectRef, effectVisibleRef, effectAlphaRef, drawBackground, drawEffectLayer, frameChannelRef, snapshotWithStickers, videoRef, displayCanvasRef]);
+  }, [selectedBackground, chromaKey, config.chromakeySimilarity, config.chromakeySmoothness, config.chromakeySpill, config.chromakeyChoke, config.chromakeyLumaIndependent, chromaKeyYuv, config.chromakeyYuvSimilarity, config.chromakeyYuvSmoothness, config.chromakeyYuvSpill, config.chromakeyYuvOpacity, config.chromakeyYuvContrast, config.chromakeyYuvBrightness, config.chromakeyYuvGamma, bgRemovalMode, segmentThresh, segmentFeather, useGpuDelegate, lightModelRef, inferenceIntervalRef, maskSmoothQualityRef, perfRef, segmenterRef, maskCanvasRef, maskReadyRef, roiRef, handRectsRef, lastInferenceTimeRef, workerRef, workerBusyRef, workerActiveRef, currentBgEffectRef, effectVisibleRef, effectAlphaRef, drawBackground, drawEffectLayer, frameChannelRef, snapshotWithStickers, videoRef, displayCanvasRef]);
 
   // 카운트다운 도중 언마운트(이전/다음 이동 등) 시 타이머가 살아남아
   // onCapture가 화면 전환 후에 실행되는 것을 막는다.

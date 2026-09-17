@@ -4,8 +4,10 @@ import {
   MODEL_GRID,
   bakeAlphaMask,
   bboxToFrame,
+  handRectsFromLandmarks,
   maskBlurPx,
   nextRoi,
+  rectsToCrop,
   type MaskTuning,
 } from "@/lib/segmentMask";
 
@@ -170,5 +172,129 @@ describe("nextRoi", () => {
     const roi = nextRoi(steady, W, H, prev)!;
     // 탈출로 오인했다면 여유가 두 배가 되어 prev보다 훨씬 넓어졌을 것이다.
     expect(roi.w).toBeLessThanOrEqual(prev.w);
+  });
+});
+
+describe("handRectsFromLandmarks", () => {
+  it("랜드마크를 감싸되 손가락 굵기만큼 여유를 붙인다", () => {
+    const hand = [
+      { x: 0.40, y: 0.30 },
+      { x: 0.50, y: 0.30 },
+      { x: 0.45, y: 0.50 },
+    ];
+    const [r] = handRectsFromLandmarks([hand]);
+    // 랜드마크는 손가락 "끝점"만 찍히므로 bbox보다 넓어야 한다.
+    expect(r.x).toBeLessThan(0.40);
+    expect(r.x + r.w).toBeGreaterThan(0.50);
+    expect(r.y).toBeLessThan(0.30);
+    expect(r.y + r.h).toBeGreaterThan(0.50);
+  });
+
+  it("여유는 긴 변 기준 — 손이 옆으로 누워 납작해도 손가락 굵기를 덮는다", () => {
+    // 가로로 납작한 손: 세로 폭이 0.02뿐이라 짧은 변 기준이면 여유가 거의 안 붙는다.
+    const [r] = handRectsFromLandmarks([[{ x: 0.2, y: 0.5 }, { x: 0.6, y: 0.52 }]]);
+    expect(r.h).toBeGreaterThan(0.1);
+  });
+
+  it("프레임 밖으로 넘치지 않게 잘린다", () => {
+    const [r] = handRectsFromLandmarks([[{ x: 0.01, y: 0.01 }, { x: 0.05, y: 0.05 }]]);
+    expect(r.x).toBeGreaterThanOrEqual(0);
+    expect(r.y).toBeGreaterThanOrEqual(0);
+    expect(r.x + r.w).toBeLessThanOrEqual(1);
+  });
+
+  it("손이 없으면 빈 배열", () => {
+    expect(handRectsFromLandmarks([])).toEqual([]);
+    expect(handRectsFromLandmarks([[]])).toEqual([]);
+  });
+});
+
+describe("rectsToCrop", () => {
+  it("크롭이 없으면 그대로 둔다", () => {
+    const r = [{ x: 0.2, y: 0.3, w: 0.1, h: 0.1 }];
+    expect(rectsToCrop(r, 1920, 1080, null)).toEqual(r);
+  });
+
+  it("크롭 안의 좌표로 다시 정규화한다", () => {
+    // 프레임 1000×1000의 (0.5,0.5)~(0.6,0.6) → 크롭 (400,400,200,200) 안에서는 (0.5,0.5)~(1,1)
+    const [r] = rectsToCrop([{ x: 0.5, y: 0.5, w: 0.1, h: 0.1 }], 1000, 1000, { x: 400, y: 400, w: 200, h: 200 });
+    expect(r.x).toBeCloseTo(0.5, 6);
+    expect(r.w).toBeCloseTo(0.5, 6);
+  });
+
+  it("크롭 밖으로 완전히 벗어난 손은 버린다", () => {
+    const out = rectsToCrop([{ x: 0.9, y: 0.9, w: 0.05, h: 0.05 }], 1000, 1000, { x: 0, y: 0, w: 200, h: 200 });
+    expect(out).toEqual([]);
+  });
+});
+
+describe("bakeAlphaMask — 손 구제", () => {
+  const opts = { fgIsMask0: true, thresh: 0.6, feather: 0.29 };
+  const w = 20;
+  const h = 20;
+  /** 확신도 0.45(임계값 0.6 아래 = 원래라면 잘려나감)인 "손가락"을 가운데 놓는다. */
+  const faintFinger = () => {
+    const arr = new Float32Array(w * h);
+    for (let y = 6; y < 14; y++) for (let x = 8; x < 12; x++) arr[y * w + x] = 0.45;
+    return arr;
+  };
+  const alphaAt = (out: Uint8ClampedArray, x: number, y: number) => out[(y * w + x) * 4 + 3];
+
+  it("구제가 없으면 임계값 아래 손가락은 사라진다", () => {
+    const out = new Uint8ClampedArray(w * h * 4);
+    expect(bakeAlphaMask(faintFinger(), out, w, h, opts)).toBeNull();
+    expect(alphaAt(out, 10, 10)).toBe(0);
+  });
+
+  it("손 영역 안에서는 컷오프가 낮아져 살아난다", () => {
+    const out = new Uint8ClampedArray(w * h * 4);
+    const bbox = bakeAlphaMask(faintFinger(), out, w, h, {
+      ...opts,
+      rescue: { rects: [{ x: 0.25, y: 0.2, w: 0.5, h: 0.6 }], strength: 1 },
+    });
+    expect(alphaAt(out, 10, 10)).toBeGreaterThan(0);
+    expect(bbox).not.toBeNull(); // 살아난 픽셀이 bbox에도 반영돼야 ROI가 손을 계속 따라간다
+  });
+
+  it("구제 영역 **밖**은 건드리지 않는다", () => {
+    const arr = faintFinger();
+    for (let y = 2; y < 4; y++) arr[y * w + 2] = 0.45; // 좌상단에도 흐린 픽셀
+    const out = new Uint8ClampedArray(w * h * 4);
+    bakeAlphaMask(arr, out, w, h, {
+      ...opts,
+      rescue: { rects: [{ x: 0.25, y: 0.2, w: 0.5, h: 0.6 }], strength: 1 },
+    });
+    expect(alphaAt(out, 2, 3)).toBe(0);
+  });
+
+  it("알파를 올리기만 한다 — 이미 선명한 실루엣을 깎지 않는다", () => {
+    const arr = new Float32Array(w * h).fill(1);
+    const plain = new Uint8ClampedArray(w * h * 4);
+    bakeAlphaMask(arr, plain, w, h, opts);
+    const rescued = new Uint8ClampedArray(w * h * 4);
+    bakeAlphaMask(arr, rescued, w, h, {
+      ...opts,
+      rescue: { rects: [{ x: 0, y: 0, w: 1, h: 1 }], strength: 1 },
+    });
+    for (let i = 3; i < plain.length; i += 4) expect(rescued[i]).toBeGreaterThanOrEqual(plain[i]);
+  });
+
+  it("세기 0이면 구제가 없는 것과 같다", () => {
+    const a = new Uint8ClampedArray(w * h * 4);
+    const b = new Uint8ClampedArray(w * h * 4);
+    bakeAlphaMask(faintFinger(), a, w, h, opts);
+    bakeAlphaMask(faintFinger(), b, w, h, { ...opts, rescue: { rects: [{ x: 0, y: 0, w: 1, h: 1 }], strength: 0 } });
+    expect(Array.from(b)).toEqual(Array.from(a));
+  });
+
+  it("영역 경계에서는 원래 임계값으로 되돌아간다 — 네모난 자국 방지", () => {
+    const arr = new Float32Array(w * h).fill(0.45); // 화면 전체가 흐린 값
+    const out = new Uint8ClampedArray(w * h * 4);
+    bakeAlphaMask(arr, out, w, h, {
+      ...opts,
+      rescue: { rects: [{ x: 0.2, y: 0.2, w: 0.6, h: 0.6 }], strength: 1 },
+    });
+    // 중앙은 살고, 사각형 테두리 픽셀은 거의 안 살아야 한다.
+    expect(alphaAt(out, 10, 10)).toBeGreaterThan(alphaAt(out, 4, 10));
   });
 });

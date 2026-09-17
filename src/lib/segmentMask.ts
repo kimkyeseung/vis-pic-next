@@ -67,6 +67,14 @@ const TEMPORAL_MAX = 0.85;
  */
 const EDGE_SHIFT_GAMMA = 2;
 
+/**
+ * 손 구제 영역을 랜드마크 bbox보다 얼마나 넓게 잡을지(bbox 크기 대비).
+ * 랜드마크는 손가락 끝점까지만 찍히므로 손가락 **굵기**와 랜드마크 떨림만큼의 여유가 필요하다.
+ */
+const HAND_RESCUE_MARGIN = 0.18;
+/** 구제 영역 경계에서 임계값이 되돌아오는 완충 폭(영역 짧은 변 대비). 사각형 자국을 없앤다. */
+const HAND_RESCUE_FALLOFF = 0.25;
+
 /** 관리자 촬영 설정에서 오는 마스크 후처리 세기. */
 export type MaskTuning = {
   /** 공간 블러 세기(%). 100 = 기본, 0 = 끔. 계단을 지우는 정도. */
@@ -79,6 +87,12 @@ export type MaskTuning = {
   roi: boolean;
   /** 추적 여유(%) — bbox 한 변 대비. 낮을수록 해상도 이득이 크고 놓칠 위험도 크다. */
   roiMargin: number;
+  /**
+   * 손 구제 세기(0~100%). 제스처 인식기가 찾아낸 손 주변에서만 전경 컷오프를 낮춘다.
+   * 손끝은 모델 확신도가 원래 가장 낮은 곳이라 임계값에 가장 먼저 잘려나가는데, 임계값은 마스크
+   * 전체에 일괄 적용이라 "손가락만" 살릴 수가 없었다(docs/CAMERA_QUALITY.md 2장-4). 0이면 끔.
+   */
+  handRescue: number;
 };
 
 export const DEFAULT_MASK_TUNING: MaskTuning = {
@@ -87,6 +101,7 @@ export const DEFAULT_MASK_TUNING: MaskTuning = {
   temporal: 0,
   roi: true,
   roiMargin: 22,
+  handRescue: 50,
 };
 
 /** 전체 프레임 픽셀 좌표계의 크롭 영역. */
@@ -94,6 +109,9 @@ export type Roi = { x: number; y: number; w: number; h: number };
 
 /** 마스크 픽셀 좌표계의 전경 경계 상자. */
 export type MaskBbox = { x: number; y: number; w: number; h: number };
+
+/** 정규화(0~1) 사각형. 어느 좌표계의 0~1인지는 쓰는 쪽 문맥이 정한다(프레임 / 크롭). */
+export type NormRect = { x: number; y: number; w: number; h: number };
 
 const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
 
@@ -122,7 +140,16 @@ export function bakeAlphaMask(
   out: Uint8ClampedArray,
   w: number,
   h: number,
-  opts: { fgIsMask0: boolean; thresh: number; feather: number },
+  opts: {
+    fgIsMask0: boolean;
+    thresh: number;
+    feather: number;
+    /**
+     * 이 사각형들(**이 마스크** 기준 정규화 좌표) 안에서만 컷오프를 낮춰 낮은 확신도 픽셀을 살린다.
+     * `strength` 0~1: 1이면 영역 안 컷오프가 0. 경계에서는 원래 임계값으로 부드럽게 되돌아간다.
+     */
+    rescue?: { rects: NormRect[]; strength: number };
+  },
 ): MaskBbox | null {
   const { fgIsMask0, thresh } = opts;
   const feather = Math.max(1e-6, opts.feather);
@@ -130,6 +157,13 @@ export function bakeAlphaMask(
   let minY = h;
   let maxX = -1;
   let maxY = -1;
+  const mark = (x: number, y: number) => {
+    if (x < minX) minX = x;
+    if (x > maxX) maxX = x;
+    if (y < minY) minY = y;
+    if (y > maxY) maxY = y;
+  };
+
   for (let y = 0; y < h; y++) {
     const row = y * w;
     for (let x = 0; x < w; x++) {
@@ -142,16 +176,106 @@ export function bakeAlphaMask(
       out[j + 1] = 255;
       out[j + 2] = 255;
       out[j + 3] = a * 255; // Uint8ClampedArray가 반올림·클램프를 대신한다
-      if (out[j + 3] >= BBOX_ALPHA) {
-        if (x < minX) minX = x;
-        if (x > maxX) maxX = x;
-        if (y < minY) minY = y;
-        if (y > maxY) maxY = y;
+      if (out[j + 3] >= BBOX_ALPHA) mark(x, y);
+    }
+  }
+
+  // ── 손 구제 ── 사각형 안만 다시 훑어 낮은 컷오프로 계산하고, 원래 값보다 크면 덮어쓴다.
+  // 전체를 한 번 더 도는 게 아니라 손 주변만 돌기 때문에 비용이 사실상 없다.
+  // 알파를 **올리기만** 하므로 이 단계가 기존 실루엣을 깎을 일은 없다.
+  const strength = opts.rescue ? clamp(opts.rescue.strength, 0, 1) : 0;
+  if (opts.rescue && strength > 0) {
+    for (const r of opts.rescue.rects) {
+      const x0 = Math.max(0, Math.floor(r.x * w));
+      const y0 = Math.max(0, Math.floor(r.y * h));
+      const x1 = Math.min(w - 1, Math.ceil((r.x + r.w) * w));
+      const y1 = Math.min(h - 1, Math.ceil((r.y + r.h) * h));
+      if (x1 <= x0 || y1 <= y0) continue;
+      // 경계 완충 — 사각형 안팎에서 임계값이 뚝 끊기면 네모난 자국이 남는다.
+      const band = Math.max(1, Math.min(x1 - x0, y1 - y0) * HAND_RESCUE_FALLOFF);
+      for (let y = y0; y <= y1; y++) {
+        const dy = Math.min(y - y0, y1 - y);
+        const row = y * w;
+        for (let x = x0; x <= x1; x++) {
+          const edge = Math.min(x - x0, x1 - x, dy);
+          const weight = Math.min(1, edge / band);
+          if (weight <= 0) continue;
+          const t = thresh * (1 - strength * weight);
+          const i = row + x;
+          const fg = fgIsMask0 ? arr[i] : 1 - arr[i];
+          const a = fg <= t ? 0 : Math.min(1, (fg - t) / feather);
+          const j = i * 4 + 3;
+          const v = a * 255;
+          if (v > out[j]) {
+            out[j] = v;
+            if (out[j] >= BBOX_ALPHA) mark(x, y);
+          }
+        }
       }
     }
   }
+
   if (maxX < 0) return null;
   return { x: minX, y: minY, w: maxX - minX + 1, h: maxY - minY + 1 };
+}
+
+/**
+ * 손 랜드마크(21점, **프레임** 정규화 좌표)를 감싸는 구제 영역으로 바꾼다.
+ * 랜드마크는 손가락 끝 "점"까지만 찍히므로 손가락 굵기와 인식 떨림만큼 여유를 붙인다.
+ */
+export function handRectsFromLandmarks(
+  hands: readonly (readonly { x: number; y: number }[])[],
+  margin = HAND_RESCUE_MARGIN,
+): NormRect[] {
+  const rects: NormRect[] = [];
+  for (const points of hands) {
+    if (!points || points.length === 0) continue;
+    let x0 = Infinity;
+    let y0 = Infinity;
+    let x1 = -Infinity;
+    let y1 = -Infinity;
+    for (const p of points) {
+      if (p.x < x0) x0 = p.x;
+      if (p.x > x1) x1 = p.x;
+      if (p.y < y0) y0 = p.y;
+      if (p.y > y1) y1 = p.y;
+    }
+    if (!Number.isFinite(x0)) continue;
+    // 손이 옆으로 누우면 한 축이 납작해진다 — 여유는 긴 변 기준으로 줘야 손가락 굵기를 덮는다.
+    const pad = Math.max(x1 - x0, y1 - y0) * margin;
+    const rx = clamp(x0 - pad, 0, 1);
+    const ry = clamp(y0 - pad, 0, 1);
+    rects.push({
+      x: rx,
+      y: ry,
+      w: clamp(x1 + pad, 0, 1) - rx,
+      h: clamp(y1 + pad, 0, 1) - ry,
+    });
+  }
+  return rects;
+}
+
+/**
+ * 프레임 정규화 사각형을 **크롭(ROI) 정규화** 좌표로 옮긴다 — 모델이 크롭만 봤으면 마스크도
+ * 크롭 좌표계이기 때문. `roi`가 null이면 그대로. 크롭 밖으로 완전히 벗어나면 제외한다.
+ */
+export function rectsToCrop(
+  rects: readonly NormRect[],
+  frameW: number,
+  frameH: number,
+  roi: Roi | null,
+): NormRect[] {
+  if (!roi) return rects.slice();
+  const out: NormRect[] = [];
+  for (const r of rects) {
+    const x = ((r.x * frameW) - roi.x) / roi.w;
+    const y = ((r.y * frameH) - roi.y) / roi.h;
+    const rw = (r.w * frameW) / roi.w;
+    const rh = (r.h * frameH) / roi.h;
+    if (x + rw <= 0 || y + rh <= 0 || x >= 1 || y >= 1) continue;
+    out.push({ x, y, w: rw, h: rh });
+  }
+  return out;
 }
 
 /**

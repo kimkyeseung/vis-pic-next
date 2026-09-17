@@ -11,7 +11,7 @@
 // 프로토콜:
 //   main → worker: { type:"init", useGpu, light, thresh, feather }
 //                  { type:"config", thresh, feather }
-//                  { type:"frame", bitmap, timestamp, roi, maskW, maskH, frameW, frameH }
+//                  { type:"frame", bitmap, timestamp, roi, maskW, maskH, frameW, frameH, rescue }
 //                  { type:"close" }                                       (bitmap 소유권 이전)
 //   worker → main: { type:"ready" }
 //                  { type:"error", error }
@@ -23,7 +23,7 @@ import {
   ImageSegmenter,
   type ImageSegmenterResult,
 } from "@mediapipe/tasks-vision";
-import { bakeAlphaMask, type Roi } from "../lib/segmentMask";
+import { bakeAlphaMask, type NormRect, type Roi } from "../lib/segmentMask";
 
 type InMsg =
   | { type: "init"; useGpu: boolean; light: boolean; thresh: number; feather: number }
@@ -37,6 +37,8 @@ type InMsg =
       maskH: number;
       frameW: number;
       frameH: number;
+      /** 손 구제 영역(크롭 정규화 좌표) — 메인이 "모델이 볼 좌표계"로 미리 옮겨 보낸다. */
+      rescue?: { rects: NormRect[]; strength: number };
     }
   | { type: "close" };
 
@@ -126,6 +128,7 @@ async function handle(msg: InMsg) {
             fgIsMask0: foregroundIsMask0,
             thresh,
             feather,
+            rescue: msg.rescue,
           });
           const out = await createImageBitmap(img);
           post({ type: "mask", bitmap: out, bbox, ...echo }, [out]);

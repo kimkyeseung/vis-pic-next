@@ -97,6 +97,8 @@ export interface DeviceConfig {
   segmentRoiMargin: number;
   /** AI 배경제거 처리 해상도 배율. "auto"면 4K에서만 0.25, 그 외 0.5. 기본 "auto". */
   segmentProcessScale: SegmentProcessScale;
+  /** AI 배경제거 손 구제 세기 (0-100%). 손 주변만 전경 컷오프를 낮춰 손끝 잘림을 막는다. 기본 50. */
+  segmentHandRescue: number;
   /** 테마 글자 색상 (서비스 화면). 미설정 시 #ffffff. */
   themeTextColor: string;
   /** 테마 강조(primary) 색상 — 선택 강조·주요 버튼. 미설정 시 #6c6fb4. */

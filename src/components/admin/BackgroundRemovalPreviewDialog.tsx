@@ -53,6 +53,8 @@ export function BackgroundRemovalPreviewDialog({
   onRoiMarginChange,
   processScale,
   onProcessScaleChange,
+  handRescue,
+  onHandRescueChange,
   onClose,
 }: {
   mode: "mediapipe" | "chromakey" | "chromakey-yuv";
@@ -100,6 +102,8 @@ export function BackgroundRemovalPreviewDialog({
   onRoiMarginChange: (n: number) => void;
   processScale: SegmentProcessScale;
   onProcessScaleChange: (v: SegmentProcessScale) => void;
+  handRescue: number;
+  onHandRescueChange: (n: number) => void;
   onClose: () => void;
 }) {
   // AI 추론 스로틀 간격(ms). 저장되는 촬영 설정이 아니라 미리보기 전용 값이라 다이얼로그가 들고 있는다.
@@ -112,7 +116,7 @@ export function BackgroundRemovalPreviewDialog({
     similarity, smoothness, spill, choke, lumaIndependent,
     yuvChromaColor, onYuvChromaColorChange,
     yuvSimilarity, yuvSmoothness, yuvSpill, yuvOpacity, yuvContrast, yuvBrightness, yuvGamma,
-    threshold, feather, maskBlur, edgeShift, temporal, roi, roiMargin, processScale,
+    threshold, feather, maskBlur, edgeShift, temporal, roi, roiMargin, processScale, handRescue,
     inferenceInterval,
   });
 
@@ -218,6 +222,8 @@ export function BackgroundRemovalPreviewDialog({
             onRoiMarginChange={onRoiMarginChange}
             processScale={processScale}
             onProcessScaleChange={onProcessScaleChange}
+            handRescue={handRescue}
+            onHandRescueChange={onHandRescueChange}
             inferenceInterval={inferenceInterval}
             onInferenceIntervalChange={setInferenceInterval}
           />

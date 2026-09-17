@@ -189,7 +189,7 @@ const FIELDS: { name: string; label: string; type?: "text" | "number" | "range" 
     min: 0,
     max: 100,
     default: 15,
-    hint: "확신도 기준. 높일수록 인물 가장자리를 안쪽으로 더 깎아냅니다. 낮추면 손끝이 살아나는 대신 배경 헤일로가 늘어납니다. 기본값 15.",
+    hint: "확신도 기준. 높일수록 인물 가장자리를 안쪽으로 더 깎아냅니다. 낮추면 손끝이 살아나는 대신 배경 헤일로가 늘어납니다. 추천 10~15(기본 15). 손가락이 사라지면 여기부터 낮추세요 — 20을 넘기면 손끝이 먼저 잘려나갑니다.",
     showIf: (s) => (s.CHROMAKEY_MODE || "mediapipe") === "mediapipe",
   },
   {
@@ -199,7 +199,7 @@ const FIELDS: { name: string; label: string; type?: "text" | "number" | "range" 
     min: 1,
     max: 100,
     default: 35,
-    hint: "반투명 전환대의 폭. 넓히면 고스팅이 늘고, 좁혀도 경계 계단은 없어지지 않습니다(계단은 아래 '경계 블러'로). 기본값 35.",
+    hint: "반투명 전환대의 폭. 넓히면 고스팅이 늘고, 좁혀도 경계 계단은 없어지지 않습니다(계단은 아래 '경계 블러'로). 추천 35~45(기본 35).",
     showIf: (s) => (s.CHROMAKEY_MODE || "mediapipe") === "mediapipe",
   },
   {
@@ -209,7 +209,7 @@ const FIELDS: { name: string; label: string; type?: "text" | "number" | "range" 
     min: 0,
     max: 200,
     default: 100,
-    hint: "AI 모델의 256칸 격자에서 오는 경계 계단을 지웁니다. 0이면 끔, 과하면 실루엣이 뭉갭니다. 기본값 100.",
+    hint: "AI 모델의 256칸 격자에서 오는 경계 계단을 지웁니다. 0이면 끔, 과하면 실루엣이 뭉갭니다. 추천 80~120(기본 100).",
     showIf: (s) => (s.CHROMAKEY_MODE || "mediapipe") === "mediapipe",
   },
   {
@@ -219,7 +219,7 @@ const FIELDS: { name: string; label: string; type?: "text" | "number" | "range" 
     min: -100,
     max: 100,
     default: 0,
-    hint: "음수면 경계를 안쪽으로 깎아 배경 헤일로를 없애고, 양수면 바깥으로 살려 손끝을 남깁니다. '경계 침식'과 달리 확신도가 아니라 실제 거리 기준입니다. 기본값 0.",
+    hint: "음수면 경계를 안쪽으로 깎아 배경 헤일로를 없애고, 양수면 바깥으로 살려 손끝을 남깁니다. '경계 침식'과 달리 확신도가 아니라 실제 거리 기준이라 손끝을 먹지 않습니다. 추천 −40~0(기본 0) — 침식을 낮춘 뒤 테두리가 지저분하면 여기를 음수로.",
     showIf: (s) => (s.CHROMAKEY_MODE || "mediapipe") === "mediapipe",
   },
   {
@@ -229,7 +229,7 @@ const FIELDS: { name: string; label: string; type?: "text" | "number" | "range" 
     min: 0,
     max: 100,
     default: 0,
-    hint: "이전 마스크를 섞어 프레임마다 경계가 떠는 것을 줄입니다. 높이면 움직일 때 잔상이 생깁니다. 기본값 0(끔).",
+    hint: "이전 마스크를 섞어 프레임마다 경계가 떠는 것을 줄입니다. 높이면 움직일 때 잔상이 생깁니다. 추천 0~40(기본 0). 60을 넘기면 손을 흔들 때 잔상이 눈에 띕니다.",
     showIf: (s) => (s.CHROMAKEY_MODE || "mediapipe") === "mediapipe",
   },
   {
@@ -237,7 +237,7 @@ const FIELDS: { name: string; label: string; type?: "text" | "number" | "range" 
     label: "AI 인물 추적 크롭",
     type: "select",
     options: [{ value: "on", label: "켬 (기본) — 경계 해상도 향상" }, { value: "off", label: "끔 — 항상 화면 전체를 추론" }],
-    hint: "인물 주변만 잘라 추론합니다. 모델 입력이 256×256 고정이라, 좁게 볼수록 경계 계단이 실제로 얇아집니다.",
+    hint: "인물 주변만 잘라 추론합니다. 모델 입력이 256×256 고정이라, 좁게 볼수록 경계 계단이 실제로 얇아집니다. 추천: 켬.",
     showIf: (s) => (s.CHROMAKEY_MODE || "mediapipe") === "mediapipe",
   },
   {
@@ -247,8 +247,18 @@ const FIELDS: { name: string; label: string; type?: "text" | "number" | "range" 
     min: 0,
     max: 100,
     default: 22,
-    hint: "크롭을 인물보다 얼마나 넓게 잡을지. 좁힐수록 해상도 이득이 크고, 빠르게 움직일 때 놓칠 위험도 커집니다. 기본값 22.",
+    hint: "크롭을 인물보다 얼마나 넓게 잡을지. 좁힐수록 해상도 이득이 크고, 빠르게 움직일 때 놓칠 위험도 커집니다. 추천 15~30(기본 22).",
     showIf: (s) => (s.CHROMAKEY_MODE || "mediapipe") === "mediapipe" && (s.CAPTURE_ROI || "on") !== "off",
+  },
+  {
+    name: "CAPTURE_HAND_RESCUE",
+    label: "AI 손 구제 (%)",
+    type: "range",
+    min: 0,
+    max: 100,
+    default: 50,
+    hint: "제스처 인식기가 찾아낸 손 주변에서만 전경 컷오프를 낮춰, 손끝이 통째로 사라지는 것을 막습니다. 손이 안 잡히면 아무 일도 하지 않습니다. 추천 40~70(기본 50). 100에 가까우면 손 주위 배경이 함께 딸려옵니다.",
+    showIf: (s) => (s.CHROMAKEY_MODE || "mediapipe") === "mediapipe",
   },
   {
     name: "CAPTURE_PROCESS_SCALE",
@@ -260,7 +270,7 @@ const FIELDS: { name: string; label: string; type?: "text" | "number" | "range" 
       { value: "50", label: "50%" },
       { value: "25", label: "25% — 가장 빠름" },
     ],
-    hint: "배경제거를 돌리는 해상도(카메라 해상도 대비). 높일수록 마스크가 정밀하지만 프레임이 떨어질 수 있습니다.",
+    hint: "배경제거를 돌리는 해상도(카메라 해상도 대비). 높일수록 마스크가 정밀하지만 프레임이 떨어질 수 있습니다. 추천: 자동. 경계가 거칠고 FPS에 여유가 있을 때만 올리세요.",
     showIf: (s) => (s.CHROMAKEY_MODE || "mediapipe") === "mediapipe",
   },
 ];
@@ -457,6 +467,8 @@ export default function CaptureSettingPage() {
           onRoiMarginChange={(n) => updateSetting("CAPTURE_ROI_MARGIN", String(n))}
           processScale={parseSegmentProcessScale(settings.CAPTURE_PROCESS_SCALE || "")}
           onProcessScaleChange={(v) => updateSetting("CAPTURE_PROCESS_SCALE", v)}
+          handRescue={clampPercent(parseIntSafe(settings.CAPTURE_HAND_RESCUE || "", 50))}
+          onHandRescueChange={(n) => updateSetting("CAPTURE_HAND_RESCUE", String(n))}
           onClose={() => setPreviewOpen(false)}
         />
       )}

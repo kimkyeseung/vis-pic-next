@@ -7,9 +7,12 @@ import {
   bakeAlphaMask,
   bboxToFrame,
   createMaskBaker,
+  handRectsFromLandmarks,
   nextRoi,
+  rectsToCrop,
   ROI_INPUT_SIZE,
   type MaskTuning,
+  type NormRect,
   type Roi,
 } from "@/lib/segmentMask";
 import { segmentProcessScaleFor } from "@/lib/deviceConfig";
@@ -24,6 +27,9 @@ import type { SegmentProcessScale } from "@/types";
 export const INFERENCE_INTERVAL_OPTIONS = [10, 20, 50, 100, 150, 200];
 /** 기본 간격 — rAF 주기(≈16.7ms)보다 짧아 사실상 매 프레임 추론한다. */
 export const DEFAULT_INFERENCE_INTERVAL_MS = 10;
+
+/** 손 위치 갱신 간격(ms). 서비스 화면(useHandGestureCapture)과 같은 값. */
+const HAND_INTERVAL_MS = 200;
 
 // 제거된 영역이 잘 보이도록 체커보드 패턴을 배경으로 그린다
 const CHECKER_SIZE = 20;
@@ -75,6 +81,7 @@ export function usePreviewCamera({
   roi,
   roiMargin,
   processScale,
+  handRescue,
   inferenceInterval,
 }: {
   mode: "mediapipe" | "chromakey" | "chromakey-yuv";
@@ -108,6 +115,8 @@ export function usePreviewCamera({
   roiMargin: number;
   /** 처리 해상도 배율 */
   processScale: SegmentProcessScale;
+  /** 손 구제 세기(0-100%) */
+  handRescue: number;
   /** mediapipe 추론 스로틀 간격(ms) — INFERENCE_INTERVAL_OPTIONS 중 하나 */
   inferenceInterval: number;
 }) {
@@ -143,7 +152,12 @@ export function usePreviewCamera({
   const yuvGammaRef = useRef(yuvGamma);
   const thresholdRef = useRef(threshold);
   const featherRef = useRef(feather);
-  const maskTuningRef = useRef<MaskTuning>({ blur: maskBlur, edgeShift, temporal, roi, roiMargin });
+  const maskTuningRef = useRef<MaskTuning>({ blur: maskBlur, edgeShift, temporal, roi, roiMargin, handRescue });
+  // 손 구제를 미리보기에서도 그대로 보려면 여기서도 손 위치를 알아야 한다. 서비스 화면은
+  // 촬영 트리거용 제스처 인식기(useHandGestureCapture)의 부산물을 쓰지만, 미리보기엔 그게 없어
+  // 랜드마크 전용으로 따로 띄운다(구제 세기가 0이면 아예 만들지 않는다).
+  const handRectsRef = useRef<NormRect[]>([]);
+  const handRecognizerRef = useRef<{ recognizeForVideo: (v: HTMLVideoElement, t: number) => { landmarks?: { x: number; y: number }[][] }; close: () => void } | null>(null);
   const processScaleRef = useRef(processScale);
   const inferenceIntervalRef = useRef(inferenceInterval);
   useEffect(() => { chromaColorRef.current = chromaColor; }, [chromaColor]);
@@ -164,8 +178,8 @@ export function usePreviewCamera({
   useEffect(() => { featherRef.current = feather; }, [feather]);
   useEffect(() => { inferenceIntervalRef.current = inferenceInterval; }, [inferenceInterval]);
   useEffect(() => {
-    maskTuningRef.current = { blur: maskBlur, edgeShift, temporal, roi, roiMargin };
-  }, [maskBlur, edgeShift, temporal, roi, roiMargin]);
+    maskTuningRef.current = { blur: maskBlur, edgeShift, temporal, roi, roiMargin, handRescue };
+  }, [maskBlur, edgeShift, temporal, roi, roiMargin, handRescue]);
   useEffect(() => { processScaleRef.current = processScale; }, [processScale]);
 
   const [eyedropper, setEyedropper] = useState(false);
@@ -235,6 +249,18 @@ export function usePreviewCamera({
             });
             if (cancelled) { segmenter.close(); return; }
             segmenterRef.current = segmenter;
+            // 손 구제 미리보기용 랜드마크 인식기. 서비스 화면과 같은 모델·파일셋을 재사용한다.
+            // 실패해도 미리보기 자체는 돌아가야 하므로 조용히 넘어간다(구제만 안 보임).
+            try {
+              const { GestureRecognizer } = await import("@mediapipe/tasks-vision");
+              const gr = await GestureRecognizer.createFromOptions(vision, {
+                baseOptions: { modelAssetPath: "/static/mediapipe/model/gesture_recognizer.task" },
+                runningMode: "VIDEO",
+                numHands: 2,
+              });
+              if (cancelled) gr.close();
+              else handRecognizerRef.current = gr as unknown as typeof handRecognizerRef.current;
+            } catch { /* 손 구제 미리보기 없이 진행 */ }
           } finally {
             console.log = origLog; console.info = origInfo; console.warn = origWarn;
           }
@@ -259,6 +285,7 @@ export function usePreviewCamera({
         let roiCanvas: HTMLCanvasElement | null = null;
         let maskImage: ImageData | null = null;
         const baker = createMaskBaker();
+        let lastHandInfer = 0;
 
         const processFrame = () => {
           const video = videoRef.current;
@@ -283,6 +310,18 @@ export function usePreviewCamera({
 
           let processed = false;
 
+          // 손 위치 갱신(200ms 간격) — 구제 세기가 0이면 인식기를 만들지도 않는다.
+          if (mode === "mediapipe" && handRecognizerRef.current && maskTuningRef.current.handRescue > 0) {
+            const t = performance.now();
+            if (t - lastHandInfer >= HAND_INTERVAL_MS) {
+              lastHandInfer = t;
+              try {
+                const res = handRecognizerRef.current.recognizeForVideo(video, t);
+                handRectsRef.current = handRectsFromLandmarks(res.landmarks ?? []);
+              } catch { /* 인식 실패는 무시 — 구제만 빠진다 */ }
+            }
+          }
+
           if (mode === "mediapipe" && segmenterRef.current) {
             // 촬영 화면(useCameraCapture)·송출(CameraStreamer)과 같은 마스크 파이프라인 —
             // ROI 크롭 추론 + 공간 블러(src/lib/segmentMask.ts). 미리보기가 실제 화면과 다르게
@@ -299,6 +338,10 @@ export function usePreviewCamera({
             const dest = crop
               ? { x: (crop.x * pw) / w, y: (crop.y * ph) / h, w: (crop.w * pw) / w, h: (crop.h * ph) / h }
               : null;
+            const rescueStrength = maskTuningRef.current.handRescue / 100;
+            const rescue = rescueStrength > 0
+              ? { rects: rectsToCrop(handRectsRef.current, w, h, crop), strength: rescueStrength }
+              : undefined;
 
             if (now - lastInferenceTimeRef.current >= inferenceIntervalRef.current || !maskReadyRef.current) {
               let input: HTMLCanvasElement = offscreen; // 크롭이 없으면 이미 그려 둔 pw×ph 프레임
@@ -326,6 +369,7 @@ export function usePreviewCamera({
                   fgIsMask0: false,
                   thresh: thresholdRef.current / 100,
                   feather: Math.max(featherRef.current, 1) / 100,
+                  rescue,
                 });
                 let mc = maskCanvasRef.current;
                 if (!mc) { mc = document.createElement("canvas"); maskCanvasRef.current = mc; }
@@ -413,6 +457,9 @@ export function usePreviewCamera({
       streamRef.current = null;
       segmenterRef.current?.close();
       segmenterRef.current = null;
+      handRecognizerRef.current?.close();
+      handRecognizerRef.current = null;
+      handRectsRef.current = [];
       maskReadyRef.current = false;
       roiRef.current = null;
       lastInferenceTimeRef.current = 0;

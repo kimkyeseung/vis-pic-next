@@ -138,7 +138,8 @@ export function CameraSection({
     temporal: config.segmentTemporal,
     roi: config.segmentRoi,
     roiMargin: config.segmentRoiMargin,
-  }), [config.segmentMaskBlur, config.segmentEdgeShift, config.segmentTemporal, config.segmentRoi, config.segmentRoiMargin]);
+    handRescue: config.segmentHandRescue,
+  }), [config.segmentMaskBlur, config.segmentEdgeShift, config.segmentTemporal, config.segmentRoi, config.segmentRoiMargin, config.segmentHandRescue]);
   // MediaPipe 세그멘터 초기화·정리·설정동기화 — useMediapipeSegmentation 참고. 프레임별 마스크
   // 굽기(메인 스레드 핫패스)는 여기 반환된 refs를 아래 processFrame 루프가 직접 사용한다.
   const {
@@ -155,7 +156,8 @@ export function CameraSection({
   useEffect(() => { suppressMediapipeLogs(); }, []);
 
   // 손동작 인식(손바닥=촬영, 배경별 트리거 제스처=이펙트) — useHandGestureCapture 참고.
-  useHandGestureCapture({
+  // 부산물인 손 위치(handRectsRef)는 배경제거의 "손 구제"에 쓰인다(추가 추론 없음).
+  const { handRectsRef } = useHandGestureCapture({
     videoRef, countdownRef, handleManualCaptureRef, onEffectTriggerRef, effectGestureRef,
   });
 
@@ -169,7 +171,7 @@ export function CameraSection({
     bgRemovalMode, selectedBackground, segmentThresh, segmentFeather, debug,
     countdown, setCountdown,
     maskSmoothQuality, maskSmoothQualityRef, useGpuDelegate, lightModelRef, inferenceIntervalRef,
-    perfRef, segmenterRef, maskCanvasRef, maskReadyRef, roiRef, lastInferenceTimeRef,
+    perfRef, segmenterRef, maskCanvasRef, maskReadyRef, roiRef, handRectsRef, lastInferenceTimeRef,
     workerRef, workerBusyRef, workerActiveRef,
     currentBgEffectRef, effectVisibleRef, effectAlphaRef,
     backEffectRef, effectTimerRef, effectDurationRef, effectStartedAtRef, stopEffect,

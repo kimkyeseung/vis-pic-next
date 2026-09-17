@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import type { GestureRecognizer } from "@mediapipe/tasks-vision";
+import { handRectsFromLandmarks, type NormRect } from "@/lib/segmentMask";
 
 /**
  * 손동작 인식 서브시스템 — 손바닥(Open_Palm)으로 촬영 트리거, 배경에 지정된 트리거 제스처로
@@ -11,6 +12,10 @@ import type { GestureRecognizer } from "@mediapipe/tasks-vision";
  * 콜백은 `*Ref`로만 받는다 — rAF 감지 루프를 매 렌더 재생성하지 않기 위해 호출부가 최신 함수를
  * ref에 담아 넘기는 계약이다(호출부: `CameraSection.tsx`가 `handleManualCaptureRef`/
  * `onEffectTriggerRef`/`effectGestureRef`를 유지).
+ *
+ * 부산물로 **손 위치(`handRectsRef`)** 도 내보낸다. 인식기는 어차피 랜드마크 21점을 함께
+ * 돌려주는데 지금까지 제스처 이름만 쓰고 버리고 있었다 — 배경제거의 "손 구제"(손 주변만 전경
+ * 컷오프를 낮춰 손끝이 잘리는 걸 막는다)가 이 값을 쓰므로 추가 추론 비용이 0이다.
  */
 export function useHandGestureCapture({
   videoRef,
@@ -24,8 +29,11 @@ export function useHandGestureCapture({
   handleManualCaptureRef: React.RefObject<() => void>;
   onEffectTriggerRef: React.RefObject<() => void>;
   effectGestureRef: React.RefObject<string>;
-}): void {
+}): { handRectsRef: React.RefObject<NormRect[]> } {
   const gestureRef = useRef<GestureRecognizer | null>(null);
+  // 최근 인식된 손을 감싸는 영역(프레임 정규화 좌표). 손이 없으면 빈 배열.
+  // 합성 루프(무-deps)가 읽으므로 ref로 둔다.
+  const handRectsRef = useRef<NormRect[]>([]);
 
   // 손바닥(Open_Palm) 제스처 인식기 초기화 — 배경 제거 모드와 무관하게 항상 동작.
   // 배경제거용 ImageSegmenter와 같은 tasks-vision 패키지·WASM 파일셋을 재사용한다.
@@ -99,6 +107,8 @@ export function useHandGestureCapture({
         const g = res.gestures?.[0]?.[0];
         name = g?.categoryName;
         score = g?.score ?? 0;
+        // 제스처와 함께 오는 랜드마크로 손 영역을 갱신한다(배경제거 손 구제용, 추가 비용 없음).
+        handRectsRef.current = handRectsFromLandmarks(res.landmarks ?? []);
       } catch {
         return;
       }
@@ -146,6 +156,11 @@ export function useHandGestureCapture({
     };
 
     raf = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf);
+    return () => {
+      cancelAnimationFrame(raf);
+      handRectsRef.current = [];
+    };
   }, [videoRef, countdownRef, handleManualCaptureRef, onEffectTriggerRef, effectGestureRef]);
+
+  return { handRectsRef };
 }

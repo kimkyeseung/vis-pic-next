@@ -150,9 +150,11 @@ export function CameraStreamer({
   // 관리자 설정(0-100%)을 confidence 스케일(0-1)로 변환해 보관. FEATHER는 0으로 나누기 방지를 위해 최소 1%.
   const segmentThreshRef = useRef(segmentThreshold / 100);
   const segmentFeatherRef = useRef(Math.max(segmentFeather, 1) / 100);
+  // 손 구제는 항상 0 — 이 컴포넌트엔 제스처 인식기가 없어 손 위치를 모른다. 카메라 단계가 아닌
+  // 화면의 송출용이라 손동작을 쓸 일도 없다(촬영 화면은 useHandGestureCapture의 부산물을 쓴다).
   const maskTuningRef = useRef<MaskTuning>({
     blur: segmentMaskBlur, edgeShift: segmentEdgeShift, temporal: segmentTemporal,
-    roi: segmentRoi, roiMargin: segmentRoiMargin,
+    roi: segmentRoi, roiMargin: segmentRoiMargin, handRescue: 0,
   });
   const processScaleRef = useRef(segmentProcessScale);
   useEffect(() => { selectedBgRef.current = selectedBackground; }, [selectedBackground]);
@@ -176,7 +178,7 @@ export function CameraStreamer({
   useEffect(() => {
     maskTuningRef.current = {
       blur: segmentMaskBlur, edgeShift: segmentEdgeShift, temporal: segmentTemporal,
-      roi: segmentRoi, roiMargin: segmentRoiMargin,
+      roi: segmentRoi, roiMargin: segmentRoiMargin, handRescue: 0,
     };
   }, [segmentMaskBlur, segmentEdgeShift, segmentTemporal, segmentRoi, segmentRoiMargin]);
   useEffect(() => { processScaleRef.current = segmentProcessScale; }, [segmentProcessScale]);
