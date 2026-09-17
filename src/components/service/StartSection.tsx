@@ -45,17 +45,24 @@ export function StartSection({
           <span className="whitespace-pre-line leading-none">{t("start.touch")}</span>
         </div>
 
-        {/* 언어 선택 — 결제 화면으로 이동. 결제 비활성 시에만 여기 표시. */}
+        {/* 언어 선택 — 결제 화면으로 이동. 결제 비활성 시에만 여기 표시.
+            이 화면은 배경화면(밝은 이미지일 수 있음) 위에 얹히므로 결제 화면의 반투명 스타일
+            (bg-white/10 · text-white/60)을 쓰지 않는다. 비선택 버튼도 불투명 단색 배경 + 인라인
+            흰 글자로 칠해 배경 밝기와 무관하게 읽히게 하고, 버튼 크기도 키워 시인성을 올린다.
+            (인라인 색이라 .service-theme의 text-white 치환 대상에서도 빠진다 — globals.css §테마 글자색) */}
         {showLanguage && (
-          <div className="flex gap-3 mt-12 portrait:mt-8 flex-wrap justify-center" onClick={(e) => e.stopPropagation()}>
+          <div className="flex gap-5 portrait:gap-4 mt-12 portrait:mt-8 flex-wrap justify-center" onClick={(e) => e.stopPropagation()}>
             {LOCALES.map(({ code, label }) => (
               <button
                 key={code}
-                className={`px-10 py-5 rounded-2xl text-3xl font-semibold transition-all ${
+                className={`px-16 py-8 portrait:px-10 portrait:py-7 rounded-2xl text-5xl portrait:text-4xl font-semibold transition-colors shadow-lg border-4 ${
                   lang === code
-                    ? "bg-white text-gray-900 shadow-lg"
-                    : "bg-white/10 text-white/60 hover:bg-white/20 hover:text-white"
+                    ? "bg-white text-gray-900"
+                    : "bg-[#3f3f46] border-[#8a8a95] hover:bg-[#52525b]"
                 }`}
+                // 선택된 버튼은 테두리를 강조(primary) 색상으로 — 지점 테마 설정이 있으면 그 값,
+                // 없으면 디자인 토큰 기본값(--color-brand). 비선택은 인라인 흰 글자(테마 치환 제외).
+                style={lang === code ? { borderColor: "var(--theme-primary, var(--color-brand))" } : { color: "#ffffff" }}
                 onClick={() => setLang(code)}
               >
                 {label}

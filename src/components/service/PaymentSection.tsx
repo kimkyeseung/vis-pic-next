@@ -138,16 +138,19 @@ export function PaymentSection({
 
           <div className="min-h-0 w-full flex flex-col items-center justify-start pt-16 portrait:pt-14 portrait:pb-28">
           <div className="w-full max-w-[1700px] flex flex-col items-center animate-fadeInUp portrait:flex-1 portrait:min-h-0">
-          {/* 언어 선택 */}
+          {/* 언어 선택 — 시작 화면(StartSection)과 동일한 불투명 스타일.
+              배경화면(밝은 이미지일 수 있음) 위에서도 읽히도록 비선택 버튼을 불투명 단색 배경 +
+              인라인 흰 글자로 칠하고, 선택 버튼은 테두리를 강조(primary) 색상으로 준다. */}
           <div className="flex gap-5 portrait:gap-6 mb-12 portrait:mb-10 flex-wrap justify-center">
             {LOCALES.map(({ code, label }) => (
               <button
                 key={code}
-                className={`px-[5.25rem] py-9 portrait:px-8 portrait:py-8 rounded-2xl text-[3.375rem] portrait:text-5xl font-semibold transition-all ${
+                className={`px-[5.25rem] py-9 portrait:px-8 portrait:py-8 rounded-2xl text-[3.375rem] portrait:text-5xl font-semibold transition-colors shadow-lg border-4 ${
                   lang === code
-                    ? "bg-white text-gray-900 shadow-lg"
-                    : "bg-white/10 text-white/60 hover:bg-white/20 hover:text-white"
+                    ? "bg-white text-gray-900"
+                    : "bg-[#3f3f46] border-[#8a8a95] hover:bg-[#52525b]"
                 }`}
+                style={lang === code ? { borderColor: "var(--theme-primary, var(--color-brand))" } : { color: "#ffffff" }}
                 onClick={() => setLang(code)}
               >
                 {label}
