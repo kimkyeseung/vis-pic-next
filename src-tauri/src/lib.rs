@@ -650,37 +650,59 @@ public class ArPicPrint {
 }
 "@ -ErrorAction SilentlyContinue
 
-                $DC_MEDIATYPES = 34
-                $DC_MEDIATYPENAMES = 35
+                # wingdi.h 값. 두 상수를 바꿔 쓰면 이름 목록(항목당 128바이트)이
+                # DWORD 버퍼(항목당 4바이트)에 쓰여 힙이 깨지고 프로세스가 즉사한다
+                # (STATUS_HEAP_CORRUPTION 0xC0000374). 실제로 그렇게 인쇄가 멎었다.
+                $DC_MEDIATYPENAMES = 34   # 항목당 64 WCHAR = 128바이트 문자열 버퍼
+                $DC_MEDIATYPES     = 35   # 항목당 DWORD = 4바이트
                 $DM_MEDIATYPE = 0x10000000
                 $DMMEDIA_GLOSSY = 3
 
-                $prn = $pd.PrinterSettings.PrinterName
-                $n = [ArPicPrint]::DeviceCapabilities($prn, $null, $DC_MEDIATYPES, [IntPtr]::Zero, [IntPtr]::Zero)
                 $mediaId = $null
-                if ($n -gt 0) {
-                    $idBuf = [Runtime.InteropServices.Marshal]::AllocHGlobal(4 * $n)
-                    # DC_MEDIATYPENAMES의 각 항목은 64 WCHAR 고정 폭이다.
-                    $nameBuf = [Runtime.InteropServices.Marshal]::AllocHGlobal(128 * $n)
+                $prn = $pd.PrinterSettings.PrinterName
+                if ([string]::IsNullOrEmpty($prn)) { throw "printer name is empty" }
+
+                # 두 목록의 개수를 각각 따로 받는다. 하나의 개수로 두 버퍼를 재면
+                # 드라이버가 다르게 보고할 때 다시 같은 종류의 오버플로가 난다.
+                $nTypes = [ArPicPrint]::DeviceCapabilities($prn, $null, $DC_MEDIATYPES, [IntPtr]::Zero, [IntPtr]::Zero)
+                $nNames = [ArPicPrint]::DeviceCapabilities($prn, $null, $DC_MEDIATYPENAMES, [IntPtr]::Zero, [IntPtr]::Zero)
+                # -1은 실패, 0은 미지원. 비정상적으로 큰 값도 방어한다.
+                if ($nTypes -gt 0 -and $nNames -gt 0 -and $nTypes -le 512 -and $nNames -le 512) {
+                    $idBuf   = [Runtime.InteropServices.Marshal]::AllocHGlobal(4 * $nTypes)
+                    $nameBuf = [Runtime.InteropServices.Marshal]::AllocHGlobal(128 * $nNames)
                     try {
                         [void][ArPicPrint]::DeviceCapabilities($prn, $null, $DC_MEDIATYPES, $idBuf, [IntPtr]::Zero)
                         [void][ArPicPrint]::DeviceCapabilities($prn, $null, $DC_MEDIATYPENAMES, $nameBuf, [IntPtr]::Zero)
-                        $ids = New-Object int[] $n
-                        [Runtime.InteropServices.Marshal]::Copy($idBuf, $ids, 0, $n)
+                        $ids = New-Object int[] $nTypes
+                        [Runtime.InteropServices.Marshal]::Copy($idBuf, $ids, 0, $nTypes)
+
+                        # 두 목록은 같은 순서로 대응한다. 개수가 어긋나면 작은 쪽까지만 본다.
+                        $count = [Math]::Min($nTypes, $nNames)
 
                         # 광택(2점) > 사진(1점). 같은 점수면 먼저 나온 항목을 쓴다.
                         $bestScore = 0
-                        for ($i = 0; $i -lt $n; $i++) {
-                            $nm = [Runtime.InteropServices.Marshal]::PtrToStringUni([IntPtr]::Add($nameBuf, $i * 128))
+                        $mediaName = $null
+                        $allNames = @()
+                        for ($i = 0; $i -lt $count; $i++) {
+                            # 이름은 "64자를 다 채우면 널 종료가 없다". 길이를 주지 않으면
+                            # 다음 항목까지 읽어버리므로 64자를 읽고 첫 널에서 자른다.
+                            $raw = [Runtime.InteropServices.Marshal]::PtrToStringUni([IntPtr]::Add($nameBuf, $i * 128), 64)
+                            $nm = $raw.Split([char]0)[0]
+                            $allNames += "$($ids[$i])=$nm"
                             $score = 0
                             if ($nm -match '광택|[Gg]loss') { $score = 2 }
                             elseif ($nm -match '사진|인화|[Pp]hoto') { $score = 1 }
-                            if ($score -gt $bestScore) { $bestScore = $score; $mediaId = $ids[$i] }
+                            if ($score -gt $bestScore) { $bestScore = $score; $mediaId = $ids[$i]; $mediaName = $nm }
                         }
                         # 이름이 안 잡히면 표준 광택값이 목록에 있을 때만 쓴다.
                         if ($mediaId -eq $null -and ($ids -contains $DMMEDIA_GLOSSY)) {
                             $mediaId = $DMMEDIA_GLOSSY
+                            $mediaName = 'DMMEDIA_GLOSSY'
                         }
+                        # 드라이버가 제공하는 전체 목록을 로그에 남긴다. 원하는 용지가 안 잡힐 때
+                        # 실제 이름을 알아야 매칭 규칙을 고칠 수 있다.
+                        Write-Host "media types: $($allNames -join ' | ')"
+                        Write-Host "media selected: $mediaName ($mediaId)"
                     } finally {
                         [Runtime.InteropServices.Marshal]::FreeHGlobal($idBuf)
                         [Runtime.InteropServices.Marshal]::FreeHGlobal($nameBuf)
@@ -707,7 +729,9 @@ public class ArPicPrint {
                     [void][ArPicPrint]::GlobalFree($hDev)
                 }
             } catch {
-                # 용지 종류 지정 실패는 인쇄를 막지 않는다.
+                # 용지 종류 지정 실패는 인쇄를 막지 않는다. 다만 왜 실패했는지는 로그에 남긴다 —
+                # 조용히 넘어가면 "왜 아직도 일반 용지로 나오지"를 추적할 수 없다.
+                Write-Host "media type skipped: $($_.Exception.Message)"
             }
 "#;
 
@@ -772,10 +796,11 @@ fn build_print_script(
 
         let script = format!(
             r#"
-            # 인쇄 실패가 조용히 성공으로 보고되지 않도록 오류를 종료성으로 만든다.
-            # (-File 실행에서 종료성 오류만 종료 코드 1을 남긴다)
-            # 용지 종류 블록은 자체 try/catch가 있어 여기 영향을 받지 않는다.
-            $ErrorActionPreference = 'Stop'
+            # 스크립트 전역을 'Stop'으로 두지 않는다. 준비 단계(용지 크기·방향 지정 등)에서
+            # 드라이버에 따라 비치명적 오류가 나는데, 예전에는 그게 무시되고도 인쇄는 정상이었다.
+            # 전역 Stop으로 바꿨더니 그 오류들이 인쇄 전체를 중단시켰다(= "Print failed:" 뒤가 빈 화면).
+            # 대신 실제 인쇄 호출만 아래에서 try/catch로 엄격하게 본다.
+            $ErrorActionPreference = 'Continue'
             Add-Type -AssemblyName System.Drawing
             $img = [System.Drawing.Image]::FromFile("{file_path}")
             $pd = New-Object System.Drawing.Printing.PrintDocument
@@ -823,7 +848,16 @@ fn build_print_script(
                 }}
                 $e.Graphics.DrawImage($img, $rect)
             }})
-            $pd.Print()
+            # 실제 인쇄만 엄격하게 본다. 여기서 던지면 진짜 실패이므로 메시지를 남기고 1로 종료한다.
+            # (준비 단계의 비치명적 경고 때문에 인쇄가 막히는 일은 없어야 한다)
+            try {{
+                $pd.Print()
+                Write-Host "print: submitted to '$($pd.PrinterSettings.PrinterName)'"
+            }} catch {{
+                [Console]::Error.WriteLine("print failed: " + $_.Exception.ToString())
+                $img.Dispose()
+                exit 1
+            }}
             $img.Dispose()
             "#,
             file_path = file_path,
@@ -873,14 +907,37 @@ fn print_file(
             .creation_flags(0x08000000)
             .output();
 
-        let _ = std::fs::remove_file(&ps1_path);
         let output = output.map_err(|e| e.to_string())?;
 
+        // 인쇄 로그. 예전에는 stdout/stderr를 그냥 버려서, 실패해도 화면에
+        // "Print failed:" 뒤가 빈 문자열로만 남고 단서가 아무데도 없었다.
+        // 드라이버가 제공하는 용지 종류 목록도 여기 찍히므로 매칭 확인에 쓸 수 있다.
+        let stdout = String::from_utf8_lossy(&output.stdout).to_string();
+        let stderr = String::from_utf8_lossy(&output.stderr).to_string();
+        let code = output.status.code();
+        let log = format!(
+            "exit: {code:?}\nprinter: {printer_name}\ncopies: {copies}\npaper_mm: {paper_mm:?}\n\
+             --- stdout ---\n{stdout}\n--- stderr ---\n{stderr}\n"
+        );
+        let _ = std::fs::write(ar_pic_dir().join("print.log"), &log);
+
         if output.status.success() {
+            let _ = std::fs::remove_file(&ps1_path);
             Ok(true)
         } else {
-            let stderr = String::from_utf8_lossy(&output.stderr);
-            Err(format!("Print failed: {}", stderr))
+            // 실패 시 .ps1을 남긴다 — 그대로 다시 실행해 보며 원인을 좁힐 수 있다.
+            let detail = if !stderr.trim().is_empty() {
+                stderr.trim().to_string()
+            } else if !stdout.trim().is_empty() {
+                stdout.trim().to_string()
+            } else {
+                // 둘 다 비어 있던 것이 지금까지 원인 파악을 막던 상황이다.
+                format!(
+                    "PowerShell이 코드 {code:?}로 종료했고 출력이 없습니다. 스크립트: {}",
+                    ps1_path.display()
+                )
+            };
+            Err(format!("Print failed: {detail}"))
         }
     }
 
@@ -1406,6 +1463,34 @@ mod tests {
     // 용지 종류(사진 용지/광택)를 지정하지 않으면 드라이버 기본값인 "일반 용지"로
     // 인쇄되어 포토 프린터에서 화질이 눈에 띄게 떨어진다.
 
+    // 회귀 방지: DC_MEDIATYPENAMES(34)와 DC_MEDIATYPES(35)를 바꿔 쓰면, 항목당 128바이트인
+    // 이름 목록을 항목당 4바이트인 DWORD 버퍼에 쓰게 되어 힙이 깨지고 PowerShell이
+    // STATUS_HEAP_CORRUPTION(0xC0000374)으로 즉사한다. 실제로 그렇게 인쇄가 완전히 멎었고,
+    // 프로세스가 죽어 stdout/stderr가 비어 원인 추적도 막혔다.
+    #[test]
+    fn device_capabilities_constants_are_not_swapped() {
+        let s = build_print_script("EPSON L18050 Series", "C:/x.jpg", 1, None);
+        assert!(
+            s.contains("$DC_MEDIATYPENAMES = 34"),
+            "DC_MEDIATYPENAMES는 34여야 한다(wingdi.h)"
+        );
+        assert!(
+            s.contains("$DC_MEDIATYPES     = 35"),
+            "DC_MEDIATYPES는 35여야 한다(wingdi.h)"
+        );
+        // 이름 버퍼는 항목당 128바이트(64 WCHAR), 값 버퍼는 항목당 4바이트여야 한다.
+        assert!(s.contains("AllocHGlobal(128 * $nNames)"));
+        assert!(s.contains("AllocHGlobal(4 * $nTypes)"));
+    }
+
+    // 이름은 64자를 다 채우면 널 종료가 없다 → 길이를 주지 않으면 다음 항목까지 읽는다.
+    #[test]
+    fn media_type_names_are_read_with_fixed_length() {
+        let s = build_print_script("EPSON L18050 Series", "C:/x.jpg", 1, None);
+        assert!(s.contains("PtrToStringUni([IntPtr]::Add($nameBuf, $i * 128), 64)"));
+        assert!(s.contains("Split([char]0)[0]"));
+    }
+
     #[test]
     fn print_script_requests_photo_glossy_media() {
         let s = build_print_script("Canon SELPHY", "C:/x.jpg", 1, None);
@@ -1446,10 +1531,24 @@ mod tests {
         assert!(!s.contains("PrinterSettings.PrinterName ="));
     }
 
+    // 회귀 방지: 전역 'Stop'으로 두면 준비 단계(용지 크기 지정 등)의 비치명적 오류가
+    // 인쇄 전체를 중단시킨다. 실제로 그렇게 해서 프린트가 아예 안 되는 상태가 됐었다.
+    // 엄격한 검사는 $pd.Print() 호출에만 건다.
     #[test]
-    fn print_failures_are_not_silently_swallowed() {
+    fn setup_warnings_do_not_abort_printing() {
+        let s = build_print_script("", "C:/x.jpg", 1, Some((102.0, 152.0)));
+        assert!(s.contains("$ErrorActionPreference = 'Continue'"));
+        assert!(!s.contains("$ErrorActionPreference = 'Stop'"));
+    }
+
+    #[test]
+    fn print_call_itself_reports_failure() {
         let s = build_print_script("", "C:/x.jpg", 1, None);
-        assert!(s.contains("$ErrorActionPreference = 'Stop'"));
+        let print_at = s.find("$pd.Print()").expect("Print 호출이 없다");
+        // Print 호출은 try 안에 있어야 하고, 실패 시 메시지를 남기고 1로 종료해야 한다.
+        assert!(s[..print_at].contains("try {"));
+        assert!(s.contains("[Console]::Error.WriteLine"));
+        assert!(s.contains("exit 1"));
     }
 
     // ── 번들 완전성 검사 ────────────────────────────────────────────────
@@ -1562,3 +1661,4 @@ mod tests {
         assert!(!fixed.contains('\\'));
     }
 }
+
