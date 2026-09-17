@@ -3,9 +3,11 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { useAdmin } from "../../../AdminContext";
 
 export default function NewDevicePage() {
   const router = useRouter();
+  const { refreshDevices } = useAdmin();
   const [deviceId, setDeviceId] = useState("");
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
@@ -31,6 +33,7 @@ export default function NewDevicePage() {
         return;
       }
 
+      await refreshDevices();
       router.push("/admin/devices");
     } catch {
       setError("서버 연결에 실패했습니다.");
