@@ -1,7 +1,15 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { WALLPAPER_NAME_LANDSCAPE, WALLPAPER_NAME_PORTRAIT, BUTTON_NAME_CAPTURE, BUTTON_NAME_NEXT, BUTTON_NAME_PAYMENT } from "@/constants/images";
+import {
+  WALLPAPER_NAME_LANDSCAPE,
+  WALLPAPER_NAME_PORTRAIT,
+  WALLPAPER_NAME_SUB_LANDSCAPE,
+  WALLPAPER_NAME_SUB_PORTRAIT,
+  BUTTON_NAME_CAPTURE,
+  BUTTON_NAME_NEXT,
+  BUTTON_NAME_PAYMENT,
+} from "@/constants/images";
 import type { Asset } from "./AssetUploader";
 
 const WALLPAPER_TYPE = 5;
@@ -22,6 +30,8 @@ export function useThemeSettings(deviceId: string | null) {
   const [glowSize, setGlowSize] = useState(28);
   const [wallpaperLs, setWallpaperLs] = useState<Asset>(null);
   const [wallpaperPt, setWallpaperPt] = useState<Asset>(null);
+  const [wallpaperSubLs, setWallpaperSubLs] = useState<Asset>(null);
+  const [wallpaperSubPt, setWallpaperSubPt] = useState<Asset>(null);
   const [logo, setLogo] = useState<Asset>(null);
   const [captureButtonImage, setCaptureButtonImage] = useState<Asset>(null);
   const [nextButtonImage, setNextButtonImage] = useState<Asset>(null);
@@ -33,6 +43,8 @@ export function useThemeSettings(deviceId: string | null) {
   const [saving, setSaving] = useState(false);
   const [wallpaperLsBusy, setWallpaperLsBusy] = useState(false);
   const [wallpaperPtBusy, setWallpaperPtBusy] = useState(false);
+  const [wallpaperSubLsBusy, setWallpaperSubLsBusy] = useState(false);
+  const [wallpaperSubPtBusy, setWallpaperSubPtBusy] = useState(false);
   const [logoBusy, setLogoBusy] = useState(false);
   const [captureButtonImageBusy, setCaptureButtonImageBusy] = useState(false);
   const [nextButtonImageBusy, setNextButtonImageBusy] = useState(false);
@@ -62,11 +74,13 @@ export function useThemeSettings(deviceId: string | null) {
       setLoading(true);
       try {
         // 색상: 전역 기본값 ← 이 지점 오버라이드 병합
-        const [g, d, wpLs, wpPt, lg, btnCapture, btnNext, btnPayment] = await Promise.all([
+        const [g, d, wpLs, wpPt, wpSubLs, wpSubPt, lg, btnCapture, btnNext, btnPayment] = await Promise.all([
           fetch("/api/setting/").then((r) => r.json()).catch(() => ({})),
           fetch(`/api/device/${deviceId}/settings/`).then((r) => r.json()).catch(() => ({})),
           loadAsset(WALLPAPER_TYPE, WALLPAPER_NAME_LANDSCAPE),
           loadAsset(WALLPAPER_TYPE, WALLPAPER_NAME_PORTRAIT),
+          loadAsset(WALLPAPER_TYPE, WALLPAPER_NAME_SUB_LANDSCAPE),
+          loadAsset(WALLPAPER_TYPE, WALLPAPER_NAME_SUB_PORTRAIT),
           loadAsset(LOGO_TYPE),
           loadAsset(BUTTON_TYPE, BUTTON_NAME_CAPTURE),
           loadAsset(BUTTON_TYPE, BUTTON_NAME_NEXT),
@@ -85,6 +99,8 @@ export function useThemeSettings(deviceId: string | null) {
         setPaymentTextColor(s.THEME_BTN_TEXT_COLOR_PAYMENT || "#ffffff");
         setWallpaperLs(wpLs);
         setWallpaperPt(wpPt);
+        setWallpaperSubLs(wpSubLs);
+        setWallpaperSubPt(wpSubPt);
         setLogo(lg);
         setCaptureButtonImage(btnCapture);
         setNextButtonImage(btnNext);
@@ -191,6 +207,8 @@ export function useThemeSettings(deviceId: string | null) {
     glowSize, setGlowSize,
     wallpaperLs, wallpaperLsBusy,
     wallpaperPt, wallpaperPtBusy,
+    wallpaperSubLs, wallpaperSubLsBusy,
+    wallpaperSubPt, wallpaperSubPtBusy,
     logo, logoBusy,
     captureButtonImage, captureButtonImageBusy,
     nextButtonImage, nextButtonImageBusy,
@@ -202,8 +220,10 @@ export function useThemeSettings(deviceId: string | null) {
     handleSaveColors,
     uploadAsset, removeAsset,
     setWallpaperLsBusy, setWallpaperPtBusy, setLogoBusy,
+    setWallpaperSubLsBusy, setWallpaperSubPtBusy,
     setCaptureButtonImageBusy, setNextButtonImageBusy, setPaymentButtonImageBusy,
     setWallpaperLs, setWallpaperPt, setLogo,
+    setWallpaperSubLs, setWallpaperSubPt,
     setCaptureButtonImage, setNextButtonImage, setPaymentButtonImage,
     WALLPAPER_TYPE, LOGO_TYPE, BUTTON_TYPE,
   };

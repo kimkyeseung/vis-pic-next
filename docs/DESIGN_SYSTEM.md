@@ -58,8 +58,8 @@ Tailwind CSS v4의 토큰 기반 방식이라 별도 `tailwind.config.js`는 없
 즉 우선순위: **지점 테마(런타임) > 디자인 토큰(기본값)**. 디자인 토큰은 "기본 팔레트",
 지점 테마는 "지점별 덮어쓰기"다. 관리자 화면(`/admin`)에는 지점 테마가 적용되지 않고 토큰만 쓴다.
 
-주입되는 런타임 변수: `--theme-text`(글자색)·`--theme-primary`(강조색) 외에, 배경은 대기화면만
-wallpaper(cover)·그 외 단계는 `THEME_BG_COLOR` 단색, 버튼 탭 글로우는 `--btn-glow-color`/
+주입되는 런타임 변수: `--theme-text`(글자색)·`--theme-primary`(강조색) 외에, 배경은 대기화면과
+그 외 단계에 각각 지정한 wallpaper(cover)·미설정 화면은 `THEME_BG_COLOR` 단색, 버튼 탭 글로우는 `--btn-glow-color`/
 `--btn-glow-size`로 제어한다(모두 관리자 **테마 관리**에서 지점별 설정 — SPEC §25).
 
 ## 5. 기타 토큰

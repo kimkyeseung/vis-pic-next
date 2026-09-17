@@ -1398,9 +1398,14 @@ npm run tauri:build
   **지점 전용**으로 저장하고, **한 장만 유지**(새 업로드 전 기존 것 삭제).
 - 조회는 **지점 연결분만**(`/api/image/list/{5|6}/?device_id=X&linked=1`) — 목록 API의 `linked=1`
   파라미터는 "전체 디바이스용 제외, 해당 지점 연결분만"을 의미한다.
-- `useDeviceSetup`이 이 지점의 wallpaper/logo를 `wallpaperUrl`/`logoUrl`로 노출.
-  **wallpaper(cover 배경)는 대기(첫) 화면에서만** 깔리고, 나머지 단계는 단색
-  `THEME_BG_COLOR`(기본 `#2a2a2a`)로 채운다. **로고는 대기 화면을 제외한 모든 단계**의
+- 배경화면은 같은 imageType 5 안에서 **`name`으로 4개 슬롯**을 구분한다(`src/constants/images.ts`):
+  첫(대기) 화면 `wallpaper`(가로)·`wallpaper_portrait`(세로), **나머지 화면** `wallpaper_sub`(가로)·
+  `wallpaper_sub_portrait`(세로). 기존 단일 배경화면(`wallpaper`)이 첫 화면 가로 슬롯이라 하위호환된다.
+- `useDeviceSetup`이 이 지점의 wallpaper/logo를 `wallpaperUrl`·`wallpaperPortraitUrl`·
+  `wallpaperSubUrl`·`wallpaperSubPortraitUrl`/`logoUrl`로 노출. 서비스는 **화면 방향에 맞는 슬롯**을
+  고르고(해당 방향이 없으면 반대 방향으로 폴백), **첫 화면은 첫 화면용, 나머지 단계는 sub 배경화면**을
+  cover로 깐다. 해당 화면의 이미지가 없으면 단색 `THEME_BG_COLOR`(기본 `#2a2a2a`)로 채운다.
+  **로고는 대기 화면을 제외한 모든 단계**의
   좌측 상단에 표시(촬영 단계 포함). 미설정 시 기본 로고는 `AR-pic` 텍스트.
 
 ### 글자색 / 강조(primary) 색상
@@ -1415,7 +1420,7 @@ npm run tauri:build
 
 ### 단색 배경 / 버튼 탭 글로우
 
-- `THEME_BG_COLOR`(기본 `#2a2a2a`) — 대기화면을 제외한 모든 단계의 단색 배경(§20).
+- `THEME_BG_COLOR`(기본 `#2a2a2a`) — 배경화면 이미지를 올리지 않은 화면의 단색 배경(§20).
 - 버튼 탭 글로우: `THEME_BTN_GLOW_ENABLED`/`_COLOR`/`_SIZE`. service 루트에
   `--btn-glow-color`·`--btn-glow-size`를 내리고, `globals.css`의 `.service-button:active`
   글로우와 탭 직후 `.btn-glow-ripple` 펄스가 이 값을 쓴다. `_ENABLED="0"`이면 글로우 없음.

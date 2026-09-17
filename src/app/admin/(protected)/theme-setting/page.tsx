@@ -1,9 +1,17 @@
 "use client";
 
 import { useAdmin } from "@/app/admin/AdminContext";
-import { WALLPAPER_NAME_LANDSCAPE, WALLPAPER_NAME_PORTRAIT, BUTTON_NAME_CAPTURE, BUTTON_NAME_NEXT, BUTTON_NAME_PAYMENT } from "@/constants/images";
+import {
+  WALLPAPER_NAME_LANDSCAPE,
+  WALLPAPER_NAME_PORTRAIT,
+  WALLPAPER_NAME_SUB_LANDSCAPE,
+  WALLPAPER_NAME_SUB_PORTRAIT,
+  BUTTON_NAME_CAPTURE,
+  BUTTON_NAME_NEXT,
+  BUTTON_NAME_PAYMENT,
+} from "@/constants/images";
 import { useThemeSettings } from "./useThemeSettings";
-import { AssetUploader } from "./AssetUploader";
+import { AssetUploader, AssetUploaderRow } from "./AssetUploader";
 import { ButtonThemeRow } from "./ButtonThemeRow";
 import { ColorRow } from "./ColorRow";
 
@@ -24,29 +32,73 @@ export default function ThemeSettingPage() {
         </p>
       </div>
 
-      <AssetUploader
-        title="배경화면 · 가로 화면용 (첫 화면 전용)"
-        description="가로(landscape) 키오스크의 대기(첫) 화면에만 깔리는 배경입니다. 이후 단계 화면은 아래 '배경 단색'이 사용됩니다. 미설정 시 세로용 이미지가 있으면 그걸, 없으면 배경 단색이 사용됩니다. (jpg/png/webp/gif, 최대 50MB)"
-        asset={t.wallpaperLs}
-        onUpload={t.uploadAsset(t.WALLPAPER_TYPE, WALLPAPER_NAME_LANDSCAPE, t.wallpaperLs, t.setWallpaperLs, t.setWallpaperLsBusy)}
-        onRemove={t.removeAsset(t.wallpaperLs, t.setWallpaperLs, t.setWallpaperLsBusy)}
-        busy={t.wallpaperLsBusy}
-        previewClass="w-64 aspect-video"
-        imageFit="cover"
-        emptyLabel="기본 배경 (#2a2a2a)"
-      />
+      {/* 배경화면 · 첫(대기) 화면 — 가로/세로 두 장을 한 카드에 묶는다. */}
+      <div className="bg-gray-800 rounded-xl border border-gray-700 divide-y divide-gray-700">
+        <div className="px-6 pt-5 pb-1">
+          <h3 className="text-white font-semibold text-base">배경화면 · 첫(대기) 화면</h3>
+          <p className="text-gray-500 text-xs mt-1">
+            대기(첫) 화면에만 깔리는 배경입니다. 화면 방향에 맞춰 가로/세로 이미지가 자동으로 선택되고, 한쪽만 올리면 그 이미지가 양쪽에 쓰입니다. 둘 다 미설정 시 아래 &apos;배경 단색&apos;이 사용됩니다. (jpg/png/webp/gif, 최대 50MB)
+          </p>
+        </div>
 
-      <AssetUploader
-        title="배경화면 · 세로 화면용 (첫 화면 전용)"
-        description="세로(portrait) 키오스크의 대기(첫) 화면에만 깔리는 배경입니다. 화면 방향에 맞춰 가로/세로 이미지가 자동으로 선택됩니다. 미설정 시 가로용 이미지가 있으면 그걸, 없으면 배경 단색이 사용됩니다. (jpg/png/webp/gif, 최대 50MB)"
-        asset={t.wallpaperPt}
-        onUpload={t.uploadAsset(t.WALLPAPER_TYPE, WALLPAPER_NAME_PORTRAIT, t.wallpaperPt, t.setWallpaperPt, t.setWallpaperPtBusy)}
-        onRemove={t.removeAsset(t.wallpaperPt, t.setWallpaperPt, t.setWallpaperPtBusy)}
-        busy={t.wallpaperPtBusy}
-        previewClass="w-40 aspect-[9/16]"
-        imageFit="cover"
-        emptyLabel="기본 배경 (#2a2a2a)"
-      />
+        <AssetUploaderRow
+          title="가로 화면용"
+          description="가로(landscape) 키오스크의 첫 화면 배경."
+          asset={t.wallpaperLs}
+          onUpload={t.uploadAsset(t.WALLPAPER_TYPE, WALLPAPER_NAME_LANDSCAPE, t.wallpaperLs, t.setWallpaperLs, t.setWallpaperLsBusy)}
+          onRemove={t.removeAsset(t.wallpaperLs, t.setWallpaperLs, t.setWallpaperLsBusy)}
+          busy={t.wallpaperLsBusy}
+          previewClass="w-64 aspect-video"
+          imageFit="cover"
+          emptyLabel="기본 배경 (#2a2a2a)"
+        />
+
+        <AssetUploaderRow
+          title="세로 화면용"
+          description="세로(portrait) 키오스크의 첫 화면 배경."
+          asset={t.wallpaperPt}
+          onUpload={t.uploadAsset(t.WALLPAPER_TYPE, WALLPAPER_NAME_PORTRAIT, t.wallpaperPt, t.setWallpaperPt, t.setWallpaperPtBusy)}
+          onRemove={t.removeAsset(t.wallpaperPt, t.setWallpaperPt, t.setWallpaperPtBusy)}
+          busy={t.wallpaperPtBusy}
+          previewClass="w-40 aspect-[9/16]"
+          imageFit="cover"
+          emptyLabel="기본 배경 (#2a2a2a)"
+        />
+      </div>
+
+      {/* 배경화면 · 나머지 화면 — 첫 화면을 제외한 모든 단계(배경 단색이 쓰이던 자리). */}
+      <div className="bg-gray-800 rounded-xl border border-gray-700 divide-y divide-gray-700">
+        <div className="px-6 pt-5 pb-1">
+          <h3 className="text-white font-semibold text-base">배경화면 · 나머지 화면</h3>
+          <p className="text-gray-500 text-xs mt-1">
+            첫(대기) 화면을 제외한 모든 서비스 화면(촬영·선택·편집·결제·완료 등)에 깔리는 배경입니다. 화면 방향에 맞춰 가로/세로 이미지가 자동으로 선택되고, 한쪽만 올리면 그 이미지가 양쪽에 쓰입니다. 둘 다 미설정 시 아래 &apos;배경 단색&apos;이 사용됩니다. (jpg/png/webp/gif, 최대 50MB)
+          </p>
+        </div>
+
+        <AssetUploaderRow
+          title="가로 화면용"
+          description="가로(landscape) 키오스크의 나머지 화면 배경."
+          asset={t.wallpaperSubLs}
+          onUpload={t.uploadAsset(t.WALLPAPER_TYPE, WALLPAPER_NAME_SUB_LANDSCAPE, t.wallpaperSubLs, t.setWallpaperSubLs, t.setWallpaperSubLsBusy)}
+          onRemove={t.removeAsset(t.wallpaperSubLs, t.setWallpaperSubLs, t.setWallpaperSubLsBusy)}
+          busy={t.wallpaperSubLsBusy}
+          previewClass="w-64 aspect-video"
+          imageFit="cover"
+          emptyLabel="배경 단색 사용"
+        />
+
+        <AssetUploaderRow
+          title="세로 화면용"
+          description="세로(portrait) 키오스크의 나머지 화면 배경."
+          asset={t.wallpaperSubPt}
+          onUpload={t.uploadAsset(t.WALLPAPER_TYPE, WALLPAPER_NAME_SUB_PORTRAIT, t.wallpaperSubPt, t.setWallpaperSubPt, t.setWallpaperSubPtBusy)}
+          onRemove={t.removeAsset(t.wallpaperSubPt, t.setWallpaperSubPt, t.setWallpaperSubPtBusy)}
+          busy={t.wallpaperSubPtBusy}
+          previewClass="w-40 aspect-[9/16]"
+          imageFit="cover"
+          emptyLabel="배경 단색 사용"
+        />
+      </div>
 
       <AssetUploader
         title="로고"
@@ -108,7 +160,7 @@ export default function ThemeSettingPage() {
         <div className="px-6 pt-5 pb-6">
           <h3 className="text-white font-semibold text-base mb-1">배경 단색</h3>
           <p className="text-gray-500 text-xs mb-4">
-            첫(대기) 화면을 제외한 나머지 서비스 화면 전체 배경으로 쓰이는 단색입니다. 배경화면 이미지를 설정하지 않으면 첫 화면에도 이 색이 사용됩니다.
+            배경화면 이미지를 올리지 않은 화면에 쓰이는 단색입니다. 위의 &apos;첫(대기) 화면&apos;·&apos;나머지 화면&apos; 배경화면을 설정하면 해당 화면은 이미지가 우선 적용됩니다.
           </p>
           <ColorRow color={t.bgColor} onChange={t.setBgColor}>
             <span

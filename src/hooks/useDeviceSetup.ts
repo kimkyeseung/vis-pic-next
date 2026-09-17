@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import type { DeviceConfig, BGImage } from "@/types";
 import { parseIntSafe, parseBgRemovalMode, parsePaymentTerminalMode, parseCaptureModes, parseCameraResolution, clampPercent, clampSigned } from "@/lib/deviceConfig";
 import { DEFAULT_CAMERA_RESOLUTION } from "@/constants/camera";
-import { LOGO_IMAGE_TYPE, WALLPAPER_IMAGE_TYPE, BUTTON_IMAGE_TYPE, WALLPAPER_NAME_LANDSCAPE, WALLPAPER_NAME_PORTRAIT, BUTTON_NAME_CAPTURE, BUTTON_NAME_NEXT, BUTTON_NAME_PAYMENT } from "@/constants/images";
+import { LOGO_IMAGE_TYPE, WALLPAPER_IMAGE_TYPE, BUTTON_IMAGE_TYPE, WALLPAPER_NAME_LANDSCAPE, WALLPAPER_NAME_PORTRAIT, WALLPAPER_NAME_SUB_LANDSCAPE, WALLPAPER_NAME_SUB_PORTRAIT, BUTTON_NAME_CAPTURE, BUTTON_NAME_NEXT, BUTTON_NAME_PAYMENT } from "@/constants/images";
 
 // 결제 화면 인쇄 매수 선택지(고정). 가격 = 1장당 가격(PAYMENT_AMOUNT) × 수량.
 const PAYMENT_QUANTITIES = [1, 2, 4];
@@ -87,6 +87,8 @@ export function useDeviceSetup(deviceId: string) {
   const [printSettings, setPrintSettings] = useState<Record<string, string>>({});
   const [wallpaperUrl, setWallpaperUrl] = useState<string | null>(null);
   const [wallpaperPortraitUrl, setWallpaperPortraitUrl] = useState<string | null>(null);
+  const [wallpaperSubUrl, setWallpaperSubUrl] = useState<string | null>(null);
+  const [wallpaperSubPortraitUrl, setWallpaperSubPortraitUrl] = useState<string | null>(null);
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
   const [captureButtonImageUrl, setCaptureButtonImageUrl] = useState<string | null>(null);
   const [nextButtonImageUrl, setNextButtonImageUrl] = useState<string | null>(null);
@@ -202,8 +204,9 @@ export function useDeviceSetup(deviceId: string) {
       });
     }
 
-    // 테마 배경화면(wallpaper, imageType 5) — 첫(대기) 화면 배경.
-    // 같은 타입 안에서 name으로 가로/세로 슬롯을 구분해 각각 노출한다(화면 방향에 맞춰 서비스에서 선택).
+    // 테마 배경화면(wallpaper, imageType 5) — 첫(대기) 화면 배경 + 나머지 화면(sub) 배경.
+    // 같은 타입 안에서 name으로 슬롯(첫/나머지 × 가로/세로)을 구분해 각각 노출한다
+    // (화면 방향에 맞춰 서비스에서 선택. 나머지 화면은 미설정 시 배경 단색).
     async function loadWallpaper(id: string) {
       await withRetry(signal, async () => {
         const res = await fetch(`/api/image/list/${WALLPAPER_IMAGE_TYPE}/?device_id=${id}&linked=1`, {
@@ -219,6 +222,8 @@ export function useDeviceSetup(deviceId: string) {
         };
         setWallpaperUrl(pick(WALLPAPER_NAME_LANDSCAPE));
         setWallpaperPortraitUrl(pick(WALLPAPER_NAME_PORTRAIT));
+        setWallpaperSubUrl(pick(WALLPAPER_NAME_SUB_LANDSCAPE));
+        setWallpaperSubPortraitUrl(pick(WALLPAPER_NAME_SUB_PORTRAIT));
         return true;
       });
     }
@@ -278,5 +283,5 @@ export function useDeviceSetup(deviceId: string) {
     return () => controller.abort();
   }, [deviceId]);
 
-  return { config, backgroundImages, printBgImages, imageBaseUrl, printSettings, wallpaperUrl, wallpaperPortraitUrl, logoUrl, captureButtonImageUrl, nextButtonImageUrl, paymentButtonImageUrl };
+  return { config, backgroundImages, printBgImages, imageBaseUrl, printSettings, wallpaperUrl, wallpaperPortraitUrl, wallpaperSubUrl, wallpaperSubPortraitUrl, logoUrl, captureButtonImageUrl, nextButtonImageUrl, paymentButtonImageUrl };
 }

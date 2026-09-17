@@ -18,6 +18,12 @@ export const BUTTON_IMAGE_TYPE = 7;
 export const WALLPAPER_NAME_LANDSCAPE = "wallpaper";
 export const WALLPAPER_NAME_PORTRAIT = "wallpaper_portrait";
 
+// 첫 화면을 제외한 나머지 서비스 화면(그동안 '배경 단색'만 쓰이던 자리)에 깔리는 배경화면.
+// 첫 화면과 마찬가지로 같은 imageType(5) 안에서 name으로 가로/세로를 구분한다.
+// 미설정 시 기존대로 배경 단색이 사용된다.
+export const WALLPAPER_NAME_SUB_LANDSCAPE = "wallpaper_sub";
+export const WALLPAPER_NAME_SUB_PORTRAIT = "wallpaper_sub_portrait";
+
 // 대형 강조 버튼(촬영하기·다음·결제하기) 배경 이미지도 같은 imageType(7) 안에서
 // name으로 구분해 버튼별로 따로 업로드한다.
 export const BUTTON_NAME_CAPTURE = "button_capture";
