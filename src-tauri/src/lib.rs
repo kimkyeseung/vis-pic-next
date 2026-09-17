@@ -286,6 +286,25 @@ fn download_mediapipe(app: tauri::AppHandle) -> Result<(), String> {
 #[cfg(not(debug_assertions))]
 static SERVER_ARCHIVE: &[u8] = include_bytes!("../server.zip");
 
+/// node.exe가 실행할 진입점. 둘 중 하나라도 없으면 서버는 뜰 수 없다.
+/// (prepare-tauri.mjs도 압축 전후로 같은 목록을 검사한다)
+#[cfg_attr(debug_assertions, allow(dead_code))]
+const REQUIRED_SERVER_FILES: &[&str] = &["server.js", "node.exe"];
+
+/// 번들 루트에 필수 파일이 모두 있는지 확인하고, 없으면 무엇이 없는지 알려준다.
+///
+/// 회귀 방지: standalone 출력이 중첩되면 server.js만 빠진 번들이 만들어지는데,
+/// 예전에는 이걸 못 걸러 node.exe가 MODULE_NOT_FOUND로 즉시 죽고 앱은
+/// 90초를 기다린 끝에 "서버가 응답하지 않습니다"라는 엉뚱한 메시지를 띄웠다.
+#[cfg_attr(debug_assertions, allow(dead_code))]
+fn missing_server_files(server_dir: &std::path::Path) -> Vec<&'static str> {
+    REQUIRED_SERVER_FILES
+        .iter()
+        .copied()
+        .filter(|f| !server_dir.join(f).exists())
+        .collect()
+}
+
 /// 임베드된 server.zip을 진행률을 보고하며 푼다.
 /// zip 크레이트의 `extract()`는 통째로 돌기 때문에 진행 상황을 알 수 없어,
 /// 항목별로 직접 풀면서 "푼 바이트 / 전체 바이트" 비율을 콜백으로 넘긴다.
@@ -313,8 +332,12 @@ fn extract_server_archive<F: FnMut(u8)>(
     for i in 0..count {
         let mut entry = archive.by_index(i)?;
         // enclosed_name()은 `..` 등 상위 경로 탈출을 걸러낸다.
+        // 걸러진 항목을 조용히 건너뛰면 파일이 빠진 채로 "정상 해제"가 되어,
+        // 한참 뒤 서버 기동 실패로만 드러난다. 그냥 실패시킨다.
         let Some(rel) = entry.enclosed_name() else {
-            continue;
+            return Err(zip::result::ZipError::InvalidArchive(
+                "아카이브에 허용되지 않는 경로가 있습니다".into(),
+            ));
         };
         let out = server_dir.join(rel);
 
@@ -373,7 +396,32 @@ fn prepare_server_dir(splash: &Splash) -> Result<std::path::PathBuf, String> {
         extract_server_archive(&server_dir, |pct| splash.progress(pct))
             .map_err(|e| format!("서버 파일 압축 해제 실패: {e}"))?;
 
-        std::fs::write(&version_file, current_version).ok();
+        // 버전 파일은 "이 번들은 정상 설치됨" 표식이다. 필수 파일이 빠졌다면
+        // 기록하지 않아야 다음 실행에서 다시 풀어볼 기회가 생긴다.
+        let missing = missing_server_files(&server_dir);
+        if !missing.is_empty() {
+            return Err(format!(
+                "서버 파일이 불완전합니다 (없음: {}). 앱을 다시 설치해 주세요.",
+                missing.join(", ")
+            ));
+        }
+
+        if let Err(e) = std::fs::write(&version_file, current_version) {
+            // 실패해도 이번 실행은 진행하되, 다음 실행에서 또 몇 분을 쓰게 되므로
+            // 로그에는 남긴다(매 실행이 느린 증상의 원인이 된다).
+            eprintln!("버전 파일 기록 실패 — 다음 실행에서 다시 압축을 해제합니다: {e}");
+        }
+    }
+
+    // 압축 해제를 건너뛴 경우(버전 일치)에도 확인한다 — 백신 격리나 수동 삭제로
+    // 파일이 사라졌는데 .version만 남아 있으면 영영 다시 풀리지 않는다.
+    let missing = missing_server_files(&server_dir);
+    if !missing.is_empty() {
+        let _ = std::fs::remove_file(&version_file);
+        return Err(format!(
+            "서버 파일이 사라졌습니다 (없음: {}). 앱을 다시 시작하면 복구를 시도합니다.",
+            missing.join(", ")
+        ));
     }
 
     // 캐시된 mediapipe가 있으면 서버 디렉터리에 복사 (오프라인 재실행 지원)
@@ -1173,6 +1221,42 @@ mod tests {
     // 스플래시에 띄우는 오류 메시지에는 Windows 경로(역슬래시)와 OS 오류 문구가
     // 그대로 들어간다. 이스케이프가 없으면 eval하는 JS 리터럴이 깨져 화면이
     // 빈 채로 멈춘다 — 정작 문제를 알려야 할 순간에 아무것도 못 보여주게 된다.
+
+    // ── 번들 완전성 검사 ────────────────────────────────────────────────
+    // 회귀 방지: standalone 출력이 중첩되면 node.exe는 루트에 있는데 server.js만
+    // 빠진 번들이 만들어진다. 그 상태로 node를 띄우면 MODULE_NOT_FOUND로 즉시
+    // 죽고, 앱은 90초를 기다린 끝에 "서버가 응답하지 않습니다"라고만 표시했다.
+
+    #[test]
+    fn missing_server_js_is_reported() {
+        let dir = std::env::temp_dir().join("arpic_bundle_no_serverjs");
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(dir.join("node.exe"), b"x").unwrap();
+        assert_eq!(missing_server_files(&dir), vec!["server.js"]);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn empty_bundle_reports_every_required_file() {
+        let dir = std::env::temp_dir().join("arpic_bundle_empty");
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        assert_eq!(missing_server_files(&dir), REQUIRED_SERVER_FILES.to_vec());
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn complete_bundle_reports_nothing_missing() {
+        let dir = std::env::temp_dir().join("arpic_bundle_ok");
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        for f in REQUIRED_SERVER_FILES {
+            std::fs::write(dir.join(f), b"x").unwrap();
+        }
+        assert!(missing_server_files(&dir).is_empty());
+        let _ = std::fs::remove_dir_all(&dir);
+    }
 
     #[test]
     fn json_str_escapes_windows_path_backslashes() {
