@@ -352,11 +352,23 @@ fn get_printers() -> Result<Vec<String>, String> {
 }
 
 #[tauri::command]
-fn print_image(printer_name: String, image_data: String, copies: Option<u32>) -> Result<bool, String> {
+fn print_image(
+    printer_name: String,
+    image_data: String,
+    copies: Option<u32>,
+    paper_width_mm: Option<f64>,
+    paper_height_mm: Option<f64>,
+) -> Result<bool, String> {
     use std::io::Write;
 
     // 결제 화면에서 고른 인쇄 매수 (미지정 시 1장)
     let copies = copies.unwrap_or(1).clamp(1, 99);
+
+    // 인화 설정(PICTURE_WIDTH/HEIGHT)의 용지 크기. 미지정이면 프린터 기본 용지를 쓴다.
+    let paper_mm = match (paper_width_mm, paper_height_mm) {
+        (Some(w), Some(h)) if w > 0.0 && h > 0.0 => Some((w, h)),
+        _ => None,
+    };
 
     let bytes = base64_decode(&image_data)?;
 
@@ -370,7 +382,7 @@ fn print_image(printer_name: String, image_data: String, copies: Option<u32>) ->
     }
 
     let temp_path_forward = temp_path_str.replace('\\', "/");
-    let result = print_file(&printer_name, &temp_path_forward, copies);
+    let result = print_file(&printer_name, &temp_path_forward, copies, paper_mm);
 
     let _ = std::fs::remove_file(&temp_path);
 
@@ -405,7 +417,12 @@ fn base64_decode(input: &str) -> Result<Vec<u8>, String> {
     Ok(buf)
 }
 
-fn print_file(printer_name: &str, file_path: &str, copies: u32) -> Result<bool, String> {
+fn print_file(
+    printer_name: &str,
+    file_path: &str,
+    copies: u32,
+    paper_mm: Option<(f64, f64)>,
+) -> Result<bool, String> {
     #[cfg(target_os = "windows")]
     {
         // Only set PrinterName when non-empty; empty string causes .NET to throw.
@@ -415,21 +432,70 @@ fn print_file(printer_name: &str, file_path: &str, copies: u32) -> Result<bool, 
             format!(r#"$pd.PrinterSettings.PrinterName = "{}""#, printer_name)
         };
 
+        // 인화 설정의 용지 크기를 실제 인쇄 작업에 반영한다. 지정하지 않으면 .NET은
+        // 프린터 드라이버 기본 용지(보통 A4)로 출력하므로, 웹(window.print + @page)에서
+        // 맞던 102x152mm 같은 설정이 exe에서는 무시되는 문제가 있었다.
+        // System.Drawing.Printing의 단위는 1/100 inch.
+        let set_paper = match paper_mm {
+            Some((w_mm, h_mm)) => {
+                let w = (w_mm / 25.4 * 100.0).round() as i32;
+                let h = (h_mm / 25.4 * 100.0).round() as i32;
+                format!(
+                    r#"
+            $reqShort = [Math]::Min({w}, {h})
+            $reqLong  = [Math]::Max({w}, {h})
+            # 드라이버가 제공하는 용지 목록에서 가장 가까운 규격을 고른다(포토 프린터의
+            # "4x6" 항목 등). 일치하는 것이 없을 때만 Custom 용지로 대체한다.
+            $best = $null
+            $bestDiff = [int]::MaxValue
+            foreach ($cand in $pd.PrinterSettings.PaperSizes) {{
+                $candShort = [Math]::Min($cand.Width, $cand.Height)
+                $candLong  = [Math]::Max($cand.Width, $cand.Height)
+                $diff = [Math]::Abs($candShort - $reqShort) + [Math]::Abs($candLong - $reqLong)
+                if ($diff -lt $bestDiff) {{ $bestDiff = $diff; $best = $cand }}
+            }}
+            # 허용 오차 0.2 inch(약 5mm) 이내일 때만 드라이버 규격을 사용
+            if ($best -ne $null -and $bestDiff -le 40) {{
+                $pd.DefaultPageSettings.PaperSize = $best
+            }} else {{
+                $custom = New-Object System.Drawing.Printing.PaperSize("Custom", {w}, {h})
+                # RawKind = 256(DMPAPER_USER) 이어야 드라이버가 사용자 정의 크기로 받아들인다
+                $custom.RawKind = 256
+                $pd.DefaultPageSettings.PaperSize = $custom
+            }}
+"#,
+                    w = w,
+                    h = h
+                )
+            }
+            None => String::new(),
+        };
+
         let script = format!(
             r#"
             Add-Type -AssemblyName System.Drawing
-            $img = [System.Drawing.Image]::FromFile("{}")
+            $img = [System.Drawing.Image]::FromFile("{file_path}")
             $pd = New-Object System.Drawing.Printing.PrintDocument
             # 기본 PrintController(PrintControllerWithStatusDialog)는 인쇄 중
             # "페이지 인쇄 중..." 상태 대화상자를 포그라운드로 띄운다. 키오스크에서는
             # 이 창이 우측 하단에 보이고, 포그라운드를 뺏겨 풀스크린 창이 흐트러지면서
             # 화면 위아래로 바탕화면이 드러난다. StandardPrintController로 무음 인쇄한다.
             $pd.PrintController = New-Object System.Drawing.Printing.StandardPrintController
-            {}
-            $pd.PrinterSettings.Copies = {}
-            $paperW = $pd.DefaultPageSettings.PaperSize.Width
-            $paperH = $pd.DefaultPageSettings.PaperSize.Height
-            $paperIsLandscape = $paperW -gt $paperH
+            {set_printer}
+            $pd.PrinterSettings.Copies = {copies}
+            {set_paper}
+            # 웹 경로의 `@page {{ margin: 0 }}`과 동일하게 여백 없이 용지 전체에 출력한다.
+            # (기본 여백은 상하좌우 1 inch라 4x6 인화지에서는 사진이 크게 줄어든다)
+            $pd.OriginAtMargins = $true
+            $pd.DefaultPageSettings.Margins = New-Object System.Drawing.Printing.Margins(0, 0, 0, 0)
+            # 방향은 드라이버 기본값에 맡기지 않고 항상 용지 본래 방향(Landscape=false)으로 고정한다.
+            # 프린터 기본 설정이 가로면 PageSettings.Bounds만 뒤집히고 PaperSize.Width/Height는
+            # 그대로여서, 회전 판정과 실제 그리기 영역이 어긋나 90° 틀어진 채 인쇄된다.
+            $pd.DefaultPageSettings.Landscape = $false
+            # 회전 판정도 PaperSize가 아니라 실제 페이지 영역(Bounds)을 기준으로 한다 —
+            # 아래 PrintPage에서 쓰는 MarginBounds와 같은 기준이어야 어긋나지 않는다.
+            $pageBounds = $pd.DefaultPageSettings.Bounds
+            $paperIsLandscape = $pageBounds.Width -gt $pageBounds.Height
             $imgIsLandscape = $img.Width -gt $img.Height
             if ($imgIsLandscape -ne $paperIsLandscape) {{
                 $img.RotateFlip([System.Drawing.RotateFlipType]::Rotate90FlipNone)
@@ -453,9 +519,10 @@ fn print_file(printer_name: &str, file_path: &str, copies: u32) -> Result<bool, 
             $pd.Print()
             $img.Dispose()
             "#,
-            file_path,
-            set_printer,
-            copies
+            file_path = file_path,
+            set_printer = set_printer,
+            copies = copies,
+            set_paper = set_paper,
         );
 
         let output = Command::new("powershell")
@@ -474,8 +541,23 @@ fn print_file(printer_name: &str, file_path: &str, copies: u32) -> Result<bool, 
 
     #[cfg(not(target_os = "windows"))]
     {
+        let mut args: Vec<String> = vec![
+            "-d".into(),
+            printer_name.into(),
+            "-n".into(),
+            copies.to_string(),
+        ];
+        if let Some((w_mm, h_mm)) = paper_mm {
+            // CUPS 사용자 정의 용지 (mm 단위) + 여백 없이 용지 전체 사용
+            args.push("-o".into());
+            args.push(format!("media=Custom.{:.0}x{:.0}mm", w_mm, h_mm));
+            args.push("-o".into());
+            args.push("fit-to-page".into());
+        }
+        args.push(file_path.into());
+
         let output = Command::new("lp")
-            .args(["-d", printer_name, "-n", &copies.to_string(), file_path])
+            .args(&args)
             .output()
             .map_err(|e| e.to_string())?;
 

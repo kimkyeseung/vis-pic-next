@@ -438,12 +438,27 @@ export function useCompositeGeneration({
     const copies = Math.max(1, Math.floor(printQuantity || 1));
     const isTauri = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
 
+    // 인화 설정의 용지 크기(cm) — 촬영 모드의 인쇄 방향에 맞춰 가로/세로를 배정한다.
+    const paperWCm = parseFloat(printSettings.PICTURE_WIDTH || "10");
+    const paperHCm = parseFloat(printSettings.PICTURE_HEIGHT || "15");
+    const orientation = (selectedFrame && FRAME_INFO[selectedFrame]?.orientation) === "portrait"
+      ? "portrait" as const
+      : "landscape" as const;
+    const { pw, ph } = getPaperDimensions(paperWCm, paperHCm, orientation);
+
     if (isTauri) {
       try {
         const { invoke } = await import("@tauri-apps/api/core");
         const base64 = stripDataUriPrefix(compositeImage);
         const printerName = printSettings.PRINTER_NAME || "";
-        await invoke("print_image", { printerName, imageData: base64, copies });
+        // 네이티브(exe) 인쇄는 브라우저의 @page 규칙을 타지 않으므로 용지 크기를 직접 넘긴다.
+        await invoke("print_image", {
+          printerName,
+          imageData: base64,
+          copies,
+          paperWidthMm: pw * 10,
+          paperHeightMm: ph * 10,
+        });
         setPrintStatus("done");
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
@@ -454,7 +469,7 @@ export function useCompositeGeneration({
     } else {
       const style = document.createElement("style");
       // 인쇄 용지 방향을 합성물(프레임) 방향에 맞춘다 — 4컷·1컷 등 가로 프레임은 landscape.
-      const pageOrient = (selectedFrame && FRAME_INFO[selectedFrame]?.orientation === "portrait") ? "portrait" : "landscape";
+      const pageOrient = orientation;
       // @page margin:0 → 브라우저가 붙이는 머리글/바닥글(날짜·제목·URL·쪽번호) 제거.
       // kiosk-printing(무음 인쇄) 모드에서도 여백 없이 이미지만 출력된다.
       style.textContent = `@page { size: ${pageOrient}; margin: 0; } @media print { html, body { margin: 0 !important; padding: 0 !important; } body > * { display: none !important; } #__print_target__ { display: block !important; position: fixed; inset: 0; background: #fff; } #__print_target__ img { width: 100%; height: 100%; object-fit: contain; } }`;
