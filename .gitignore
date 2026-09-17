@@ -34,6 +34,10 @@ yarn-error.log*
 .env
 .env.local
 .env.production
+# 사본까지 전부 제외한다. 다른 PC로 옮기려고 만든 123.env / backup.env 같은
+# 파일에도 서비스 롤 키와 DB 비밀번호가 그대로 들어 있어, 실수로 커밋되면
+# 공개 저장소에 비밀값이 남는다. (.env.example은 이 패턴에 걸리지 않는다)
+*.env
 !.env.example
 
 # vercel

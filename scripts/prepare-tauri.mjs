@@ -1,13 +1,87 @@
 import { execSync } from "child_process";
-import { cpSync, rmSync, existsSync, copyFileSync, writeFileSync, readdirSync } from "fs";
+import { cpSync, rmSync, existsSync, copyFileSync, writeFileSync, readdirSync, readFileSync } from "fs";
 import { join, dirname, sep } from "path";
 import { fileURLToPath } from "url";
+import { parse as parseEnv } from "dotenv";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const SERVER_DIR = join(ROOT, "src-tauri", "server");
 
 /// node.exe가 실행할 진입점. 이 두 파일이 번들 루트에 없으면 앱은 시작되지 못한다.
 const REQUIRED_AT_ROOT = ["server.js", "node.exe"];
+
+/// 번들에 복사되는 환경변수 파일. Next standalone 서버가 cwd에서 읽는다.
+/// (.env는 git에 없다 — 새 PC에서 clone만 하면 전부 비어 있다)
+const ENV_FILES = [".env", ".env.local", ".env.production"];
+
+/// 없으면 앱이 동작하지 않는 값들.
+/// DATABASE_URL/DIRECT_URL은 prisma/schema.prisma가 env()로 읽어 코드 검색에는
+/// 잡히지 않으므로 특히 빠뜨리기 쉽다.
+const REQUIRED_ENV = [
+  "DATABASE_URL",
+  "DIRECT_URL",
+  "NEXT_PUBLIC_SUPABASE_URL",
+  "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY",
+  "SUPABASE_SERVICE_ROLE_KEY",
+  "SESSION_PASSWORD",
+];
+
+/// 없어도 앱은 뜨지만 해당 기능이 조용히 죽는 값들.
+const RECOMMENDED_ENV = {
+  PAYAPP_LINKKEY: "PayApp 결제 피드백의 진위를 검증할 수 없습니다",
+  PAYAPP_LINKVAL: "PayApp 결제 피드백의 진위를 검증할 수 없습니다",
+};
+
+/** 번들에 들어갈 env 파일들을 병합해 읽는다. 뒤 파일이 앞 파일을 덮어쓴다. */
+function collectBundledEnv(dir) {
+  const merged = {};
+  const found = [];
+  for (const f of ENV_FILES) {
+    const p = join(dir, f);
+    if (!existsSync(p)) continue;
+    found.push(f);
+    Object.assign(merged, parseEnv(readFileSync(p)));
+  }
+  return { merged, found };
+}
+
+/**
+ * 환경변수를 검증한다. next build 전에 불러야 한다 —
+ * NEXT_PUBLIC_* 는 빌드 시점에 번들로 인라인되므로, 빌드 후에 .env를
+ * 복사해도 이미 undefined가 박힌 뒤다.
+ *
+ * process.env가 아니라 파일만 본다. 번들에 실제로 들어가는 건 파일이라,
+ * 셸에만 값이 있으면 빌드는 되지만 설치된 exe에는 설정이 없다.
+ */
+function verifyEnv() {
+  const { merged, found } = collectBundledEnv(ROOT);
+
+  const missing = REQUIRED_ENV.filter((k) => !merged[k]);
+  const problems = missing.map((k) => `  - ${k} (없음)`);
+
+  // 런타임(src/lib/session.ts)과 같은 규칙. 짧으면 관리자 로그인이 전부 실패한다.
+  if (merged.SESSION_PASSWORD && merged.SESSION_PASSWORD.length < 32) {
+    problems.push(
+      `  - SESSION_PASSWORD (${merged.SESSION_PASSWORD.length}자 — 32자 이상이어야 합니다)`
+    );
+  }
+
+  if (problems.length > 0) {
+    throw new Error(
+      `환경변수가 빠졌습니다:\n${problems.join("\n")}\n\n` +
+        `  읽은 파일: ${found.length ? found.join(", ") : "(없음)"}\n` +
+        `  .env는 git에 포함되지 않습니다. 기존 개발 PC에서 ${ENV_FILES.join("/")}을(를)\n` +
+        `  복사하거나, .env.example을 참고해 값을 채우세요.\n` +
+        `  SESSION_PASSWORD 생성: node -e "console.log(require('crypto').randomBytes(36).toString('base64url'))"`
+    );
+  }
+
+  for (const [key, why] of Object.entries(RECOMMENDED_ENV)) {
+    if (!merged[key]) console.warn(`  Warning: ${key} 미설정 — ${why}`);
+  }
+
+  console.log(`  Verified ${REQUIRED_ENV.length} required keys from ${found.join(", ")}`);
+}
 
 /** server.js를 너비 우선으로 찾는다. node_modules/.next 아래는 보지 않는다. */
 function findServerJs(dir, depth = 0) {
@@ -55,12 +129,18 @@ if (existsSync(versionFile)) {
   console.log("[0] Cleared cached version → app will re-extract on next run");
 }
 
-// 1. Next.js build (prisma generate included in npm run build)
-console.log("[1/6] Building Next.js...");
+// 1. Environment variables — next build보다 먼저 검증한다.
+// NEXT_PUBLIC_* 는 빌드 시점에 번들로 인라인되므로, 빌드가 끝난 뒤에 발견하면
+// 이미 undefined가 박힌 뒤라 .env를 채워도 다시 빌드해야 한다.
+console.log("[1/7] Verifying environment variables...");
+verifyEnv();
+
+// 2. Next.js build (prisma generate included in npm run build)
+console.log("[2/7] Building Next.js...");
 execSync("npm run build", { cwd: ROOT, stdio: "inherit" });
 
-// 2. Server bundle
-console.log("[2/6] Preparing server bundle...");
+// 3. Server bundle
+console.log("[3/7] Preparing server bundle...");
 if (existsSync(SERVER_DIR)) {
   rmSync(SERVER_DIR, { recursive: true, force: true });
 }
@@ -73,7 +153,7 @@ cpSync(join(ROOT, ".next", "standalone"), SERVER_DIR, {
 // standalone 출력이 한 단계 이상 중첩된 경우 평탄화한다.
 // Next는 상위 폴더에 lockfile이 있으면 워크스페이스 루트를 추론해 tracing root를
 // 프로젝트 상위로 잡고, 그러면 standalone/<상대경로>/server.js 로 들어간다.
-// node.exe는 아래 3단계에서 루트에 직접 복사되므로, 이 경우
+// node.exe는 아래 4단계에서 루트에 직접 복사되므로, 이 경우
 // "node.exe는 있는데 server.js만 없는" 번들이 만들어져 런타임에
 // MODULE_NOT_FOUND로 죽는다 — 증상이 서버 기동 실패로만 보여 원인 찾기가 어렵다.
 flattenStandalone(SERVER_DIR);
@@ -120,14 +200,14 @@ if (existsSync(prismaClientDir)) {
   }
 }
 
-// 3. Node.js runtime
-console.log("[3/6] Copying Node.js runtime...");
+// 4. Node.js runtime
+console.log("[4/7] Copying Node.js runtime...");
 const nodeExeDest = join(SERVER_DIR, "node.exe");
 copyFileSync(process.execPath, nodeExeDest);
 console.log(`  Copied ${process.execPath} (${process.version})`);
 
-// 4. Sharp native DLLs (file tracer only copies the .node file, not the companion DLLs)
-console.log("[4/6] Copying sharp native DLLs...");
+// 5. Sharp native DLLs (file tracer only copies the .node file, not the companion DLLs)
+console.log("[5/7] Copying sharp native DLLs...");
 const sharpPkg = `@img/sharp-${process.platform}-${process.arch}`;
 const sharpLibSrc = join(ROOT, "node_modules", "@img", `sharp-${process.platform}-${process.arch}`, "lib");
 const sharpLibDest = join(SERVER_DIR, "node_modules", "@img", `sharp-${process.platform}-${process.arch}`, "lib");
@@ -138,9 +218,9 @@ if (existsSync(sharpLibSrc)) {
   console.warn(`  Warning: ${sharpPkg}/lib not found, skipping`);
 }
 
-// 5. Environment files
-console.log("[5/6] Copying environment files...");
-for (const f of [".env", ".env.local", ".env.production"]) {
+// 6. Environment files
+console.log("[6/7] Copying environment files...");
+for (const f of ENV_FILES) {
   const src = join(ROOT, f);
   if (existsSync(src)) {
     copyFileSync(src, join(SERVER_DIR, f));
@@ -148,8 +228,18 @@ for (const f of [".env", ".env.local", ".env.production"]) {
   }
 }
 
-// 6. Zip server bundle into single archive for embedding
-console.log("[6/6] Zipping server bundle...");
+// 복사된 결과를 번들 쪽에서 다시 읽어 확인한다. 1단계는 프로젝트 루트를 봤으므로,
+// 복사가 누락되면(파일 목록 불일치 등) 그건 여기서만 잡힌다.
+{
+  const { merged } = collectBundledEnv(SERVER_DIR);
+  const missing = REQUIRED_ENV.filter((k) => !merged[k]);
+  if (missing.length > 0) {
+    throw new Error(`번들의 env 파일에 ${missing.join(", ")}이(가) 없습니다`);
+  }
+}
+
+// 7. Zip server bundle into single archive for embedding
+console.log("[7/7] Zipping server bundle...");
 
 // 압축 전 최종 점검. 여기서 걸러내지 못하면 앱이 설치된 PC에서
 // "서버가 응답하지 않습니다"로만 보이고, 원인은 server-stderr.log를
