@@ -704,46 +704,80 @@ sticker 오버레이 (canvas.drawImage / fillText)
 
 ### MediaPipe (`bgRemovalMode: "mediapipe"`)
 
-- 모델(2종, 디버그 토글로 전환 — §27):
-  - **정밀 `selfie_multiclass_256x256.tflite`**(16MB, 6클래스) — **기본값**. 배경/경계 품질이 좋다.
-    `confidenceMasks[0]` = **배경** 확신도 → 전경 = `1 - masks[0]`.
-  - **경량 `selfie_segmenter.tflite`**(249KB, 이진 전경/배경) — 추론은 빠르지만 배경 처리 품질이
-    떨어져 실사용 부적합(실측). `confidenceMasks[0]` = **전경(사람)** 확신도 → 전경 = `masks[0]`.
-  - 두 모델은 **전경 극성이 반대**라 모델과 극성을 함께 전환한다(`localStorage:photobooth_seg_model`,
-    기본 `multiclass`; `light` 저장 시에만 경량).
+> 튜닝 근거·한계·개선 이력은 **`docs/CAMERA_QUALITY.md`**에 있다. 여기엔 "무엇이 있는지"만 적는다.
+
+**모델** (2종, 디버그 토글로 전환 — §27)
+
+- **정밀 `selfie_multiclass_256x256.tflite`**(16MB, 6클래스) — **기본값**. `confidenceMasks[0]` =
+  **배경** 확신도 → 전경 = `1 - masks[0]`.
+- **경량 `selfie_segmenter.tflite`**(249KB) — 추론은 빠르지만 배경 품질이 떨어져 실사용 부적합(실측).
+  `confidenceMasks[0]` = **전경** 확신도.
+- 두 모델은 **전경 극성이 반대**라 모델과 극성을 함께 전환한다
+  (`localStorage:photobooth_seg_model`, 기본 `multiclass`).
+- 둘 다 입력을 **256×256으로 고정 축소**해 추론한다 — 바깥에서 해상도를 올려도 내부에서 다시
+  줄이므로 소용없고, 이것이 경계 품질의 상한이다(경계 계단의 근본 원인).
 - WASM: `vision_wasm_internal.js` + `.wasm` (SIMD / non-SIMD 자동 선택)
-- **추론 델리게이트(CPU/GPU)**: 세그멘터 생성 시 `baseOptions.delegate`로 `CPU`(WASM) 또는
-  `GPU`(WebGL) 선택. **기본값은 `GPU`**. 메인 촬영 화면(`CameraSection.tsx`)에서
-  **디버그 모드 토글 스위치**로 전환할 수 있으며(§27), 값은 `localStorage`
-  (`photobooth_seg_delegate`)에 저장돼 재시작에도 유지된다(명시적으로 `cpu`를 저장한 경우에만
-  CPU, 그 외에는 GPU). 토글 변경 시 세그멘터가 자동
-  재생성된다. GPU로 켜면 추론이 WebGL로 넘어가 CPU 대비 크게 빨라질 수 있다(기기별 상이 —
-  디버그 계측으로 실측 비교). 서브 모니터(`CameraStreamer.tsx`)·관리자 미리보기
-  (`BackgroundRemovalPreviewDialog.tsx`)는 아직 별도 세그멘터라 CPU 고정.
-- 출력: `confidenceMasks[0]` = 배경 확신도. 전경 확신도는 `1 - masks[0][i]`로 계산
-  (레이블 검색이나 중앙/테두리 픽셀 휴리스틱 같은 건 없음 — 배경 채널을 고정 인덱스로 사용)
-- 알파 변환: `softAlpha = clamp((fgConf - THRESH) / FEATHER, 0, 1)`
-  - `THRESH`(경계 침식, %) = `CAPTURE_THRESHOLD` 설정값 / 100, 기본 15%
-  - `FEATHER`(경계 부드러움, %) = `CAPTURE_SMOOTHNESS` 설정값 / 100 (최소 1%), 기본 35%
-  - 관리자 촬영 설정 페이지(`/admin/capture-setting`)에서 두 값 모두 조정 가능 (§23 참고)
-- **성능: 메인 스레드(기본) ↔ Web Worker(디버그 토글)**. 기본은 메인 스레드에서 추론하고
-  스로틀 간격마다 마스크를 굽는다(그 사이 프레임은 직전 마스크 재사용, 표시 루프는 최대 60fps).
-  스로틀 간격은 디버그 패널에서 **50·100·150·200ms 중 선택**(기본 50,
-  `localStorage:photobooth_seg_interval`) — 낮출수록 잔상↓·메인 스레드 부하↑. 워커 경로에선 무시.
-  - **Web Worker 경로**(디버그 토글 ON, `localStorage:photobooth_seg_worker=on`,
-    `src/workers/segmenter.worker.ts`): 무거운 `segmentForVideo` + 마스크
-    readback(`getAsFloat32Array`)을 워커에서 돌려 표시 루프가 절대 안 막히게 한다. GPU
-    델리게이트에서도 readback이 프레임당 ~90ms라 메인에서 매 프레임 돌리면 FPS가 10 안팎으로
-    떨어지기 때문(측정). 워커로 옮기면 표시는 부드럽지만 마스크 갱신은 워커 왕복 속도(≈10회/초)로
-    제한돼 움직일 때 경계가 영상보다 뒤처지는 desync가 보일 수 있다 — 그래서 **기본은 off**.
-    - 흐름: 메인 → 워커로 다운스케일 프레임(`ImageBitmap`) 전송(워커 idle일 때만, busy 플래그로
-      큐 적체 방지) → 워커가 soft-alpha 마스크(`ImageBitmap`) 반환 → 메인이 `maskCanvasRef`에
-      그려 두고 매 프레임 `destination-in`으로 합성(표시·촬영 캡처 공유).
-    - 워커 생성/초기화 실패(예: WebView2에서 워커 WebGL 미지원) 시 **메인 스레드로 자동 폴백**.
-  - 처리 해상도는 원본의 절반(4K는 1/4)로 다운스케일하고, 최종 표시/캡처는 원본 해상도로
-    업스케일되어 화질 손실은 미미함.
-  - 서브 모니터(`CameraStreamer.tsx`)·관리자 미리보기(`BackgroundRemovalPreviewDialog.tsx`)는
-    아직 **메인 스레드 세그멘터**(200ms 스로틀)를 쓴다 — 워커 분리는 메인 촬영 화면에만 적용됨.
+
+**마스크 생성** — `src/lib/segmentMask.ts`. 촬영(`useCameraCapture`)·송출(`CameraStreamer`)·관리자
+미리보기(`usePreviewCamera`) 세 경로가 이 코드를 공유하므로 설정 조정이 세 곳에 똑같이 반영된다.
+
+1. **ROI 크롭 추론** — 직전 마스크의 전경 bbox 주변만 잘라 넣어 256 격자가 덮는 면적을 줄인다
+   (= 경계 계단 폭 축소). 정사각/프레임비율로 맞추지 않고 변마다 여유를 붙여 자르므로, 인물이
+   세로를 채우는 부스 구도에서 위아래는 끝까지 가고 **좌우만 좁아진다**. 이득이 없거나 설정을
+   끄면 프레임 전체로 추론.
+2. **알파 변환** — `softAlpha = clamp((fgConf - THRESH) / FEATHER, 0, 1)`
+3. **공간 블러** — 256 격자 계단 제거. 블러는 캔버스 바깥을 투명으로 보므로, 어깨처럼 화면 끝에
+   닿은 부위에 반투명 띠가 생기지 않도록 가장자리 1px을 복제(edge clamp)한 뒤 블러한다.
+4. **경계 두께 + 시간축 평활** — 블러 뒤 알파에 픽셀 패스 한 번(추론마다 1회, 매 프레임 아님).
+   두께는 `a^g` 감마 곡선 — 알파를 평행이동시키면 실루엣 **내부**까지 반투명해진다.
+   평활은 직전 마스크와의 선형 보간이며, 되먹이는 값은 **두께 보정 전** 알파다(누적 방지).
+
+마스크 캔버스는 ROI 유무와 무관하게 항상 프레임 전체를 덮으므로, 소비하는 쪽(프리뷰
+`destination-in`, `captureHiRes`)은 크롭을 몰라도 된다.
+
+**설정 8종** — 전부 관리자 촬영 설정(§23)에서 조정하며 미리보기에서 실시간 확인 가능.
+
+| 키 | 기본 | 뜻 |
+|---|:---:|---|
+| `CAPTURE_THRESHOLD` | 15 | THRESH(%). **확신도 기준** 전경 컷오프. 낮추면 손끝 유지↑·헤일로↑ |
+| `CAPTURE_SMOOTHNESS` | 35 | FEATHER(%). 반투명 전환대 폭. 넓히면 고스팅↑ |
+| `CAPTURE_MASK_BLUR` | 100 | 공간 블러 세기(0~200%). 격자 계단 제거. 0이면 끔 |
+| `CAPTURE_EDGE_SHIFT` | 0 | **거리 기준** 경계 두께(-100~100). −면 침식, +면 팽창 |
+| `CAPTURE_TEMPORAL` | 0 | 시간축 평활(0~100%). 경계 떨림↓·잔상↑ |
+| `CAPTURE_ROI` | on | 인물 추적 크롭 |
+| `CAPTURE_ROI_MARGIN` | 22 | 크롭 여유(0~100%). 좁힐수록 해상도↑·놓칠 위험↑ |
+| `CAPTURE_PROCESS_SCALE` | auto | 처리 해상도(자동/100/50/25%). 자동은 4K에서만 25% |
+
+> `THRESHOLD`와 `EDGE_SHIFT`는 둘 다 경계를 안팎으로 옮기지만 기준이 다르다 — 전자는 모델
+> **확신도**를 자르는 지점이라 확신이 낮은 곳(손끝·머리카락)부터 사라지고, 후자는 **실제 거리**라
+> 실루엣 전체에 고르게 작용한다. 손끝을 살리려면 THRESHOLD↓, 그때 생긴 테두리는 EDGE_SHIFT(−)로.
+
+**추론 델리게이트(CPU/GPU)**: 세그멘터 생성 시 `baseOptions.delegate`로 선택. **기본 `GPU`(WebGL)**.
+촬영 화면은 디버그 토글로 전환할 수 있고(§27) 값은 `localStorage:photobooth_seg_delegate`에
+저장된다(명시적으로 `cpu`를 저장한 경우에만 CPU). 토글 변경 시 세그멘터가 자동 재생성된다.
+관리자 미리보기도 GPU를 명시한다. **서브 모니터(`CameraStreamer.tsx`)만 아직 별도 세그멘터라
+델리게이트 미지정 = CPU 고정.**
+
+**성능: 메인 스레드(기본) ↔ Web Worker(디버그 토글)**. 기본은 메인 스레드에서 추론하고 스로틀
+간격마다 마스크를 굽는다(그 사이 프레임은 직전 마스크를 GPU 합성으로 재사용, 표시 루프는 최대
+60fps). 스로틀 간격은 디버그 패널에서 **10·20·50·100·150·200ms 중 선택**(기본 50,
+`localStorage:photobooth_seg_interval`) — 낮출수록 잔상↓·메인 스레드 부하↑. 워커 경로에선 무시.
+
+- **Web Worker 경로**(디버그 토글 ON, `localStorage:photobooth_seg_worker=on`,
+  `src/workers/segmenter.worker.ts`): 무거운 `segmentForVideo` + 마스크
+  readback(`getAsFloat32Array`)을 워커에서 돌려 표시 루프가 절대 안 막히게 한다. GPU
+  델리게이트에서도 readback이 프레임당 ~90ms라 메인에서 매 프레임 돌리면 FPS가 10 안팎으로
+  떨어지기 때문(측정). 워커로 옮기면 표시는 부드럽지만 마스크 갱신은 워커 왕복 속도로 제한돼
+  움직일 때 경계가 영상보다 뒤처지는 desync가 보일 수 있다 — 그래서 **기본은 off**.
+  - 흐름: 메인 → 워커로 프레임(`ImageBitmap`, ROI면 크롭)을 전송(워커 idle일 때만, busy 플래그로
+    큐 적체 방지) → 워커가 알파 마스크 + 전경 bbox 반환 → 메인이 굽기(블러·두께·평활)를 마쳐
+    `maskCanvasRef`에 두고 매 프레임 `destination-in`으로 합성(표시·촬영 캡처 공유).
+    워커는 크롭을 해석하지 않고 받은 `roi`를 그대로 되돌려준다 — 왕복 중 ROI가 바뀌어도 어긋나지 않는다.
+  - 워커 생성/초기화 실패(예: WebView2에서 워커 WebGL 미지원) 시 **메인 스레드로 자동 폴백**.
+- 처리 해상도는 `CAPTURE_PROCESS_SCALE`을 따른다(기본 자동 = 원본의 절반, 4K는 1/4). 최종
+  표시/캡처는 원본 해상도로 업스케일된다.
+- 서브 모니터는 아직 **별도 메인 스레드 세그멘터**(200ms 고정 스로틀)를 쓴다 — 워커 분리는 촬영
+  화면에만 적용된다. 마스크 굽기 코드는 공유하므로 화질 설정은 동일하게 반영된다.
 
 ### Chromakey (`bgRemovalMode: "chromakey"`)
 
@@ -1332,7 +1366,7 @@ npm run tauri:build
 | 이미지 관리 | `/admin/images`, `/images/upload` | 배경/프레임/스티커 탭별 조회·삭제·업로드(프레임·스티커는 PNG·JPG만), MP4/WebM 영상 미리보기. 배경·프레임·스티커는 지점별 뱅크 UI로 노출 선택 |
 | 테마 관리 | `/admin/theme-setting` | 지점별 배경화면·로고, 글자색·강조(primary)색, **버튼 탭 글로우**(on/off·색·세기) 설정 (§25) |
 | 인화 설정 | `/admin/print-setting` | 인화지 크기, 모드별 사진 크기·간격·4방향 여백, 배경 이미지, 프린터 선택. 설정값 실시간 미리보기 + 용지 초과 경고 |
-| 촬영 설정 | `/admin/capture-setting` | 카운트다운, 촬영 횟수, 배경 제거 모드(AI/크로마키/크로마키 OBS 방식/off), 크로마키 색상(컬러피커), AI 배경제거 경계 침식/부드러움, 카메라 실시간 미리보기 (§12 참고) |
+| 촬영 설정 | `/admin/capture-setting` | 카운트다운, 촬영 횟수, 배경 제거 모드(AI/크로마키/크로마키 OBS 방식/off), 크로마키 색상(컬러피커), AI 배경제거 세부 설정 8종(경계 침식·부드러움·블러·두께·떨림 억제, 인물 추적 크롭·여유, 처리 해상도), 카메라 실시간 미리보기 (§12 참고) |
 | 타이머 설정 | `/admin/timer-setting` | 유휴 타임아웃, 촬영 자동 타이머, 인화 자동 복귀 타이머 |
 | 결제 설정 | `/admin/payment` | PayApp 활성화, 금액, 단말 모드 설정 (전역 적용, 디바이스 설정이 우선) |
 | 결제 내역 | `/admin/payment-history` | 거래 이력 조회 |
@@ -1481,7 +1515,7 @@ npm run tauri:build
 - **토글**: 좌상단 로고 **5회 연속 탭**(2초 내) 또는 **`Ctrl+Shift+D`**. 대기화면엔 로고가 없어 키보드 사용.
 - **진단 패널**(`DebugOverlay`): 좌하단에 deviceId·단계·프레임/슬롯·선택 사진·배경/인쇄배경·배경제거 모드·카메라 해상도·촬영 설정·서브모니터 등 표시(민감정보 제외). **축소/펼치기·끄기** 버튼.
 - **그리드 시각화**(`DebugGridOverlay`): `getComputedStyle`로 `grid-template-rows`를 실측해 각 **행=초록 박스**(r1·r2 라벨), **셀(그리드 아이템)=빨간 박스**를 절대배치 오버레이로 그린다. Tailwind `.grid`와 인라인 `grid-template`(촬영 화면) 모두 대상. `pointer-events-none`이라 터치를 막지 않음(완료 화면은 flex라 그릴 그리드 없음).
-- **배경제거 성능 패널**(촬영 화면, `bgRemovalMode:"mediapipe"`일 때): 미리보기 좌상단에 **표시 FPS·세그멘터 상태**와 **처리 방식**을 실시간 표시(0.5초 갱신). 처리 방식이 **Web Worker**면 `추론 왕복(worker) ms`·`마스크 갱신 /s`를, **메인 스레드(폴백)**면 `추론(segmentForVideo) ms`·`마스크 생성 ms`를 보여준다(§12). 계측 누적은 항상 돌지만 디버그도 개발도 아닌 손님 세션에선 갱신 리렌더를 건너뛴다. 같은 패널에 3개 토글 — **GPU 가속**(CPU/WASM ↔ GPU/WebGL), **경량 모델**(경량 selfie ↔ 정밀 멀티클래스), **Web Worker**(메인 스레드 ↔ 워커 분리) — 이 있어 속도·품질을 A/B 비교할 수 있다(§12). 기본값: GPU on · 정밀 모델 · Worker off. 구현은 `CameraSection.tsx`.
+- **배경제거 성능 패널**(촬영 화면, `bgRemovalMode:"mediapipe"`일 때): 미리보기 좌상단에 **표시 FPS·세그멘터 상태**와 **처리 방식**을 실시간 표시(0.5초 갱신). 처리 방식이 **Web Worker**면 `추론 왕복(worker) ms`·`마스크 갱신 /s`를, **메인 스레드(폴백)**면 `추론(segmentForVideo) ms`·`마스크 생성 ms`를 보여준다(§12). 계측 누적은 항상 돌지만 디버그도 개발도 아닌 손님 세션에선 갱신 리렌더를 건너뛴다. 같은 패널에 3개 토글 — **GPU 가속**(CPU/WASM ↔ GPU/WebGL), **경량 모델**(경량 selfie ↔ 정밀 멀티클래스), **Web Worker**(메인 스레드 ↔ 워커 분리) — 이 있어 속도·품질을 A/B 비교할 수 있다(§12). 기본값: GPU on · 정밀 모델 · Worker off. 구현은 `src/components/service/camera/`의 `SegmentationDebugPanel.tsx` + `useSegmentationDebugSettings.ts`(값·localStorage 영속화).
 - **FPS 배지(개발 전용)**: 개발 모드(`process.env.NODE_ENV !== "production"` = `next dev`/localhost)에서 디버그가 꺼져 있을 때 좌상단에 **FPS만** 작게 표시(디버그를 켜면 위 전체 패널로 대체). `IS_DEV` 상수로 게이트하므로 **배포된 키오스크(production 빌드, `127.0.0.1:3001`)에서는 절대 뜨지 않는다**(호스트명이 아니라 빌드 모드로 판별 — 키오스크도 localhost류 주소라 호스트명 판별은 손님 화면 노출 위험).
 - 구현: `src/components/service/DebugContext.tsx`(컨텍스트+`useSecretTap`), `DebugOverlay.tsx`, `DebugGridOverlay.tsx`.
 
@@ -1494,7 +1528,11 @@ npm run tauri:build
 | 타입 정의 | `src/types/index.ts` |
 | 메인 서비스 페이지 | `src/app/service/page.tsx` |
 | 서브 모니터 페이지 | `src/app/output/page.tsx` |
-| 카메라 컴포넌트 | `src/components/service/CameraSection.tsx` |
+| 카메라 컴포넌트(오케스트레이션) | `src/components/service/CameraSection.tsx` |
+| 촬영 합성 루프·고해상도 캡처 | `src/components/service/camera/useCameraCapture.ts` |
+| 세그멘터 초기화·워커 연결 | `src/components/service/camera/useMediapipeSegmentation.ts` |
+| 마스크 후처리(블러·두께·평활·ROI) | `src/lib/segmentMask.ts` |
+| 세그멘테이션 워커 | `src/workers/segmenter.worker.ts` |
 | MediaPipe 로더 | `src/components/MediapipeLoader.tsx` |
 | 사진 흐름 훅 | `src/hooks/usePhotoFlow.ts` |
 | 장면 동기화 훅 | `src/hooks/useSceneSync.ts` |
