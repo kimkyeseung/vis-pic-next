@@ -85,6 +85,18 @@ export interface DeviceConfig {
   segmentThreshold: number;
   /** AI 배경제거 경계 부드러움 (0-100%). 낮을수록 경계가 더 또렷하게 잘린다. */
   segmentFeather: number;
+  /** AI 배경제거 경계 블러 세기 (0-200%). 모델의 256 격자 계단을 지운다. 0이면 끔, 기본 100. */
+  segmentMaskBlur: number;
+  /** AI 배경제거 경계 두께 (-100~100). +면 바깥으로 살리고, -면 안쪽으로 깎는다. 기본 0. */
+  segmentEdgeShift: number;
+  /** AI 배경제거 시간축 평활 (0-100%). 경계 떨림을 줄이는 대신 잔상이 는다. 기본 0(끔). */
+  segmentTemporal: number;
+  /** AI 배경제거 인물 추적 크롭 사용 여부. 켜면 경계 해상도가 올라간다. 기본 true. */
+  segmentRoi: boolean;
+  /** AI 배경제거 추적 여유 (0-100%). bbox 한 변 대비. 기본 22. */
+  segmentRoiMargin: number;
+  /** AI 배경제거 처리 해상도 배율. "auto"면 4K에서만 0.25, 그 외 0.5. 기본 "auto". */
+  segmentProcessScale: SegmentProcessScale;
   /** 테마 글자 색상 (서비스 화면). 미설정 시 #ffffff. */
   themeTextColor: string;
   /** 테마 강조(primary) 색상 — 선택 강조·주요 버튼. 미설정 시 #6c6fb4. */
@@ -104,6 +116,9 @@ export interface DeviceConfig {
   /** '결제하기' 버튼 텍스트 색상. 미설정 시 #ffffff. */
   btnPaymentTextColor: string;
 }
+
+/** AI 배경제거 처리 해상도 배율. "auto"는 4K에서만 0.25로 낮춘다. */
+export type SegmentProcessScale = "auto" | "100" | "50" | "25";
 
 export interface BGImage {
   id: number;

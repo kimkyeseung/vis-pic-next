@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import type { DeviceConfig, BGImage, Sticker } from "@/types";
+import type { MaskTuning } from "@/lib/segmentMask";
 import { FALLBACK_BACKGROUNDS } from "@/constants/frames";
 import { DEFAULT_EFFECT_GESTURE, getGestureEmoji } from "@/constants/images";
 import { getCameraResolution } from "@/constants/camera";
@@ -129,6 +130,15 @@ export function CameraSection({
   // 관리자 설정(0-100%) → confidence 스케일(0-1). FEATHER는 0으로 나누기 방지를 위해 최소 1%로 clamp됨(useDeviceSetup 참고).
   const segmentThresh = config.segmentThreshold / 100;
   const segmentFeather = config.segmentFeather / 100;
+  // 마스크 후처리 세기(블러·두께·시간축·ROI) — 워커 경로와 메인 스레드 경로가 같은 값을 써야 하므로
+  // 여기서 한 번만 만들어 두 훅에 같이 넘긴다(useCameraCapture는 config에서 직접 유도한다).
+  const maskTuning = useMemo((): MaskTuning => ({
+    blur: config.segmentMaskBlur,
+    edgeShift: config.segmentEdgeShift,
+    temporal: config.segmentTemporal,
+    roi: config.segmentRoi,
+    roiMargin: config.segmentRoiMargin,
+  }), [config.segmentMaskBlur, config.segmentEdgeShift, config.segmentTemporal, config.segmentRoi, config.segmentRoiMargin]);
   // MediaPipe 세그멘터 초기화·정리·설정동기화 — useMediapipeSegmentation 참고. 프레임별 마스크
   // 굽기(메인 스레드 핫패스)는 여기 반환된 refs를 아래 processFrame 루프가 직접 사용한다.
   const {
@@ -137,7 +147,7 @@ export function CameraSection({
     segmenterStatus, segmenterError, workerActive,
   } = useMediapipeSegmentation({
     bgRemovalMode, useGpuDelegate, useLightModel, useWorker,
-    segmentThresh, segmentFeather, perfRef,
+    segmentThresh, segmentFeather, maskTuning, perfRef,
   });
 
   // MediaPipe/TFLite 내부 로그(console.error로 나오는 INFO 등)가 Next dev 에러 오버레이를

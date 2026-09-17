@@ -1,11 +1,15 @@
 import { describe, it, expect } from "vitest";
 import {
+  DEFAULT_MASK_TUNING,
   MODEL_GRID,
   bakeAlphaMask,
   bboxToFrame,
   maskBlurPx,
   nextRoi,
+  type MaskTuning,
 } from "@/lib/segmentMask";
+
+const tuning = (over: Partial<MaskTuning> = {}): MaskTuning => ({ ...DEFAULT_MASK_TUNING, ...over });
 
 /** w×h confidence 배열을 만든다. `fg(x,y)`가 true인 칸만 전경 확신도 1. */
 function conf(w: number, h: number, fg: (x: number, y: number) => boolean): Float32Array {
@@ -24,6 +28,17 @@ describe("maskBlurPx", () => {
 
   it("상한이 있어 전체 프레임을 볼 때도 과하게 번지지 않는다", () => {
     expect(maskBlurPx(100_000)).toBeLessThanOrEqual(6);
+  });
+
+  it("설정 세기에 비례하고, 0이면 블러가 꺼진다", () => {
+    const base = maskBlurPx(MODEL_GRID * 4, tuning({ blur: 100 }));
+    expect(maskBlurPx(MODEL_GRID * 4, tuning({ blur: 200 }))).toBeCloseTo(base * 2, 5);
+    expect(maskBlurPx(MODEL_GRID * 4, tuning({ blur: 0 }))).toBe(0);
+  });
+
+  it("블러를 껐어도 경계 두께를 쓰면 최소 전환대를 만들어 준다", () => {
+    // 두께 보정은 블러가 만든 전환대 안에서 알파를 미는 방식이라, 전환대가 없으면 아무 일도 안 난다.
+    expect(maskBlurPx(MODEL_GRID * 4, tuning({ blur: 0, edgeShift: -40 }))).toBeGreaterThan(0);
   });
 });
 
@@ -116,6 +131,17 @@ describe("nextRoi", () => {
 
   it("인물이 프레임을 가득 채우면 null — 잘라도 얻을 해상도가 없다", () => {
     expect(nextRoi({ x: 20, y: 10, w: 1880, h: 1060 }, W, H, null)).toBeNull();
+  });
+
+  it("설정에서 끄면 항상 null — 프레임 전체로 추론한다", () => {
+    expect(nextRoi({ x: 800, y: 300, w: 300, h: 500 }, W, H, null, tuning({ roi: false }))).toBeNull();
+  });
+
+  it("추적 여유를 좁히면 크롭도 좁아진다", () => {
+    const wide = nextRoi({ x: 800, y: 300, w: 300, h: 500 }, W, H, null, tuning({ roiMargin: 50 }))!;
+    const tight = nextRoi({ x: 800, y: 300, w: 300, h: 500 }, W, H, null, tuning({ roiMargin: 5 }))!;
+    expect(tight.w).toBeLessThan(wide.w);
+    expect(tight.w).toBeGreaterThanOrEqual(300); // bbox는 항상 들어가야 한다
   });
 
   it("이전 ROI가 있으면 EMA로 따라가 프레임마다 들썩이지 않는다", () => {

@@ -7,16 +7,17 @@ import { applyChromaKey } from "@/lib/chromakey";
 import { applyChromaKeyYuv } from "@/lib/chromakeyYuv";
 import {
   bakeAlphaMask,
-  bakeBlurredMask,
   bboxToFrame,
-  maskBlurPx,
+  createMaskBaker,
   nextRoi,
   ROI_INPUT_SIZE,
+  type MaskTuning,
   type Roi,
 } from "@/lib/segmentMask";
+import { segmentProcessScaleFor } from "@/lib/deviceConfig";
 import { FALLBACK_BACKGROUNDS } from "@/constants/frames";
 import { suppressMediapipeLogs } from "@/lib/suppressMediapipeLogs";
-import type { BGImage, BgRemovalMode } from "@/types";
+import type { BGImage, BgRemovalMode, SegmentProcessScale } from "@/types";
 
 type Segmenter = {
   segmentForVideo: (source: HTMLVideoElement | HTMLCanvasElement, ts: number) => {
@@ -59,6 +60,12 @@ export function CameraStreamer({
   chromakeyYuvGamma = 0,
   segmentThreshold = 15,
   segmentFeather = 35,
+  segmentMaskBlur = 100,
+  segmentEdgeShift = 0,
+  segmentTemporal = 0,
+  segmentRoi = true,
+  segmentRoiMargin = 22,
+  segmentProcessScale = "auto",
 }: {
   enabled: boolean;
   sendFrames?: boolean;
@@ -97,6 +104,18 @@ export function CameraStreamer({
   segmentThreshold?: number;
   /** AI 배경제거 경계 부드러움 (0-100%). 메인 촬영 화면과 동일한 관리자 설정값. */
   segmentFeather?: number;
+  /** AI 배경제거 경계 블러 세기 (0-200%). 메인 촬영 화면과 동일한 관리자 설정값. */
+  segmentMaskBlur?: number;
+  /** AI 배경제거 경계 두께 (-100~100). 메인 촬영 화면과 동일한 관리자 설정값. */
+  segmentEdgeShift?: number;
+  /** AI 배경제거 시간축 평활 (0-100%). 메인 촬영 화면과 동일한 관리자 설정값. */
+  segmentTemporal?: number;
+  /** AI 배경제거 인물 추적 크롭 사용 여부. 메인 촬영 화면과 동일한 관리자 설정값. */
+  segmentRoi?: boolean;
+  /** AI 배경제거 추적 여유 (0-100%). 메인 촬영 화면과 동일한 관리자 설정값. */
+  segmentRoiMargin?: number;
+  /** AI 배경제거 처리 해상도 배율. 메인 촬영 화면과 동일한 관리자 설정값. */
+  segmentProcessScale?: SegmentProcessScale;
 }) {
   const frameChannelRef = useFrameSender(enabled && sendFrames);
   const lastSentRef = useRef(0);
@@ -131,6 +150,11 @@ export function CameraStreamer({
   // 관리자 설정(0-100%)을 confidence 스케일(0-1)로 변환해 보관. FEATHER는 0으로 나누기 방지를 위해 최소 1%.
   const segmentThreshRef = useRef(segmentThreshold / 100);
   const segmentFeatherRef = useRef(Math.max(segmentFeather, 1) / 100);
+  const maskTuningRef = useRef<MaskTuning>({
+    blur: segmentMaskBlur, edgeShift: segmentEdgeShift, temporal: segmentTemporal,
+    roi: segmentRoi, roiMargin: segmentRoiMargin,
+  });
+  const processScaleRef = useRef(segmentProcessScale);
   useEffect(() => { selectedBgRef.current = selectedBackground; }, [selectedBackground]);
   useEffect(() => { bgRemovalModeRef.current = bgRemovalMode; }, [bgRemovalMode]);
   useEffect(() => { chromakeyRgbRef.current = chromakeyRgb; }, [chromakeyRgb]);
@@ -149,6 +173,13 @@ export function CameraStreamer({
   useEffect(() => { chromakeyYuvGammaRef.current = chromakeyYuvGamma; }, [chromakeyYuvGamma]);
   useEffect(() => { segmentThreshRef.current = segmentThreshold / 100; }, [segmentThreshold]);
   useEffect(() => { segmentFeatherRef.current = Math.max(segmentFeather, 1) / 100; }, [segmentFeather]);
+  useEffect(() => {
+    maskTuningRef.current = {
+      blur: segmentMaskBlur, edgeShift: segmentEdgeShift, temporal: segmentTemporal,
+      roi: segmentRoi, roiMargin: segmentRoiMargin,
+    };
+  }, [segmentMaskBlur, segmentEdgeShift, segmentTemporal, segmentRoi, segmentRoiMargin]);
+  useEffect(() => { processScaleRef.current = segmentProcessScale; }, [segmentProcessScale]);
 
   // 배경 이미지/비디오 로드
   useEffect(() => {
@@ -242,6 +273,7 @@ export function CameraStreamer({
     // 마스크 ImageData도 크기가 같은 동안 재사용한다(추론마다 수 MB 할당을 피한다).
     let roiCanvas: HTMLCanvasElement | null = null;
     let maskImage: ImageData | null = null;
+    const baker = createMaskBaker();
 
     const drawBg = (w: number, h: number) => {
       const sbg = selectedBgRef.current;
@@ -306,8 +338,8 @@ export function CameraStreamer({
 
           const w = video.videoWidth;
           const h = video.videoHeight;
-          // 4K(2560+)에서 배경제거 처리 해상도를 0.25로 낮춰 픽셀 연산량을 ~75% 감소.
-          const PROCESS_SCALE = w >= 2560 ? 0.25 : 0.5;
+          // 배경제거 처리 해상도. 기본("auto")은 4K(2560+)에서만 0.25로 낮춰 픽셀 연산량을 줄인다.
+          const PROCESS_SCALE = segmentProcessScaleFor(processScaleRef.current, w);
           // 송출 전용 캔버스는 최대 1440px로 캡 — 서브 모니터 선명도와 toDataURL 인코딩 비용의 절충.
           const MAX_STREAM_W = 1440;
           const cScale = Math.min(1, MAX_STREAM_W / w);
@@ -422,12 +454,12 @@ export function CameraStreamer({
                   let mc = maskCanvasRef.current;
                   if (!mc) { mc = document.createElement("canvas"); maskCanvasRef.current = mc; }
                   // 마스크 캔버스는 ROI 유무와 무관하게 항상 프레임 전체(pw×ph)를 덮는다.
-                  bakeBlurredMask(mc, maskImage, pw, ph, maskBlurPx(dest ? dest.w : pw), dest);
+                  baker.bake(mc, maskImage, pw, ph, dest, maskTuningRef.current);
                   lastInferenceTimeRef.current = now;
                   maskReadyRef.current = true;
                   // 다음 추론용 크롭 갱신. 전경을 못 찾았으면 전체 프레임에서 다시 찾는다.
                   roiRef.current = bbox
-                    ? nextRoi(bboxToFrame(bbox, mw, mh, crop, w, h), w, h, crop)
+                    ? nextRoi(bboxToFrame(bbox, mw, mh, crop, w, h), w, h, crop, maskTuningRef.current)
                     : null;
                 }
               }

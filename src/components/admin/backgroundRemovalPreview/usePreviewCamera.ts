@@ -5,17 +5,17 @@ import { applyChromaKey } from "@/lib/chromakey";
 import { applyChromaKeyYuv } from "@/lib/chromakeyYuv";
 import {
   bakeAlphaMask,
-  bakeBlurredMask,
   bboxToFrame,
-  maskBlurPx,
+  createMaskBaker,
   nextRoi,
   ROI_INPUT_SIZE,
+  type MaskTuning,
   type Roi,
 } from "@/lib/segmentMask";
+import { segmentProcessScaleFor } from "@/lib/deviceConfig";
+import type { SegmentProcessScale } from "@/types";
 
-// 크로마키 임계값은 감도(similarity)에서 파생한다 — CameraSection.tsx와 동일 규칙.
-// 배경제거 처리 해상도를 낮춰 프레임 드롭을 줄인다 (CameraSection.tsx와 동일한 이유).
-const PROCESS_SCALE = 0.5;
+// 크로마키 임계값은 감도(similarity)에서 파생한다 — useCameraCapture와 동일 규칙.
 /**
  * mediapipe 추론 스로틀 간격(ms) 선택지 — 이 간격이 지나지 않으면 직전 마스크를 재사용한다.
  * 서비스 화면의 추론 스로틀(useSegmentationDebugSettings / SegmentationDebugPanel)과 같은 값을
@@ -69,6 +69,12 @@ export function usePreviewCamera({
   yuvGamma,
   threshold,
   feather,
+  maskBlur,
+  edgeShift,
+  temporal,
+  roi,
+  roiMargin,
+  processScale,
   inferenceInterval,
 }: {
   mode: "mediapipe" | "chromakey" | "chromakey-yuv";
@@ -90,6 +96,18 @@ export function usePreviewCamera({
   yuvGamma: number;
   threshold: number;
   feather: number;
+  /** 경계 블러 세기(0-200%) */
+  maskBlur: number;
+  /** 경계 두께(-100~100) */
+  edgeShift: number;
+  /** 시간축 평활(0-100%) */
+  temporal: number;
+  /** 인물 추적 크롭 사용 여부 */
+  roi: boolean;
+  /** 추적 여유(0-100%) */
+  roiMargin: number;
+  /** 처리 해상도 배율 */
+  processScale: SegmentProcessScale;
   /** mediapipe 추론 스로틀 간격(ms) — INFERENCE_INTERVAL_OPTIONS 중 하나 */
   inferenceInterval: number;
 }) {
@@ -125,6 +143,8 @@ export function usePreviewCamera({
   const yuvGammaRef = useRef(yuvGamma);
   const thresholdRef = useRef(threshold);
   const featherRef = useRef(feather);
+  const maskTuningRef = useRef<MaskTuning>({ blur: maskBlur, edgeShift, temporal, roi, roiMargin });
+  const processScaleRef = useRef(processScale);
   const inferenceIntervalRef = useRef(inferenceInterval);
   useEffect(() => { chromaColorRef.current = chromaColor; }, [chromaColor]);
   useEffect(() => { similarityRef.current = similarity; }, [similarity]);
@@ -143,6 +163,10 @@ export function usePreviewCamera({
   useEffect(() => { thresholdRef.current = threshold; }, [threshold]);
   useEffect(() => { featherRef.current = feather; }, [feather]);
   useEffect(() => { inferenceIntervalRef.current = inferenceInterval; }, [inferenceInterval]);
+  useEffect(() => {
+    maskTuningRef.current = { blur: maskBlur, edgeShift, temporal, roi, roiMargin };
+  }, [maskBlur, edgeShift, temporal, roi, roiMargin]);
+  useEffect(() => { processScaleRef.current = processScale; }, [processScale]);
 
   const [eyedropper, setEyedropper] = useState(false);
   const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
@@ -234,6 +258,7 @@ export function usePreviewCamera({
         // 마스크 ImageData도 크기가 같은 동안 재사용한다(추론마다 수 MB 할당을 피한다).
         let roiCanvas: HTMLCanvasElement | null = null;
         let maskImage: ImageData | null = null;
+        const baker = createMaskBaker();
 
         const processFrame = () => {
           const video = videoRef.current;
@@ -247,8 +272,9 @@ export function usePreviewCamera({
           const h = video.videoHeight;
           if (canvas.width !== w) canvas.width = w;
           if (canvas.height !== h) canvas.height = h;
-          const pw = Math.max(1, Math.round(w * PROCESS_SCALE));
-          const ph = Math.max(1, Math.round(h * PROCESS_SCALE));
+          const scale = segmentProcessScaleFor(processScaleRef.current, w);
+          const pw = Math.max(1, Math.round(w * scale));
+          const ph = Math.max(1, Math.round(h * scale));
           if (offscreen.width !== pw) offscreen.width = pw;
           if (offscreen.height !== ph) offscreen.height = ph;
 
@@ -304,12 +330,12 @@ export function usePreviewCamera({
                 let mc = maskCanvasRef.current;
                 if (!mc) { mc = document.createElement("canvas"); maskCanvasRef.current = mc; }
                 // 마스크 캔버스는 ROI 유무와 무관하게 항상 프레임 전체(pw×ph)를 덮는다.
-                bakeBlurredMask(mc, maskImage, pw, ph, maskBlurPx(dest ? dest.w : pw), dest);
+                baker.bake(mc, maskImage, pw, ph, dest, maskTuningRef.current);
                 lastInferenceTimeRef.current = now;
                 maskReadyRef.current = true;
                 // 다음 추론용 크롭 갱신. 전경을 못 찾았으면 전체 프레임에서 다시 찾는다.
                 roiRef.current = bbox
-                  ? nextRoi(bboxToFrame(bbox, mw, mh, crop, w, h), w, h, crop)
+                  ? nextRoi(bboxToFrame(bbox, mw, mh, crop, w, h), w, h, crop, maskTuningRef.current)
                   : null;
               }
             }

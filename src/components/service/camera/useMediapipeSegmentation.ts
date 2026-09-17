@@ -4,11 +4,11 @@ import { useEffect, useRef, useState } from "react";
 import type { ImageSegmenter } from "@mediapipe/tasks-vision";
 import type { BgRemovalMode } from "@/types";
 import {
-  bakeBlurredMask,
   bboxToFrame,
-  maskBlurPx,
+  createMaskBaker,
   nextRoi,
   type MaskBbox,
+  type MaskTuning,
   type Roi,
 } from "@/lib/segmentMask";
 
@@ -41,6 +41,7 @@ export function useMediapipeSegmentation({
   useWorker,
   segmentThresh,
   segmentFeather,
+  maskTuning,
   perfRef,
 }: {
   bgRemovalMode: BgRemovalMode;
@@ -49,6 +50,8 @@ export function useMediapipeSegmentation({
   useWorker: boolean;
   segmentThresh: number;
   segmentFeather: number;
+  /** 마스크 후처리 세기(블러·두께·시간축·ROI) — 관리자 촬영 설정에서 온다. */
+  maskTuning: MaskTuning;
   perfRef: React.RefObject<{ frames: number; lastFlush: number; inferMs: number; maskMs: number; sentAt: number }>;
 }): {
   segmenterRef: React.RefObject<ImageSegmenter | null>;
@@ -91,6 +94,12 @@ export function useMediapipeSegmentation({
   const segmentFeatherRef = useRef(segmentFeather);
   useEffect(() => { segmentThreshRef.current = segmentThresh; }, [segmentThresh]);
   useEffect(() => { segmentFeatherRef.current = segmentFeather; }, [segmentFeather]);
+  // 워커 응답 핸들러(effect 재생성 없이 살아있음)가 최신 세기를 읽도록 ref로 보관.
+  const maskTuningRef = useRef(maskTuning);
+  useEffect(() => { maskTuningRef.current = maskTuning; }, [maskTuning]);
+  // 마스크를 굽는 주체(스크래치 캔버스 + 시간축 평활 상태)를 이 훅이 소유한다.
+  const bakerRef = useRef<ReturnType<typeof createMaskBaker> | null>(null);
+  if (bakerRef.current == null) bakerRef.current = createMaskBaker();
 
   useEffect(() => {
     if (bgRemovalMode !== "mediapipe") {
@@ -165,6 +174,7 @@ export function useMediapipeSegmentation({
     Promise.resolve().then(() => { if (!cancelled) setSegmenterStatus("loading"); });
     maskReadyRef.current = false;
     roiRef.current = null;
+    bakerRef.current?.reset();
     workerBusyRef.current = false;
 
     // Web Worker 토글이 꺼져 있으면 곧장 메인 스레드 세그멘터를 쓴다(기본값).
@@ -215,12 +225,12 @@ export function useMediapipeSegmentation({
                   h: (roi.h * maskH) / frameH,
                 }
               : null;
-            bakeBlurredMask(mc, bmp, maskW, maskH, maskBlurPx(dest ? dest.w : maskW), dest);
+            bakerRef.current!.bake(mc, bmp, maskW, maskH, dest, maskTuningRef.current);
             bmp.close();
             maskReadyRef.current = true;
             // 다음 추론에 쓸 크롭 갱신. 전경을 못 찾았으면 전체 프레임에서 다시 찾는다.
             roiRef.current = bbox
-              ? nextRoi(bboxToFrame(bbox, bw, bh, roi, frameW, frameH), frameW, frameH, roi)
+              ? nextRoi(bboxToFrame(bbox, bw, bh, roi, frameW, frameH), frameW, frameH, roi, maskTuningRef.current)
               : null;
             const sent = perfRef.current.sentAt;
             if (sent) perfRef.current.inferMs = performance.now() - sent; // 계측: 워커 왕복 시간
@@ -250,6 +260,7 @@ export function useMediapipeSegmentation({
       segmenterRef.current = null;
       maskReadyRef.current = false;
       roiRef.current = null;
+      bakerRef.current?.reset();
       lastInferenceTimeRef.current = 0;
       workerBusyRef.current = false;
     };

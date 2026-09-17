@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { HexColorPicker } from "react-colorful";
 import { BackgroundRemovalPreviewDialog } from "@/components/admin/BackgroundRemovalPreviewDialog";
-import { parseIntSafe, clampPercent, clampSigned } from "@/lib/deviceConfig";
+import { parseIntSafe, clampPercent, clampSigned, parseSegmentProcessScale } from "@/lib/deviceConfig";
 import { useAdminDeviceSettings } from "@/hooks/useAdminDeviceSettings";
 import { CAMERA_RESOLUTIONS } from "@/constants/camera";
 
@@ -184,21 +184,84 @@ const FIELDS: { name: string; label: string; type?: "text" | "number" | "range" 
   },
   {
     name: "CAPTURE_THRESHOLD",
-    label: "AI 배경제거 경계 침식 (%)",
+    label: "AI 경계 침식 (%)",
     type: "range",
     min: 0,
     max: 100,
     default: 15,
-    hint: "높일수록 인물 가장자리를 안쪽으로 더 깎아내 배경과의 경계가 또렷해집니다. 기본값 15.",
+    hint: "확신도 기준. 높일수록 인물 가장자리를 안쪽으로 더 깎아냅니다. 낮추면 손끝이 살아나는 대신 배경 헤일로가 늘어납니다. 기본값 15.",
+    showIf: (s) => (s.CHROMAKEY_MODE || "mediapipe") === "mediapipe",
   },
   {
     name: "CAPTURE_SMOOTHNESS",
-    label: "AI 배경제거 경계 부드러움 (%)",
+    label: "AI 경계 부드러움 (%)",
     type: "range",
     min: 1,
     max: 100,
     default: 35,
-    hint: "낮을수록 경계가 딱딱하게 잘리고, 높을수록 부드럽게 번집니다. 기본값 35.",
+    hint: "반투명 전환대의 폭. 넓히면 고스팅이 늘고, 좁혀도 경계 계단은 없어지지 않습니다(계단은 아래 '경계 블러'로). 기본값 35.",
+    showIf: (s) => (s.CHROMAKEY_MODE || "mediapipe") === "mediapipe",
+  },
+  {
+    name: "CAPTURE_MASK_BLUR",
+    label: "AI 경계 블러 (%)",
+    type: "range",
+    min: 0,
+    max: 200,
+    default: 100,
+    hint: "AI 모델의 256칸 격자에서 오는 경계 계단을 지웁니다. 0이면 끔, 과하면 실루엣이 뭉갭니다. 기본값 100.",
+    showIf: (s) => (s.CHROMAKEY_MODE || "mediapipe") === "mediapipe",
+  },
+  {
+    name: "CAPTURE_EDGE_SHIFT",
+    label: "AI 경계 두께",
+    type: "range",
+    min: -100,
+    max: 100,
+    default: 0,
+    hint: "음수면 경계를 안쪽으로 깎아 배경 헤일로를 없애고, 양수면 바깥으로 살려 손끝을 남깁니다. '경계 침식'과 달리 확신도가 아니라 실제 거리 기준입니다. 기본값 0.",
+    showIf: (s) => (s.CHROMAKEY_MODE || "mediapipe") === "mediapipe",
+  },
+  {
+    name: "CAPTURE_TEMPORAL",
+    label: "AI 경계 떨림 억제 (%)",
+    type: "range",
+    min: 0,
+    max: 100,
+    default: 0,
+    hint: "이전 마스크를 섞어 프레임마다 경계가 떠는 것을 줄입니다. 높이면 움직일 때 잔상이 생깁니다. 기본값 0(끔).",
+    showIf: (s) => (s.CHROMAKEY_MODE || "mediapipe") === "mediapipe",
+  },
+  {
+    name: "CAPTURE_ROI",
+    label: "AI 인물 추적 크롭",
+    type: "select",
+    options: [{ value: "on", label: "켬 (기본) — 경계 해상도 향상" }, { value: "off", label: "끔 — 항상 화면 전체를 추론" }],
+    hint: "인물 주변만 잘라 추론합니다. 모델 입력이 256×256 고정이라, 좁게 볼수록 경계 계단이 실제로 얇아집니다.",
+    showIf: (s) => (s.CHROMAKEY_MODE || "mediapipe") === "mediapipe",
+  },
+  {
+    name: "CAPTURE_ROI_MARGIN",
+    label: "AI 추적 여유 (%)",
+    type: "range",
+    min: 0,
+    max: 100,
+    default: 22,
+    hint: "크롭을 인물보다 얼마나 넓게 잡을지. 좁힐수록 해상도 이득이 크고, 빠르게 움직일 때 놓칠 위험도 커집니다. 기본값 22.",
+    showIf: (s) => (s.CHROMAKEY_MODE || "mediapipe") === "mediapipe" && (s.CAPTURE_ROI || "on") !== "off",
+  },
+  {
+    name: "CAPTURE_PROCESS_SCALE",
+    label: "AI 처리 해상도",
+    type: "select",
+    options: [
+      { value: "auto", label: "자동 (기본) — 4K에서만 25%" },
+      { value: "100", label: "100% — 가장 정밀, 가장 느림" },
+      { value: "50", label: "50%" },
+      { value: "25", label: "25% — 가장 빠름" },
+    ],
+    hint: "배경제거를 돌리는 해상도(카메라 해상도 대비). 높일수록 마스크가 정밀하지만 프레임이 떨어질 수 있습니다.",
+    showIf: (s) => (s.CHROMAKEY_MODE || "mediapipe") === "mediapipe",
   },
 ];
 
@@ -382,6 +445,18 @@ export default function CaptureSettingPage() {
           onThresholdChange={(n) => updateSetting("CAPTURE_THRESHOLD", String(n))}
           feather={clampPercent(parseIntSafe(settings.CAPTURE_SMOOTHNESS || "", 35), 1)}
           onFeatherChange={(n) => updateSetting("CAPTURE_SMOOTHNESS", String(n))}
+          maskBlur={clampSigned(parseIntSafe(settings.CAPTURE_MASK_BLUR || "", 100), 0, 200)}
+          onMaskBlurChange={(n) => updateSetting("CAPTURE_MASK_BLUR", String(n))}
+          edgeShift={clampSigned(parseIntSafe(settings.CAPTURE_EDGE_SHIFT || "", 0))}
+          onEdgeShiftChange={(n) => updateSetting("CAPTURE_EDGE_SHIFT", String(n))}
+          temporal={clampPercent(parseIntSafe(settings.CAPTURE_TEMPORAL || "", 0))}
+          onTemporalChange={(n) => updateSetting("CAPTURE_TEMPORAL", String(n))}
+          roi={(settings.CAPTURE_ROI || "on") !== "off"}
+          onRoiChange={(v) => updateSetting("CAPTURE_ROI", v ? "on" : "off")}
+          roiMargin={clampPercent(parseIntSafe(settings.CAPTURE_ROI_MARGIN || "", 22))}
+          onRoiMarginChange={(n) => updateSetting("CAPTURE_ROI_MARGIN", String(n))}
+          processScale={parseSegmentProcessScale(settings.CAPTURE_PROCESS_SCALE || "")}
+          onProcessScaleChange={(v) => updateSetting("CAPTURE_PROCESS_SCALE", v)}
           onClose={() => setPreviewOpen(false)}
         />
       )}

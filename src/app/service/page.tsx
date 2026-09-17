@@ -300,6 +300,12 @@ function ServiceContent() {
           chromakeyYuvGamma={config.chromakeyYuvGamma}
           segmentThreshold={config.segmentThreshold}
           segmentFeather={config.segmentFeather}
+          segmentMaskBlur={config.segmentMaskBlur}
+          segmentEdgeShift={config.segmentEdgeShift}
+          segmentTemporal={config.segmentTemporal}
+          segmentRoi={config.segmentRoi}
+          segmentRoiMargin={config.segmentRoiMargin}
+          segmentProcessScale={config.segmentProcessScale}
         />
       )}
 

@@ -6,13 +6,14 @@ import type { DeviceConfig, BgRemovalMode } from "@/types";
 import { computeCaptureSize } from "@/lib/canvas";
 import {
   bakeAlphaMask,
-  bakeBlurredMask,
   bboxToFrame,
-  maskBlurPx,
+  createMaskBaker,
   nextRoi,
   ROI_INPUT_SIZE,
+  type MaskTuning,
   type Roi,
 } from "@/lib/segmentMask";
+import { segmentProcessScaleFor } from "@/lib/deviceConfig";
 import { applyChromaKey } from "@/lib/chromakey";
 import { applyChromaKeyYuv } from "@/lib/chromakeyYuv";
 import { useAutoCaptureTimer } from "@/hooks/useAutoCaptureTimer";
@@ -148,6 +149,20 @@ export function useCameraCapture({
   // 손님 세션에선 0.5초마다의 setPerf 리렌더를 건너뛴다(계측 자체는 가벼워 항상 누적).
   const debugRef = useRef(debug);
   useEffect(() => { debugRef.current = debug; }, [debug]);
+
+  // 마스크 후처리 세기(블러·두께·시간축·ROI)와 처리 해상도는 관리자 촬영 설정에서 온다.
+  // 무-deps rAF 루프가 최신 값을 읽도록 ref로 보관 — 설정이 바뀌어도 루프를 재생성하지 않는다.
+  const maskTuning = useMemo((): MaskTuning => ({
+    blur: config.segmentMaskBlur,
+    edgeShift: config.segmentEdgeShift,
+    temporal: config.segmentTemporal,
+    roi: config.segmentRoi,
+    roiMargin: config.segmentRoiMargin,
+  }), [config.segmentMaskBlur, config.segmentEdgeShift, config.segmentTemporal, config.segmentRoi, config.segmentRoiMargin]);
+  const maskTuningRef = useRef(maskTuning);
+  useEffect(() => { maskTuningRef.current = maskTuning; }, [maskTuning]);
+  const processScaleRef = useRef(config.segmentProcessScale);
+  useEffect(() => { processScaleRef.current = config.segmentProcessScale; }, [config.segmentProcessScale]);
   const lastFrameSentRef = useRef(0);
 
   const chromaKey = useMemo(() => {
@@ -269,6 +284,7 @@ export function useCameraCapture({
     // 마스크 ImageData도 크기가 같은 동안 재사용한다(추론마다 수 MB 할당을 피한다).
     let roiCanvas: HTMLCanvasElement | null = null;
     let maskImage: ImageData | null = null;
+    const baker = createMaskBaker();
 
     const processFrame = () => {
       const video = videoRef.current;
@@ -303,10 +319,9 @@ export function useCameraCapture({
         }
       }
 
-      // 배경제거 처리 해상도를 낮춰 프레임 드롭을 줄인다. 4K(2880+)에서는 0.25로 더 줄여
-      // 처리 픽셀 수를 1/16로 낮춘다. 최종 표시는 네이티브 해상도로 업스케일되므로
-      // 화질 손실은 가장자리 마스크 정밀도 정도로 미미하고 FEATHER 블렌딩이 이를 가려준다.
-      const PROCESS_SCALE = w >= 2560 ? 0.25 : 0.5;
+      // 배경제거 처리 해상도. 낮추면 프레임 드롭이 줄고 마스크 정밀도가 떨어진다.
+      // 기본("auto")은 4K에서만 0.25로 낮춰 처리 픽셀 수를 1/16로 만든다.
+      const PROCESS_SCALE = segmentProcessScaleFor(processScaleRef.current, w);
 
       // 프리뷰 캔버스는 최대 1440px로 제한 — 캔버스 렌더링·GPU 전송 비용을 줄인다.
       // 최종 촬영본은 이 상한과 별개로 captureHiRes()가 촬영 순간에만 원본 해상도(최대 1800px)로 합성한다.
@@ -423,12 +438,12 @@ export function useCameraCapture({
                 if (!mc) { mc = document.createElement("canvas"); maskCanvasRef.current = mc; }
                 // 마스크 캔버스는 ROI 유무와 무관하게 항상 프레임 전체(pw×ph)를 덮는다 —
                 // 소비하는 쪽(아래 destination-in, captureHiRes)이 크롭을 몰라도 되도록.
-                bakeBlurredMask(mc, maskImage, pw, ph, maskBlurPx(dest ? dest.w : pw), dest);
+                baker.bake(mc, maskImage, pw, ph, dest, maskTuningRef.current);
                 lastInferenceTimeRef.current = now;
                 maskReadyRef.current = true;
                 // 다음 추론용 크롭 갱신. 전경을 못 찾았으면 전체 프레임에서 다시 찾는다.
                 roiRef.current = bbox
-                  ? nextRoi(bboxToFrame(bbox, mw, mh, crop, w, h), w, h, crop)
+                  ? nextRoi(bboxToFrame(bbox, mw, mh, crop, w, h), w, h, crop, maskTuningRef.current)
                   : null;
                 perfRef.current.inferMs = inferEnd - inferStart;
                 perfRef.current.maskMs = performance.now() - inferEnd;

@@ -5,6 +5,7 @@ import { usePreviewCamera, DEFAULT_INFERENCE_INTERVAL_MS } from "./backgroundRem
 import { ChromaKeyControls } from "./backgroundRemovalPreview/ChromaKeyControls";
 import { ChromaKeyYuvControls } from "./backgroundRemovalPreview/ChromaKeyYuvControls";
 import { MediapipeControls } from "./backgroundRemovalPreview/MediapipeControls";
+import type { SegmentProcessScale } from "@/types";
 
 export function BackgroundRemovalPreviewDialog({
   mode,
@@ -40,6 +41,18 @@ export function BackgroundRemovalPreviewDialog({
   onThresholdChange,
   feather,
   onFeatherChange,
+  maskBlur,
+  onMaskBlurChange,
+  edgeShift,
+  onEdgeShiftChange,
+  temporal,
+  onTemporalChange,
+  roi,
+  onRoiChange,
+  roiMargin,
+  onRoiMarginChange,
+  processScale,
+  onProcessScaleChange,
   onClose,
 }: {
   mode: "mediapipe" | "chromakey" | "chromakey-yuv";
@@ -75,6 +88,18 @@ export function BackgroundRemovalPreviewDialog({
   onThresholdChange: (n: number) => void;
   feather: number;
   onFeatherChange: (n: number) => void;
+  maskBlur: number;
+  onMaskBlurChange: (n: number) => void;
+  edgeShift: number;
+  onEdgeShiftChange: (n: number) => void;
+  temporal: number;
+  onTemporalChange: (n: number) => void;
+  roi: boolean;
+  onRoiChange: (v: boolean) => void;
+  roiMargin: number;
+  onRoiMarginChange: (n: number) => void;
+  processScale: SegmentProcessScale;
+  onProcessScaleChange: (v: SegmentProcessScale) => void;
   onClose: () => void;
 }) {
   // AI 추론 스로틀 간격(ms). 저장되는 촬영 설정이 아니라 미리보기 전용 값이라 다이얼로그가 들고 있는다.
@@ -87,7 +112,8 @@ export function BackgroundRemovalPreviewDialog({
     similarity, smoothness, spill, choke, lumaIndependent,
     yuvChromaColor, onYuvChromaColorChange,
     yuvSimilarity, yuvSmoothness, yuvSpill, yuvOpacity, yuvContrast, yuvBrightness, yuvGamma,
-    threshold, feather, inferenceInterval,
+    threshold, feather, maskBlur, edgeShift, temporal, roi, roiMargin, processScale,
+    inferenceInterval,
   });
 
   return (
@@ -180,6 +206,18 @@ export function BackgroundRemovalPreviewDialog({
             onThresholdChange={onThresholdChange}
             feather={feather}
             onFeatherChange={onFeatherChange}
+            maskBlur={maskBlur}
+            onMaskBlurChange={onMaskBlurChange}
+            edgeShift={edgeShift}
+            onEdgeShiftChange={onEdgeShiftChange}
+            temporal={temporal}
+            onTemporalChange={onTemporalChange}
+            roi={roi}
+            onRoiChange={onRoiChange}
+            roiMargin={roiMargin}
+            onRoiMarginChange={onRoiMarginChange}
+            processScale={processScale}
+            onProcessScaleChange={onProcessScaleChange}
             inferenceInterval={inferenceInterval}
             onInferenceIntervalChange={setInferenceInterval}
           />

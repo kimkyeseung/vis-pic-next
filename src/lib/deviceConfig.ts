@@ -1,4 +1,4 @@
-import type { BgRemovalMode, PaymentTerminalMode, PaymentTier } from "@/types";
+import type { BgRemovalMode, PaymentTerminalMode, PaymentTier, SegmentProcessScale } from "@/types";
 import { CAMERA_RESOLUTIONS, DEFAULT_CAMERA_RESOLUTION, type CameraResolutionId } from "@/constants/camera";
 
 /** parseInt 실패(NaN) 시 기본값 반환. 0은 유효한 값으로 처리. */
@@ -60,6 +60,21 @@ export function parsePaymentTiers(raw: string): PaymentTier[] {
 /** 0-100 범위로 고정. min을 주면 0으로 나누기 등을 막기 위한 하한을 별도로 지정할 수 있다. */
 export function clampPercent(value: number, min = 0): number {
   return Math.min(100, Math.max(min, value));
+}
+
+/** 저장된 AI 배경제거 처리 해상도 배율을 검증. 알 수 없는 값이면 "auto". */
+export function parseSegmentProcessScale(raw: string): SegmentProcessScale {
+  const v = raw.trim();
+  return v === "100" || v === "50" || v === "25" ? v : "auto";
+}
+
+/**
+ * 처리 해상도 설정을 실제 배율로 바꾼다. "auto"는 4K(2560+)에서만 0.25로 낮춰
+ * 처리 픽셀 수를 1/16로 만든다(기존 하드코딩 규칙).
+ */
+export function segmentProcessScaleFor(setting: SegmentProcessScale, frameWidth: number): number {
+  if (setting === "auto") return frameWidth >= 2560 ? 0.25 : 0.5;
+  return parseInt(setting, 10) / 100;
 }
 
 /** -100~100 범위로 고정. 대비/명암/감마처럼 0을 중심으로 양쪽 조정이 필요한 값에 사용. */

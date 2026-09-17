@@ -8,9 +8,12 @@
  * 관리자 슬라이더의 "경계 부드러움(FEATHER)"은 confidence라는 **값 축**만 완만하게 만들 뿐
  * **공간 축**은 건드리지 않아 계단을 못 없앤다(넓히면 고스팅만 는다). 그래서 두 방향으로 접근한다.
  *
- *  · `bakeBlurredMask` — 구워진 마스크에 **공간 블러**를 걸어 격자 계단을 지운다(대증요법, 비용 ~0).
+ *  · `createMaskBaker().bake` — 구워진 마스크에 **공간 블러**를 걸어 격자 계단을 지운다(비용 ~0).
+ *    이어서 **경계 두께**(기하학적 팽창/침식)와 **시간축 평활**을 한 번의 픽셀 패스로 적용한다.
  *  · `nextRoi` — 다음 추론을 **인물 주변만 잘라** 돌려 256 격자가 덮는 실제 면적을 줄인다.
  *    인물이 프레임 폭의 절반이면 경계 해상도가 2배 → 계단 폭이 실제로 절반이 된다(근본 대책).
+ *
+ * 세기는 전부 관리자 촬영 설정(`MaskTuning`)에서 온다 — 기본값은 `DEFAULT_MASK_TUNING`.
  *
  * 워커(`src/workers/segmenter.worker.ts`)와 메인 스레드가 함께 쓰므로, DOM 접근은 반드시
  * 함수 본문 안에만 둔다(모듈 최상위에서 document를 건드리면 워커에서 터진다).
@@ -27,7 +30,7 @@ export const MODEL_GRID = 256;
  */
 export const ROI_INPUT_SIZE = 320;
 
-/** 256 격자 텍셀 대비 블러 반경 비율. 계단은 지우면서 실루엣은 안 뭉개지는 선. */
+/** 256 격자 텍셀 대비 블러 반경 비율(설정 100% 기준). 계단은 지우면서 실루엣은 안 뭉개지는 선. */
 const BLUR_TEXEL_RATIO = 0.6;
 /** 블러 반경 상한(px). ROI를 못 잡아 전체 프레임을 볼 때 과하게 번지는 걸 막는다. */
 const BLUR_MAX_PX = 6;
@@ -37,8 +40,6 @@ const BLUR_MIN_PX = 0.3;
 /** bbox에 넣을 "확실한 전경" 알파 하한. 페더의 옅은 꼬리까지 세면 ROI가 계속 부푼다. */
 const BBOX_ALPHA = 128;
 
-/** ROI를 bbox보다 한 변당 얼마나 더 넓게 잡을지(bbox 크기 대비). 다음 추론까지의 움직임 여유. */
-const ROI_MARGIN = 0.22;
 /** ROI 떨림(breathing)을 줄이는 EMA 계수. 1에 가까울수록 즉각적이고 덜 안정적. */
 const ROI_EMA = 0.35;
 /** ROI 최소 한 변(px). 너무 좁히면 얼굴만 남아 인물을 놓칠 여지가 커진다. */
@@ -50,6 +51,43 @@ const ROI_MIN_PX = 160;
 const ROI_WORTH_RATIO = 0.85;
 /** 인물이 크롭 경계에 "닿았다"고 볼 여유(256 격자 텍셀 단위). */
 const ROI_ESCAPE_TEXELS = 2;
+
+/**
+ * 경계 두께 보정은 **블러가 만든 전환대 안에서** 알파를 위아래로 밀어 경계선을 옮기는 방식이라,
+ * 블러가 0이면 아무 일도 안 일어난다. 두께를 쓰겠다고 했으면 최소한의 전환대는 만들어 준다
+ * (256 격자 텍셀 대비 비율).
+ */
+const SHIFT_MIN_BLUR_RATIO = 0.35;
+/** 시간축 평활의 최대 가중치. 1에 가까우면 마스크가 갱신을 거의 안 해 잔상이 된다. */
+const TEMPORAL_MAX = 0.85;
+/**
+ * 경계 두께를 감마 곡선 `a^g`로 구현할 때 설정 ±100에 대응하는 지수(2^GAMMA).
+ * 감마를 쓰는 이유: 알파를 그냥 더하고 빼면(평행이동) 실루엣 **내부**(알파 1.0)까지 같이 내려가
+ * 인물 전체가 반투명해진다. `a^g`는 0과 1을 고정점으로 두고 전환대만 움직인다.
+ */
+const EDGE_SHIFT_GAMMA = 2;
+
+/** 관리자 촬영 설정에서 오는 마스크 후처리 세기. */
+export type MaskTuning = {
+  /** 공간 블러 세기(%). 100 = 기본, 0 = 끔. 계단을 지우는 정도. */
+  blur: number;
+  /** 경계 두께(-100~100). +면 바깥으로 살리고(팽창), -면 안쪽으로 깎는다(침식). */
+  edgeShift: number;
+  /** 시간축 평활(0~100). 이전 마스크를 섞어 경계 떨림을 줄인다. 높을수록 잔상이 는다. */
+  temporal: number;
+  /** 인물 추적 크롭 사용 여부. */
+  roi: boolean;
+  /** 추적 여유(%) — bbox 한 변 대비. 낮을수록 해상도 이득이 크고 놓칠 위험도 크다. */
+  roiMargin: number;
+};
+
+export const DEFAULT_MASK_TUNING: MaskTuning = {
+  blur: 100,
+  edgeShift: 0,
+  temporal: 0,
+  roi: true,
+  roiMargin: 22,
+};
 
 /** 전체 프레임 픽셀 좌표계의 크롭 영역. */
 export type Roi = { x: number; y: number; w: number; h: number };
@@ -64,8 +102,12 @@ const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v
  * ROI로 좁게 볼수록 격자 텍셀이 작아지므로 블러도 자동으로 약해진다 — 해상도/ROI가 바뀌어도
  * "계단 한 칸을 지우는" 정도가 일정하게 유지된다.
  */
-export function maskBlurPx(sampledWidthInMaskPx: number): number {
-  return clamp((sampledWidthInMaskPx / MODEL_GRID) * BLUR_TEXEL_RATIO, 0, BLUR_MAX_PX);
+export function maskBlurPx(sampledWidthInMaskPx: number, tuning: MaskTuning = DEFAULT_MASK_TUNING): number {
+  const texel = sampledWidthInMaskPx / MODEL_GRID;
+  let px = texel * BLUR_TEXEL_RATIO * (tuning.blur / 100);
+  // 두께 보정은 전환대가 있어야 동작한다 — 블러를 0으로 둔 채 두께만 올린 경우의 최소치.
+  if (tuning.edgeShift !== 0) px = Math.max(px, texel * SHIFT_MIN_BLUR_RATIO);
+  return clamp(px, 0, BLUR_MAX_PX);
 }
 
 /**
@@ -146,7 +188,10 @@ export function nextRoi(
   frameW: number,
   frameH: number,
   prev: Roi | null,
+  tuning: MaskTuning = DEFAULT_MASK_TUNING,
 ): Roi | null {
+  if (!tuning.roi) return null;
+  const baseMargin = clamp(tuning.roiMargin, 0, 100) / 100;
   // 인물이 직전 크롭의 **안쪽** 경계에 닿았으면 크롭 밖으로 나가는 중이다 — 여유를 두 배로 잡고
   // EMA 없이 즉시 반영한다(한 박자 늦으면 인물이 크롭 밖에서 잘려 나간다).
   // 프레임 끝에 맞닿은 변은 원래 화면이 인물을 자르는 자리라 판단에서 뺀다.
@@ -157,7 +202,7 @@ export function nextRoi(
       (prev.y > 0 && bbox.y <= prev.y + tol) ||
       (prev.x + prev.w < frameW && bbox.x + bbox.w >= prev.x + prev.w - tol) ||
       (prev.y + prev.h < frameH && bbox.y + bbox.h >= prev.y + prev.h - tol));
-  const m = escaping ? ROI_MARGIN * 2 : ROI_MARGIN;
+  const m = escaping ? baseMargin * 2 : baseMargin;
 
   const x0 = clamp(bbox.x - bbox.w * m, 0, frameW);
   const x1 = clamp(bbox.x + bbox.w * (1 + m), 0, frameW);
@@ -194,87 +239,151 @@ export function nextRoi(
 
 // ── 아래부터는 메인 스레드(DOM) 전용 ──────────────────────────────────────────────
 
-// 스크래치 캔버스는 모듈 레벨에서 재사용한다(프레임마다 새로 만들면 GC가 튄다).
-// 호출이 동기적이고 재진입하지 않아 공유해도 안전하다.
-let srcCanvas: HTMLCanvasElement | null = null;
-let padCanvas: HTMLCanvasElement | null = null;
-let blurCanvas: HTMLCanvasElement | null = null;
-
-function sized(c: HTMLCanvasElement | null, w: number, h: number): HTMLCanvasElement {
-  const canvas = c ?? document.createElement("canvas");
-  if (canvas.width !== w) canvas.width = w;
-  if (canvas.height !== h) canvas.height = h;
-  return canvas;
-}
-
-/** ImageData는 drawImage 소스가 못 되므로 스크래치 캔버스를 거친다. */
-function asDrawable(source: ImageData | CanvasImageSource): CanvasImageSource {
-  if (source instanceof ImageData) {
-    srcCanvas = sized(srcCanvas, source.width, source.height);
-    srcCanvas.getContext("2d")!.putImageData(source, 0, 0);
-    return srcCanvas;
-  }
-  return source;
-}
+/**
+ * 마스크 한 장을 굽는다(블러 → 두께 → 시간축 평활). 스크래치 캔버스와 직전 마스크를 들고 있어야
+ * 하므로 팩토리로 만든다 — 합성 루프마다 하나씩 만들어 쓰면 경로끼리 상태가 섞이지 않는다.
+ */
+export type MaskBaker = {
+  /**
+   * `source`를 `target`(mw×mh, 프레임 전체 대응)에 굽는다. `dest`를 주면 그 사각형에만 놓고
+   * 나머지는 투명으로 둔다(= ROI 추론 결과를 전체 프레임 마스크에 되붙일 때).
+   */
+  bake(
+    target: HTMLCanvasElement,
+    source: ImageData | CanvasImageSource,
+    mw: number,
+    mh: number,
+    dest: Roi | null,
+    tuning?: MaskTuning,
+  ): void;
+  /** 시간축 평활 상태를 버린다(해상도·모드가 바뀌어 이전 마스크가 무의미해졌을 때). */
+  reset(): void;
+};
 
 /**
- * 마스크 한 장을 `target`(mw×mh, 전체 프레임 대응)에 굽는다. `dest`를 주면 그 사각형에만 놓고
- * 나머지는 투명으로 둔다(= ROI 추론 결과를 전체 프레임 마스크에 되붙일 때).
- *
- * 그 다음 공간 블러로 256 격자 계단을 지운다. 블러는 캔버스 바깥을 "투명"으로 보기 때문에,
- * 어깨처럼 **화면 끝에 닿은 부위**가 그대로 블러되면 프레임 가장자리를 따라 반투명 띠가 생긴다.
- * 그래서 패딩된 캔버스에 놓고 가장자리 1px을 바깥으로 복제(edge clamp)한 뒤 블러하고 되잘라낸다.
+ * 경계 두께용 알파 룩업 테이블. `a^g` 곡선을 256칸에 미리 구워 둔다 — 알파가 0~255 정수라
+ * 손실이 없고, 픽셀마다 Math.pow를 부르는 것보다 훨씬 싸다. 설정이 바뀔 때만 다시 만든다.
  */
-export function bakeBlurredMask(
-  target: HTMLCanvasElement,
-  source: ImageData | CanvasImageSource,
-  mw: number,
-  mh: number,
-  blurPx: number,
-  dest?: Roi | null,
-): void {
-  if (target.width !== mw) target.width = mw;
-  if (target.height !== mh) target.height = mh;
-  const tctx = target.getContext("2d")!;
-  const img = asDrawable(source);
+let edgeShiftLutCache: Uint8ClampedArray | null = null;
+let edgeShiftLutFor = NaN;
+function edgeShiftLut(shift: number): Uint8ClampedArray {
+  if (edgeShiftLutCache && edgeShiftLutFor === shift) return edgeShiftLutCache;
+  // shift<0(침식) → g>1 → 전환대가 안쪽으로, shift>0(팽창) → g<1 → 바깥쪽으로.
+  const g = Math.pow(2, (-shift / 100) * EDGE_SHIFT_GAMMA);
+  const lut = new Uint8ClampedArray(256);
+  for (let i = 0; i < 256; i++) lut[i] = Math.pow(i / 255, g) * 255;
+  edgeShiftLutCache = lut;
+  edgeShiftLutFor = shift;
+  return lut;
+}
 
-  tctx.filter = "none";
-  tctx.imageSmoothingEnabled = true;
-  tctx.imageSmoothingQuality = "high";
-  tctx.clearRect(0, 0, mw, mh);
-  if (dest) tctx.drawImage(img, dest.x, dest.y, dest.w, dest.h);
-  else tctx.drawImage(img, 0, 0, mw, mh);
+export function createMaskBaker(): MaskBaker {
+  let srcCanvas: HTMLCanvasElement | null = null;
+  let padCanvas: HTMLCanvasElement | null = null;
+  let blurCanvas: HTMLCanvasElement | null = null;
+  // 시간축 평활용 직전 알파. 두께 보정 **전** 값을 담는다 — 보정 후 값을 되먹이면 매 프레임
+  // 두께가 누적돼 실루엣이 계속 부풀거나 사라진다.
+  let prevAlpha: Uint8ClampedArray | null = null;
 
-  if (blurPx < BLUR_MIN_PX) return;
+  const sized = (c: HTMLCanvasElement | null, w: number, h: number): HTMLCanvasElement => {
+    const canvas = c ?? document.createElement("canvas");
+    if (canvas.width !== w) canvas.width = w;
+    if (canvas.height !== h) canvas.height = h;
+    return canvas;
+  };
 
-  const pad = Math.ceil(blurPx * 3);
-  const pw = mw + pad * 2;
-  const ph = mh + pad * 2;
+  /** ImageData는 drawImage 소스가 못 되므로 스크래치 캔버스를 거친다. */
+  const asDrawable = (source: ImageData | CanvasImageSource): CanvasImageSource => {
+    if (source instanceof ImageData) {
+      srcCanvas = sized(srcCanvas, source.width, source.height);
+      srcCanvas.getContext("2d")!.putImageData(source, 0, 0);
+      return srcCanvas;
+    }
+    return source;
+  };
 
-  padCanvas = sized(padCanvas, pw, ph);
-  const pctx = padCanvas.getContext("2d")!;
-  pctx.filter = "none";
-  pctx.imageSmoothingEnabled = false; // 1px 테두리를 늘려 붙이기만 한다 — 보간할 것이 없다
-  pctx.clearRect(0, 0, pw, ph);
-  pctx.drawImage(target, pad, pad);
-  // 상·하·좌·우 1px 복제
-  pctx.drawImage(target, 0, 0, mw, 1, pad, 0, mw, pad);
-  pctx.drawImage(target, 0, mh - 1, mw, 1, pad, pad + mh, mw, pad);
-  pctx.drawImage(target, 0, 0, 1, mh, 0, pad, pad, mh);
-  pctx.drawImage(target, mw - 1, 0, 1, mh, pad + mw, pad, pad, mh);
-  // 네 모서리
-  pctx.drawImage(target, 0, 0, 1, 1, 0, 0, pad, pad);
-  pctx.drawImage(target, mw - 1, 0, 1, 1, pad + mw, 0, pad, pad);
-  pctx.drawImage(target, 0, mh - 1, 1, 1, 0, pad + mh, pad, pad);
-  pctx.drawImage(target, mw - 1, mh - 1, 1, 1, pad + mw, pad + mh, pad, pad);
+  return {
+    reset() {
+      prevAlpha = null;
+    },
 
-  blurCanvas = sized(blurCanvas, pw, ph);
-  const bctx = blurCanvas.getContext("2d")!;
-  bctx.clearRect(0, 0, pw, ph);
-  bctx.filter = `blur(${blurPx}px)`;
-  bctx.drawImage(padCanvas, 0, 0);
-  bctx.filter = "none";
+    bake(target, source, mw, mh, dest, tuning = DEFAULT_MASK_TUNING) {
+      if (target.width !== mw) target.width = mw;
+      if (target.height !== mh) target.height = mh;
+      const tctx = target.getContext("2d", { willReadFrequently: true })!;
+      const img = asDrawable(source);
 
-  tctx.clearRect(0, 0, mw, mh);
-  tctx.drawImage(blurCanvas, pad, pad, mw, mh, 0, 0, mw, mh);
+      tctx.filter = "none";
+      tctx.imageSmoothingEnabled = true;
+      tctx.imageSmoothingQuality = "high";
+      tctx.clearRect(0, 0, mw, mh);
+      if (dest) tctx.drawImage(img, dest.x, dest.y, dest.w, dest.h);
+      else tctx.drawImage(img, 0, 0, mw, mh);
+
+      // ── 공간 블러 ── 256 격자 계단을 지운다.
+      const blurPx = maskBlurPx(dest ? dest.w : mw, tuning);
+      if (blurPx >= BLUR_MIN_PX) {
+        // 블러는 캔버스 바깥을 투명으로 보기 때문에, 어깨처럼 **화면 끝에 닿은 부위**가 그대로
+        // 블러되면 프레임 가장자리를 따라 반투명 띠가 생긴다. 패딩된 캔버스에 가장자리 1px을
+        // 바깥으로 복제(edge clamp)한 뒤 블러하고 되잘라 이를 막는다.
+        const pad = Math.ceil(blurPx * 3);
+        const pw = mw + pad * 2;
+        const ph = mh + pad * 2;
+
+        padCanvas = sized(padCanvas, pw, ph);
+        const pctx = padCanvas.getContext("2d")!;
+        pctx.filter = "none";
+        pctx.imageSmoothingEnabled = false; // 1px 테두리를 늘려 붙이기만 한다 — 보간할 것이 없다
+        pctx.clearRect(0, 0, pw, ph);
+        pctx.drawImage(target, pad, pad);
+        // 상·하·좌·우 1px 복제
+        pctx.drawImage(target, 0, 0, mw, 1, pad, 0, mw, pad);
+        pctx.drawImage(target, 0, mh - 1, mw, 1, pad, pad + mh, mw, pad);
+        pctx.drawImage(target, 0, 0, 1, mh, 0, pad, pad, mh);
+        pctx.drawImage(target, mw - 1, 0, 1, mh, pad + mw, pad, pad, mh);
+        // 네 모서리
+        pctx.drawImage(target, 0, 0, 1, 1, 0, 0, pad, pad);
+        pctx.drawImage(target, mw - 1, 0, 1, 1, pad + mw, 0, pad, pad);
+        pctx.drawImage(target, 0, mh - 1, 1, 1, 0, pad + mh, pad, pad);
+        pctx.drawImage(target, mw - 1, mh - 1, 1, 1, pad + mw, pad + mh, pad, pad);
+
+        blurCanvas = sized(blurCanvas, pw, ph);
+        const bctx = blurCanvas.getContext("2d")!;
+        bctx.clearRect(0, 0, pw, ph);
+        bctx.filter = `blur(${blurPx}px)`;
+        bctx.drawImage(padCanvas, 0, 0);
+        bctx.filter = "none";
+
+        tctx.clearRect(0, 0, mw, mh);
+        tctx.drawImage(blurCanvas, pad, pad, mw, mh, 0, 0, mw, mh);
+      }
+
+      // ── 경계 두께 + 시간축 평활 ── 둘 다 알파만 만지므로 픽셀 패스 한 번에 처리한다.
+      // 추론마다 한 번이라(매 프레임이 아니라) readback 비용을 감당할 수 있다.
+      const shift = clamp(tuning.edgeShift, -100, 100);
+      const weight = (clamp(tuning.temporal, 0, 100) / 100) * TEMPORAL_MAX;
+      if (shift === 0 && weight === 0) {
+        prevAlpha = null; // 평활을 끈 상태의 낡은 상태를 들고 있지 않는다
+        return;
+      }
+
+      const n = mw * mh;
+      if (prevAlpha && prevAlpha.length !== n) prevAlpha = null; // 해상도가 바뀌면 이전 값은 무의미
+      const blend = prevAlpha ? weight : 0; // 첫 프레임엔 섞을 이전 마스크가 없다
+      const keep = prevAlpha ?? new Uint8ClampedArray(n);
+      const lut = shift === 0 ? null : edgeShiftLut(shift);
+
+      const image = tctx.getImageData(0, 0, mw, mh);
+      const d = image.data;
+      for (let i = 0; i < n; i++) {
+        const j = i * 4 + 3;
+        let a = d[j];
+        if (blend > 0) a = keep[i] * blend + a * (1 - blend);
+        keep[i] = a; // 되먹임은 두께 보정 **전** 값으로 — 보정 후를 되먹이면 프레임마다 누적된다
+        d[j] = lut ? lut[keep[i]] : a;
+      }
+      tctx.putImageData(image, 0, 0);
+      prevAlpha = weight > 0 ? keep : null;
+    },
+  };
 }

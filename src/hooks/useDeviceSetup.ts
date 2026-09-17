@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import type { DeviceConfig, BGImage } from "@/types";
-import { parseIntSafe, parseBgRemovalMode, parsePaymentTerminalMode, parseCaptureModes, parseCameraResolution, clampPercent, clampSigned } from "@/lib/deviceConfig";
+import { parseIntSafe, parseBgRemovalMode, parsePaymentTerminalMode, parseCaptureModes, parseCameraResolution, clampPercent, clampSigned, parseSegmentProcessScale } from "@/lib/deviceConfig";
 import { DEFAULT_CAMERA_RESOLUTION } from "@/constants/camera";
 import { LOGO_IMAGE_TYPE, WALLPAPER_IMAGE_TYPE, BUTTON_IMAGE_TYPE, WALLPAPER_NAME_LANDSCAPE, WALLPAPER_NAME_PORTRAIT, WALLPAPER_NAME_SUB_LANDSCAPE, WALLPAPER_NAME_SUB_PORTRAIT, BUTTON_NAME_CAPTURE, BUTTON_NAME_NEXT, BUTTON_NAME_PAYMENT } from "@/constants/images";
 
@@ -68,6 +68,12 @@ const DEFAULT_CONFIG: DeviceConfig = {
   printAutoTimerSeconds: 30,
   segmentThreshold: 15,
   segmentFeather: 35,
+  segmentMaskBlur: 100,
+  segmentEdgeShift: 0,
+  segmentTemporal: 0,
+  segmentRoi: true,
+  segmentRoiMargin: 22,
+  segmentProcessScale: "auto",
   themeTextColor: "#ffffff",
   themePrimaryColor: "#6c6fb4",
   themeBgColor: "#2a2a2a",
@@ -159,6 +165,13 @@ export function useDeviceSetup(deviceId: string) {
           printAutoTimerSeconds: parseIntSafe(s.PRINT_AUTO_TIMER || "", 30),
           segmentThreshold: clampPercent(parseIntSafe(s.CAPTURE_THRESHOLD || "", 15)),
           segmentFeather: clampPercent(parseIntSafe(s.CAPTURE_SMOOTHNESS || "", 35), 1),
+          segmentMaskBlur: clampSigned(parseIntSafe(s.CAPTURE_MASK_BLUR || "", 100), 0, 200),
+          segmentEdgeShift: clampSigned(parseIntSafe(s.CAPTURE_EDGE_SHIFT || "", 0)),
+          segmentTemporal: clampPercent(parseIntSafe(s.CAPTURE_TEMPORAL || "", 0)),
+          // 저장된 적 없으면(undefined) 기본 켬. 끄려면 명시적으로 "off"가 들어온다.
+          segmentRoi: (s.CAPTURE_ROI || "on") !== "off",
+          segmentRoiMargin: clampPercent(parseIntSafe(s.CAPTURE_ROI_MARGIN || "", 22)),
+          segmentProcessScale: parseSegmentProcessScale(s.CAPTURE_PROCESS_SCALE || ""),
           themeTextColor: s.THEME_TEXT_COLOR || "#ffffff",
           themePrimaryColor: s.THEME_PRIMARY_COLOR || "#6c6fb4",
           themeBgColor: s.THEME_BG_COLOR || "#2a2a2a",
