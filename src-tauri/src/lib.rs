@@ -836,6 +836,28 @@ fn should_close_subwindows_with(window_label: &str) -> bool {
     window_label == "main"
 }
 
+/// Node 서버를 종료하고 실제로 죽을 때까지 기다린다.
+///
+/// Windows의 kill()은 TerminateProcess를 "요청"만 하고 즉시 반환한다.
+/// wait() 없이 앱 프로세스가 먼저 사라지면 node.exe가 3001 포트를 쥔 채
+/// 고아로 남아, 다음 실행이 포트 정리에 시간을 쓰거나 아예 막힌다.
+///
+/// Mutex에서 child를 꺼내가므로 여러 번 불러도 안전하다(멱등) —
+/// 창 파괴와 앱 종료 양쪽에서 부르기 때문에 이 성질이 필요하다.
+#[cfg(not(debug_assertions))]
+fn shutdown_node_server(app: &tauri::AppHandle) {
+    let Some(state) = app.try_state::<NodeProcess>() else {
+        return;
+    };
+    let Ok(mut guard) = state.0.lock() else {
+        return;
+    };
+    if let Some(mut child) = guard.take() {
+        let _ = child.kill();
+        let _ = child.wait();
+    }
+}
+
 /// F11 전체화면 ↔ 창 모드 토글.
 /// 창은 borderless 1920x1080 전체화면으로 시작하므로, 전체화면만 해제하면
 /// 여전히 모니터 전체를 덮어 아무 변화가 없어 보인다. 창 모드로 나올 때는
@@ -1114,18 +1136,23 @@ pub fn run() {
                     return;
                 }
                 #[cfg(not(debug_assertions))]
-                if let Some(state) = window.try_state::<NodeProcess>() {
-                    if let Ok(mut guard) = state.0.lock() {
-                        if let Some(mut child) = guard.take() {
-                            let _ = child.kill();
-                        }
-                    }
-                }
+                shutdown_node_server(window.app_handle());
             }
             _ => {}
         })
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .build(tauri::generate_context!())
+        .expect("error while building tauri application")
+        .run(|_app_handle, _event| {
+            // 종료 경로 안전망. 위 Destroyed 훅은 메인 창이 파괴될 때만 도는데,
+            // app.exit()(스플래시 단계 Alt+F4)이나 마지막 창이 닫혀 끝나는 경로 등
+            // 그걸 거치지 않는 종료가 있다. 그런 경우 node.exe가 3001 포트를 쥔 채
+            // 고아로 남아 다음 실행을 방해한다.
+            // shutdown_node_server는 멱등이라 Destroyed에서 이미 정리됐으면 아무 일도 안 한다.
+            #[cfg(not(debug_assertions))]
+            if let tauri::RunEvent::ExitRequested { .. } = _event {
+                shutdown_node_server(_app_handle);
+            }
+        });
 }
 
 #[cfg(test)]
