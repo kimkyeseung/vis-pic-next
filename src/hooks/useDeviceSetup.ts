@@ -52,8 +52,10 @@ const DEFAULT_CONFIG: DeviceConfig = {
   chromakeyChoke: 0,
   chromakeyLumaIndependent: false,
   chromakeyYuvRgb: "0,255,0",
-  chromakeyYuvSimilarity: 50,
-  chromakeyYuvSmoothness: 50,
+  // 감도/부드러움 기본값이 chromakey 모드(50/50)보다 낮은 이유는 lib/chromakeyYuv.ts 헤더 주석 참고 —
+  // UV 거리 스케일에서는 50/50이면 페더 구간이 인물 색까지 덮어 피사체가 반투명해진다.
+  chromakeyYuvSimilarity: 30,
+  chromakeyYuvSmoothness: 10,
   chromakeyYuvSpill: 0,
   chromakeyYuvOpacity: 100,
   chromakeyYuvContrast: 0,
@@ -141,8 +143,8 @@ export function useDeviceSetup(deviceId: string) {
           chromakeyChoke: clampPercent(parseIntSafe(s.CHROMAKEY_CHOKE || "", 0)),
           chromakeyLumaIndependent: s.CHROMAKEY_LUMA === "on",
           chromakeyYuvRgb: s.CHROMAKEY_YUV_RGB || "0,255,0",
-          chromakeyYuvSimilarity: clampPercent(parseIntSafe(s.CHROMAKEY_YUV_SIMILARITY || "", 50), 1),
-          chromakeyYuvSmoothness: clampPercent(parseIntSafe(s.CHROMAKEY_YUV_SMOOTHNESS || "", 50)),
+          chromakeyYuvSimilarity: clampPercent(parseIntSafe(s.CHROMAKEY_YUV_SIMILARITY || "", 30), 1),
+          chromakeyYuvSmoothness: clampPercent(parseIntSafe(s.CHROMAKEY_YUV_SMOOTHNESS || "", 10)),
           chromakeyYuvSpill: clampPercent(parseIntSafe(s.CHROMAKEY_YUV_SPILL || "", 0)),
           chromakeyYuvOpacity: clampPercent(parseIntSafe(s.CHROMAKEY_YUV_OPACITY || "", 100)),
           chromakeyYuvContrast: clampSigned(parseIntSafe(s.CHROMAKEY_YUV_CONTRAST || "", 0)),

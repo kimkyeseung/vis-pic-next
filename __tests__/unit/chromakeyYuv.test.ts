@@ -28,6 +28,39 @@ describe("applyChromaKeyYuv — 기본 키잉(색차 거리)", () => {
   });
 });
 
+// 운영 기본값(useDeviceSetup·관리자 폼·CameraStreamer가 공유). 이 조합에서 인물이 반투명해지는
+// 회귀를 막기 위한 값 — 바꾸려면 chromakeyYuv.ts 헤더의 `threshold + band < 136` 조건을 먼저 확인할 것.
+const DEFAULT_SIMILARITY = 30;
+const DEFAULT_SMOOTHNESS = 10;
+
+describe("applyChromaKeyYuv — 운영 기본값(감도 30 / 부드러움 10)", () => {
+  // 기본값이 50/50이던 시절엔 페더 구간이 100~200이라 아래 색들이 전부 alpha 90~130으로
+  // 반투명하게 찍혔다. 페더 상한(60+20=80)이 무채색 거리(~136)보다 확실히 낮아야 한다.
+  it.each([
+    ["피부", 230, 180, 150],
+    ["어두운 피부", 140, 100, 80],
+    ["흰색", 255, 255, 255],
+    ["회색", 128, 128, 128],
+    ["검정", 0, 0, 0],
+    ["갈색 머리", 80, 55, 40],
+    ["청바지", 60, 80, 140],
+    ["연두색 옷", 150, 200, 90],
+  ])("%s 픽셀은 완전 불투명(alpha 255)으로 남는다", (_label, r, g, b) => {
+    const d = px(r, g, b);
+    applyChromaKeyYuv(d, 1, 1, GREEN, DEFAULT_SIMILARITY, DEFAULT_SMOOTHNESS);
+    expect(d[3]).toBe(255);
+  });
+
+  it("스포이드로 찍은 그린스크린 색과 그 그늘진 부분은 제거된다", () => {
+    const key = { r: 40, g: 200, b: 60 }; // 실제 스크린에서 샘플한 키 색
+    for (const [r, g, b] of [[40, 200, 60], [90, 255, 110], [20, 110, 35], [80, 180, 90]]) {
+      const d = px(r, g, b);
+      applyChromaKeyYuv(d, 1, 1, key, DEFAULT_SIMILARITY, DEFAULT_SMOOTHNESS);
+      expect(d[3]).toBe(0);
+    }
+  });
+});
+
 describe("applyChromaKeyYuv — 스필 제거", () => {
   it("남은 픽셀의 키 색 방향 색차 성분을 줄여 초록 기운을 눌러낸다(강도 100)", () => {
     // 초록이 섞인 살구색 픽셀(테두리 초록 번짐 상황을 흉내).

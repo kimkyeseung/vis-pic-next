@@ -118,8 +118,8 @@ const FIELDS: { name: string; label: string; type?: "text" | "number" | "range" 
     type: "range",
     min: 1,
     max: 100,
-    default: 50,
-    hint: "높일수록 키 색과 더 먼 색까지 제거됩니다. 기본값 50.",
+    default: 30,
+    hint: "높일수록 키 색과 더 먼 색까지 제거됩니다. 기본값 30 — 65를 넘기면 피부·머리카락 같은 무채색 계열까지 지워집니다.",
     showIf: (s) => s.CHROMAKEY_MODE === "chromakey-yuv",
   },
   {
@@ -128,8 +128,8 @@ const FIELDS: { name: string; label: string; type?: "text" | "number" | "range" 
     type: "range",
     min: 0,
     max: 100,
-    default: 50,
-    hint: "낮을수록 경계가 딱딱하게 잘리고, 높을수록 부드럽게 번집니다. 기본값 50.",
+    default: 10,
+    hint: "낮을수록 경계가 딱딱하게 잘리고, 높을수록 부드럽게 번집니다. 기본값 10 — 과하게 올리면 인물 전체가 반투명해집니다.",
     showIf: (s) => s.CHROMAKEY_MODE === "chromakey-yuv",
   },
   {
@@ -364,9 +364,9 @@ export default function CaptureSettingPage() {
           onLumaIndependentChange={(v) => updateSetting("CHROMAKEY_LUMA", v ? "on" : "off")}
           yuvChromaColor={parseRgbString(settings.CHROMAKEY_YUV_RGB || "0,255,0")}
           onYuvChromaColorChange={(rgb) => updateSetting("CHROMAKEY_YUV_RGB", rgb)}
-          yuvSimilarity={clampPercent(parseIntSafe(settings.CHROMAKEY_YUV_SIMILARITY || "", 50), 1)}
+          yuvSimilarity={clampPercent(parseIntSafe(settings.CHROMAKEY_YUV_SIMILARITY || "", 30), 1)}
           onYuvSimilarityChange={(n) => updateSetting("CHROMAKEY_YUV_SIMILARITY", String(n))}
-          yuvSmoothness={clampPercent(parseIntSafe(settings.CHROMAKEY_YUV_SMOOTHNESS || "", 50))}
+          yuvSmoothness={clampPercent(parseIntSafe(settings.CHROMAKEY_YUV_SMOOTHNESS || "", 10))}
           onYuvSmoothnessChange={(n) => updateSetting("CHROMAKEY_YUV_SMOOTHNESS", String(n))}
           yuvSpill={clampPercent(parseIntSafe(settings.CHROMAKEY_YUV_SPILL || "", 0))}
           onYuvSpillChange={(n) => updateSetting("CHROMAKEY_YUV_SPILL", String(n))}

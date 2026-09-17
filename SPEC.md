@@ -758,7 +758,9 @@ sticker 오버레이 (canvas.drawImage / fillText)
 - 로직은 **신규 파일 `src/lib/chromakeyYuv.applyChromaKeyYuv`**(`chromakey.ts`는 수정하지 않음) — OBS 등 방송 소프트웨어의 크로마키 필터(유사성/매끄러움/스필 제거 + 투명도/대비/명암/감마)와 비슷한 조작감을 제공하는 자체 구현이며, 바이트 단위 재현이 아니다(OBS 소스 비공개)
 - 설정(관리자 촬영 설정 페이지·미리보기에서 조정):
   - `CHROMAKEY_YUV_RGB`(키 색상, 기본 "0,255,0")
-  - `CHROMAKEY_YUV_SIMILARITY`(감도, 1-100, 기본 50) · `CHROMAKEY_YUV_SMOOTHNESS`(경계 부드러움, 0-100, 기본 50)
+  - `CHROMAKEY_YUV_SIMILARITY`(감도, 1-100, 기본 30) · `CHROMAKEY_YUV_SMOOTHNESS`(경계 부드러움, 0-100, 기본 10)
+    - 기본값이 `chromakey` 모드(50/50)보다 낮은 이유: 판정 단위가 UV 거리라 초록 키에서 무채색까지의 거리가 **약 136**뿐이다. 감도 50/부드러움 50이면 페더 구간이 100~200이 되어 피부(147)·머리(141)·무채색(136)이 전부 페더에 걸려 인물이 alpha 90~120의 반투명으로 찍힌다. 기본값 30/10은 완전제거 ≤60, 페더 60~80으로 실제 그린스크린 변이(그늘 ~36, 짙은 그늘 ~52)를 덮으면서 무채색까지 56의 여유를 남긴다
+    - 같은 이유로 감도를 **68 이상**으로 올리면 무채색·피부까지 threshold 안에 들어와 화면 전체가 지워진다
   - `CHROMAKEY_YUV_SPILL`(스필 제거, 0-100, 기본 0) · `CHROMAKEY_YUV_OPACITY`(결과 전체 투명도 배율, 0-100, 기본 100)
   - `CHROMAKEY_YUV_CONTRAST` · `CHROMAKEY_YUV_BRIGHTNESS` · `CHROMAKEY_YUV_GAMMA`(대비/명암/감마, -100~100, 기본 0)
 - **판정 방식**: RGB를 BT.601 YUV로 변환해 **색차(U,V)만 비교**하고 밝기(Y)는 무시한다 — 그늘지거나 밝게 반사된 같은 키 색도 한 감도로 함께 잡힌다(`chromakey` 모드의 `CHROMAKEY_LUMA=on`과 비슷한 효과가 기본 내장돼 있으며, 이 모드엔 별도 토글이 없다)
