@@ -5,6 +5,15 @@ import { useFrameSender } from "@/hooks/useSceneSync";
 import { fillGradientFromCSS } from "@/lib/canvas";
 import { applyChromaKey } from "@/lib/chromakey";
 import { applyChromaKeyYuv } from "@/lib/chromakeyYuv";
+import {
+  bakeAlphaMask,
+  bakeBlurredMask,
+  bboxToFrame,
+  maskBlurPx,
+  nextRoi,
+  ROI_INPUT_SIZE,
+  type Roi,
+} from "@/lib/segmentMask";
 import { FALLBACK_BACKGROUNDS } from "@/constants/frames";
 import { suppressMediapipeLogs } from "@/lib/suppressMediapipeLogs";
 import type { BGImage, BgRemovalMode } from "@/types";
@@ -93,8 +102,13 @@ export function CameraStreamer({
   const lastSentRef = useRef(0);
   const bgSourceRef = useRef<HTMLImageElement | HTMLVideoElement | null>(null);
   const segmenterRef = useRef<Segmenter | null>(null);
-  // mediapipe 추론은 무거우므로 스로틀링해서 재사용한다 (CameraSection.tsx와 동일한 이유)
-  const lastMaskRef = useRef<{ data: Float32Array; w: number; h: number } | null>(null);
+  // mediapipe 추론은 무거우므로 스로틀링해서 재사용한다 (useCameraCapture와 동일한 이유).
+  // 추론마다 프레임 전체를 덮는 soft-alpha 마스크를 이 캔버스에 한 번만 굽고(블러 포함),
+  // 매 프레임에는 GPU 합성(destination-in)으로만 적용한다.
+  const maskCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const maskReadyRef = useRef(false);
+  // 다음 추론에 쓸 인물 주변 크롭(전체 프레임 픽셀 좌표). null이면 프레임 전체를 본다.
+  const roiRef = useRef<Roi | null>(null);
   const lastInferenceTimeRef = useRef(0);
 
   // 애니메이션 루프에서 최신 값을 읽기 위한 ref
@@ -173,7 +187,8 @@ export function CameraStreamer({
     if (bgRemovalMode !== "mediapipe") {
       segmenterRef.current?.close();
       segmenterRef.current = null;
-      lastMaskRef.current = null;
+      maskReadyRef.current = false;
+      roiRef.current = null;
       lastInferenceTimeRef.current = 0;
       return;
     }
@@ -202,7 +217,8 @@ export function CameraStreamer({
       cancelled = true;
       segmenterRef.current?.close();
       segmenterRef.current = null;
-      lastMaskRef.current = null;
+      maskReadyRef.current = false;
+      roiRef.current = null;
       lastInferenceTimeRef.current = 0;
     };
   }, [bgRemovalMode]);
@@ -222,6 +238,10 @@ export function CameraStreamer({
     const ctx = canvas.getContext("2d")!;
     const offscreen = document.createElement("canvas");
     const offCtx = offscreen.getContext("2d")!;
+    // ROI 추론 입력(정사각 고정) — 크기가 매 프레임 같아야 MediaPipe가 텐서를 다시 안 잡는다.
+    // 마스크 ImageData도 크기가 같은 동안 재사용한다(추론마다 수 MB 할당을 피한다).
+    let roiCanvas: HTMLCanvasElement | null = null;
+    let maskImage: ImageData | null = null;
 
     const drawBg = (w: number, h: number) => {
       const sbg = selectedBgRef.current;
@@ -353,49 +373,71 @@ export function CameraStreamer({
             ctx.drawImage(offscreen, 0, 0, cw, ch);
             ctx.restore();
           } else if (mode === "mediapipe" && segmenterRef.current) {
+            // 촬영 화면(useCameraCapture)과 같은 마스크 파이프라인 — ROI 크롭 추론 + 공간 블러로
+            // 256 격자 계단을 줄이고, 굽는 건 추론마다 한 번, 매 프레임에는 GPU 합성(destination-in)만
+            // 한다. 예전엔 프레임마다 pw×ph 픽셀 루프로 알파를 다시 썼다(src/lib/segmentMask.ts 참고).
             try {
               offCtx.drawImage(video, 0, 0, pw, ph);
 
               const now = performance.now();
-              if (now - lastInferenceTimeRef.current >= INFERENCE_INTERVAL_MS || !lastMaskRef.current) {
-                // 다운스케일된 offscreen을 입력으로 넘겨 마스크 자체를 더 작게 받는다
-                const result = segmenterRef.current.segmentForVideo(offscreen, now);
+              // 다음 추론이 볼 크롭. 해상도가 바뀌면 이전 ROI가 프레임 밖을 가리킬 수 있어 버린다.
+              const prev = roiRef.current;
+              const crop =
+                prev && prev.x >= 0 && prev.y >= 0 && prev.x + prev.w <= w && prev.y + prev.h <= h
+                  ? prev
+                  : null;
+              if (!crop) roiRef.current = null;
+              // 마스크 캔버스 좌표계에서 이번 크롭이 차지하는 자리(= 되붙일 위치).
+              const dest = crop
+                ? { x: (crop.x * pw) / w, y: (crop.y * ph) / h, w: (crop.w * pw) / w, h: (crop.h * ph) / h }
+                : null;
+
+              if (now - lastInferenceTimeRef.current >= INFERENCE_INTERVAL_MS || !maskReadyRef.current) {
+                let input: HTMLCanvasElement = offscreen; // 크롭이 없으면 이미 그려 둔 pw×ph 프레임
+                if (crop) {
+                  if (!roiCanvas) {
+                    roiCanvas = document.createElement("canvas");
+                    roiCanvas.width = ROI_INPUT_SIZE;
+                    roiCanvas.height = ROI_INPUT_SIZE;
+                  }
+                  const rctx = roiCanvas.getContext("2d")!;
+                  rctx.imageSmoothingEnabled = true;
+                  rctx.imageSmoothingQuality = "high";
+                  rctx.drawImage(video, crop.x, crop.y, crop.w, crop.h, 0, 0, ROI_INPUT_SIZE, ROI_INPUT_SIZE);
+                  input = roiCanvas;
+                }
+                const result = segmenterRef.current.segmentForVideo(input, now);
                 const masks = result.confidenceMasks;
                 if (masks && masks.length > 0) {
-                  lastMaskRef.current = {
-                    data: masks[0].getAsFloat32Array().slice(),
-                    w: masks[0].width ?? pw,
-                    h: masks[0].height ?? ph,
-                  };
+                  const arr = masks[0].getAsFloat32Array();
+                  const mw = masks[0].width ?? (crop ? ROI_INPUT_SIZE : pw);
+                  const mh = masks[0].height ?? (crop ? ROI_INPUT_SIZE : ph);
+                  if (!maskImage || maskImage.width !== mw || maskImage.height !== mh) maskImage = new ImageData(mw, mh);
+                  // 이 컴포넌트는 멀티클래스 모델만 쓴다 → masks[0]=배경(전경 = 1 - v).
+                  const bbox = bakeAlphaMask(arr, maskImage.data, mw, mh, {
+                    fgIsMask0: false,
+                    thresh: segmentThreshRef.current,
+                    feather: segmentFeatherRef.current,
+                  });
+                  let mc = maskCanvasRef.current;
+                  if (!mc) { mc = document.createElement("canvas"); maskCanvasRef.current = mc; }
+                  // 마스크 캔버스는 ROI 유무와 무관하게 항상 프레임 전체(pw×ph)를 덮는다.
+                  bakeBlurredMask(mc, maskImage, pw, ph, maskBlurPx(dest ? dest.w : pw), dest);
                   lastInferenceTimeRef.current = now;
+                  maskReadyRef.current = true;
+                  // 다음 추론용 크롭 갱신. 전경을 못 찾았으면 전체 프레임에서 다시 찾는다.
+                  roiRef.current = bbox
+                    ? nextRoi(bboxToFrame(bbox, mw, mh, crop, w, h), w, h, crop)
+                    : null;
                 }
               }
 
-              const cached = lastMaskRef.current;
-              if (cached) {
-                const imgData = offCtx.getImageData(0, 0, pw, ph);
-                const d = imgData.data;
-                const bgMask = cached.data;
-                const maskW = cached.w;
-                const maskH = cached.h;
-                const THRESH = segmentThreshRef.current;
-                const FEATHER = segmentFeatherRef.current;
-                if (bgMask.length === pw * ph) {
-                  for (let i = 0; i < bgMask.length; i++) {
-                    const alpha = Math.max(0, Math.min(1, (1 - bgMask[i] - THRESH) / FEATHER));
-                    d[i * 4 + 3] = Math.round(alpha * 255);
-                  }
-                } else {
-                  for (let y = 0; y < ph; y++) {
-                    const my = Math.min(maskH - 1, Math.floor((y / ph) * maskH));
-                    for (let x = 0; x < pw; x++) {
-                      const mx = Math.min(maskW - 1, Math.floor((x / pw) * maskW));
-                      const alpha = Math.max(0, Math.min(1, (1 - (bgMask[my * maskW + mx] ?? 0) - THRESH) / FEATHER));
-                      d[(y * pw + x) * 4 + 3] = Math.round(alpha * 255);
-                    }
-                  }
-                }
-                offCtx.putImageData(imgData, 0, 0);
+              const mc = maskCanvasRef.current;
+              if (maskReadyRef.current && mc) {
+                offCtx.save();
+                offCtx.globalCompositeOperation = "destination-in";
+                offCtx.drawImage(mc, 0, 0, pw, ph);
+                offCtx.restore();
                 drawBg(cw, ch);
                 ctx.save();
                 ctx.translate(cw, 0);

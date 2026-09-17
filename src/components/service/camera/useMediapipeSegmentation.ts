@@ -3,13 +3,31 @@
 import { useEffect, useRef, useState } from "react";
 import type { ImageSegmenter } from "@mediapipe/tasks-vision";
 import type { BgRemovalMode } from "@/types";
+import {
+  bakeBlurredMask,
+  bboxToFrame,
+  maskBlurPx,
+  nextRoi,
+  type MaskBbox,
+  type Roi,
+} from "@/lib/segmentMask";
 
 // 워커 프로토콜(src/workers/segmenter.worker.ts 참고) 중 워커 → 메인 방향 메시지만 타입으로 재선언한다
 // (워커 파일 자체는 건드리지 않음 — 타입만 여기서 대응시켜 e.data의 암묵적 any를 없앤다).
 type WorkerOutMsg =
   | { type: "ready" }
   | { type: "error"; error: string }
-  | { type: "mask"; bitmap: ImageBitmap | null };
+  | {
+      type: "mask";
+      bitmap: ImageBitmap | null;
+      bbox: MaskBbox | null;
+      /** 이 마스크를 만든 크롭(전체 프레임 픽셀 좌표). null이면 프레임 전체를 봤다는 뜻. */
+      roi: Roi | null;
+      maskW: number;
+      maskH: number;
+      frameW: number;
+      frameH: number;
+    };
 
 /**
  * MediaPipe 배경제거 세그멘터의 **초기화·정리·설정동기화**만 담당한다. 메인 스레드 폴백 경로의
@@ -36,6 +54,7 @@ export function useMediapipeSegmentation({
   segmenterRef: React.RefObject<ImageSegmenter | null>;
   maskCanvasRef: React.RefObject<HTMLCanvasElement | null>;
   maskReadyRef: React.RefObject<boolean>;
+  roiRef: React.RefObject<Roi | null>;
   lastInferenceTimeRef: React.RefObject<number>;
   workerRef: React.RefObject<Worker | null>;
   workerBusyRef: React.RefObject<boolean>;
@@ -51,6 +70,11 @@ export function useMediapipeSegmentation({
   // GPU 합성(destination-in)으로만 적용한다 — per-frame getImageData/픽셀 루프 제거.
   const maskCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const maskReadyRef = useRef(false);
+  // 다음 추론에 쓸 크롭(전체 프레임 픽셀 좌표). null이면 프레임 전체를 본다.
+  // 모델 입력이 256×256 고정이라 프레임 전체를 넣으면 경계 해상도가 프레임 폭/256으로 묶인다 —
+  // 인물 주변만 잘라 넣으면 같은 256 격자가 더 좁은 면적을 덮어 계단 폭이 실제로 줄어든다.
+  // 마스크가 올 때마다 갱신되고, 여기서 만든 마스크를 되붙일 때도 같은 값을 쓴다.
+  const roiRef = useRef<Roi | null>(null);
   const lastInferenceTimeRef = useRef(0);
   const [segmenterStatus, setSegmenterStatus] = useState<"idle" | "loading" | "ready" | "error">("idle");
   const [segmenterError, setSegmenterError] = useState<string | null>(null);
@@ -133,12 +157,14 @@ export function useMediapipeSegmentation({
       workerActiveRef.current = false;
       setWorkerActive(false);
       maskReadyRef.current = false;
+      roiRef.current = null;
       initSegmenter();
     }
 
     // 초기 로딩 표시(effect 본문 동기 setState 회피 — 마이크로태스크로 미룸).
     Promise.resolve().then(() => { if (!cancelled) setSegmenterStatus("loading"); });
     maskReadyRef.current = false;
+    roiRef.current = null;
     workerBusyRef.current = false;
 
     // Web Worker 토글이 꺼져 있으면 곧장 메인 스레드 세그멘터를 쓴다(기본값).
@@ -170,18 +196,32 @@ export function useMediapipeSegmentation({
           fallbackToMainThread(msg.error);
         } else if (msg.type === "mask") {
           // 워커가 돌려준 alpha 마스크를 maskCanvasRef에 그려 둔다(표시 루프·촬영 캡처가 공유).
+          // maskCanvasRef는 ROI 유무와 무관하게 **항상 프레임 전체**(maskW×maskH)를 덮는다 —
+          // 소비하는 쪽(프리뷰 destination-in, captureHiRes)이 크롭을 몰라도 되도록.
           workerBusyRef.current = false;
           const bmp = msg.bitmap;
           if (bmp) {
+            const { maskW, maskH, frameW, frameH, roi, bbox } = msg;
+            const bw = bmp.width;
+            const bh = bmp.height;
             let mc = maskCanvasRef.current;
             if (!mc) { mc = document.createElement("canvas"); maskCanvasRef.current = mc; }
-            if (mc.width !== bmp.width) mc.width = bmp.width;
-            if (mc.height !== bmp.height) mc.height = bmp.height;
-            const mctx = mc.getContext("2d")!;
-            mctx.clearRect(0, 0, mc.width, mc.height);
-            mctx.drawImage(bmp, 0, 0);
+            // 크롭 사각형을 마스크 캔버스 좌표로 옮겨 그 자리에만 되붙인다.
+            const dest = roi
+              ? {
+                  x: (roi.x * maskW) / frameW,
+                  y: (roi.y * maskH) / frameH,
+                  w: (roi.w * maskW) / frameW,
+                  h: (roi.h * maskH) / frameH,
+                }
+              : null;
+            bakeBlurredMask(mc, bmp, maskW, maskH, maskBlurPx(dest ? dest.w : maskW), dest);
             bmp.close();
             maskReadyRef.current = true;
+            // 다음 추론에 쓸 크롭 갱신. 전경을 못 찾았으면 전체 프레임에서 다시 찾는다.
+            roiRef.current = bbox
+              ? nextRoi(bboxToFrame(bbox, bw, bh, roi, frameW, frameH), frameW, frameH, roi)
+              : null;
             const sent = perfRef.current.sentAt;
             if (sent) perfRef.current.inferMs = performance.now() - sent; // 계측: 워커 왕복 시간
           }
@@ -209,6 +249,7 @@ export function useMediapipeSegmentation({
       segmenterRef.current?.close();
       segmenterRef.current = null;
       maskReadyRef.current = false;
+      roiRef.current = null;
       lastInferenceTimeRef.current = 0;
       workerBusyRef.current = false;
     };
@@ -225,6 +266,7 @@ export function useMediapipeSegmentation({
     segmenterRef,
     maskCanvasRef,
     maskReadyRef,
+    roiRef,
     lastInferenceTimeRef,
     workerRef,
     workerBusyRef,

@@ -4,6 +4,15 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ImageSegmenter } from "@mediapipe/tasks-vision";
 import type { DeviceConfig, BgRemovalMode } from "@/types";
 import { computeCaptureSize } from "@/lib/canvas";
+import {
+  bakeAlphaMask,
+  bakeBlurredMask,
+  bboxToFrame,
+  maskBlurPx,
+  nextRoi,
+  ROI_INPUT_SIZE,
+  type Roi,
+} from "@/lib/segmentMask";
 import { applyChromaKey } from "@/lib/chromakey";
 import { applyChromaKeyYuv } from "@/lib/chromakeyYuv";
 import { useAutoCaptureTimer } from "@/hooks/useAutoCaptureTimer";
@@ -54,6 +63,7 @@ export function useCameraCapture({
   segmenterRef,
   maskCanvasRef,
   maskReadyRef,
+  roiRef,
   lastInferenceTimeRef,
   workerRef,
   workerBusyRef,
@@ -96,6 +106,8 @@ export function useCameraCapture({
   segmenterRef: React.RefObject<ImageSegmenter | null>;
   maskCanvasRef: React.RefObject<HTMLCanvasElement | null>;
   maskReadyRef: React.RefObject<boolean>;
+  /** 다음 추론에 쓸 인물 주변 크롭(전체 프레임 픽셀 좌표). null이면 프레임 전체. */
+  roiRef: React.RefObject<Roi | null>;
   lastInferenceTimeRef: React.RefObject<number>;
   workerRef: React.RefObject<Worker | null>;
   workerBusyRef: React.RefObject<boolean>;
@@ -253,6 +265,10 @@ export function useCameraCapture({
   // 배경과 동일하게 미러 없이 그린다. transition 모드는 배경 자체를 바꾸므로 여기서 그리지 않는다.
   useEffect(() => {
     const offscreen = document.createElement("canvas");
+    // ROI 추론 입력(정사각 고정) — 크기가 매 프레임 같아야 MediaPipe가 텐서를 다시 안 잡는다.
+    // 마스크 ImageData도 크기가 같은 동안 재사용한다(추론마다 수 MB 할당을 피한다).
+    let roiCanvas: HTMLCanvasElement | null = null;
+    let maskImage: ImageData | null = null;
 
     const processFrame = () => {
       const video = videoRef.current;
@@ -341,16 +357,36 @@ export function useCameraCapture({
       if (bgRemovalMode === "mediapipe") {
         try {
           const now = performance.now();
+          // 이번 추론이 볼 크롭. 모델 입력이 256×256 고정이라 프레임 전체를 넣으면 경계 해상도가
+          // (프레임 폭 / 256)으로 묶여 확대 시 계단이 된다 — 인물 주변만 잘라 넣어 그 폭을 줄인다.
+          // null이면 아직 인물을 못 찾았거나 인물이 프레임을 거의 채운 경우로, 전체 프레임을 본다.
+          const roi = roiRef.current;
+          // 해상도가 바뀌면(카메라 전환 등) 이전 ROI가 프레임 밖을 가리킬 수 있어 버린다.
+          const roiValid = !roi || (roi.x >= 0 && roi.y >= 0 && roi.x + roi.w <= w && roi.y + roi.h <= h);
+          if (!roiValid) roiRef.current = null;
+          const crop = roiValid ? roi : null;
+          // 마스크 캔버스 좌표계에서 이번 크롭이 차지하는 자리(= 되붙일 위치).
+          const dest = crop
+            ? { x: (crop.x * pw) / w, y: (crop.y * ph) / h, w: (crop.w * pw) / w, h: (crop.h * ph) / h }
+            : null;
+
           if (workerActiveRef.current && workerRef.current) {
             // 워커 경로: 무거운 추론+readback을 워커가 담당하므로 메인 스레드(표시 루프)는 안 막힌다.
-            // 워커가 idle일 때만 현재 프레임을 다운스케일(pw×ph)해 보낸다 — 큐 적체 방지.
+            // 워커가 idle일 때만 현재 프레임을 보낸다 — 큐 적체 방지.
             if (!workerBusyRef.current) {
               workerBusyRef.current = true;
               perfRef.current.sentAt = now;
-              createImageBitmap(video, { resizeWidth: pw, resizeHeight: ph, resizeQuality: "low" })
+              // resizeQuality "low"는 입력부터 에일리어싱시켜 마스크 경계를 더 지저분하게 만든다.
+              const opts = { resizeQuality: "medium" as const };
+              const src = crop
+                ? createImageBitmap(video, crop.x, crop.y, crop.w, crop.h, { ...opts, resizeWidth: ROI_INPUT_SIZE, resizeHeight: ROI_INPUT_SIZE })
+                : createImageBitmap(video, { ...opts, resizeWidth: pw, resizeHeight: ph });
+              src
                 .then((bmp) => {
                   const worker = workerRef.current;
-                  if (worker) worker.postMessage({ type: "frame", bitmap: bmp, timestamp: performance.now() }, [bmp]);
+                  // 크롭/치수를 함께 실어 보낸다 — 마스크가 돌아올 때 어느 자리에 되붙일지는
+                  // 그 사이 바뀌었을 수 있는 현재 ROI가 아니라 "보낼 때의 크롭"이 정한다.
+                  if (worker) worker.postMessage({ type: "frame", bitmap: bmp, timestamp: performance.now(), roi: crop, maskW: pw, maskH: ph, frameW: w, frameH: h }, [bmp]);
                   else bmp.close();
                 })
                 .catch(() => { workerBusyRef.current = false; });
@@ -358,35 +394,42 @@ export function useCameraCapture({
           } else if (segmenterRef.current) {
             // 메인 스레드 경로: 선택된 스로틀 간격(inferenceIntervalRef)마다 soft alpha 마스크를 굽는다.
             if (now - lastInferenceTimeRef.current >= inferenceIntervalRef.current || !maskReadyRef.current) {
+              let input: CanvasImageSource = offscreen; // 크롭이 없으면 이미 그려 둔 pw×ph 프레임
+              if (crop) {
+                if (!roiCanvas) { roiCanvas = document.createElement("canvas"); roiCanvas.width = ROI_INPUT_SIZE; roiCanvas.height = ROI_INPUT_SIZE; }
+                const rctx = roiCanvas.getContext("2d")!;
+                rctx.imageSmoothingEnabled = true;
+                rctx.imageSmoothingQuality = "high";
+                rctx.drawImage(video, crop.x, crop.y, crop.w, crop.h, 0, 0, ROI_INPUT_SIZE, ROI_INPUT_SIZE);
+                input = roiCanvas;
+              }
               const inferStart = performance.now();
-              const result = segmenterRef.current.segmentForVideo(offscreen, now);
+              const result = segmenterRef.current.segmentForVideo(input, now);
               const inferEnd = performance.now();
               const masks = result.confidenceMasks;
               if (masks && masks.length > 0) {
                 const mask = masks[0];
                 const arr = mask.getAsFloat32Array();
-                const mw = mask.width ?? pw;
-                const mh = mask.height ?? ph;
+                const mw = mask.width ?? (crop ? ROI_INPUT_SIZE : pw);
+                const mh = mask.height ?? (crop ? ROI_INPUT_SIZE : ph);
+                if (!maskImage || maskImage.width !== mw || maskImage.height !== mh) maskImage = new ImageData(mw, mh);
+                // 전경 극성: 경량 selfie는 masks[0]=전경, 멀티클래스는 masks[0]=배경(전경=1-v).
+                const bbox = bakeAlphaMask(arr, maskImage.data, mw, mh, {
+                  fgIsMask0: lightModelRef.current,
+                  thresh: segmentThresh,
+                  feather: segmentFeather,
+                });
                 let mc = maskCanvasRef.current;
                 if (!mc) { mc = document.createElement("canvas"); maskCanvasRef.current = mc; }
-                if (mc.width !== mw) mc.width = mw;
-                if (mc.height !== mh) mc.height = mh;
-                const mctx = mc.getContext("2d")!;
-                // 전경 극성: 경량 selfie는 masks[0]=전경, 멀티클래스는 masks[0]=배경(전경=1-v).
-                const fgIsMask0 = lightModelRef.current;
-                const mImg = mctx.createImageData(mw, mh);
-                const md = mImg.data;
-                const THRESH = segmentThresh;
-                const FEATHER = segmentFeather;
-                for (let i = 0; i < arr.length; i++) {
-                  const fgConf = fgIsMask0 ? arr[i] : 1 - arr[i];
-                  const softAlpha = Math.max(0, Math.min(1, (fgConf - THRESH) / FEATHER));
-                  md[i * 4] = 255; md[i * 4 + 1] = 255; md[i * 4 + 2] = 255;
-                  md[i * 4 + 3] = Math.round(softAlpha * 255);
-                }
-                mctx.putImageData(mImg, 0, 0);
+                // 마스크 캔버스는 ROI 유무와 무관하게 항상 프레임 전체(pw×ph)를 덮는다 —
+                // 소비하는 쪽(아래 destination-in, captureHiRes)이 크롭을 몰라도 되도록.
+                bakeBlurredMask(mc, maskImage, pw, ph, maskBlurPx(dest ? dest.w : pw), dest);
                 lastInferenceTimeRef.current = now;
                 maskReadyRef.current = true;
+                // 다음 추론용 크롭 갱신. 전경을 못 찾았으면 전체 프레임에서 다시 찾는다.
+                roiRef.current = bbox
+                  ? nextRoi(bboxToFrame(bbox, mw, mh, crop, w, h), w, h, crop)
+                  : null;
                 perfRef.current.inferMs = inferEnd - inferStart;
                 perfRef.current.maskMs = performance.now() - inferEnd;
               }
@@ -394,7 +437,7 @@ export function useCameraCapture({
           }
 
           // 워커/폴백 공통: 준비된 최신 마스크를 GPU 합성(destination-in)으로 적용.
-          // 마스크를 pw×ph로 확대할 때의 bilinear 보간이 경계를 더 부드럽게 해준다.
+          // 마스크는 이미 프레임 전체(pw×ph)에 공간 블러까지 구워진 상태라 그대로 1:1로 덮는다.
           const mc = maskCanvasRef.current;
           if (maskReadyRef.current && mc) {
             offCtx.save();
@@ -459,7 +502,7 @@ export function useCameraCapture({
 
     animFrameRef.current = requestAnimationFrame(processFrame);
     return () => cancelAnimationFrame(animFrameRef.current);
-  }, [selectedBackground, chromaKey, config.chromakeySimilarity, config.chromakeySmoothness, config.chromakeySpill, config.chromakeyChoke, config.chromakeyLumaIndependent, chromaKeyYuv, config.chromakeyYuvSimilarity, config.chromakeyYuvSmoothness, config.chromakeyYuvSpill, config.chromakeyYuvOpacity, config.chromakeyYuvContrast, config.chromakeyYuvBrightness, config.chromakeyYuvGamma, bgRemovalMode, segmentThresh, segmentFeather, useGpuDelegate, lightModelRef, inferenceIntervalRef, maskSmoothQualityRef, perfRef, segmenterRef, maskCanvasRef, maskReadyRef, lastInferenceTimeRef, workerRef, workerBusyRef, workerActiveRef, currentBgEffectRef, effectVisibleRef, effectAlphaRef, drawBackground, drawEffectLayer, frameChannelRef, snapshotWithStickers, videoRef, displayCanvasRef]);
+  }, [selectedBackground, chromaKey, config.chromakeySimilarity, config.chromakeySmoothness, config.chromakeySpill, config.chromakeyChoke, config.chromakeyLumaIndependent, chromaKeyYuv, config.chromakeyYuvSimilarity, config.chromakeyYuvSmoothness, config.chromakeyYuvSpill, config.chromakeyYuvOpacity, config.chromakeyYuvContrast, config.chromakeyYuvBrightness, config.chromakeyYuvGamma, bgRemovalMode, segmentThresh, segmentFeather, useGpuDelegate, lightModelRef, inferenceIntervalRef, maskSmoothQualityRef, perfRef, segmenterRef, maskCanvasRef, maskReadyRef, roiRef, lastInferenceTimeRef, workerRef, workerBusyRef, workerActiveRef, currentBgEffectRef, effectVisibleRef, effectAlphaRef, drawBackground, drawEffectLayer, frameChannelRef, snapshotWithStickers, videoRef, displayCanvasRef]);
 
   // 카운트다운 도중 언마운트(이전/다음 이동 등) 시 타이머가 살아남아
   // onCapture가 화면 전환 후에 실행되는 것을 막는다.

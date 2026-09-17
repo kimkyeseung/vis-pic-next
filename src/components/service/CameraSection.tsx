@@ -132,7 +132,7 @@ export function CameraSection({
   // MediaPipe 세그멘터 초기화·정리·설정동기화 — useMediapipeSegmentation 참고. 프레임별 마스크
   // 굽기(메인 스레드 핫패스)는 여기 반환된 refs를 아래 processFrame 루프가 직접 사용한다.
   const {
-    segmenterRef, maskCanvasRef, maskReadyRef, lastInferenceTimeRef,
+    segmenterRef, maskCanvasRef, maskReadyRef, roiRef, lastInferenceTimeRef,
     workerRef, workerBusyRef, workerActiveRef,
     segmenterStatus, segmenterError, workerActive,
   } = useMediapipeSegmentation({
@@ -159,7 +159,7 @@ export function CameraSection({
     bgRemovalMode, selectedBackground, segmentThresh, segmentFeather, debug,
     countdown, setCountdown,
     maskSmoothQuality, maskSmoothQualityRef, useGpuDelegate, lightModelRef, inferenceIntervalRef,
-    perfRef, segmenterRef, maskCanvasRef, maskReadyRef, lastInferenceTimeRef,
+    perfRef, segmenterRef, maskCanvasRef, maskReadyRef, roiRef, lastInferenceTimeRef,
     workerRef, workerBusyRef, workerActiveRef,
     currentBgEffectRef, effectVisibleRef, effectAlphaRef,
     backEffectRef, effectTimerRef, effectDurationRef, effectStartedAtRef, stopEffect,

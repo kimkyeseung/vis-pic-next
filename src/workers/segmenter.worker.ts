@@ -4,25 +4,40 @@
 // 이 무거운 작업을 워커로 옮겨 메인 스레드의 표시 루프가 절대 막히지 않게 한다.
 // 워커는 프레임(ImageBitmap)을 받아 추론 → soft-alpha 마스크(ImageBitmap)를 되돌려준다.
 //
+// ROI: 메인 스레드가 인물 주변만 잘라 보낼 수 있다(경계 계단 완화 — src/lib/segmentMask.ts 참고).
+// 워커는 크롭을 해석하지 않고 `roi`/`maskW`/`maskH`를 그대로 되돌려주기만 한다 — 어느 크롭의
+// 결과인지는 붙여넣는 쪽이 알아야 하고, 왕복 중에 메인 스레드의 ROI가 바뀌어도 어긋나지 않는다.
+//
 // 프로토콜:
-//   main → worker: { type:"init", useGpu, thresh, feather }
+//   main → worker: { type:"init", useGpu, light, thresh, feather }
 //                  { type:"config", thresh, feather }
-//                  { type:"frame", bitmap, timestamp }   (bitmap 소유권 이전)
-//                  { type:"close" }
+//                  { type:"frame", bitmap, timestamp, roi, maskW, maskH, frameW, frameH }
+//                  { type:"close" }                                       (bitmap 소유권 이전)
 //   worker → main: { type:"ready" }
 //                  { type:"error", error }
-//                  { type:"mask", bitmap|null }          (bitmap 소유권 이전)
+//                  { type:"mask", bitmap|null, bbox, roi, maskW, maskH, frameW, frameH }
+//                                                                         (bitmap 소유권 이전)
 
 import {
   FilesetResolver,
   ImageSegmenter,
   type ImageSegmenterResult,
 } from "@mediapipe/tasks-vision";
+import { bakeAlphaMask, type Roi } from "../lib/segmentMask";
 
 type InMsg =
   | { type: "init"; useGpu: boolean; light: boolean; thresh: number; feather: number }
   | { type: "config"; thresh: number; feather: number }
-  | { type: "frame"; bitmap: ImageBitmap; timestamp: number }
+  | {
+      type: "frame";
+      bitmap: ImageBitmap;
+      timestamp: number;
+      roi: Roi | null;
+      maskW: number;
+      maskH: number;
+      frameW: number;
+      frameH: number;
+    }
   | { type: "close" };
 
 const MODEL_LIGHT = "/static/mediapipe/model/selfie_segmenter.tflite";
@@ -83,6 +98,14 @@ async function handle(msg: InMsg) {
       return;
 
     case "frame": {
+      // 어느 크롭의 결과인지 붙여넣는 쪽이 알아야 하므로 실패 경로에서도 그대로 되돌려준다.
+      const echo = {
+        roi: msg.roi,
+        maskW: msg.maskW,
+        maskH: msg.maskH,
+        frameW: msg.frameW,
+        frameH: msg.frameH,
+      };
       if (!segmenter) {
         msg.bitmap.close();
         return;
@@ -99,20 +122,15 @@ async function handle(msg: InMsg) {
           const mh = mask.height;
           // 전경 확신도(모델 극성은 foregroundIsMask0). rgb는 흰색, alpha에만 soft mask를 굽는다.
           const img = new ImageData(mw, mh);
-          const d = img.data;
-          for (let i = 0; i < arr.length; i++) {
-            const fg = foregroundIsMask0 ? arr[i] : 1 - arr[i];
-            const a = Math.max(0, Math.min(1, (fg - thresh) / feather));
-            const j = i * 4;
-            d[j] = 255;
-            d[j + 1] = 255;
-            d[j + 2] = 255;
-            d[j + 3] = Math.round(a * 255);
-          }
+          const bbox = bakeAlphaMask(arr, img.data, mw, mh, {
+            fgIsMask0: foregroundIsMask0,
+            thresh,
+            feather,
+          });
           const out = await createImageBitmap(img);
-          post({ type: "mask", bitmap: out }, [out]);
+          post({ type: "mask", bitmap: out, bbox, ...echo }, [out]);
         } else {
-          post({ type: "mask", bitmap: null });
+          post({ type: "mask", bitmap: null, bbox: null, ...echo });
         }
       } catch (err) {
         post({

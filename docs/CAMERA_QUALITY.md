@@ -18,15 +18,15 @@
 
 ### 1-2. 두 개의 렌더 경로 (동일 수식)
 
-| 경로 | 컴포넌트 | 언제 |
-|------|----------|------|
-| 라이브 프리뷰 | `CameraStreamer` | 카메라 단계가 **아닌** 화면(배경 선택 등) |
-| 촬영 화면·촬영본 | `CameraSection` | 카메라 단계 + 실제 셔터 |
+| 경로 | 구현 | 언제 |
+|------|------|------|
+| 송출(서브 모니터) | `CameraStreamer` | 카메라 단계가 **아닌** 화면(배경 선택 등) |
+| 촬영 화면·촬영본 | `useCameraCapture` (+ 워커) | 카메라 단계 + 실제 셔터 |
+| 관리자 미리보기 | `usePreviewCamera` | `/admin/preview` 튜닝 다이얼로그 |
 
-- 두 경로가 **같은 알파 합성 수식**을 쓴다. 즉 설정값 조정은 프리뷰·촬영에 일관되게 반영된다.
-  (`CameraStreamer.tsx:305-317`, `CameraSection.tsx:945-951`)
-- 추론은 무거우므로 매 프레임이 아니라 **스로틀링**(초당 최대 N회)해서 돈다. 사이 프레임은 마지막 마스크를 GPU 합성으로 재사용한다.
-  (`CameraSection.tsx:852, 926, 959-962`)
+- 세 경로가 **같은 마스크 코드**(`src/lib/segmentMask.ts`)를 쓴다. 즉 설정값 조정이 미리보기·송출·촬영에 일관되게 반영된다.
+- 추론은 무거우므로 매 프레임이 아니라 **스로틀링**해서 돈다. 사이 프레임은 마지막으로 구워 둔 마스크
+  캔버스를 GPU 합성(`destination-in`)으로 재사용한다 — 프레임마다 픽셀 루프를 다시 돌지 않는다.
 
 ### 1-3. 촬영본 처리 (중요)
 
@@ -36,7 +36,37 @@
 - 인화 해상도 상한 `CAPTURE_MAX_W = 1800`(10×15cm 300DPI 기준). 그 이상은 인쇄상 무의미.
   (`CameraSection.tsx:743`)
 
-### 1-4. 마스크 합성 수식
+### 1-4. 마스크 후처리 (ROI 크롭 · 공간 블러)
+
+경계 계단(에일리어싱) 대책으로 두 단계가 더 있다. 둘 다 `src/lib/segmentMask.ts`에 있고,
+**촬영(`useCameraCapture`) · 송출(`CameraStreamer`) · 관리자 미리보기(`usePreviewCamera`)
+세 경로가 모두 같은 코드를 공유한다** (촬영 경로는 워커/메인 스레드 폴백도 동일).
+미리보기가 실제 화면과 다르게 보이면 슬라이더를 아무리 맞춰도 소용이 없으므로, 세 경로를
+갈라두지 말 것.
+
+- **ROI 크롭 추론** (`nextRoi`) — 직전 마스크의 전경 bbox에 여유를 붙인 사각형만 잘라 다음 추론에
+  넣는다. 모델 입력이 256×256 고정이라 프레임 전체를 넣으면 경계 해상도가 `프레임 폭 / 256`으로
+  묶이는데, 크롭하면 같은 격자가 더 좁은 면적을 덮어 **계단 폭이 실제로 줄어든다.**
+  - 정사각·프레임비율로 맞추지 **않는다.** 부스에서 인물은 보통 세로를 거의 채우므로 비율을 맞추면
+    어떤 크롭도 프레임만 해져 이득이 사라진다. 변마다 여유를 붙이고 프레임으로 자른다 —
+    위아래는 이미 화면이 인물을 자르므로 끝까지 가고, **좌우만 좁아진다.** 실루엣의 주요 경계가
+    세로 방향이라 가로 해상도가 곧 계단 폭이다.
+  - 어느 축도 의미 있게 줄지 않으면(`ROI_WORTH_RATIO`) `null` → 프레임 전체로 추론(기존 동작).
+  - 인물이 크롭의 **안쪽** 경계에 닿으면 여유를 두 배로 잡고 EMA 없이 즉시 넓힌다. 프레임 끝에
+    맞닿은 변은 원래 화면이 자르는 자리라 판단에서 뺀다.
+- **공간 블러** (`bakeBlurredMask`) — 구워진 마스크에 `ctx.filter = blur()`를 건다. 반경은 256 격자
+  텍셀 크기에 비례하므로 ROI로 좁게 볼수록 자동으로 약해진다.
+  - 블러는 캔버스 바깥을 투명으로 보기 때문에, 어깨처럼 **화면 끝에 닿은 부위**가 그대로 블러되면
+    프레임 가장자리에 반투명 띠가 생긴다. 패딩 캔버스에 가장자리 1px을 복제(edge clamp)한 뒤
+    블러하고 되잘라 이를 막는다.
+- 마스크 캔버스(`maskCanvasRef`)는 ROI 유무와 무관하게 **항상 프레임 전체**를 덮는다. 소비하는
+  쪽(프리뷰 `destination-in`, `captureHiRes`)은 크롭을 몰라도 된다.
+
+> 세 경로의 남은 차이는 **처리 해상도와 카메라 요청 비율뿐**이다 — 미리보기는 1280×720(16:9)에
+> `PROCESS_SCALE` 0.5 고정, 서비스는 4:3에 4K에서 0.25로 낮춘다. 블러 반경이 처리 해상도에
+> 비례하므로 보이는 결과의 성격은 같지만, 화각 자체는 미리보기와 촬영이 다르다.
+
+### 1-5. 마스크 합성 수식
 
 ```
 alpha = clamp01( (fgConf - THRESH) / FEATHER )     // fgConf = 1 - 배경확신도
@@ -73,6 +103,9 @@ alpha = clamp01( (fgConf - THRESH) / FEATHER )     // fgConf = 1 - 배경확신�
 | 3-1. 설정값 튜닝 | ✅ | ⚠️ (3-3 없을 때만) | 없음(숫자만) |
 | 3-2. 마스크 후처리 | ✅ | ⚠️ (3-3 없을 때만) | 중간 |
 | 3-3. 촬영 전용 고품질 모델 | ❌ | ✅✅ | 큼 |
+
+> **3-2 일부는 도입됨** — 공간 블러와 ROI 크롭 추론이 촬영 경로에 들어갔다(1-4). 남은 것은 아래
+> 3-2에 적힌 **guided filter(실제 RGB 윤곽에 마스크를 스냅)** 와 시간축 평활(EMA)이다.
 
 - **3-3을 도입하면** 인화본은 더 이상 프리뷰 마스크를 쓰지 않으므로, 3-1·3-2는 **프리뷰 화면 정확도 전용**으로 역할이 좁아진다.
 - **3-3이 사실상 본체(약 80% 가치)**, 3-1·3-2는 프리뷰 폴리시.
@@ -122,7 +155,10 @@ MediaPipe에 256보다 뚜렷이 나은 공식 tflite가 없어, 실시간 고�
 ### FEATHER를 넓히면
 
 - **윤곽 고스팅** — 실루엣 경계 전체가 더 반투명해져 배경이 비치는 반투명 테두리. 심하면 몸 외곽까지 흐릿.
-- 반대로 **너무 낮추면** 256 마스크를 확대할 때 경계가 계단처럼 각짐(에일리어싱).
+- 반대로 너무 낮춰도 **계단은 FEATHER로 못 고친다.** FEATHER는 confidence라는 **값 축**만 완만하게
+  만들 뿐 **공간 축**은 건드리지 않는다. 계단은 마스크의 기하학적 형태가 256 격자에 양자화돼서 생기는
+  것이라, 공간 블러(1-4)나 ROI 크롭(1-4)으로 다뤄야 한다. FEATHER를 넓히면 계단이 덜 보이는 대신
+  고스팅만 늘어난다.
 
 ### 공통
 
@@ -161,10 +197,13 @@ MediaPipe에 256보다 뚜렷이 나은 공식 tflite가 없어, 실시간 고�
 
 | 항목 | 위치 |
 |------|------|
-| 세그먼터 초기화 · 모델 로드 | `src/components/service/CameraSection.tsx` — `initSegmenter` effect |
-| 프리뷰 합성 루프(마스크 굽기·적용) | `src/components/service/CameraSection.tsx` — `processFrame` |
-| 촬영 순간 고해상도 합성(프리뷰 마스크 재사용) | `src/components/service/CameraSection.tsx` — `captureHiRes()` |
-| 보조 모니터 합성 | `src/components/service/CameraStreamer.tsx` |
+| 마스크 후처리(공간 블러 · ROI 크롭 · 알파 굽기) | `src/lib/segmentMask.ts` |
+| 세그먼터 초기화 · 정리 · 워커 마스크 수신 | `src/components/service/camera/useMediapipeSegmentation.ts` |
+| 프리뷰 합성 루프(추론·마스크 굽기·적용) | `src/components/service/camera/useCameraCapture.ts` — `processFrame` |
+| 촬영 순간 고해상도 합성(프리뷰 마스크 재사용) | `src/components/service/camera/useCameraCapture.ts` — `captureHiRes()` |
+| 워커 추론(추론+readback 분리) | `src/workers/segmenter.worker.ts` |
+| 보조 모니터 송출 합성 | `src/components/service/CameraStreamer.tsx` |
+| 관리자 미리보기 합성 | `src/components/admin/backgroundRemovalPreview/usePreviewCamera.ts` |
 | 설정 기본값(THRESH 15 / FEATHER 35)·소스 키 | `src/hooks/useDeviceSetup.ts` — `CAPTURE_THRESHOLD` / `CAPTURE_SMOOTHNESS` |
 | 관리자 조정 UI | `src/app/admin/(protected)/capture-setting/page.tsx` |
 | 방식별 미리보기 다이얼로그 | `src/components/admin/BackgroundRemovalPreviewDialog.tsx` |

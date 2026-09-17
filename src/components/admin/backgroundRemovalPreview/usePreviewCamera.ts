@@ -3,6 +3,15 @@
 import { useEffect, useRef, useState } from "react";
 import { applyChromaKey } from "@/lib/chromakey";
 import { applyChromaKeyYuv } from "@/lib/chromakeyYuv";
+import {
+  bakeAlphaMask,
+  bakeBlurredMask,
+  bboxToFrame,
+  maskBlurPx,
+  nextRoi,
+  ROI_INPUT_SIZE,
+  type Roi,
+} from "@/lib/segmentMask";
 
 // 크로마키 임계값은 감도(similarity)에서 파생한다 — CameraSection.tsx와 동일 규칙.
 // 배경제거 처리 해상도를 낮춰 프레임 드롭을 줄인다 (CameraSection.tsx와 동일한 이유).
@@ -90,8 +99,13 @@ export function usePreviewCamera({
   const streamRef = useRef<MediaStream | null>(null);
   const animFrameRef = useRef<number>(0);
   const segmenterRef = useRef<Segmenter>(null);
-  // mediapipe 추론은 무거우므로 스로틀링해서 재사용한다 (CameraSection.tsx와 동일한 이유)
-  const lastMaskRef = useRef<{ data: Float32Array; w: number; h: number } | null>(null);
+  // mediapipe 추론은 무거우므로 스로틀링해서 재사용한다 (useCameraCapture와 동일한 이유).
+  // 추론마다 프레임 전체를 덮는 soft-alpha 마스크를 이 캔버스에 한 번만 굽고(블러 포함),
+  // 매 프레임에는 GPU 합성(destination-in)으로만 적용한다.
+  const maskCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const maskReadyRef = useRef(false);
+  // 다음 추론에 쓸 인물 주변 크롭(전체 프레임 픽셀 좌표). null이면 프레임 전체를 본다.
+  const roiRef = useRef<Roi | null>(null);
   const lastInferenceTimeRef = useRef(0);
 
   // rAF 루프가 최신 값을 읽도록 ref로 미러링 (슬라이더 조작마다 이펙트/루프를 재시작하지 않기 위함)
@@ -216,6 +230,10 @@ export function usePreviewCamera({
 
         const offscreen = document.createElement("canvas");
         offscreenRef.current = offscreen;
+        // ROI 추론 입력(정사각 고정) — 크기가 매 프레임 같아야 MediaPipe가 텐서를 다시 안 잡는다.
+        // 마스크 ImageData도 크기가 같은 동안 재사용한다(추론마다 수 MB 할당을 피한다).
+        let roiCanvas: HTMLCanvasElement | null = null;
+        let maskImage: ImageData | null = null;
 
         const processFrame = () => {
           const video = videoRef.current;
@@ -240,36 +258,68 @@ export function usePreviewCamera({
           let processed = false;
 
           if (mode === "mediapipe" && segmenterRef.current) {
+            // 촬영 화면(useCameraCapture)·송출(CameraStreamer)과 같은 마스크 파이프라인 —
+            // ROI 크롭 추론 + 공간 블러(src/lib/segmentMask.ts). 미리보기가 실제 화면과 다르게
+            // 보이면 슬라이더를 아무리 맞춰도 소용이 없으므로 세 경로가 같은 코드를 쓴다.
             const now = performance.now();
-            if (now - lastInferenceTimeRef.current >= inferenceIntervalRef.current || !lastMaskRef.current) {
-              // 다운스케일된 offscreen을 입력으로 넘겨 마스크 자체를 더 작게 받는다
-              const result = segmenterRef.current.segmentForVideo(offscreen, now);
+            // 다음 추론이 볼 크롭. 해상도가 바뀌면 이전 ROI가 프레임 밖을 가리킬 수 있어 버린다.
+            const prev = roiRef.current;
+            const crop =
+              prev && prev.x >= 0 && prev.y >= 0 && prev.x + prev.w <= w && prev.y + prev.h <= h
+                ? prev
+                : null;
+            if (!crop) roiRef.current = null;
+            // 마스크 캔버스 좌표계에서 이번 크롭이 차지하는 자리(= 되붙일 위치).
+            const dest = crop
+              ? { x: (crop.x * pw) / w, y: (crop.y * ph) / h, w: (crop.w * pw) / w, h: (crop.h * ph) / h }
+              : null;
+
+            if (now - lastInferenceTimeRef.current >= inferenceIntervalRef.current || !maskReadyRef.current) {
+              let input: HTMLCanvasElement = offscreen; // 크롭이 없으면 이미 그려 둔 pw×ph 프레임
+              if (crop) {
+                if (!roiCanvas) {
+                  roiCanvas = document.createElement("canvas");
+                  roiCanvas.width = ROI_INPUT_SIZE;
+                  roiCanvas.height = ROI_INPUT_SIZE;
+                }
+                const rctx = roiCanvas.getContext("2d")!;
+                rctx.imageSmoothingEnabled = true;
+                rctx.imageSmoothingQuality = "high";
+                rctx.drawImage(video, crop.x, crop.y, crop.w, crop.h, 0, 0, ROI_INPUT_SIZE, ROI_INPUT_SIZE);
+                input = roiCanvas;
+              }
+              const result = segmenterRef.current.segmentForVideo(input, now);
               const masks = result.confidenceMasks;
               if (masks && masks.length > 0) {
-                lastMaskRef.current = {
-                  data: (masks[0].getAsFloat32Array() as Float32Array).slice(),
-                  w: masks[0].width ?? pw,
-                  h: masks[0].height ?? ph,
-                };
+                const arr = masks[0].getAsFloat32Array() as Float32Array;
+                const mw = (masks[0].width as number | undefined) ?? (crop ? ROI_INPUT_SIZE : pw);
+                const mh = (masks[0].height as number | undefined) ?? (crop ? ROI_INPUT_SIZE : ph);
+                if (!maskImage || maskImage.width !== mw || maskImage.height !== mh) maskImage = new ImageData(mw, mh);
+                // 미리보기는 멀티클래스 모델만 쓴다 → masks[0]=배경(전경 = 1 - v).
+                const bbox = bakeAlphaMask(arr, maskImage.data, mw, mh, {
+                  fgIsMask0: false,
+                  thresh: thresholdRef.current / 100,
+                  feather: Math.max(featherRef.current, 1) / 100,
+                });
+                let mc = maskCanvasRef.current;
+                if (!mc) { mc = document.createElement("canvas"); maskCanvasRef.current = mc; }
+                // 마스크 캔버스는 ROI 유무와 무관하게 항상 프레임 전체(pw×ph)를 덮는다.
+                bakeBlurredMask(mc, maskImage, pw, ph, maskBlurPx(dest ? dest.w : pw), dest);
                 lastInferenceTimeRef.current = now;
+                maskReadyRef.current = true;
+                // 다음 추론용 크롭 갱신. 전경을 못 찾았으면 전체 프레임에서 다시 찾는다.
+                roiRef.current = bbox
+                  ? nextRoi(bboxToFrame(bbox, mw, mh, crop, w, h), w, h, crop)
+                  : null;
               }
             }
 
-            const cached = lastMaskRef.current;
-            if (cached) {
-              const imageData = offCtx.getImageData(0, 0, pw, ph);
-              const data = imageData.data;
-              const bgMask = cached.data;
-              const THRESH = thresholdRef.current / 100;
-              const FEATHER = Math.max(featherRef.current, 1) / 100;
-              if (bgMask.length === pw * ph) {
-                for (let i = 0; i < bgMask.length; i++) {
-                  const fgConf = 1 - bgMask[i];
-                  const softAlpha = Math.max(0, Math.min(1, (fgConf - THRESH) / FEATHER));
-                  data[i * 4 + 3] = Math.round(softAlpha * 255);
-                }
-              }
-              offCtx.putImageData(imageData, 0, 0);
+            const mc = maskCanvasRef.current;
+            if (maskReadyRef.current && mc) {
+              offCtx.save();
+              offCtx.globalCompositeOperation = "destination-in";
+              offCtx.drawImage(mc, 0, 0, pw, ph);
+              offCtx.restore();
               processed = true;
             }
           } else if (mode === "chromakey") {
@@ -337,7 +387,8 @@ export function usePreviewCamera({
       streamRef.current = null;
       segmenterRef.current?.close();
       segmenterRef.current = null;
-      lastMaskRef.current = null;
+      maskReadyRef.current = false;
+      roiRef.current = null;
       lastInferenceTimeRef.current = 0;
     };
   }, [mode]);
