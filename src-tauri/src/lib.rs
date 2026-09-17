@@ -609,13 +609,120 @@ fn base64_decode(input: &str) -> Result<Vec<u8>, String> {
     Ok(buf)
 }
 
-fn print_file(
+/// 용지 종류를 "사진 용지(광택)"으로 지정하는 PowerShell 조각.
+///
+/// System.Drawing.Printing에는 용지 종류 API가 없다(PaperSize는 크기일 뿐이다).
+/// 용지 종류는 DEVMODE의 dmMediaType에만 있고, 이 값이 지정되지 않으면 드라이버
+/// 기본값인 "일반 용지"로 인쇄되어 포토 프린터에서 화질이 눈에 띄게 떨어진다.
+///
+/// 번호를 하드코딩하지 않고 DeviceCapabilities로 드라이버가 제공하는 목록을 받아
+/// 이름으로 고른다 — 포토 프린터 대부분은 표준값(DMMEDIA_GLOSSY=3) 대신 256 이상의
+/// 자체 번호를 쓰기 때문에, 하드코딩하면 프린터를 바꾸는 순간 조용히 틀어진다.
+///
+/// 전부 best-effort다. 실패해도 인쇄 자체는 드라이버 기본 용지로 진행된다 —
+/// 키오스크에서 화질 설정 때문에 인쇄가 아예 안 되는 쪽이 더 나쁘다.
+#[cfg_attr(not(target_os = "windows"), allow(dead_code))]
+const SET_MEDIA_TYPE_PS: &str = r#"
+            try {
+                Add-Type @"
+using System;
+using System.Runtime.InteropServices;
+[StructLayout(LayoutKind.Sequential, CharSet=CharSet.Unicode)]
+public struct ARPIC_DEVMODE {
+  [MarshalAs(UnmanagedType.ByValTStr, SizeConst=32)] public string dmDeviceName;
+  public ushort dmSpecVersion; public ushort dmDriverVersion; public ushort dmSize; public ushort dmDriverExtra;
+  public uint dmFields;
+  public short dmOrientation; public short dmPaperSize; public short dmPaperLength; public short dmPaperWidth;
+  public short dmScale; public short dmCopies; public short dmDefaultSource; public short dmPrintQuality;
+  public short dmColor; public short dmDuplex; public short dmYResolution; public short dmTTOption; public short dmCollate;
+  [MarshalAs(UnmanagedType.ByValTStr, SizeConst=32)] public string dmFormName;
+  public ushort dmLogPixels; public uint dmBitsPerPel; public uint dmPelsWidth; public uint dmPelsHeight;
+  public uint dmDisplayFlags; public uint dmDisplayFrequency; public uint dmICMMethod; public uint dmICMIntent;
+  public uint dmMediaType; public uint dmDitherType; public uint dmReserved1; public uint dmReserved2;
+  public uint dmPanningWidth; public uint dmPanningHeight;
+}
+public class ArPicPrint {
+  [DllImport("winspool.drv", CharSet=CharSet.Unicode)]
+  public static extern int DeviceCapabilities(string device, string port, short cap, IntPtr output, IntPtr devmode);
+  [DllImport("kernel32.dll")] public static extern IntPtr GlobalLock(IntPtr h);
+  [DllImport("kernel32.dll")] public static extern bool GlobalUnlock(IntPtr h);
+  [DllImport("kernel32.dll")] public static extern IntPtr GlobalFree(IntPtr h);
+}
+"@ -ErrorAction SilentlyContinue
+
+                $DC_MEDIATYPES = 34
+                $DC_MEDIATYPENAMES = 35
+                $DM_MEDIATYPE = 0x10000000
+                $DMMEDIA_GLOSSY = 3
+
+                $prn = $pd.PrinterSettings.PrinterName
+                $n = [ArPicPrint]::DeviceCapabilities($prn, $null, $DC_MEDIATYPES, [IntPtr]::Zero, [IntPtr]::Zero)
+                $mediaId = $null
+                if ($n -gt 0) {
+                    $idBuf = [Runtime.InteropServices.Marshal]::AllocHGlobal(4 * $n)
+                    # DC_MEDIATYPENAMES의 각 항목은 64 WCHAR 고정 폭이다.
+                    $nameBuf = [Runtime.InteropServices.Marshal]::AllocHGlobal(128 * $n)
+                    try {
+                        [void][ArPicPrint]::DeviceCapabilities($prn, $null, $DC_MEDIATYPES, $idBuf, [IntPtr]::Zero)
+                        [void][ArPicPrint]::DeviceCapabilities($prn, $null, $DC_MEDIATYPENAMES, $nameBuf, [IntPtr]::Zero)
+                        $ids = New-Object int[] $n
+                        [Runtime.InteropServices.Marshal]::Copy($idBuf, $ids, 0, $n)
+
+                        # 광택(2점) > 사진(1점). 같은 점수면 먼저 나온 항목을 쓴다.
+                        $bestScore = 0
+                        for ($i = 0; $i -lt $n; $i++) {
+                            $nm = [Runtime.InteropServices.Marshal]::PtrToStringUni([IntPtr]::Add($nameBuf, $i * 128))
+                            $score = 0
+                            if ($nm -match '광택|[Gg]loss') { $score = 2 }
+                            elseif ($nm -match '사진|인화|[Pp]hoto') { $score = 1 }
+                            if ($score -gt $bestScore) { $bestScore = $score; $mediaId = $ids[$i] }
+                        }
+                        # 이름이 안 잡히면 표준 광택값이 목록에 있을 때만 쓴다.
+                        if ($mediaId -eq $null -and ($ids -contains $DMMEDIA_GLOSSY)) {
+                            $mediaId = $DMMEDIA_GLOSSY
+                        }
+                    } finally {
+                        [Runtime.InteropServices.Marshal]::FreeHGlobal($idBuf)
+                        [Runtime.InteropServices.Marshal]::FreeHGlobal($nameBuf)
+                    }
+                }
+
+                if ($mediaId -ne $null) {
+                    $hDev = $pd.PrinterSettings.GetHdevmode($pd.DefaultPageSettings)
+                    $ptr = [ArPicPrint]::GlobalLock($hDev)
+                    $dm = [Runtime.InteropServices.Marshal]::PtrToStructure($ptr, [Type][ARPIC_DEVMODE])
+                    # 드라이버의 DEVMODE가 우리 구조체보다 작으면 뒤쪽 드라이버 전용
+                    # 영역을 덮어쓰게 되므로 건드리지 않는다.
+                    if ($dm.dmSize -ge [Runtime.InteropServices.Marshal]::SizeOf([Type][ARPIC_DEVMODE])) {
+                        $dm.dmMediaType = [uint32]$mediaId
+                        $dm.dmFields = [uint32]($dm.dmFields -bor $DM_MEDIATYPE)
+                        # fDeleteOld=$false: 구조체 뒤에 붙은 드라이버 전용 데이터를 보존한다.
+                        [Runtime.InteropServices.Marshal]::StructureToPtr($dm, $ptr, $false)
+                        [void][ArPicPrint]::GlobalUnlock($hDev)
+                        $pd.PrinterSettings.SetHdevmode($hDev)
+                        $pd.DefaultPageSettings.SetHdevmode($hDev)
+                    } else {
+                        [void][ArPicPrint]::GlobalUnlock($hDev)
+                    }
+                    [void][ArPicPrint]::GlobalFree($hDev)
+                }
+            } catch {
+                # 용지 종류 지정 실패는 인쇄를 막지 않는다.
+            }
+"#;
+
+/// 인쇄용 PowerShell 스크립트를 만든다.
+///
+/// Windows 전용 분기 밖에 둔다 — 안에 두면 다른 OS에서는 컴파일조차 되지 않아
+/// format! 자리표시자 오타 같은 실수가 Windows 빌드에서야 드러난다.
+/// 덕분에 생성 결과를 단위 테스트로 검증할 수도 있다.
+#[cfg_attr(not(target_os = "windows"), allow(dead_code))]
+fn build_print_script(
     printer_name: &str,
     file_path: &str,
     copies: u32,
     paper_mm: Option<(f64, f64)>,
-) -> Result<bool, String> {
-    #[cfg(target_os = "windows")]
+) -> String {
     {
         // Only set PrinterName when non-empty; empty string causes .NET to throw.
         let set_printer = if printer_name.is_empty() {
@@ -665,6 +772,10 @@ fn print_file(
 
         let script = format!(
             r#"
+            # 인쇄 실패가 조용히 성공으로 보고되지 않도록 오류를 종료성으로 만든다.
+            # (-File 실행에서 종료성 오류만 종료 코드 1을 남긴다)
+            # 용지 종류 블록은 자체 try/catch가 있어 여기 영향을 받지 않는다.
+            $ErrorActionPreference = 'Stop'
             Add-Type -AssemblyName System.Drawing
             $img = [System.Drawing.Image]::FromFile("{file_path}")
             $pd = New-Object System.Drawing.Printing.PrintDocument
@@ -674,6 +785,10 @@ fn print_file(
             # 화면 위아래로 바탕화면이 드러난다. StandardPrintController로 무음 인쇄한다.
             $pd.PrintController = New-Object System.Drawing.Printing.StandardPrintController
             {set_printer}
+            # 용지 종류(사진 용지/광택)를 먼저 잡는다. SetHdevmode가 PrinterSettings/
+            # DefaultPageSettings를 DEVMODE 값으로 되돌리므로, 매수·용지 크기·방향 같은
+            # .NET 쪽 설정은 모두 이 뒤에 적용해야 덮어써지지 않는다.
+            {set_media_type}
             $pd.PrinterSettings.Copies = {copies}
             {set_paper}
             # 웹 경로의 `@page {{ margin: 0 }}`과 동일하게 여백 없이 용지 전체에 출력한다.
@@ -713,15 +828,53 @@ fn print_file(
             "#,
             file_path = file_path,
             set_printer = set_printer,
+            set_media_type = SET_MEDIA_TYPE_PS,
             copies = copies,
             set_paper = set_paper,
         );
 
+        script
+    }
+}
+
+fn print_file(
+    printer_name: &str,
+    file_path: &str,
+    copies: u32,
+    paper_mm: Option<(f64, f64)>,
+) -> Result<bool, String> {
+    #[cfg(target_os = "windows")]
+    {
+        let script = build_print_script(printer_name, file_path, copies, paper_mm);
+
+        // 스크립트를 임시 .ps1로 쓰고 -File로 실행한다.
+        // -Command로 넘기면 (1) 인용부호가 많은 C#/here-string이 셸 이스케이프를
+        // 거치며 깨질 수 있고, (2) 더 중요하게는 한글이 살아남지 못한다.
+        // 용지 종류를 이름('광택')으로 고르므로 인코딩이 깨지면 매칭이 조용히 실패한다.
+        //
+        // UTF-8 BOM 필수: Windows PowerShell 5.1은 BOM 없는 .ps1을 시스템 ANSI
+        // 코드페이지로 읽어 한글을 깨뜨린다. (prepare-tauri.mjs의 압축 스크립트에서
+        // 같은 이유로 BOM을 붙인다)
+        let ps1_path = std::env::temp_dir().join(format!("arpic_print_{}.ps1", std::process::id()));
+        let mut bytes = Vec::with_capacity(script.len() + 3);
+        bytes.extend_from_slice(&[0xEF, 0xBB, 0xBF]);
+        bytes.extend_from_slice(script.as_bytes());
+        std::fs::write(&ps1_path, &bytes).map_err(|e| e.to_string())?;
+
         let output = Command::new("powershell")
-            .args(["-Command", &script])
+            .args([
+                "-NoProfile",
+                "-NonInteractive",
+                "-ExecutionPolicy",
+                "Bypass",
+                "-File",
+                &ps1_path.to_string_lossy(),
+            ])
             .creation_flags(0x08000000)
-            .output()
-            .map_err(|e| e.to_string())?;
+            .output();
+
+        let _ = std::fs::remove_file(&ps1_path);
+        let output = output.map_err(|e| e.to_string())?;
 
         if output.status.success() {
             Ok(true)
@@ -1248,6 +1401,56 @@ mod tests {
     // 스플래시에 띄우는 오류 메시지에는 Windows 경로(역슬래시)와 OS 오류 문구가
     // 그대로 들어간다. 이스케이프가 없으면 eval하는 JS 리터럴이 깨져 화면이
     // 빈 채로 멈춘다 — 정작 문제를 알려야 할 순간에 아무것도 못 보여주게 된다.
+
+    // ── 인쇄 스크립트 생성 ──────────────────────────────────────────────
+    // 용지 종류(사진 용지/광택)를 지정하지 않으면 드라이버 기본값인 "일반 용지"로
+    // 인쇄되어 포토 프린터에서 화질이 눈에 띄게 떨어진다.
+
+    #[test]
+    fn print_script_requests_photo_glossy_media() {
+        let s = build_print_script("Canon SELPHY", "C:/x.jpg", 1, None);
+        // dmMediaType에 값을 넣고 DM_MEDIATYPE 비트를 세워야 드라이버가 인식한다.
+        assert!(s.contains("dmMediaType"));
+        assert!(s.contains("DM_MEDIATYPE"));
+        // 번호는 드라이버마다 다르므로 이름으로 고른다.
+        assert!(s.contains("광택") && s.contains("[Gg]loss"));
+    }
+
+    // 회귀 방지: SetHdevmode는 PrinterSettings/DefaultPageSettings를 DEVMODE 값으로
+    // 되돌린다. 매수·용지 크기를 그보다 먼저 설정하면 조용히 덮어써진다.
+    #[test]
+    fn media_type_is_applied_before_dotnet_side_settings() {
+        let s = build_print_script("Canon SELPHY", "C:/x.jpg", 3, Some((102.0, 152.0)));
+        let set_hdevmode = s.find("SetHdevmode").expect("SetHdevmode 호출이 없다");
+        let copies = s
+            .find("$pd.PrinterSettings.Copies")
+            .expect("Copies 설정이 없다");
+        let paper = s
+            .find("$pd.DefaultPageSettings.PaperSize")
+            .expect("PaperSize 설정이 없다");
+        assert!(set_hdevmode < copies, "매수가 DEVMODE 적용보다 먼저다");
+        assert!(set_hdevmode < paper, "용지 크기가 DEVMODE 적용보다 먼저다");
+    }
+
+    #[test]
+    fn paper_size_is_converted_to_hundredths_of_inch() {
+        // 4x6인치 인화지(102x152mm) → 402 x 598 (1/100 inch)
+        let s = build_print_script("", "C:/x.jpg", 1, Some((102.0, 152.0)));
+        assert!(s.contains(r#"PaperSize("Custom", 402, 598)"#), "{s}");
+    }
+
+    #[test]
+    fn empty_printer_name_is_not_assigned() {
+        // 빈 문자열을 PrinterName에 넣으면 .NET이 예외를 던진다 → 기본 프린터를 쓴다.
+        let s = build_print_script("", "C:/x.jpg", 1, None);
+        assert!(!s.contains("PrinterSettings.PrinterName ="));
+    }
+
+    #[test]
+    fn print_failures_are_not_silently_swallowed() {
+        let s = build_print_script("", "C:/x.jpg", 1, None);
+        assert!(s.contains("$ErrorActionPreference = 'Stop'"));
+    }
 
     // ── 번들 완전성 검사 ────────────────────────────────────────────────
     // 회귀 방지: standalone 출력이 중첩되면 node.exe는 루트에 있는데 server.js만
