@@ -32,6 +32,9 @@ export function PaymentSection({
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const isManual = config.paymentTerminalMode === "manual";
+  // 영문 타이틀만 2줄("Please complete\n your payment")이라 가로 화면에서 카드가 결제 버튼과 겹친다.
+  // 영어일 때만 카드 높이를 낮춰 겹침을 없앤다(세로 화면은 portrait:h-auto라 영향 없음).
+  const tierHeightClass = lang === "en" ? "h-[21rem]" : "h-[26rem]";
   const tiers = config.paymentTiers.length > 0 ? config.paymentTiers : [{ qty: 1, price: config.paymentAmount }];
 
   // 선택 티어: 세션 복원값(printQuantity)의 매수가 티어에 있으면 유지, 아니면 첫 티어.
@@ -160,7 +163,7 @@ export function PaymentSection({
                 <button
                   key={tier.qty}
                   onClick={() => selectQty(tier.qty)}
-                  className={`w-[32rem] h-[26rem] portrait:w-full portrait:h-auto portrait:flex-1 portrait:min-h-0 rounded-2xl flex flex-col items-center justify-center gap-3 portrait:gap-5 transition-all duration-200 border-2 ${
+                  className={`w-[32rem] ${tierHeightClass} portrait:w-full portrait:h-auto portrait:flex-1 portrait:min-h-0 rounded-2xl flex flex-col items-center justify-center gap-3 portrait:gap-5 transition-all duration-200 border-2 ${
                     selected
                       ? "border-transparent scale-[1.04] shadow-2xl"
                       : "bg-white border-black/10 hover:border-black/20"
