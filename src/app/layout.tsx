@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import FullscreenToggle from "@/components/FullscreenToggle";
+import HomeShortcut from "@/components/HomeShortcut";
 import MediapipeLoader from "@/components/MediapipeLoader";
 
 export const metadata: Metadata = {
@@ -21,6 +22,7 @@ export default function RootLayout({
       </head>
       <body>
         <FullscreenToggle />
+        <HomeShortcut />
         <MediapipeLoader>
           {children}
         </MediapipeLoader>

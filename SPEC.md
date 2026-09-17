@@ -339,6 +339,7 @@
 | 파일 | 역할 |
 |------|------|
 | `FullscreenToggle.tsx` | F11 전체화면 토글 웹뷰 리스너 (전역 단축키 등록 실패 시 폴백) |
+| `HomeShortcut.tsx` | `Ctrl+Shift+H` — 초기(모드 선택) 화면 복귀 단축키 |
 | `MediapipeLoader.tsx` | 앱 시작 시 MediaPipe WASM 설치 확인 + 다운로드 UI |
 
 ### CameraSection 상세
@@ -634,6 +635,7 @@ useSceneSyncReceiver → BroadcastChannel.onmessage(state)   ※ 레거시
 |--------|------|---------|
 | `F11` | 전체화면 ↔ 창 모드 토글 | 1차: Rust 전역 단축키 (`toggle_fullscreen`, lib.rs) / 폴백: `src/components/FullscreenToggle.tsx` (전역 레이아웃에 마운트) |
 | `Ctrl+Alt+F4` | 서브 모니터 창(`camera-output`) 강제 종료 + 메인 창 복귀(show·focus) | Rust 전역 단축키 (lib.rs `with_handler`, `shortcut.key`로 F11과 분기) |
+| `Ctrl+Shift+H` | **초기(모드 선택) 화면으로 복귀** — 서비스·관리자 화면 어디서든 | `src/components/HomeShortcut.tsx` (전역 레이아웃에 마운트) |
 
 - 창은 borderless 1920×1080 전체화면으로 시작하므로, 창 모드 전환 시
   **테두리 복원 + 1280×800 축소 + 화면 중앙 배치**로 토글이 시각적으로 구분되게 한다
@@ -641,6 +643,11 @@ useSceneSyncReceiver → BroadcastChannel.onmessage(state)   ※ 레거시
 - 두 구현(Rust/웹뷰)은 동일한 동작을 수행하며, 전역 단축키가 등록되면
   OS가 키를 소비하므로 웹뷰 리스너는 실행되지 않는다 (이중 토글 없음)
 - 브라우저 직접 실행: 동작 없음 (Tauri API 미존재)
+- `Ctrl+Shift+H`는 실행 파일에서 한 번 고른 모드(서비스/관리자)를 **앱 재시작 없이 바꾸는
+  탈출구**다. SPA 이동이 아니라 전체 새로고침(`location.assign("/")`)이라 촬영 중이던
+  카메라 스트림·MediaPipe 리소스가 확실히 해제된다. 키보드가 없는 키오스크를 위해
+  **서비스 대기 화면의 운영자 패널(⚙ 출력 설정)** 안에 같은 동작의 버튼을 두었고,
+  관리자 화면은 기존 사이드바 **초기화면** 버튼이 같은 경로다.
 - `Ctrl+Alt+F4`는 서브 모니터 창이 잘못된(메인) 모니터에 `always_on_top`·전체화면으로
   떠 화면을 덮어 Alt+Tab조차 안 먹는 상황의 **탈출구**다. 전역(OS) 단축키라 어떤 창이
   위에 있든 발동하며, 메인 창 웹뷰 keydown으로는 (메인이 포커스를 잃어) 이 상황을 못 벗어난다.

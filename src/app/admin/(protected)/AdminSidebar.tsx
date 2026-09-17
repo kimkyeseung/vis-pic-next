@@ -5,6 +5,7 @@ import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import type { Device } from "@/types";
 import { useAdmin } from "../AdminContext";
+import { HOME_SHORTCUT_LABEL } from "@/components/HomeShortcut";
 
 interface AdminSidebarProps {
   adminName: string;
@@ -231,6 +232,7 @@ export function AdminSidebar({ adminName, children }: AdminSidebarProps) {
             <Link
               href="/"
               className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-500 transition-colors"
+              title={`단축키 ${HOME_SHORTCUT_LABEL}`}
             >
               초기화면
             </Link>

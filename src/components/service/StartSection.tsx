@@ -2,6 +2,7 @@ import { useState } from "react";
 import type { MonitorInfo } from "@/types";
 import { useLanguage } from "@/i18n/LanguageContext";
 import { LOCALES } from "@/i18n/translations";
+import { HOME_SHORTCUT_LABEL } from "@/components/HomeShortcut";
 
 export function StartSection({
   onNext,
@@ -126,6 +127,18 @@ export function StartSection({
           {syncEnabled && monitors.length === 0 && (
             <p className="text-white/40 text-xs">연결된 외부 모니터가 없습니다</p>
           )}
+
+          {/* 초기(모드 선택) 화면으로 — 키보드가 없는 키오스크를 위한 터치 경로.
+              단축키(HomeShortcut)와 동작이 같고, 대기 화면에서만 열리는 운영자 패널 안에 둔다. */}
+          <div className="mt-5 pt-4 border-t border-white/15">
+            <button
+              className="w-full px-3 py-2 rounded-lg text-sm bg-white/10 text-white/80 hover:bg-white/20 transition-colors"
+              onClick={() => window.location.assign("/")}
+            >
+              초기화면(모드 선택)으로
+            </button>
+            <p className="text-white/40 text-xs mt-2 text-center">단축키 {HOME_SHORTCUT_LABEL}</p>
+          </div>
         </div>
       )}
     </section>
