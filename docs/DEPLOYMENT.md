@@ -154,7 +154,7 @@ npm run tauri:dev
 | `/admin/devices/[id]` | 장치 편집 |
 | `/admin/images` | 이미지 관리 |
 | `/admin/images/upload` | 이미지 업로드 |
-| `/admin/theme-setting` | 테마 관리 (서비스 화면 배경화면·글자색) |
+| `/admin/theme-setting` | 테마 관리 (서비스 화면 배경화면·화면별 배경·촬영 오버레이·버튼 이미지·글자색) |
 | `/admin/print-setting` | 인화 설정 (용지 크기·촬영 모드·배경·focal point 조절) |
 | `/admin/capture-setting` | 촬영 설정 (카운트다운·크로마키 등) |
 | `/admin/timer-setting` | 타이머 설정 (유휴·촬영·인화 타이머) |

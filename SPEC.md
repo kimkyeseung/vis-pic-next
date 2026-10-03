@@ -169,7 +169,7 @@
 | `/admin/devices/[id]` | `src/app/admin/(protected)/devices/[id]/page.tsx` | 디바이스 편집 |
 | `/admin/images` | `src/app/admin/(protected)/images/page.tsx` | 배경/프레임/스티커 이미지 관리 |
 | `/admin/images/upload` | `src/app/admin/(protected)/images/upload/page.tsx` | 이미지 업로드 |
-| `/admin/theme-setting` | `src/app/admin/(protected)/theme-setting/page.tsx` | 테마 관리(지점별) — 배경화면·로고·글자색·강조색 (§25 참고) |
+| `/admin/theme-setting` | `src/app/admin/(protected)/theme-setting/page.tsx` | 테마 관리(지점별) — 배경화면(첫/공통/화면별)·로고·촬영 안내 오버레이·버튼 이미지·글자색·강조색 (§25 참고) |
 | `/admin/print-setting` | `src/app/admin/(protected)/print-setting/page.tsx` | 인쇄 레이아웃 치수 설정 |
 | `/admin/capture-setting` | `src/app/admin/(protected)/capture-setting/page.tsx` | 촬영/배경 제거 설정 (§12, §23 참고) |
 | `/admin/timer-setting` | `src/app/admin/(protected)/timer-setting/page.tsx` | 유휴·촬영·인화 타이머 설정 |
@@ -415,7 +415,7 @@ useSceneSyncReceiver → BroadcastChannel.onmessage(state)   ※ 레거시
 
 | 메서드 | 경로 | 설명 |
 |--------|------|------|
-| GET | `/api/image/list/[imageType]` | 이미지 목록 (1=촬영 배경, 2=프레임/인쇄 배경, 3=스티커, 5=배경화면, 6=로고). `?device_id=X` 필터, `&linked=1`=해당 지점 연결분만 |
+| GET | `/api/image/list/[imageType]` | 이미지 목록 (1=촬영 배경, 2=프레임/인쇄 배경, 3=스티커, 5=배경화면·화면별 배경·촬영 오버레이, 6=로고, 7=버튼). `?device_id=X` 필터, `&linked=1`=해당 지점 연결분만 |
 | GET | `/api/images/url` | 이미지 베이스 URL (Supabase Storage) |
 | POST | `/api/admin/images/upload` | 이미지 업로드 (최대 50MB, `deviceIds`로 지점 연결) — 서버 경유 업로드 |
 | POST | `/api/admin/images/presign` | Supabase Storage 직접 업로드용 서명 URL 발급 (미설정 시 `{mode:"local"}` 폴백) |
@@ -514,7 +514,7 @@ useSceneSyncReceiver → BroadcastChannel.onmessage(state)   ※ 레거시
 |------|------|------|
 | id | Int (PK) | 자동 증가 |
 | ~~deviceId~~ | String? | **deprecated** — 지점 지정은 `ImageDevice` 조인 테이블 사용, 더 이상 읽지 않음 |
-| imageType | Int | 1=촬영 배경, 2=프레임(인쇄 배경), 3=스티커, 5=배경화면(테마), 6=로고 |
+| imageType | Int | 1=촬영 배경, 2=프레임(인쇄 배경), 3=스티커, 5=배경화면(테마), 6=로고, 7=버튼 |
 | name | String | 표시 이름 (최대 32자) |
 | filename | String | 파일명 |
 | width | Int? | 이미지 너비 (px) |
@@ -895,6 +895,9 @@ PRINTER_NAME             # 출력 프린터 이름 (비우면 기본 프린터)
 - `WIDTH`/`HEIGHT` 미설정 시 4:3 비율 자동 배치 폴백
 - 슬롯이 인화지를 벗어나면 `overflow` 플래그 → 미리보기에 빨간 슬롯 + 경고 배너 표시
 - **사진 배치는 cover(슬롯 비율에 맞춰 center-crop)** — 사진의 보이는 비율 = 슬롯 비율(`MODE_{ID}_WIDTH:HEIGHT`). 슬롯이 4:3이 아니면 4:3 카메라 사진이 상하/좌우로 잘린다
+- **프레임 업로드 시 자동 가로화**: 세로(높이>너비, EXIF 회전 반영) 프레임 이미지는 업로드 API가
+  시계방향 90° 회전해 가로로 저장한다(`src/lib/frameOrientation.ts`, PNG는 PNG·JPG는 quality 95).
+  이미 올라가 있는 세로 프레임은 재업로드해야 적용된다
 - **프레임(인쇄 배경) 이미지 회전**: 프레임 디자인은 가로 기준이며, 세로 용지 모드(`orientation:"portrait"` — 2x1·2x4·4x1)에서는 합성·미리보기(`FramedPreview`) 모두 프레임 이미지를 **90° 회전**해 용지 방향에 맞춘다(슬롯 좌표는 이미 용지 방향 기준이라 프레임 이미지만 회전)
 
 ### 중간 프레임 (Intermediate Frames)
@@ -1248,6 +1251,8 @@ mediapipe 파일은 웹 빌드에 없으므로 프리캐시하지 않고, 존재
 | `THEME_BTN_GLOW_ENABLED` | "1" | 버튼 탭 글로우 on/off ("0"이면 끔) |
 | `THEME_BTN_GLOW_COLOR` | "#6c6fb4" | 버튼 탭 글로우 색 |
 | `THEME_BTN_GLOW_SIZE` | "28" | 버튼 탭 글로우 번짐 크기(px) |
+| `THEME_BTN_IMAGE_ONLY_{CAPTURE\|NEXT\|PAYMENT}` | (미설정=켬) | 버튼 이미지만 표시 — 단색 배경·그림자 제거, "0"이면 끔 (§25) |
+| `THEME_BTN_HIDE_TEXT_{CAPTURE\|NEXT\|PAYMENT}` | (미설정=끔) | 버튼 이미지 사용 시 텍스트 숨김, "1"이면 켬 (§25) |
 
 > 위 표의 기본값은 **코드 하드코딩 폴백**(`useDeviceSetup.ts`, 설정 키가 없을 때 값) 기준이다.
 > `prisma/seed.ts`는 초기 DB에 일부 다른 값을 심는다 — 예: `PAYMENT_ENABLED="1"`(활성),
@@ -1378,7 +1383,7 @@ npm run tauri:build
 | 계정 관리 | `/admin/accounts` | 관리자 계정 추가·삭제·비밀번호 변경 (`AdminAccount` 테이블) |
 | 디바이스 관리 | `/admin/devices`, `/devices/new`, `/devices/[id]` | 생성, 편집, 복제 (활성/비활성 상태 배지 UI는 제거됨 — 필요 시 DB 직접 수정) |
 | 이미지 관리 | `/admin/images`, `/images/upload` | 배경/프레임/스티커 탭별 조회·삭제·업로드(프레임·스티커는 PNG·JPG만), MP4/WebM 영상 미리보기. 배경·프레임·스티커는 지점별 뱅크 UI로 노출 선택 |
-| 테마 관리 | `/admin/theme-setting` | 지점별 배경화면·로고, 글자색·강조(primary)색, **버튼 탭 글로우**(on/off·색·세기) 설정 (§25) |
+| 테마 관리 | `/admin/theme-setting` | 지점별 배경화면(첫 화면·공통·**화면별**)·로고·**촬영 안내 오버레이**·**버튼 이미지**(고정 크기 안내·이미지만 표시·텍스트 숨김), 글자색·강조(primary)색, **버튼 탭 글로우**(on/off·색·세기) 설정 (§25) |
 | 인화 설정 | `/admin/print-setting` | 인화지 크기, 모드별 사진 크기·간격·4방향 여백, 배경 이미지, 프린터 선택. 설정값 실시간 미리보기 + 용지 초과 경고 |
 | 촬영 설정 | `/admin/capture-setting` | 카운트다운, 촬영 횟수, 배경 제거 모드(AI/크로마키/크로마키 OBS 방식/off), 크로마키 색상(컬러피커), AI 배경제거 세부 설정 9종(경계 침식·부드러움·블러·두께·떨림 억제, 손 구제, 인물 추적 크롭·여유, 처리 해상도) — 각 항목에 추천값 표시, 카메라 실시간 미리보기 (§12 참고) |
 | 타이머 설정 | `/admin/timer-setting` | 유휴 타임아웃, 촬영 자동 타이머, 인화 자동 복귀 타이머 |
@@ -1444,7 +1449,7 @@ npm run tauri:build
 ## 25. 테마 관리 (배경화면 / 로고 / 색상) — 지점별
 
 관리자 **테마 관리** 페이지(`/admin/theme-setting`)에서 **상단에서 선택한 지점**의 서비스
-화면 배경화면·로고 이미지와 글자색·강조(primary) 색상을 설정한다. 지점마다 다르게 적용되며,
+화면 배경화면·로고·촬영 안내 오버레이·버튼 이미지와 글자색·강조(primary) 색상을 설정한다. 지점마다 다르게 적용되며,
 관리자 UI에는 적용되지 않고 `/service`에만 적용된다. 지점 전환 시 그 지점 테마가 로드된다.
 
 ### 배경화면 (wallpaper, type 5) / 로고 (logo, type 6)
@@ -1453,15 +1458,47 @@ npm run tauri:build
   **지점 전용**으로 저장하고, **한 장만 유지**(새 업로드 전 기존 것 삭제).
 - 조회는 **지점 연결분만**(`/api/image/list/{5|6}/?device_id=X&linked=1`) — 목록 API의 `linked=1`
   파라미터는 "전체 디바이스용 제외, 해당 지점 연결분만"을 의미한다.
-- 배경화면은 같은 imageType 5 안에서 **`name`으로 4개 슬롯**을 구분한다(`src/constants/images.ts`):
-  첫(대기) 화면 `wallpaper`(가로)·`wallpaper_portrait`(세로), **나머지 화면** `wallpaper_sub`(가로)·
-  `wallpaper_sub_portrait`(세로). 기존 단일 배경화면(`wallpaper`)이 첫 화면 가로 슬롯이라 하위호환된다.
+- 배경화면은 같은 imageType 5 안에서 **`name`으로 슬롯**을 구분한다(`src/constants/images.ts`):
+  - 첫(대기) 화면 `wallpaper`(가로)·`wallpaper_portrait`(세로) — 기존 단일 배경화면(`wallpaper`)이 첫 화면 가로 슬롯이라 하위호환.
+  - **나머지 화면(공통)** `wallpaper_sub`(가로)·`wallpaper_sub_portrait`(세로).
+  - **화면별** `wp_{step}`(가로)·`wp_{step}_pt`(세로) — step: `payment`·`frame`·`background`·`camera`·
+    `select`·`printbg`·`complete` (`WALLPAPER_PAGE_STEPS`, `wallpaperPageName()`). `Image.name`이
+    VarChar(32)라 짧은 접두어를 쓴다.
 - `useDeviceSetup`이 이 지점의 wallpaper/logo를 `wallpaperUrl`·`wallpaperPortraitUrl`·
-  `wallpaperSubUrl`·`wallpaperSubPortraitUrl`/`logoUrl`로 노출. 서비스는 **화면 방향에 맞는 슬롯**을
-  고르고(해당 방향이 없으면 반대 방향으로 폴백), **첫 화면은 첫 화면용, 나머지 단계는 sub 배경화면**을
-  cover로 깐다. 해당 화면의 이미지가 없으면 단색 `THEME_BG_COLOR`(기본 `#2a2a2a`)로 채운다.
+  `wallpaperSubUrl`·`wallpaperSubPortraitUrl`·`pageWallpaperUrls`(화면별, name 키 맵)/`logoUrl`로 노출.
+  서비스는 **화면 방향에 맞는 슬롯**을 고르고(해당 방향이 없으면 반대 방향으로 폴백) cover로 깐다.
+  - 첫 화면: 첫 화면용 → 없으면 단색.
+  - 나머지 단계(CSS 캐스케이드처럼): **화면별 → 공통(sub) → 단색 `THEME_BG_COLOR`**(기본 `#2a2a2a`).
+    모든 화면을 통일하려면 화면별 슬롯을 비워 두면 된다. 관리자에선 단계 탭으로 고르며, 개별 배경이
+    지정된 탭에 초록 점이 표시된다(`PageWallpaperCard`).
   **로고는 대기 화면을 제외한 모든 단계**의
   좌측 상단에 표시(촬영 단계 포함). 미설정 시 기본 로고는 `AR-pic` 텍스트.
+
+### 촬영 화면 안내 오버레이 (type 5, `overlay_camera`)
+
+- 촬영 화면 카메라 미리보기(4:3) 위에 겹쳐 보이는 안내 이미지(예: "손바닥을 펴면 촬영돼요").
+  `useDeviceSetup`의 `cameraOverlayUrl` → `CameraSection`의 `overlayImageUrl`.
+- **화면 표시 전용** — 합성 캔버스 밖의 `<img>`라 촬영본에는 담기지 않는다. 카운트다운이 시작되면
+  숨겨 카운트 숫자와 겹치지 않게 하고, 스티커 드래그 레이어(z-10)보다 아래라 조작을 막지 않는다.
+- 권장: 1600×1200px(4:3) 투명 PNG(`object-contain`).
+
+### 버튼 이미지 (button, type 7)
+
+- 대형 강조 버튼(촬영하기·다음으로·결제하기)별 배경 이미지. name `button_capture`·`button_next`·
+  `button_payment`로 구분, 지점 연결·한 장 유지는 배경화면과 동일. 버튼별 텍스트 색은
+  `THEME_BTN_TEXT_COLOR_{CAPTURE|NEXT|PAYMENT}`.
+- **이미지가 있는 버튼은 고정 크기** — `BUTTON_IMAGE_SIZE`(가로 화면 **544×116px**, 세로 화면
+  **736×160px**, 기존 단색 버튼 실측값과 동일해 이미지 유무로 레이아웃이 흔들리지 않음). 관리자 버튼
+  카드에 "권장 이미지 크기"로 같은 값을 안내한다.
+- 버튼별 표시 옵션(`ButtonImageOptions`, `parseButtonImageOptions()`):
+  - `THEME_BTN_IMAGE_ONLY_{ROLE}` — **이미지만 표시**. 단색 배경·그림자·라운드·hover 광택을 없애고
+    이미지를 `contain`(잘림 없음)으로 표시 → 투명 PNG가 그대로 보인다. **미설정 시 켬**("0"이면 끔 →
+    단색 버튼 위에 `cover`로 채우는 이전 동작).
+  - `THEME_BTN_HIDE_TEXT_{ROLE}` — **버튼 텍스트 숨김**(이미지에 글자가 포함된 경우). "1"일 때만 켬.
+- 구현: service 루트(`.service-theme`)에 `data-btn-img-{role}`·`data-btn-imgonly-{role}`·
+  `data-btn-hidetext-{role}` 속성과 `--btn-img-w/h` 변수를 내리고, `globals.css`의 언레이어드 규칙이
+  `.btn-role-{role}` 버튼에 적용된다(버튼을 그리는 각 Section은 옵션을 몰라도 됨). 옵션은 관리자
+  하단 **설정 저장**으로 반영(이미지는 업로드 즉시 반영).
 
 ### 글자색 / 강조(primary) 색상
 
