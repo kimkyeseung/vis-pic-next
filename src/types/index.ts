@@ -117,6 +117,18 @@ export interface DeviceConfig {
   btnNextTextColor: string;
   /** '결제하기' 버튼 텍스트 색상. 미설정 시 #ffffff. */
   btnPaymentTextColor: string;
+  /** 버튼 이미지 표시 옵션(버튼별). 이미지가 업로드된 버튼에만 의미가 있다. */
+  btnImageOptions: Record<ButtonRole, ButtonImageOptions>;
+}
+
+/** 테마 이미지를 지정할 수 있는 대형 강조 버튼 종류. */
+export type ButtonRole = "capture" | "next" | "payment";
+
+export interface ButtonImageOptions {
+  /** 이미지만 표시 — 버튼 단색 배경·그림자·라운드를 없애 투명 PNG가 그대로 보이게 한다. 미설정 시 켬. */
+  imageOnly: boolean;
+  /** 버튼 텍스트 숨김 — 이미지에 글자가 들어 있을 때. 미설정 시 끔. */
+  hideText: boolean;
 }
 
 /** AI 배경제거 처리 해상도 배율. "auto"는 4K에서만 0.25로 낮춘다. */

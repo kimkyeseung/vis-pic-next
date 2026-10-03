@@ -231,6 +231,11 @@ function ImageUploadForm() {
               PNG·JPG만 업로드 가능 (투명 배경은 PNG 권장)
             </p>
           )}
+          {imageType === "2" && (
+            <p className="mt-1 text-sm text-gray-400">
+              프레임은 가로 기준으로 합성됩니다. 세로로 만든 시안은 업로드 시 자동으로 시계방향 90° 회전해 가로로 저장됩니다.
+            </p>
+          )}
         </div>
 
         <div>

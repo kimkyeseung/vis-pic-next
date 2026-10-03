@@ -1,4 +1,4 @@
-import type { BgRemovalMode, PaymentTerminalMode, PaymentTier, SegmentProcessScale } from "@/types";
+import type { BgRemovalMode, ButtonImageOptions, ButtonRole, PaymentTerminalMode, PaymentTier, SegmentProcessScale } from "@/types";
 import { CAMERA_RESOLUTIONS, DEFAULT_CAMERA_RESOLUTION, type CameraResolutionId } from "@/constants/camera";
 
 /** parseInt 실패(NaN) 시 기본값 반환. 0은 유효한 값으로 처리. */
@@ -80,4 +80,22 @@ export function segmentProcessScaleFor(setting: SegmentProcessScale, frameWidth:
 /** -100~100 범위로 고정. 대비/명암/감마처럼 0을 중심으로 양쪽 조정이 필요한 값에 사용. */
 export function clampSigned(value: number, min = -100, max = 100): number {
   return Math.min(max, Math.max(min, value));
+}
+
+export const BUTTON_ROLES: readonly ButtonRole[] = ["capture", "next", "payment"];
+
+/** 버튼별 이미지 표시 옵션 설정 키. 예: THEME_BTN_IMAGE_ONLY_CAPTURE / THEME_BTN_HIDE_TEXT_NEXT */
+export function buttonImageOptionKeys(role: ButtonRole) {
+  const suffix = role.toUpperCase();
+  return { imageOnly: `THEME_BTN_IMAGE_ONLY_${suffix}`, hideText: `THEME_BTN_HIDE_TEXT_${suffix}` };
+}
+
+/** 설정 맵 → 버튼별 이미지 옵션. 이미지만 표시는 미설정 시 켬("0"일 때만 끔), 텍스트 숨김은 "1"일 때만 켬. */
+export function parseButtonImageOptions(s: Record<string, string | undefined>): Record<ButtonRole, ButtonImageOptions> {
+  const out = {} as Record<ButtonRole, ButtonImageOptions>;
+  for (const role of BUTTON_ROLES) {
+    const k = buttonImageOptionKeys(role);
+    out[role] = { imageOnly: s[k.imageOnly] !== "0", hideText: s[k.hideText] === "1" };
+  }
+  return out;
 }

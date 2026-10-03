@@ -4,6 +4,7 @@ import { uploadImage, getImageBaseUrl } from "@/lib/storage";
 import { requireAdmin } from "@/lib/adminAuth";
 import { defaultActiveForNewImage } from "@/lib/imageActive";
 import { FRAME_IMAGE_TYPE, STICKER_IMAGE_TYPE } from "@/constants/images";
+import { normalizeFrameToLandscape } from "@/lib/frameOrientation";
 
 const ALLOWED_EXTENSIONS = ["jpg", "jpeg", "png", "gif", "mp4", "webp"];
 // 프레임·스티커는 PNG/JPG만 허용 (동영상·gif 불필요, 투명 배경 지원)
@@ -79,8 +80,14 @@ export async function POST(request: NextRequest) {
     const uid = crypto.randomUUID().replace(/-/g, "").slice(0, 12);
     const filename = `${uid}.${ext}`;
 
+    // 프레임은 가로 디자인 전제 — 세로 시안이면 시계방향 90° 회전해 가로로 저장한다.
+    let body: File | Buffer = file;
+    if (imageType === FRAME_IMAGE_TYPE) {
+      body = (await normalizeFrameToLandscape(Buffer.from(await file.arrayBuffer()), ext)).buffer;
+    }
+
     // Upload to Supabase Storage (throws on failure)
-    await uploadImage(file, filename);
+    await uploadImage(body, filename);
 
     // Save to database (name is VarChar(32))
     const image = await prisma.image.create({

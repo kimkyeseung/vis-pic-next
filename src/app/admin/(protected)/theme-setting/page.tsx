@@ -1,7 +1,9 @@
 "use client";
 
 import { useAdmin } from "@/app/admin/AdminContext";
+import { PageWallpaperCard } from "./PageWallpaperCard";
 import {
+  OVERLAY_NAME_CAMERA,
   WALLPAPER_NAME_LANDSCAPE,
   WALLPAPER_NAME_PORTRAIT,
   WALLPAPER_NAME_SUB_LANDSCAPE,
@@ -69,9 +71,9 @@ export default function ThemeSettingPage() {
       {/* 배경화면 · 나머지 화면 — 첫 화면을 제외한 모든 단계(배경 단색이 쓰이던 자리). */}
       <div className="bg-gray-800 rounded-xl border border-gray-700 divide-y divide-gray-700">
         <div className="px-6 pt-5 pb-1">
-          <h3 className="text-white font-semibold text-base">배경화면 · 나머지 화면</h3>
+          <h3 className="text-white font-semibold text-base">배경화면 · 나머지 화면 (공통)</h3>
           <p className="text-gray-500 text-xs mt-1">
-            첫(대기) 화면을 제외한 모든 서비스 화면(촬영·선택·편집·결제·완료 등)에 깔리는 배경입니다. 화면 방향에 맞춰 가로/세로 이미지가 자동으로 선택되고, 한쪽만 올리면 그 이미지가 양쪽에 쓰입니다. 둘 다 미설정 시 아래 &apos;배경 단색&apos;이 사용됩니다. (jpg/png/webp/gif, 최대 50MB)
+            첫(대기) 화면을 제외한 모든 서비스 화면(촬영·선택·편집·결제·완료 등)에 공통으로 깔리는 배경입니다. 아래 &apos;화면별 배경화면&apos;을 지정한 화면은 그 이미지가 우선합니다. 화면 방향에 맞춰 가로/세로 이미지가 자동으로 선택되고, 한쪽만 올리면 그 이미지가 양쪽에 쓰입니다. 둘 다 미설정 시 아래 &apos;배경 단색&apos;이 사용됩니다. (jpg/png/webp/gif, 최대 50MB)
           </p>
         </div>
 
@@ -100,6 +102,20 @@ export default function ThemeSettingPage() {
         />
       </div>
 
+      <PageWallpaperCard t={t} />
+
+      <AssetUploader
+        title="촬영 화면 안내 오버레이"
+        description="촬영 화면의 카메라 미리보기(4:3) 위에 겹쳐 보이는 안내 이미지입니다(예: '손바닥을 펴면 촬영돼요'). 화면에만 보이고 촬영된 사진에는 들어가지 않으며, 카운트다운이 시작되면 사라집니다. 투명 배경 PNG를 권장하며 1600×1200px(4:3) 크기로 만들면 화면에 딱 맞습니다."
+        asset={t.namedAssets[OVERLAY_NAME_CAMERA] ?? null}
+        onUpload={t.uploadNamed(OVERLAY_NAME_CAMERA)}
+        onRemove={t.removeNamed(OVERLAY_NAME_CAMERA)}
+        busy={!!t.namedBusy[OVERLAY_NAME_CAMERA]}
+        previewClass="w-64 aspect-[4/3] bg-[repeating-conic-gradient(#3a3a3a_0%_25%,#2a2a2a_0%_50%)] bg-[length:16px_16px]"
+        imageFit="contain"
+        emptyLabel="오버레이 없음"
+      />
+
       <AssetUploader
         title="로고"
         description="첫(대기) 화면을 제외한 서비스 화면 좌측 상단에 표시되는 로고입니다. 배경 위에 얹히므로 투명 배경 PNG를 권장합니다. 미설정 시 기본 로고(AR-pic)가 사용됩니다."
@@ -117,7 +133,7 @@ export default function ThemeSettingPage() {
         <div className="px-6 pt-5 pb-1">
           <h3 className="text-white font-semibold text-base">버튼 이미지 · 텍스트 색상</h3>
           <p className="text-gray-500 text-xs mt-1">
-            촬영·다음·결제 버튼의 배경 이미지와 글자 색상입니다. 이미지는 버튼 비율(가로로 넓은 사각형)에 맞춰 꽉 채워지므로(cover) 좌우로 넉넉한 이미지를 권장합니다. 미설정 시 기본 단색 버튼이 사용됩니다.
+            촬영·다음·결제 버튼의 배경 이미지와 글자 색상입니다. 이미지를 올리면 버튼이 아래 안내된 고정 크기로 바뀌므로 그 크기로 제작하세요. &apos;이미지만 표시&apos;를 켜면 단색 배경 없이 이미지가 잘림 없이 그대로 보이고, 끄면 단색 버튼 위에 이미지를 꽉 채웁니다. 미설정 시 기본 단색 버튼이 사용됩니다. (옵션은 아래 &apos;설정 저장&apos;을 눌러야 반영됩니다)
           </p>
         </div>
 
@@ -130,6 +146,8 @@ export default function ThemeSettingPage() {
           busy={t.captureButtonImageBusy}
           textColor={t.captureTextColor}
           onTextColorChange={t.setCaptureTextColor}
+          options={t.buttonImageOptions.capture}
+          onOptionChange={(k, v) => t.setButtonImageOption("capture", k, v)}
         />
 
         <ButtonThemeRow
@@ -141,6 +159,8 @@ export default function ThemeSettingPage() {
           busy={t.nextButtonImageBusy}
           textColor={t.nextTextColor}
           onTextColorChange={t.setNextTextColor}
+          options={t.buttonImageOptions.next}
+          onOptionChange={(k, v) => t.setButtonImageOption("next", k, v)}
         />
 
         <ButtonThemeRow
@@ -152,6 +172,8 @@ export default function ThemeSettingPage() {
           busy={t.paymentButtonImageBusy}
           textColor={t.paymentTextColor}
           onTextColorChange={t.setPaymentTextColor}
+          options={t.buttonImageOptions.payment}
+          onOptionChange={(k, v) => t.setButtonImageOption("payment", k, v)}
         />
       </div>
 
@@ -276,9 +298,9 @@ export default function ThemeSettingPage() {
           disabled={t.saving}
           className="px-8 py-3 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition-colors disabled:opacity-50"
         >
-          {t.saving ? "저장 중..." : "색상 저장"}
+          {t.saving ? "저장 중..." : "설정 저장"}
         </button>
-        <span className="ml-3 text-gray-500 text-xs">배경화면·로고는 업로드 즉시 반영됩니다.</span>
+        <span className="ml-3 text-gray-500 text-xs">이미지는 업로드 즉시 반영됩니다. 색상·버튼 옵션은 저장해야 반영됩니다.</span>
       </div>
     </div>
   );

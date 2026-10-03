@@ -25,6 +25,7 @@ import { DebugProvider, useDebug, useSecretTap } from "@/components/service/Debu
 import { DebugOverlay } from "@/components/service/DebugOverlay";
 import { DebugLayoutGuide } from "@/components/service/DebugLayoutGuide";
 import type { Step } from "@/types";
+import { BUTTON_IMAGE_SIZE, wallpaperPageName, type WallpaperPageStep } from "@/constants/images";
 
 // 개발(next dev = localhost) 여부. 빌드 시점에 인라인되는 상수라 SSR/클라이언트가 일치하고,
 // 배포된 키오스크(production 빌드)에서는 항상 false → 손님 화면엔 뒤로가기 버튼이 안 뜬다.
@@ -45,7 +46,7 @@ function ServiceContent() {
     return () => mq.removeEventListener("change", update);
   }, []);
 
-  const { config, backgroundImages, printBgImages, imageBaseUrl, printSettings, wallpaperUrl, wallpaperPortraitUrl, wallpaperSubUrl, wallpaperSubPortraitUrl, logoUrl, captureButtonImageUrl, nextButtonImageUrl, paymentButtonImageUrl } = useDeviceSetup(deviceId);
+  const { config, backgroundImages, printBgImages, imageBaseUrl, printSettings, wallpaperUrl, wallpaperPortraitUrl, wallpaperSubUrl, wallpaperSubPortraitUrl, pageWallpaperUrls, cameraOverlayUrl, logoUrl, captureButtonImageUrl, nextButtonImageUrl, paymentButtonImageUrl } = useDeviceSetup(deviceId);
   const flow = usePhotoFlow(deviceId, config, printBgImages);
   const { monitors, syncEnabled, setSyncEnabled, selectedMonitorIndex, setSelectedMonitorIndex } = useTauriMonitor();
   const { idleRemaining, clearIdleTimer, paused: idlePaused, togglePause: toggleIdlePause } = useIdleTimer(
@@ -182,13 +183,27 @@ function ServiceContent() {
   // 테마관리에서 설정한 배경화면/글자색을 서비스 화면 전체에 적용 (어드민 화면에는 미적용).
   // 글자색은 --theme-text 변수로 내려 globals.css의 .service-theme 규칙이 본문 흰 텍스트를 치환한다.
   // 배경화면 이미지는 첫 화면(start)과 나머지 단계에 각각 따로 설정한다(관리자 > 테마 관리).
-  // 해당 화면에 이미지가 없으면 관리자가 지정한 배경 단색을 그대로 쓴다.
+  // 나머지 단계는 CSS 캐스케이드처럼 "화면별 이미지 → 공통(나머지 화면) 이미지 → 배경 단색" 순으로 적용.
   const isFirstPage = currentStep === "start";
   // 화면 방향에 맞는 배경화면 선택. 해당 방향 이미지가 없으면 반대 방향 이미지로 폴백(하위호환).
-  const pickWallpaper = (ls: string | null, pt: string | null) => (isPortrait ? (pt ?? ls) : (ls ?? pt));
+  const pickWallpaper = (ls: string | null | undefined, pt: string | null | undefined) =>
+    (isPortrait ? (pt ?? ls) : (ls ?? pt)) ?? null;
+  const pageStep = currentStep as WallpaperPageStep;
   const activeWallpaper = isFirstPage
     ? pickWallpaper(wallpaperUrl, wallpaperPortraitUrl)
-    : pickWallpaper(wallpaperSubUrl, wallpaperSubPortraitUrl);
+    : pickWallpaper(pageWallpaperUrls[wallpaperPageName(pageStep, false)], pageWallpaperUrls[wallpaperPageName(pageStep, true)])
+      ?? pickWallpaper(wallpaperSubUrl, wallpaperSubPortraitUrl);
+  // 버튼 이미지가 있는 버튼은 고정 크기 + (옵션) 이미지만 표시 / 텍스트 숨김.
+  // 루트의 data-* 속성으로 globals.css 규칙을 켠다(버튼을 렌더하는 각 Section은 몰라도 된다).
+  const buttonImageUrls = { capture: captureButtonImageUrl, next: nextButtonImageUrl, payment: paymentButtonImageUrl };
+  const buttonDataAttrs: Record<string, string> = {};
+  for (const role of ["capture", "next", "payment"] as const) {
+    if (!buttonImageUrls[role]) continue;
+    buttonDataAttrs[`data-btn-img-${role}`] = "";
+    if (config.btnImageOptions[role].imageOnly) buttonDataAttrs[`data-btn-imgonly-${role}`] = "";
+    if (config.btnImageOptions[role].hideText) buttonDataAttrs[`data-btn-hidetext-${role}`] = "";
+  }
+  const buttonImageSize = isPortrait ? BUTTON_IMAGE_SIZE.portrait : BUTTON_IMAGE_SIZE.landscape;
   const themeStyle: React.CSSProperties = {
     ...(config.themeTextColor ? { ["--theme-text"]: config.themeTextColor } : {}),
     ...(config.themePrimaryColor ? { ["--theme-primary"]: config.themePrimaryColor } : {}),
@@ -197,6 +212,8 @@ function ServiceContent() {
     ...(captureButtonImageUrl ? { ["--theme-btn-capture-image"]: `url(${captureButtonImageUrl})` } : {}),
     ...(nextButtonImageUrl ? { ["--theme-btn-next-image"]: `url(${nextButtonImageUrl})` } : {}),
     ...(paymentButtonImageUrl ? { ["--theme-btn-payment-image"]: `url(${paymentButtonImageUrl})` } : {}),
+    ["--btn-img-w"]: `${buttonImageSize.width}px`,
+    ["--btn-img-h"]: `${buttonImageSize.height}px`,
     // 버튼별 텍스트 색상. 버튼 배경(단색/이미지)에 맞춰 관리자가 지정.
     ...(config.btnCaptureTextColor ? { ["--theme-btn-capture-text"]: config.btnCaptureTextColor } : {}),
     ...(config.btnNextTextColor ? { ["--theme-btn-next-text"]: config.btnNextTextColor } : {}),
@@ -225,6 +242,7 @@ function ServiceContent() {
     <div style={{ width: stageW * stageScale, height: stageH * stageScale }}>
     <div
       className="service-theme overflow-hidden relative"
+      {...buttonDataAttrs}
       style={{ ...themeStyle, width: stageW, height: stageH, transform: `scale(${stageScale})`, transformOrigin: "top left" }}
     >
       {showTimer && (
@@ -363,6 +381,7 @@ function ServiceContent() {
           selectedBackground={selectedBackground}
           backgroundImages={backgroundImages}
           imageBaseUrl={imageBaseUrl}
+          overlayImageUrl={cameraOverlayUrl}
           stickers={flow.stickers}
           syncEnabled={syncEnabled}
           onStickersChange={flow.setStickers}

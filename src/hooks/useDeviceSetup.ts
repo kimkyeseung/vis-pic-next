@@ -1,8 +1,8 @@
 import { useState, useEffect } from "react";
 import type { DeviceConfig, BGImage } from "@/types";
-import { parseIntSafe, parseBgRemovalMode, parsePaymentTerminalMode, parseCaptureModes, parseCameraResolution, clampPercent, clampSigned, parseSegmentProcessScale } from "@/lib/deviceConfig";
+import { parseIntSafe, parseBgRemovalMode, parsePaymentTerminalMode, parseCaptureModes, parseCameraResolution, clampPercent, clampSigned, parseSegmentProcessScale, parseButtonImageOptions } from "@/lib/deviceConfig";
 import { DEFAULT_CAMERA_RESOLUTION } from "@/constants/camera";
-import { LOGO_IMAGE_TYPE, WALLPAPER_IMAGE_TYPE, BUTTON_IMAGE_TYPE, WALLPAPER_NAME_LANDSCAPE, WALLPAPER_NAME_PORTRAIT, WALLPAPER_NAME_SUB_LANDSCAPE, WALLPAPER_NAME_SUB_PORTRAIT, BUTTON_NAME_CAPTURE, BUTTON_NAME_NEXT, BUTTON_NAME_PAYMENT } from "@/constants/images";
+import { LOGO_IMAGE_TYPE, WALLPAPER_IMAGE_TYPE, BUTTON_IMAGE_TYPE, WALLPAPER_NAME_LANDSCAPE, WALLPAPER_NAME_PORTRAIT, WALLPAPER_NAME_SUB_LANDSCAPE, WALLPAPER_NAME_SUB_PORTRAIT, BUTTON_NAME_CAPTURE, BUTTON_NAME_NEXT, BUTTON_NAME_PAYMENT, WALLPAPER_PAGE_STEPS, wallpaperPageName, OVERLAY_NAME_CAMERA } from "@/constants/images";
 
 // 결제 화면 인쇄 매수 선택지(고정). 가격 = 1장당 가격(PAYMENT_AMOUNT) × 수량.
 const PAYMENT_QUANTITIES = [1, 2, 4];
@@ -84,6 +84,7 @@ const DEFAULT_CONFIG: DeviceConfig = {
   btnCaptureTextColor: "#2a2a2a",
   btnNextTextColor: "#ffffff",
   btnPaymentTextColor: "#ffffff",
+  btnImageOptions: parseButtonImageOptions({}),
 };
 
 export function useDeviceSetup(deviceId: string) {
@@ -96,6 +97,9 @@ export function useDeviceSetup(deviceId: string) {
   const [wallpaperPortraitUrl, setWallpaperPortraitUrl] = useState<string | null>(null);
   const [wallpaperSubUrl, setWallpaperSubUrl] = useState<string | null>(null);
   const [wallpaperSubPortraitUrl, setWallpaperSubPortraitUrl] = useState<string | null>(null);
+  // 화면별 배경화면 — key는 wallpaperPageName(step, portrait). 미설정 슬롯은 키 자체가 없다.
+  const [pageWallpaperUrls, setPageWallpaperUrls] = useState<Record<string, string>>({});
+  const [cameraOverlayUrl, setCameraOverlayUrl] = useState<string | null>(null);
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
   const [captureButtonImageUrl, setCaptureButtonImageUrl] = useState<string | null>(null);
   const [nextButtonImageUrl, setNextButtonImageUrl] = useState<string | null>(null);
@@ -184,6 +188,7 @@ export function useDeviceSetup(deviceId: string) {
           btnCaptureTextColor: s.THEME_BTN_TEXT_COLOR_CAPTURE || "#2a2a2a",
           btnNextTextColor: s.THEME_BTN_TEXT_COLOR_NEXT || "#ffffff",
           btnPaymentTextColor: s.THEME_BTN_TEXT_COLOR_PAYMENT || "#ffffff",
+          btnImageOptions: parseButtonImageOptions(s),
         });
         return true;
       });
@@ -219,7 +224,8 @@ export function useDeviceSetup(deviceId: string) {
       });
     }
 
-    // 테마 배경화면(wallpaper, imageType 5) — 첫(대기) 화면 배경 + 나머지 화면(sub) 배경.
+    // 테마 배경화면(wallpaper, imageType 5) — 첫(대기) 화면 배경 + 나머지 화면(sub) 배경
+    // + 화면별 배경(wp_*) + 촬영 화면 안내 오버레이.
     // 같은 타입 안에서 name으로 슬롯(첫/나머지 × 가로/세로)을 구분해 각각 노출한다
     // (화면 방향에 맞춰 서비스에서 선택. 나머지 화면은 미설정 시 배경 단색).
     async function loadWallpaper(id: string) {
@@ -239,6 +245,16 @@ export function useDeviceSetup(deviceId: string) {
         setWallpaperPortraitUrl(pick(WALLPAPER_NAME_PORTRAIT));
         setWallpaperSubUrl(pick(WALLPAPER_NAME_SUB_LANDSCAPE));
         setWallpaperSubPortraitUrl(pick(WALLPAPER_NAME_SUB_PORTRAIT));
+        const pages: Record<string, string> = {};
+        for (const { step } of WALLPAPER_PAGE_STEPS) {
+          for (const portrait of [false, true]) {
+            const name = wallpaperPageName(step, portrait);
+            const url = pick(name);
+            if (url) pages[name] = url;
+          }
+        }
+        setPageWallpaperUrls(pages);
+        setCameraOverlayUrl(pick(OVERLAY_NAME_CAMERA));
         return true;
       });
     }
@@ -298,5 +314,5 @@ export function useDeviceSetup(deviceId: string) {
     return () => controller.abort();
   }, [deviceId]);
 
-  return { config, backgroundImages, printBgImages, imageBaseUrl, printSettings, wallpaperUrl, wallpaperPortraitUrl, wallpaperSubUrl, wallpaperSubPortraitUrl, logoUrl, captureButtonImageUrl, nextButtonImageUrl, paymentButtonImageUrl };
+  return { config, backgroundImages, printBgImages, imageBaseUrl, printSettings, wallpaperUrl, wallpaperPortraitUrl, wallpaperSubUrl, wallpaperSubPortraitUrl, pageWallpaperUrls, cameraOverlayUrl, logoUrl, captureButtonImageUrl, nextButtonImageUrl, paymentButtonImageUrl };
 }

@@ -3,6 +3,7 @@ import { describe, it, expect, beforeEach } from "vitest";
 import { act, renderHook } from "@testing-library/react";
 import { usePhotoFlow } from "@/hooks/usePhotoFlow";
 import type { BGImage, DeviceConfig } from "@/types";
+import { parseButtonImageOptions } from "@/lib/deviceConfig";
 
 /**
  * advanceFromCurrentStep은 다음 순간에만 호출된다:
@@ -59,6 +60,7 @@ const baseConfig: DeviceConfig = {
   btnCaptureTextColor: "#2a2a2a",
   btnNextTextColor: "#ffffff",
   btnPaymentTextColor: "#ffffff",
+  btnImageOptions: parseButtonImageOptions({}),
 };
 
 const printBg: BGImage[] = [

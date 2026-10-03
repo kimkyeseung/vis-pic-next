@@ -6,6 +6,7 @@ import {
   clampPercent,
   parsePaymentTerminalMode,
   parseCameraResolution,
+  parseButtonImageOptions,
 } from "@/lib/deviceConfig";
 
 /**
@@ -152,5 +153,24 @@ describe("parseCameraResolution (카메라 화질 티어)", () => {
     expect(parseCameraResolution("")).toBe("fhd");
     expect(parseCameraResolution("4k")).toBe("fhd");
     expect(parseCameraResolution("garbage")).toBe("fhd");
+  });
+});
+
+describe("parseButtonImageOptions (버튼 이미지 표시 옵션)", () => {
+  it("미설정 시 이미지만 표시는 켬, 텍스트 숨김은 끔", () => {
+    const o = parseButtonImageOptions({});
+    expect(o.capture).toEqual({ imageOnly: true, hideText: false });
+    expect(o.next).toEqual({ imageOnly: true, hideText: false });
+    expect(o.payment).toEqual({ imageOnly: true, hideText: false });
+  });
+
+  it("버튼별 키를 따로 읽는다", () => {
+    const o = parseButtonImageOptions({
+      THEME_BTN_IMAGE_ONLY_NEXT: "0",
+      THEME_BTN_HIDE_TEXT_PAYMENT: "1",
+    });
+    expect(o.capture).toEqual({ imageOnly: true, hideText: false });
+    expect(o.next).toEqual({ imageOnly: false, hideText: false });
+    expect(o.payment).toEqual({ imageOnly: true, hideText: true });
   });
 });

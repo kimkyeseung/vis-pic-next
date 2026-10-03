@@ -2,6 +2,7 @@
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { DeviceConfig, Sticker } from "@/types";
+import { parseButtonImageOptions } from "@/lib/deviceConfig";
 import { FRAME_INFO } from "@/constants/frames";
 import { LanguageProvider, useLanguage } from "@/i18n/LanguageContext";
 import { LOCALES, type Locale } from "@/i18n/translations";
@@ -124,6 +125,7 @@ function makeConfig(paymentEnabled: boolean): DeviceConfig {
     btnCaptureTextColor: "#2a2a2a",
     btnNextTextColor: "#ffffff",
     btnPaymentTextColor: "#ffffff",
+    btnImageOptions: parseButtonImageOptions({}),
   };
 }
 

@@ -38,6 +38,7 @@ export function CameraSection({
   selectedBackground,
   backgroundImages,
   imageBaseUrl,
+  overlayImageUrl = null,
   stickers,
   syncEnabled = false,
   mockCamera = false,
@@ -54,6 +55,8 @@ export function CameraSection({
   selectedBackground: number | null;
   backgroundImages: BGImage[];
   imageBaseUrl: string;
+  /** 카메라 미리보기 위에 겹쳐 보이는 안내 이미지(테마 관리 > 촬영 화면 안내 오버레이). 촬영본에는 안 들어간다. */
+  overlayImageUrl?: string | null;
   stickers: Sticker[];
   syncEnabled?: boolean;
   /** 실제 카메라를 켜지 않고 곧바로 MOCK CAMERA 화면으로 대체(관리자 화면 미리보기용) */
@@ -302,6 +305,12 @@ export function CameraSection({
           <canvas ref={displayCanvasRef} className="camera-video" width={previewRes.width} height={previewRes.height} />
           {/* 스티커 전용 레이어: 메인 합성 루프와 분리되어 60fps로 부드럽게 이동 */}
           <canvas ref={stickerCanvasRef} className="camera-video absolute inset-0 pointer-events-none" />
+          {/* 안내 오버레이 — 화면 표시 전용(합성 캔버스 밖이라 촬영본엔 안 담긴다). 카운트다운이 시작되면 숨겨
+              카운트 숫자와 겹치지 않게 한다. 스티커 드래그 레이어(z-10)보다 아래라 조작을 막지 않는다. */}
+          {overlayImageUrl && countdown === null && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={overlayImageUrl} alt="" className="absolute inset-0 w-full h-full object-contain pointer-events-none rounded-[17px]" />
+          )}
 
           {cameraError && (
             // mock 화면이 아래 비치도록 전체를 덮지 않고, 상단에 작은 안내 배너만 띄운다.

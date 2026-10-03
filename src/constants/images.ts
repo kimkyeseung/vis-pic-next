@@ -24,11 +24,40 @@ export const WALLPAPER_NAME_PORTRAIT = "wallpaper_portrait";
 export const WALLPAPER_NAME_SUB_LANDSCAPE = "wallpaper_sub";
 export const WALLPAPER_NAME_SUB_PORTRAIT = "wallpaper_sub_portrait";
 
+// 화면별 배경화면 — 첫 화면을 제외한 각 단계에 개별 배경을 지정한다(같은 imageType 5, name으로 구분).
+// CSS 캐스케이드처럼 "화면별 이미지 → 공통(나머지 화면) 이미지 → 배경 단색" 순으로 적용된다.
+// Image.name이 VarChar(32)라 짧은 접두어(wp_)를 쓴다.
+export const WALLPAPER_PAGE_STEPS = [
+  { step: "payment", label: "결제" },
+  { step: "frame", label: "프레임(컷) 선택" },
+  { step: "background", label: "배경 선택" },
+  { step: "camera", label: "촬영" },
+  { step: "select", label: "사진 선택" },
+  { step: "printbg", label: "인쇄 프레임 선택" },
+  { step: "complete", label: "완료(인쇄)" },
+] as const;
+export type WallpaperPageStep = (typeof WALLPAPER_PAGE_STEPS)[number]["step"];
+export function wallpaperPageName(step: WallpaperPageStep, portrait: boolean): string {
+  return `wp_${step}${portrait ? "_pt" : ""}`;
+}
+
+// 촬영 화면 안내 오버레이 — 카메라 미리보기(4:3) 위에 겹쳐 보이는 안내 이미지(예: "손바닥을 펴세요").
+// 화면 표시용이며 촬영본에는 합성되지 않는다. 같은 imageType 5 안에서 name으로 구분.
+export const OVERLAY_NAME_CAMERA = "overlay_camera";
+
 // 대형 강조 버튼(촬영하기·다음·결제하기) 배경 이미지도 같은 imageType(7) 안에서
 // name으로 구분해 버튼별로 따로 업로드한다.
 export const BUTTON_NAME_CAPTURE = "button_capture";
 export const BUTTON_NAME_NEXT = "button_next";
 export const BUTTON_NAME_PAYMENT = "button_payment";
+
+// 버튼 이미지를 올리면 버튼이 이 고정 크기(px, 1920×1080 / 1080×1920 스테이지 기준)로 바뀐다.
+// 관리자 화면에 권장 이미지 크기로 그대로 안내되므로, 디자이너는 이 크기로 제작하면 된다.
+// 값은 기존 단색 버튼(SERVICE_BIG_BUTTON_CLASS)의 실측 크기와 같게 잡아 이미지 유무로 레이아웃이 흔들리지 않게 했다.
+export const BUTTON_IMAGE_SIZE = {
+  landscape: { width: 544, height: 116 },
+  portrait: { width: 736, height: 160 },
+} as const;
 
 // 서비스 화면에 노출할 수 있는 활성 배경의 최대 개수.
 // 이 수를 초과해 활성화하려 하면 관리자에서 거부(invalid)된다.

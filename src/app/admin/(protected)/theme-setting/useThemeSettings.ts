@@ -9,12 +9,22 @@ import {
   BUTTON_NAME_CAPTURE,
   BUTTON_NAME_NEXT,
   BUTTON_NAME_PAYMENT,
+  WALLPAPER_PAGE_STEPS,
+  wallpaperPageName,
+  OVERLAY_NAME_CAMERA,
 } from "@/constants/images";
+import { BUTTON_ROLES, buttonImageOptionKeys, parseButtonImageOptions } from "@/lib/deviceConfig";
+import type { ButtonImageOptions, ButtonRole } from "@/types";
 import type { Asset } from "./AssetUploader";
 
 const WALLPAPER_TYPE = 5;
 const LOGO_TYPE = 6;
 const BUTTON_TYPE = 7;
+// imageType 5 안에서 name 맵으로 관리하는 슬롯 — 화면별 배경(가로/세로) + 촬영 화면 안내 오버레이.
+const NAMED_WALLPAPER_SLOTS = [
+  ...WALLPAPER_PAGE_STEPS.flatMap(({ step }) => [wallpaperPageName(step, false), wallpaperPageName(step, true)]),
+  OVERLAY_NAME_CAMERA,
+];
 
 /**
  * 테마 관리 페이지의 데이터 계층 — 색상 설정 로드/저장, 배경화면·로고·버튼 이미지 애셋의
@@ -39,6 +49,10 @@ export function useThemeSettings(deviceId: string | null) {
   const [captureTextColor, setCaptureTextColor] = useState("#2a2a2a");
   const [nextTextColor, setNextTextColor] = useState("#ffffff");
   const [paymentTextColor, setPaymentTextColor] = useState("#ffffff");
+  const [buttonImageOptions, setButtonImageOptions] = useState<Record<ButtonRole, ButtonImageOptions>>(parseButtonImageOptions({}));
+  // 화면별 배경화면·안내 오버레이 — 슬롯이 많아 name(wallpaperPageName / OVERLAY_NAME_CAMERA)을 키로 한 맵으로 관리.
+  const [namedAssets, setNamedAssets] = useState<Record<string, Asset>>({});
+  const [namedBusy, setNamedBusy] = useState<Record<string, boolean>>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [wallpaperLsBusy, setWallpaperLsBusy] = useState(false);
@@ -67,6 +81,20 @@ export function useThemeSettings(deviceId: string | null) {
     return first && data.baseUrl ? { id: first.id, filename: first.filename, url: `${data.baseUrl}/${first.filename}` } : null;
   };
 
+  // 한 번의 목록 조회로 여러 name 슬롯을 채운다(화면별 배경 14칸을 슬롯마다 따로 조회하지 않도록).
+  const loadAssetsByName = async (type: number, names: string[]): Promise<Record<string, Asset>> => {
+    if (!deviceId) return {};
+    const res = await fetch(`/api/image/list/${type}/?device_id=${deviceId}&linked=1`, { cache: "no-store" });
+    const data = await res.json();
+    const list: Array<{ id: number; name: string; filename: string }> = data.images ?? [];
+    const out: Record<string, Asset> = {};
+    for (const name of names) {
+      const img = list.find((i) => i.name === name);
+      out[name] = img && data.baseUrl ? { id: img.id, filename: img.filename, url: `${data.baseUrl}/${img.filename}` } : null;
+    }
+    return out;
+  };
+
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -74,7 +102,7 @@ export function useThemeSettings(deviceId: string | null) {
       setLoading(true);
       try {
         // 색상: 전역 기본값 ← 이 지점 오버라이드 병합
-        const [g, d, wpLs, wpPt, wpSubLs, wpSubPt, lg, btnCapture, btnNext, btnPayment] = await Promise.all([
+        const [g, d, wpLs, wpPt, wpSubLs, wpSubPt, lg, btnCapture, btnNext, btnPayment, named] = await Promise.all([
           fetch("/api/setting/").then((r) => r.json()).catch(() => ({})),
           fetch(`/api/device/${deviceId}/settings/`).then((r) => r.json()).catch(() => ({})),
           loadAsset(WALLPAPER_TYPE, WALLPAPER_NAME_LANDSCAPE),
@@ -85,6 +113,7 @@ export function useThemeSettings(deviceId: string | null) {
           loadAsset(BUTTON_TYPE, BUTTON_NAME_CAPTURE),
           loadAsset(BUTTON_TYPE, BUTTON_NAME_NEXT),
           loadAsset(BUTTON_TYPE, BUTTON_NAME_PAYMENT),
+          loadAssetsByName(WALLPAPER_TYPE, NAMED_WALLPAPER_SLOTS),
         ]);
         if (cancelled) return;
         const s = { ...(g.settings || {}), ...(d.settings || {}) };
@@ -97,6 +126,8 @@ export function useThemeSettings(deviceId: string | null) {
         setCaptureTextColor(s.THEME_BTN_TEXT_COLOR_CAPTURE || "#2a2a2a");
         setNextTextColor(s.THEME_BTN_TEXT_COLOR_NEXT || "#ffffff");
         setPaymentTextColor(s.THEME_BTN_TEXT_COLOR_PAYMENT || "#ffffff");
+        setButtonImageOptions(parseButtonImageOptions(s));
+        setNamedAssets(named);
         setWallpaperLs(wpLs);
         setWallpaperPt(wpPt);
         setWallpaperSubLs(wpSubLs);
@@ -131,9 +162,14 @@ export function useThemeSettings(deviceId: string | null) {
           THEME_BTN_TEXT_COLOR_CAPTURE: captureTextColor,
           THEME_BTN_TEXT_COLOR_NEXT: nextTextColor,
           THEME_BTN_TEXT_COLOR_PAYMENT: paymentTextColor,
+          ...Object.fromEntries(BUTTON_ROLES.flatMap((role) => {
+            const k = buttonImageOptionKeys(role);
+            const o = buttonImageOptions[role];
+            return [[k.imageOnly, o.imageOnly ? "1" : "0"], [k.hideText, o.hideText ? "1" : "0"]];
+          })),
         }),
       });
-      flash(res.ok ? "색상이 저장되었습니다." : "저장 실패");
+      flash(res.ok ? "설정이 저장되었습니다." : "저장 실패");
     } catch {
       flash("서버 연결 실패");
     } finally {
@@ -198,6 +234,17 @@ export function useThemeSettings(deviceId: string | null) {
     }
   };
 
+  const setButtonImageOption = (role: ButtonRole, key: keyof ButtonImageOptions, value: boolean) =>
+    setButtonImageOptions((prev) => ({ ...prev, [role]: { ...prev[role], [key]: value } }));
+
+  // name 키 맵 슬롯용 업로드/제거 — 기존 uploadAsset/removeAsset을 맵 setter로 감싼다.
+  const setNamedAsset = (name: string) => (a: Asset) => setNamedAssets((prev) => ({ ...prev, [name]: a }));
+  const setNamedBusyFor = (name: string) => (b: boolean) => setNamedBusy((prev) => ({ ...prev, [name]: b }));
+  const uploadNamed = (name: string) =>
+    uploadAsset(WALLPAPER_TYPE, name, namedAssets[name] ?? null, setNamedAsset(name), setNamedBusyFor(name));
+  const removeNamed = (name: string) =>
+    removeAsset(namedAssets[name] ?? null, setNamedAsset(name), setNamedBusyFor(name));
+
   return {
     textColor, setTextColor,
     primaryColor, setPrimaryColor,
@@ -226,5 +273,7 @@ export function useThemeSettings(deviceId: string | null) {
     setWallpaperSubLs, setWallpaperSubPt,
     setCaptureButtonImage, setNextButtonImage, setPaymentButtonImage,
     WALLPAPER_TYPE, LOGO_TYPE, BUTTON_TYPE,
+    buttonImageOptions, setButtonImageOption,
+    namedAssets, namedBusy, uploadNamed, removeNamed,
   };
 }
