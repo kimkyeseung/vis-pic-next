@@ -21,6 +21,7 @@ import { applyChromaKeyYuv } from "@/lib/chromakeyYuv";
 import { useAutoCaptureTimer } from "@/hooks/useAutoCaptureTimer";
 import { createSoundPlayer, type SoundPlayer } from "@/lib/sounds";
 import type { BgEffectInfo } from "./useBackgroundCompositing";
+import type { FrameChannel } from "@/hooks/useSceneSync";
 
 // GIF 중간 프레임 캡처: ~180ms 간격(재생 10fps와 매칭), 800px 다운스케일.
 // 최근 24장만 유지해 메모리·GIF 파일 크기(~2.5MB)를 제한한다.
@@ -129,7 +130,7 @@ export function useCameraCapture({
   drawBackground: (ctx: CanvasRenderingContext2D, w: number, h: number) => void;
   drawEffectLayer: (ctx: CanvasRenderingContext2D, w: number, h: number, alpha: number) => void;
   drawStickers: (ctx: CanvasRenderingContext2D, w: number, h: number, pxScale?: number) => void;
-  frameChannelRef: React.RefObject<{ postMessage: (msg: { type: string; dataUrl: string }) => void } | null>;
+  frameChannelRef: React.RefObject<FrameChannel | null>;
 }): {
   flash: boolean;
   capturedPreview: string | null;
@@ -184,7 +185,7 @@ export function useCameraCapture({
   // 촬영·서브 모니터 송출용: 카메라 합성 캔버스 위에 스티커 레이어를 얹은 스냅샷.
   // maxWidth 지정 시 다운스케일 (GIF 중간 프레임처럼 고해상도가 필요 없는 경우)
   const composeCanvasRef = useRef<HTMLCanvasElement | null>(null);
-  const snapshotWithStickers = useCallback((quality: number, maxWidth?: number): string | null => {
+  const composeWithStickers = useCallback((maxWidth?: number): HTMLCanvasElement | null => {
     const display = displayCanvasRef.current;
     if (!display || !display.width || !display.height) return null;
     const scale = maxWidth ? Math.min(1, maxWidth / display.width) : 1;
@@ -200,8 +201,21 @@ export function useCameraCapture({
     const ctx = c.getContext("2d")!;
     ctx.drawImage(display, 0, 0, w, h);
     drawStickers(ctx, w, h, scale);
-    return c.toDataURL("image/jpeg", quality);
+    return c;
   }, [drawStickers, displayCanvasRef]);
+  const snapshotWithStickers = useCallback((quality: number, maxWidth?: number): string | null => {
+    return composeWithStickers(maxWidth)?.toDataURL("image/jpeg", quality) ?? null;
+  }, [composeWithStickers]);
+  // 서브 모니터 송출: 인코딩은 sendCanvas가 toBlob(비동기)으로 하므로 여기선 합성만 한다.
+  // 직전 프레임이 아직 전송 중이면 건너뛰고(false) 다음 rAF에 다시 시도한다.
+  const sendFrame = useCallback(() => {
+    const channel = frameChannelRef.current;
+    if (!channel) return;
+    const now = performance.now();
+    if (now - lastFrameSentRef.current <= 100) return;
+    const c = composeWithStickers(1440);
+    if (c && channel.sendCanvas(c, 0.85)) lastFrameSentRef.current = now;
+  }, [composeWithStickers, frameChannelRef]);
 
   // 촬영 순간에만 실행하는 고해상도 캡처(프리뷰 루프는 그대로 1440 상한 유지).
   // 원본 video(고해상도)를 다시 그리고, 프리뷰에서 만든 저해상도 마스크(maskCanvasRef)를 확대 적용해
@@ -286,6 +300,12 @@ export function useCameraCapture({
   // 배경과 동일하게 미러 없이 그린다. transition 모드는 배경 자체를 바꾸므로 여기서 그리지 않는다.
   useEffect(() => {
     const offscreen = document.createElement("canvas");
+    // 크로마키는 매 프레임 getImageData로 픽셀을 읽으므로 CPU 백업 캔버스(willReadFrequently)로 둬야
+    // 프레임마다 GPU→CPU 동기 readback이 일어나지 않는다. 반대로 mediapipe는 GPU 합성(destination-in)만
+    // 하므로 GPU 캔버스가 유리하다. 이 effect는 bgRemovalMode가 바뀌면 재생성되므로 모드별로 정해 둔다.
+    const offCtx = offscreen.getContext("2d", {
+      willReadFrequently: bgRemovalMode === "chromakey" || bgRemovalMode === "chromakey-yuv",
+    })!;
     // ROI 추론 입력(정사각 고정) — 크기가 매 프레임 같아야 MediaPipe가 텐서를 다시 안 잡는다.
     // 마스크 ImageData도 크기가 같은 동안 재사용한다(추론마다 수 MB 할당을 피한다).
     let roiCanvas: HTMLCanvasElement | null = null;
@@ -350,14 +370,7 @@ export function useCameraCapture({
         ctx.drawImage(video, 0, 0, dw, dh);
         ctx.restore();
 
-        if (frameChannelRef.current) {
-          const now = performance.now();
-          if (now - lastFrameSentRef.current > 100) {
-            lastFrameSentRef.current = now;
-            const dataUrl = snapshotWithStickers(0.85, 1440);
-            if (dataUrl) frameChannelRef.current.postMessage({ type: "frame", dataUrl });
-          }
-        }
+        sendFrame();
 
         animFrameRef.current = requestAnimationFrame(processFrame);
         return;
@@ -367,7 +380,6 @@ export function useCameraCapture({
       const ph = Math.max(1, Math.round(h * PROCESS_SCALE));
       if (offscreen.width !== pw) offscreen.width = pw;
       if (offscreen.height !== ph) offscreen.height = ph;
-      const offCtx = offscreen.getContext("2d")!;
       offCtx.imageSmoothingEnabled = true;
       offCtx.imageSmoothingQuality = maskSmoothQualityRef.current;
 
@@ -514,22 +526,15 @@ export function useCameraCapture({
 
       // 스티커는 별도 캔버스 레이어에서 그린다 (송출 프레임에는 snapshotWithStickers로 합성)
 
-      // syncEnabled 시 ~30fps로 합성 프레임을 output 창에 전송
-      if (frameChannelRef.current) {
-        const now = performance.now();
-        if (now - lastFrameSentRef.current > 100) {
-          lastFrameSentRef.current = now;
-          const dataUrl = snapshotWithStickers(0.85, 1440);
-          if (dataUrl) frameChannelRef.current?.postMessage({ type: "frame", dataUrl });
-        }
-      }
+      // syncEnabled 시 최대 ~10fps로 합성 프레임을 output 창에 전송
+      sendFrame();
 
       animFrameRef.current = requestAnimationFrame(processFrame);
     };
 
     animFrameRef.current = requestAnimationFrame(processFrame);
     return () => cancelAnimationFrame(animFrameRef.current);
-  }, [selectedBackground, chromaKey, config.chromakeySimilarity, config.chromakeySmoothness, config.chromakeySpill, config.chromakeyChoke, config.chromakeyLumaIndependent, chromaKeyYuv, config.chromakeyYuvSimilarity, config.chromakeyYuvSmoothness, config.chromakeyYuvSpill, config.chromakeyYuvOpacity, config.chromakeyYuvContrast, config.chromakeyYuvBrightness, config.chromakeyYuvGamma, bgRemovalMode, segmentThresh, segmentFeather, useGpuDelegate, lightModelRef, inferenceIntervalRef, maskSmoothQualityRef, perfRef, segmenterRef, maskCanvasRef, maskReadyRef, roiRef, handRectsRef, lastInferenceTimeRef, workerRef, workerBusyRef, workerActiveRef, currentBgEffectRef, effectVisibleRef, effectAlphaRef, drawBackground, drawEffectLayer, frameChannelRef, snapshotWithStickers, videoRef, displayCanvasRef]);
+  }, [selectedBackground, chromaKey, config.chromakeySimilarity, config.chromakeySmoothness, config.chromakeySpill, config.chromakeyChoke, config.chromakeyLumaIndependent, chromaKeyYuv, config.chromakeyYuvSimilarity, config.chromakeyYuvSmoothness, config.chromakeyYuvSpill, config.chromakeyYuvOpacity, config.chromakeyYuvContrast, config.chromakeyYuvBrightness, config.chromakeyYuvGamma, bgRemovalMode, segmentThresh, segmentFeather, useGpuDelegate, lightModelRef, inferenceIntervalRef, maskSmoothQualityRef, perfRef, segmenterRef, maskCanvasRef, maskReadyRef, roiRef, handRectsRef, lastInferenceTimeRef, workerRef, workerBusyRef, workerActiveRef, currentBgEffectRef, effectVisibleRef, effectAlphaRef, drawBackground, drawEffectLayer, sendFrame, videoRef, displayCanvasRef]);
 
   // 카운트다운 도중 언마운트(이전/다음 이동 등) 시 타이머가 살아남아
   // onCapture가 화면 전환 후에 실행되는 것을 막는다.

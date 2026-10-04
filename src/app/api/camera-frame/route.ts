@@ -4,12 +4,21 @@ export const dynamic = "force-dynamic";
 const sseClients = new Set<ReadableStreamDefaultController<Uint8Array>>();
 const encoder = new TextEncoder();
 
+// 송출 측(useFrameSender)은 JPEG 바이너리를 그대로 POST한다 — base64 변환은 키오스크 렌더링
+// 스레드가 아니라 여기(서버)서 한다. 구버전 클라이언트용으로 JSON { dataUrl }도 계속 받는다.
 export async function POST(req: Request) {
   let dataUrl: string;
   try {
-    const body = (await req.json()) as { dataUrl: string };
-    dataUrl = body.dataUrl;
-    if (!dataUrl) throw new Error("missing dataUrl");
+    const type = req.headers.get("content-type") ?? "";
+    if (type.startsWith("image/")) {
+      const buf = Buffer.from(await req.arrayBuffer());
+      if (buf.length === 0) throw new Error("empty body");
+      dataUrl = `data:${type.split(";")[0]};base64,${buf.toString("base64")}`;
+    } else {
+      const body = (await req.json()) as { dataUrl: string };
+      dataUrl = body.dataUrl;
+      if (!dataUrl) throw new Error("missing dataUrl");
+    }
   } catch {
     return new Response("Bad Request", { status: 400 });
   }

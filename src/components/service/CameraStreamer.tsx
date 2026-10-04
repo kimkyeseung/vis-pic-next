@@ -269,8 +269,14 @@ export function CameraStreamer({
     video.muted = true;
     const canvas = document.createElement("canvas");
     const ctx = canvas.getContext("2d")!;
+    // mediapipe 경로는 GPU 합성(destination-in)만 하므로 GPU 캔버스(offscreen)를,
+    // 크로마키 경로는 매 프레임 getImageData로 픽셀을 읽으므로 CPU 백업 캔버스(keyCanvas,
+    // willReadFrequently)를 쓴다 — 하나로 쓰면 어느 한쪽이 프레임마다 GPU↔CPU 동기 전송을 치른다.
+    // 모드는 ref로 바뀌어 루프가 재생성되지 않으므로 둘 다 만들어 둔다.
     const offscreen = document.createElement("canvas");
     const offCtx = offscreen.getContext("2d")!;
+    const keyCanvas = document.createElement("canvas");
+    const keyCtx = keyCanvas.getContext("2d", { willReadFrequently: true })!;
     // ROI 추론 입력(정사각 고정) — 크기가 매 프레임 같아야 MediaPipe가 텐서를 다시 안 잡는다.
     // 마스크 ImageData도 크기가 같은 동안 재사용한다(추론마다 수 MB 할당을 피한다).
     let roiCanvas: HTMLCanvasElement | null = null;
@@ -342,7 +348,7 @@ export function CameraStreamer({
           const h = video.videoHeight;
           // 배경제거 처리 해상도. 기본("auto")은 4K(2560+)에서만 0.25로 낮춰 픽셀 연산량을 줄인다.
           const PROCESS_SCALE = segmentProcessScaleFor(processScaleRef.current, w);
-          // 송출 전용 캔버스는 최대 1440px로 캡 — 서브 모니터 선명도와 toDataURL 인코딩 비용의 절충.
+          // 송출 전용 캔버스는 최대 1440px로 캡 — 서브 모니터 선명도와 JPEG 인코딩·전송 비용의 절충.
           const MAX_STREAM_W = 1440;
           const cScale = Math.min(1, MAX_STREAM_W / w);
           const cw = Math.round(w * cScale);
@@ -351,18 +357,20 @@ export function CameraStreamer({
           if (canvas.height !== ch) canvas.height = ch;
           const pw = Math.max(1, Math.round(w * PROCESS_SCALE));
           const ph = Math.max(1, Math.round(h * PROCESS_SCALE));
-          if (offscreen.width !== pw) offscreen.width = pw;
-          if (offscreen.height !== ph) offscreen.height = ph;
-
           const mode = bgRemovalModeRef.current;
+          const isChroma = mode === "chromakey" || mode === "chromakey-yuv";
+          const work = isChroma ? keyCanvas : offscreen;
+          if (work.width !== pw) work.width = pw;
+          if (work.height !== ph) work.height = ph;
+
           const sbg = selectedBgRef.current;
           const hasBg = sbg !== null;
 
           if (!hasBg || mode === "off") {
             drawRaw(cw, ch);
           } else if (mode === "chromakey") {
-            offCtx.drawImage(video, 0, 0, pw, ph);
-            const imgData = offCtx.getImageData(0, 0, pw, ph);
+            keyCtx.drawImage(video, 0, 0, pw, ph);
+            const imgData = keyCtx.getImageData(0, 0, pw, ph);
             const [kr, kg, kb] = chromakeyRgbRef.current.split(",").map(Number);
             applyChromaKey(
               imgData.data,
@@ -375,16 +383,16 @@ export function CameraStreamer({
               chromakeyChokeRef.current,
               chromakeyLumaIndependentRef.current,
             );
-            offCtx.putImageData(imgData, 0, 0);
+            keyCtx.putImageData(imgData, 0, 0);
             drawBg(cw, ch);
             ctx.save();
             ctx.translate(cw, 0);
             ctx.scale(-1, 1);
-            ctx.drawImage(offscreen, 0, 0, cw, ch);
+            ctx.drawImage(keyCanvas, 0, 0, cw, ch);
             ctx.restore();
           } else if (mode === "chromakey-yuv") {
-            offCtx.drawImage(video, 0, 0, pw, ph);
-            const imgData = offCtx.getImageData(0, 0, pw, ph);
+            keyCtx.drawImage(video, 0, 0, pw, ph);
+            const imgData = keyCtx.getImageData(0, 0, pw, ph);
             const [kr, kg, kb] = chromakeyYuvRgbRef.current.split(",").map(Number);
             applyChromaKeyYuv(
               imgData.data,
@@ -399,12 +407,12 @@ export function CameraStreamer({
               chromakeyYuvBrightnessRef.current,
               chromakeyYuvGammaRef.current,
             );
-            offCtx.putImageData(imgData, 0, 0);
+            keyCtx.putImageData(imgData, 0, 0);
             drawBg(cw, ch);
             ctx.save();
             ctx.translate(cw, 0);
             ctx.scale(-1, 1);
-            ctx.drawImage(offscreen, 0, 0, cw, ch);
+            ctx.drawImage(keyCanvas, 0, 0, cw, ch);
             ctx.restore();
           } else if (mode === "mediapipe" && segmenterRef.current) {
             // 촬영 화면(useCameraCapture)과 같은 마스크 파이프라인 — ROI 크롭 추론 + 공간 블러로
@@ -490,12 +498,9 @@ export function CameraStreamer({
           }
 
           const now = performance.now();
+          // 직전 프레임이 아직 전송 중이면 sendCanvas가 건너뛰므로(false) 그땐 다음 rAF에 다시 시도한다.
           if (frameChannelRef.current && now - lastSentRef.current > 100) {
-            lastSentRef.current = now;
-            frameChannelRef.current.postMessage({
-              type: "frame",
-              dataUrl: canvas.toDataURL("image/jpeg", 0.85),
-            });
+            if (frameChannelRef.current.sendCanvas(canvas, 0.85)) lastSentRef.current = now;
           }
         };
 

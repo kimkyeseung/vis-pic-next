@@ -69,21 +69,33 @@ export function applyChromaKeyYuv(
     const clamped = Math.max(0, Math.min(255, graded));
     return Math.max(0, Math.min(255, 255 * Math.pow(clamped / 255, gammaExp)));
   };
+  // 색보정은 채널값만의 함수라 정수 입력(0-255)은 256칸 표로 미리 계산해 픽셀 루프의 Math.pow(픽셀당 3회)를
+  // 없앤다. 스필 제거를 거친 픽셀은 채널값이 소수이거나 0-255 밖일 수 있어(보정 전에 자르면 결과가 달라진다)
+  // 그때만 applyGrade로 정확히 계산한다. 보정값이 모두 0이면 applyGrade는 클램프뿐이라 그것도 생략한다.
+  const gradeLut = new Uint8ClampedArray(256);
+  for (let c = 0; c < 256; c++) gradeLut[c] = applyGrade(c);
+  const gradeIsIdentity = contrast === 0 && brightness === 0 && gamma === 0;
+
+  // 거리 비교는 제곱으로 한다 — 제곱근은 페더 구간에 든 픽셀에서만 계산한다.
+  const keyU = keyYuv.u, keyV = keyYuv.v;
+  const thresholdSq = threshold * threshold;
+  const outerSq = (threshold + band) * (threshold + band);
 
   for (let i = 0; i < data.length; i += 4) {
     const r = data[i], g = data[i + 1], b = data[i + 2];
-    const { u, v } = toYuv(r, g, b);
-    const du = u - keyYuv.u, dv = v - keyYuv.v;
-    const dist = Math.hypot(du, dv);
+    const u = -0.168736 * r - 0.331264 * g + 0.5 * b;
+    const v = 0.5 * r - 0.418688 * g - 0.081312 * b;
+    const du = u - keyU, dv = v - keyV;
+    const distSq = du * du + dv * dv;
 
     let alpha = data[i + 3];
-    if (dist <= threshold) {
+    if (distSq <= thresholdSq) {
       alpha = 0;
-    } else if (dist < threshold + band) {
-      alpha = Math.round(((dist - threshold) / band) * 255);
+    } else if (distSq < outerSq) {
+      alpha = Math.round(((Math.sqrt(distSq) - threshold) / band) * 255);
     }
 
-    let outR = r, outG = g, outB = b;
+    data[i + 3] = Math.round(alpha * opacityAmt);
     if (spillAmt > 0 && alpha > 0) {
       // 픽셀 색차 벡터를 키 색 방향으로 투영 — 같은 방향(양수)일 때만 그만큼 원점 쪽으로 당긴다.
       const proj = u * keyDirU + v * keyDirV;
@@ -92,15 +104,19 @@ export function applyChromaKeyYuv(
         const nu = u - pull * keyDirU;
         const nv = v - pull * keyDirV;
         const y = 0.299 * r + 0.587 * g + 0.114 * b;
-        outR = y + 1.402 * nv;
-        outG = y - 0.344136 * nu - 0.714136 * nv;
-        outB = y + 1.772 * nu;
+        const outR = y + 1.402 * nv;
+        const outG = y - 0.344136 * nu - 0.714136 * nv;
+        const outB = y + 1.772 * nu;
+        // Uint8ClampedArray 대입이 클램프·반올림을 해 주므로 보정이 없으면 그대로 넣는다.
+        data[i] = gradeIsIdentity ? outR : applyGrade(outR);
+        data[i + 1] = gradeIsIdentity ? outG : applyGrade(outG);
+        data[i + 2] = gradeIsIdentity ? outB : applyGrade(outB);
+        continue;
       }
     }
 
-    data[i] = applyGrade(outR);
-    data[i + 1] = applyGrade(outG);
-    data[i + 2] = applyGrade(outB);
-    data[i + 3] = Math.round(alpha * opacityAmt);
+    data[i] = gradeLut[r];
+    data[i + 1] = gradeLut[g];
+    data[i + 2] = gradeLut[b];
   }
 }
