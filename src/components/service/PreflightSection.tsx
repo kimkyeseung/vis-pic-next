@@ -156,12 +156,13 @@ export function PreflightSection({
       // ④ 배경 애셋 (경고 등급)
       if (serverOk) {
         try {
-          const res = await withTimeout(fetch(`/api/image/list/1/?device_id=${deviceId}`));
+          // 서비스가 실제로 쓰는 지점 노출 배경 목록으로 확인한다(전체 이미지 목록이 아니라).
+          const res = await withTimeout(fetch(`/api/device/${deviceId}/backgrounds/`));
           if (!res.ok) throw new Error(`HTTP ${res.status}`);
           const data = await res.json();
           const first = data.images?.[0];
           if (!first) {
-            set("assets", "warn", "업로드된 배경 없음 (기본 그라디언트 사용)");
+            set("assets", "warn", "이 지점에 노출할 배경 없음 (기본 그라디언트 사용)");
           } else {
             const isVideo = /\.(mp4|webm)$/.test(first.filename);
             const ok = isVideo || (await withTimeout(loadImageOk(`${data.baseUrl}/${first.filename}`)));

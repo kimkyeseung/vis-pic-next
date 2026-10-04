@@ -17,7 +17,11 @@ export async function GET(
     const { deviceId } = await params;
     const links = await prisma.imageDevice.findMany({
       where: { deviceId, image: { imageType: FRAME_IMAGE_TYPE } },
-      orderBy: { sortOrder: "asc" },
+      // 노출 순서(sortOrder)가 같은 연결(예전 업로드·편집 경로로 생긴 연결은 0으로 들어갔다)은 먼저 등록된 이미지 순.
+      orderBy: [{ sortOrder: "asc" }, { imageId: "asc" }],
+      // 연결이 몇 개든 상위 프레임 최대 개수만 내보낸다 — 저장(PUT)만 자르면 다른 경로로 쌓인 연결이 서비스에 그대로 노출된다.
+      // 관리자 노출 목록도 이 결과를 쓰므로, 거기서 저장하면 초과분 연결은 정리된다.
+      take: MAX_ACTIVE_FRAMES,
       include: { image: true },
     });
     const images = links.map((l) => ({
