@@ -128,6 +128,11 @@ export function usePrintSettingsForm(deviceId: string | undefined) {
 
   const handleSave = async () => {
     if (!deviceId) { setMessage("먼저 상단에서 지점을 선택하세요."); return; }
+    // 빈 목록을 저장하면 읽는 쪽이 기본 모드(1x1,2x2)로 대체해 의도와 다르게 동작한다.
+    if (modes.length === 0) { setMessage("촬영 모드를 1개 이상 추가한 뒤 저장하세요. (저장 실패)"); return; }
+    const pw = parseFloat(paperWidth);
+    const ph = parseFloat(paperHeight);
+    if (!(pw > 0) || !(ph > 0)) { setMessage("인화지 가로·세로 크기를 0보다 큰 값으로 입력하세요. (저장 실패)"); return; }
     setSaving(true);
     setMessage("");
     try {
@@ -207,6 +212,7 @@ export function usePrintSettingsForm(deviceId: string | undefined) {
   };
 
   const removeMode = (mode: string) => {
+    if (modes.length <= 1) return; // 최소 1개 유지(빈 목록은 기본 모드로 대체됨)
     const next = modes.filter((m) => m !== mode);
     setModes(next);
     if (previewMode === mode) setPreviewMode(next[0] || null);

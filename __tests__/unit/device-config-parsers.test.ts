@@ -7,6 +7,7 @@ import {
   parsePaymentTerminalMode,
   parseCameraResolution,
   parseButtonImageOptions,
+  validateDeviceInput,
 } from "@/lib/deviceConfig";
 
 /**
@@ -172,5 +173,32 @@ describe("parseButtonImageOptions (버튼 이미지 표시 옵션)", () => {
     expect(o.capture).toEqual({ imageOnly: true, hideText: false });
     expect(o.next).toEqual({ imageOnly: false, hideText: false });
     expect(o.payment).toEqual({ imageOnly: true, hideText: true });
+  });
+});
+
+describe("validateDeviceInput — 지점 ID·이름·설명 검증", () => {
+  it("영문·숫자·하이픈·밑줄 ID와 이름이면 통과", () => {
+    expect(validateDeviceInput({ deviceId: "booth-001", name: "1층 포토부스" }, "create")).toBeNull();
+    expect(validateDeviceInput({ deviceId: "device_02", name: "지점", description: "" }, "create")).toBeNull();
+  });
+
+  it("공백·슬래시·한글·빈 값·64자 초과 ID는 거부", () => {
+    for (const deviceId of ["booth 1", "a/b", "지점1", "", "a".repeat(65), undefined as unknown as string]) {
+      expect(validateDeviceInput({ deviceId, name: "x" }, "create")).not.toBeNull();
+    }
+    expect(validateDeviceInput({ deviceId: "a".repeat(64), name: "x" }, "create")).toBeNull();
+  });
+
+  it("이름은 공백만 있거나 128자를 넘으면 거부, 설명은 255자 초과 거부", () => {
+    expect(validateDeviceInput({ name: "   " }, "update")).not.toBeNull();
+    expect(validateDeviceInput({ name: "a".repeat(129) }, "update")).not.toBeNull();
+    expect(validateDeviceInput({ name: "a", description: "a".repeat(256) }, "update")).not.toBeNull();
+  });
+
+  it("수정(update)은 넘어온 필드만 검사, 생성(create)은 ID·이름이 빠지면 거부", () => {
+    expect(validateDeviceInput({ name: "새 이름", description: null }, "update")).toBeNull();
+    expect(validateDeviceInput({ description: "설명만" }, "update")).toBeNull();
+    expect(validateDeviceInput({ name: "이름만" }, "create")).not.toBeNull();
+    expect(validateDeviceInput({ deviceId: "booth-1" }, "create")).not.toBeNull();
   });
 });

@@ -99,3 +99,36 @@ export function parseButtonImageOptions(s: Record<string, string | undefined>): 
   }
   return out;
 }
+
+/**
+ * 지점(장치) ID 규칙 — 영문·숫자·하이픈(-)·밑줄(_), 1~64자(DB VarChar(64)).
+ * ID는 API 경로(/api/device/{id}/...)와 결제 주문번호에 그대로 들어가므로 공백·슬래시 등을 막는다.
+ */
+export const DEVICE_ID_PATTERN = /^[A-Za-z0-9_-]{1,64}$/;
+const DEVICE_NAME_MAX = 128; // DB VarChar(128)
+const DEVICE_DESCRIPTION_MAX = 255; // DB VarChar(255)
+
+/**
+ * 지점 입력 검증. 문제가 없으면 null, 있으면 사용자에게 보여줄 메시지.
+ * - "create"(생성·복제): ID·이름 필수.
+ * - "update"(수정): 넘어온 필드만 검사하고 ID는 보지 않는다(생성 후 변경 불가).
+ */
+export function validateDeviceInput(
+  input: { deviceId?: unknown; name?: unknown; description?: unknown },
+  mode: "create" | "update",
+): string | null {
+  if (mode === "create") {
+    if (typeof input.deviceId !== "string" || !DEVICE_ID_PATTERN.test(input.deviceId)) {
+      return "장치 ID는 영문, 숫자, 하이픈(-), 밑줄(_)만 사용해 1~64자로 입력하세요.";
+    }
+  }
+  if (mode === "create" || input.name !== undefined) {
+    if (typeof input.name !== "string" || !input.name.trim()) return "장치 이름을 입력하세요.";
+    if (input.name.length > DEVICE_NAME_MAX) return `장치 이름은 ${DEVICE_NAME_MAX}자 이하로 입력하세요.`;
+  }
+  if (input.description !== undefined && input.description !== null) {
+    if (typeof input.description !== "string") return "설명 형식이 올바르지 않습니다.";
+    if (input.description.length > DEVICE_DESCRIPTION_MAX) return `설명은 ${DEVICE_DESCRIPTION_MAX}자 이하로 입력하세요.`;
+  }
+  return null;
+}

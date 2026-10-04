@@ -42,8 +42,8 @@ function normalizeSelectValue(name: string, val: string | undefined): string {
 }
 
 const FIELDS: { name: string; label: string; type?: "text" | "number" | "range" | "select" | "color"; options?: { value: string; label: string }[]; min?: number; max?: number; default?: number; hint?: string; showIf?: (settings: Record<string, string>) => boolean }[] = [
-  { name: "CAPTURE_SECONDS", label: "카운트다운 (초)", type: "number" },
-  { name: "CAPTURE_COUNT_UNIFORM", label: "슬롯당 촬영 횟수", type: "number", hint: "각 슬롯당 촬영할 장수. 예: 2 → 4컷은 8장 촬영 후 4장 선택." },
+  { name: "CAPTURE_SECONDS", label: "카운트다운 (초)", type: "number", min: 1, max: 30, hint: "1~30초. 기본 3." },
+  { name: "CAPTURE_COUNT_UNIFORM", label: "슬롯당 촬영 횟수", type: "number", min: 1, max: 10, hint: "각 슬롯당 촬영할 장수(1~10). 예: 2 → 4컷은 8장 촬영 후 4장 선택." },
   {
     name: "CAMERA_RESOLUTION",
     label: "카메라 화질(해상도)",
@@ -277,10 +277,43 @@ const FIELDS: { name: string; label: string; type?: "text" | "number" | "range" 
 
 const FIELD_NAMES = FIELDS.map((f) => f.name);
 
+/** min/max가 있는 숫자·슬라이더 칸 중 범위를 벗어난(또는 숫자가 아닌) 값의 라벨 목록. 빈 값은 기본값 사용이라 통과. */
+function invalidFieldLabels(settings: Record<string, string>): string[] {
+  return FIELDS.filter((f) => {
+    if ((f.type !== "number" && f.type !== "range") || (f.min === undefined && f.max === undefined)) return false;
+    const raw = (settings[f.name] ?? "").trim();
+    if (raw === "") return false;
+    const n = Number(raw);
+    if (!Number.isInteger(n)) return true;
+    return (f.min !== undefined && n < f.min) || (f.max !== undefined && n > f.max);
+  }).map((f) => `${f.label}(${f.min ?? ""}~${f.max ?? ""})`);
+}
+
+/**
+ * 표시 판단용 설정 뷰 — 레거시 CHROMAKEY_MODE("0"/"1")를 셀렉트와 같은 값으로 정규화하고, 미설정이면
+ * 기본 "mediapipe"로 채운다. 셀렉트만 정규화하고 showIf는 원값을 보면 "크로마키"로 표시되는데 세부 항목이 숨는다.
+ */
+function viewSettings(settings: Record<string, string>): Record<string, string> {
+  return { ...settings, CHROMAKEY_MODE: normalizeSelectValue("CHROMAKEY_MODE", settings.CHROMAKEY_MODE) || "mediapipe" };
+}
+
 export default function CaptureSettingPage() {
   const { selectedDevice, settings, update: updateSetting, save, loading, saving, message } = useAdminDeviceSettings();
   const [colorPickerOpen, setColorPickerOpen] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
+  const [validationError, setValidationError] = useState("");
+  const view = viewSettings(settings);
+  const mode = view.CHROMAKEY_MODE;
+
+  const handleSave = () => {
+    const invalid = invalidFieldLabels(settings);
+    if (invalid.length > 0) {
+      setValidationError(`범위를 벗어난 값이 있어 저장하지 않았습니다: ${invalid.join(", ")}`);
+      return;
+    }
+    setValidationError("");
+    save(FIELD_NAMES);
+  };
 
   if (loading) return <div className="text-gray-400">로딩중...</div>;
   if (!selectedDevice) return <div className="p-8 bg-gray-800 rounded-xl text-center text-gray-400">상단에서 지점을 선택하세요.</div>;
@@ -298,7 +331,7 @@ export default function CaptureSettingPage() {
 
       <div className="bg-gray-800 rounded-xl border border-gray-700">
         <div className="px-6 py-6 space-y-4">
-          {FIELDS.filter((field) => !field.showIf || field.showIf(settings)).map((field) => (
+          {FIELDS.filter((field) => !field.showIf || field.showIf(view)).map((field) => (
             <div key={field.name} className="grid grid-cols-[220px_1fr] gap-4 items-center">
               <label className="text-gray-400 text-sm truncate" title={field.name}>
                 {field.label}
@@ -378,7 +411,7 @@ export default function CaptureSettingPage() {
             </div>
           ))}
 
-          {(settings.CHROMAKEY_MODE || "mediapipe") !== "off" && (
+          {mode !== "off" && (
             <div className="grid grid-cols-[220px_1fr] gap-4 items-center">
               <label className="text-gray-400 text-sm">배경 제거 미리보기</label>
               <div>
@@ -398,6 +431,10 @@ export default function CaptureSettingPage() {
         </div>
       </div>
 
+      {validationError && (
+        <div className="p-4 rounded-lg bg-red-900/50 border border-red-500 text-red-300">{validationError}</div>
+      )}
+
       {message && (
         <div className={`p-4 rounded-lg ${message.includes("실패") ? "bg-red-900/50 border border-red-500 text-red-300" : "bg-green-900/50 border border-green-500 text-green-300"}`}>
           {message}
@@ -406,7 +443,7 @@ export default function CaptureSettingPage() {
 
       <div className="sticky bottom-0 py-4 bg-[#2a2a2a]">
         <button
-          onClick={() => save(FIELD_NAMES)}
+          onClick={handleSave}
           disabled={saving}
           className="px-8 py-3 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition-colors disabled:opacity-50"
         >
@@ -416,13 +453,7 @@ export default function CaptureSettingPage() {
 
       {previewOpen && (
         <BackgroundRemovalPreviewDialog
-          mode={
-            (settings.CHROMAKEY_MODE || "mediapipe") === "chromakey"
-              ? "chromakey"
-              : settings.CHROMAKEY_MODE === "chromakey-yuv"
-              ? "chromakey-yuv"
-              : "mediapipe"
-          }
+          mode={mode === "chromakey" || mode === "chromakey-yuv" ? mode : "mediapipe"}
           chromaColor={parseRgbString(settings.CHROMAKEY_RGB || "0,255,0")}
           onChromaColorChange={(rgb) => updateSetting("CHROMAKEY_RGB", rgb)}
           similarity={clampPercent(parseIntSafe(settings.CHROMAKEY_SIMILARITY || "", 50), 1)}

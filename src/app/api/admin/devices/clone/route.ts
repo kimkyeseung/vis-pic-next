@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/db";
 import { requireAdmin } from "@/lib/adminAuth";
+import { validateDeviceInput } from "@/lib/deviceConfig";
 
 export async function POST(request: NextRequest) {
   const authError = await requireAdmin();
@@ -10,11 +11,12 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { sourceDeviceId, newDeviceId, newName, newDescription } = body;
 
-    if (!sourceDeviceId || !newDeviceId || !newName) {
-      return NextResponse.json(
-        { error: "sourceDeviceId, newDeviceId, newName are required" },
-        { status: 400 },
-      );
+    if (!sourceDeviceId) {
+      return NextResponse.json({ error: "복제할 원본 장치가 없습니다." }, { status: 400 });
+    }
+    const invalid = validateDeviceInput({ deviceId: newDeviceId, name: newName, description: newDescription || undefined }, "create");
+    if (invalid) {
+      return NextResponse.json({ error: invalid }, { status: 400 });
     }
 
     const source = await prisma.device.findUnique({
@@ -35,7 +37,7 @@ export async function POST(request: NextRequest) {
 
     if (existing) {
       return NextResponse.json(
-        { error: "Device ID already exists" },
+        { error: "이미 사용 중인 장치 ID입니다." },
         { status: 409 },
       );
     }

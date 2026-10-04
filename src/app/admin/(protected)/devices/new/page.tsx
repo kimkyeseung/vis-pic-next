@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAdmin } from "../../../AdminContext";
+import { validateDeviceInput } from "@/lib/deviceConfig";
 
 export default function NewDevicePage() {
   const router = useRouter();
@@ -16,6 +17,8 @@ export default function NewDevicePage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    const invalid = validateDeviceInput({ deviceId, name, description: description || undefined }, "create");
+    if (invalid) { setError(invalid); return; }
     setError("");
     setLoading(true);
 
@@ -68,10 +71,13 @@ export default function NewDevicePage() {
             onChange={(e) => setDeviceId(e.target.value)}
             className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-blue-500"
             placeholder="예: booth-001"
+            maxLength={64}
+            pattern="[A-Za-z0-9_\-]+"
+            title="영문, 숫자, 하이픈(-), 밑줄(_)만 사용할 수 있습니다."
             required
           />
           <p className="mt-1 text-sm text-gray-500">
-            영문, 숫자, 하이픈만 사용 가능합니다
+            영문, 숫자, 하이픈(-), 밑줄(_)만 사용 가능합니다 (최대 64자). 생성 후에는 바꿀 수 없습니다.
           </p>
         </div>
 
@@ -85,6 +91,7 @@ export default function NewDevicePage() {
             onChange={(e) => setName(e.target.value)}
             className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-blue-500"
             placeholder="예: 1층 포토부스"
+            maxLength={128}
             required
           />
         </div>
@@ -95,6 +102,7 @@ export default function NewDevicePage() {
             value={description}
             onChange={(e) => setDescription(e.target.value)}
             rows={3}
+            maxLength={255}
             className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-blue-500"
             placeholder="장치에 대한 설명을 입력하세요"
           />

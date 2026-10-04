@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/db";
 import { requireAdmin } from "@/lib/adminAuth";
+import { validateDeviceInput } from "@/lib/deviceConfig";
 
 export async function GET() {
   const authError = await requireAdmin();
@@ -32,11 +33,9 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { deviceId, name, description } = body;
 
-    if (!deviceId || !name) {
-      return NextResponse.json(
-        { error: "Device ID and name are required" },
-        { status: 400 }
-      );
+    const invalid = validateDeviceInput({ deviceId, name, description: description || undefined }, "create");
+    if (invalid) {
+      return NextResponse.json({ error: invalid }, { status: 400 });
     }
 
     const existing = await prisma.device.findUnique({
@@ -45,7 +44,7 @@ export async function POST(request: NextRequest) {
 
     if (existing) {
       return NextResponse.json(
-        { error: "Device ID already exists" },
+        { error: "이미 사용 중인 장치 ID입니다." },
         { status: 409 }
       );
     }

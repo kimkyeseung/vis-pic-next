@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import prisma from "@/lib/db";
 import { requireAdmin } from "@/lib/adminAuth";
+import { validateDeviceInput } from "@/lib/deviceConfig";
 
 export async function GET(
   request: NextRequest,
@@ -57,6 +58,10 @@ export async function PUT(
     }
     const body = await request.json();
     const { name, description, isActive, password } = body;
+    const invalid = validateDeviceInput({ name, description }, "update");
+    if (invalid) {
+      return NextResponse.json({ error: invalid }, { status: 400 });
+    }
 
     // password 처리:
     //  - 문자열(비어있지 않음) → 새 비밀번호로 해시 저장

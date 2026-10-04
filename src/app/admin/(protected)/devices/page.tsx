@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useAdmin } from "../../AdminContext";
 import type { Device } from "@/types";
+import { validateDeviceInput } from "@/lib/deviceConfig";
 
 export default function DevicesPage() {
   const { refreshDevices } = useAdmin();
@@ -49,6 +50,8 @@ export default function DevicesPage() {
 
   const handleClone = async () => {
     if (!cloneTarget || !cloneForm.deviceId || !cloneForm.name) return;
+    const invalid = validateDeviceInput({ deviceId: cloneForm.deviceId, name: cloneForm.name, description: cloneForm.description || undefined }, "create");
+    if (invalid) { alert(invalid); return; }
     try {
       const res = await fetch("/api/admin/devices/clone/", {
         method: "POST",
@@ -185,7 +188,9 @@ export default function DevicesPage() {
                   onChange={(e) => setCloneForm({ ...cloneForm, deviceId: e.target.value })}
                   className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-blue-500"
                   placeholder="예: device_02"
+                  maxLength={64}
                 />
+                <p className="text-gray-500 text-xs mt-1">영문, 숫자, 하이픈(-), 밑줄(_)만 사용 가능 (최대 64자)</p>
               </div>
               <div>
                 <label className="block text-gray-400 text-sm mb-1">장치 이름</label>
@@ -193,6 +198,7 @@ export default function DevicesPage() {
                   type="text"
                   value={cloneForm.name}
                   onChange={(e) => setCloneForm({ ...cloneForm, name: e.target.value })}
+                  maxLength={128}
                   className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-blue-500"
                 />
               </div>
@@ -202,6 +208,7 @@ export default function DevicesPage() {
                   type="text"
                   value={cloneForm.description}
                   onChange={(e) => setCloneForm({ ...cloneForm, description: e.target.value })}
+                  maxLength={255}
                   className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-blue-500"
                 />
               </div>

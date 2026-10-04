@@ -116,6 +116,7 @@ export default function DeviceEditPage({
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
+              maxLength={128}
               className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-blue-500"
               required
             />
@@ -127,6 +128,7 @@ export default function DeviceEditPage({
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               rows={3}
+              maxLength={255}
               className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-blue-500"
             />
           </div>

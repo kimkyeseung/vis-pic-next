@@ -131,7 +131,8 @@ export function useDeviceSetup(deviceId: string) {
 
         setPrintSettings(s);
 
-        const captureCount = parseIntSafe(s.CAPTURE_COUNT_UNIFORM || "", 4) || 4;
+        // 관리자 촬영 설정과 같은 범위로 보정 — 음수·0이 저장돼 있으면 촬영 매수가 0 이하가 돼 촬영 단계가 건너뛰어진다.
+        const captureCount = clampSigned(parseIntSafe(s.CAPTURE_COUNT_UNIFORM || "", 4) || 4, 1, 10);
         // 관리자는 "1장당 가격"(PAYMENT_AMOUNT)만 설정, 매수 선택지는 1/2/4장 고정.
         const perSheet = parseIntSafe(s.PAYMENT_AMOUNT || "", 5000);
         const paymentTiers = PAYMENT_QUANTITIES.map((qty) => ({ qty, price: qty * perSheet }));
@@ -146,7 +147,7 @@ export function useDeviceSetup(deviceId: string) {
           paymentAmount: perSheet,
           paymentTiers,
           paymentTerminalMode,
-          captureSeconds: parseIntSafe(s.CAPTURE_SECONDS || "", 3),
+          captureSeconds: clampSigned(parseIntSafe(s.CAPTURE_SECONDS || "", 3), 1, 30),
           captureCount,
           cameraResolution: parseCameraResolution(s.CAMERA_RESOLUTION || ""),
           chromakeyRgb: s.CHROMAKEY_RGB || "0,255,0",

@@ -91,7 +91,10 @@ export function ShootingModesCard({
 
                 <button
                   onClick={(e) => { e.stopPropagation(); removeMode(mode); }}
-                  className="px-3 py-1 bg-red-600/80 text-white text-sm rounded-lg hover:bg-red-500 transition-colors flex-shrink-0"
+                  // 모드를 전부 지우면 저장값이 비어 서비스·관리자 모두 기본 모드(1x1,2x2)로 되돌아가므로 마지막 하나는 남긴다.
+                  disabled={modes.length <= 1}
+                  title={modes.length <= 1 ? "촬영 모드는 최소 1개가 필요합니다." : undefined}
+                  className="px-3 py-1 bg-red-600/80 text-white text-sm rounded-lg hover:bg-red-500 transition-colors flex-shrink-0 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-red-600/80"
                 >
                   삭제
                 </button>
@@ -177,6 +180,14 @@ export function ShootingModesCard({
             <p className="text-gray-500 text-xs mb-3">
               ※ 값을 비우면 자동 중앙 정렬됩니다.
             </p>
+            {(["MARGIN_TOP", "MARGIN_LEFT"] as const).some((a) => {
+              const b = a === "MARGIN_TOP" ? "MARGIN_BOTTOM" : "MARGIN_RIGHT";
+              return (settings[prefix + a] ?? "").trim() !== "" && (settings[prefix + b] ?? "").trim() !== "";
+            }) && (
+              <p className="text-amber-400 text-xs mb-3">
+                ⚠ 마주 보는 여백이 둘 다 입력돼 있습니다. 상단·좌측 값만 적용되니 한쪽을 비워 주세요.
+              </p>
+            )}
             <div className="grid grid-cols-2 gap-3">
               {[
                 { suffix: "MARGIN_TOP", label: "상단 여백", opposite: "MARGIN_BOTTOM" },
@@ -185,7 +196,10 @@ export function ShootingModesCard({
                 { suffix: "MARGIN_RIGHT", label: "우측 여백", opposite: "MARGIN_LEFT" },
               ].map(({ suffix, label, opposite }) => {
                 const key = prefix + suffix;
-                const disabled = (settings[prefix + opposite] ?? "").trim() !== "";
+                // 반대쪽이 입력돼 있으면 막되, 이미 둘 다 입력된 상태(예전 데이터·전역 기본값)에선 막지 않는다 —
+                // 서로를 이유로 둘 다 잠기면 어느 쪽도 지울 수 없게 된다.
+                const disabled =
+                  (settings[prefix + opposite] ?? "").trim() !== "" && (settings[key] ?? "").trim() === "";
                 return (
                   <div key={suffix}>
                     <label className="block text-gray-500 text-xs mb-1">{label}</label>
