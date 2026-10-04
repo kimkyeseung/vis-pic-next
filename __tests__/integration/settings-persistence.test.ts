@@ -1,16 +1,17 @@
 import "dotenv/config";
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import prisma from "@/lib/db";
+import { SESSION_COOKIE, sealAdminSession } from "@/lib/session";
 
-// POST /api/setting은 admin_session 쿠키(= AdminAccount.id)만 검사하므로
-// 비밀번호 없이도 활성 관리자 id로 쿠키를 구성해 인증된 요청을 흉내낼 수 있다.
-const BASE = "http://localhost:3000";
+// 관리자 세션은 iron-session 봉인 쿠키다 — 서버와 같은 SESSION_PASSWORD(.env)로 활성 관리자 id를 봉인해
+// 비밀번호 로그인 없이 인증된 요청을 만든다. (예전엔 쿠키 값이 관리자 id 원문이라 그대로 넣었다.)
+const BASE = process.env.INTEGRATION_BASE_URL || "http://localhost:3000"; // 다른 포트로 띄웠으면 INTEGRATION_BASE_URL로 지정
 let adminCookie: string;
 
 beforeAll(async () => {
   const admin = await prisma.adminAccount.findFirst({ where: { isActive: true } });
   if (!admin) throw new Error("테스트를 실행하려면 활성 관리자 계정이 최소 1개 필요합니다");
-  adminCookie = `admin_session=${admin.id}`;
+  adminCookie = `${SESSION_COOKIE}=${await sealAdminSession(admin.id)}`;
 });
 
 afterAll(async () => {

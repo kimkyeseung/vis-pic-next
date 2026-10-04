@@ -21,7 +21,7 @@ async function makeTestJpegBase64(
 }
 
 describe("POST /api/gif/create", () => {
-  const BASE = "http://localhost:3000";
+  const BASE = process.env.INTEGRATION_BASE_URL || "http://localhost:3000"; // 다른 포트로 띄웠으면 INTEGRATION_BASE_URL로 지정
 
   it("returns error when fewer than 2 images", async () => {
     const res = await fetch(`${BASE}/api/gif/create/`, {
@@ -82,7 +82,7 @@ describe("POST /api/gif/create", () => {
 });
 
 describe("POST /api/print/upload-image", () => {
-  const BASE = "http://localhost:3000";
+  const BASE = process.env.INTEGRATION_BASE_URL || "http://localhost:3000"; // 다른 포트로 띄웠으면 INTEGRATION_BASE_URL로 지정
 
   it("returns error when no image_data provided", async () => {
     const res = await fetch(`${BASE}/api/print/upload-image/`, {
@@ -130,7 +130,7 @@ describe("POST /api/print/upload-image", () => {
 });
 
 describe("GET /api/print/cleanup", () => {
-  const BASE = "http://localhost:3000";
+  const BASE = process.env.INTEGRATION_BASE_URL || "http://localhost:3000"; // 다른 포트로 띄웠으면 INTEGRATION_BASE_URL로 지정
 
   it("returns cleanup result", async () => {
     // 서버에 CRON_SECRET이 설정된 환경에서는 Bearer 인증이 필요하다

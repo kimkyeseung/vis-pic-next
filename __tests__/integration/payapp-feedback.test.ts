@@ -5,7 +5,7 @@ import prisma from "@/lib/db";
 // 회귀 대상: PayApp 피드백 웹훅은 orderId(var1)만 알면 누구나 결제완료로
 // 조작할 수 있었다. linkkey/linkval/userid/mul_no/price 교차검증이 다시
 // 빠지는 회귀를 잡기 위한 테스트.
-const BASE = "http://localhost:3000";
+const BASE = process.env.INTEGRATION_BASE_URL || "http://localhost:3000"; // 다른 포트로 띄웠으면 INTEGRATION_BASE_URL로 지정
 const DEVICE_ID = "test2"; // FK 제약 — 활성 장치여야 함
 // 실제 서버가 검증에 쓰는 값을 .env에서 그대로 읽는다 (테스트 코드에 비밀값 하드코딩 금지)
 const REAL_USERID = process.env.PAYAPP_USERID;
