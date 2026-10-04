@@ -7,6 +7,10 @@ export const FRAME_IMAGE_TYPE = 2;
 // 스티커 이미지 타입 id (prisma seed: ImageType id 3 = sticker)
 export const STICKER_IMAGE_TYPE = 3;
 
+// 지점별 노출 목록(뱅크 모델)으로 관리하는 타입 — ImageDevice 연결이 "이 지점에 노출"을, sortOrder가 순서를
+// 뜻한다. 연결은 지점별 선택 API(/api/device/[id]/backgrounds|frames|stickers)로만 바꾼다(최대 개수·순서 보장).
+export const BANK_IMAGE_TYPES: ReadonlySet<number> = new Set([BACKGROUND_IMAGE_TYPE, FRAME_IMAGE_TYPE, STICKER_IMAGE_TYPE]);
+
 // 테마 배경화면(wallpaper) / 로고 / 버튼 이미지 타입 id (prisma seed)
 export const WALLPAPER_IMAGE_TYPE = 5;
 export const LOGO_IMAGE_TYPE = 6;

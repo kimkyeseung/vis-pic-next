@@ -5,6 +5,7 @@ import { deleteImage } from "@/lib/storage";
 import { requireAdmin } from "@/lib/adminAuth";
 import {
   BACKGROUND_IMAGE_TYPE,
+  BANK_IMAGE_TYPES,
   MAX_ACTIVE_BACKGROUNDS,
   normalizeEffectGesture,
   normalizeEffectMode,
@@ -89,7 +90,7 @@ export async function PATCH(
       data.effectChromaSmoothness = Math.max(0, Math.min(100, Math.trunc(body.effectChromaSmoothness)));
     }
 
-    // deviceIds 배열이 오면 조인 행을 통째로 교체한다(빈 배열 = 모든 디바이스).
+    // deviceIds 배열이 오면 조인 행을 통째로 교체한다(빈 배열 = 모든 디바이스). 테마 등 뱅크가 아닌 타입에만 적용.
     const hasDeviceIds = Array.isArray(body.deviceIds);
     const deviceIds: string[] = hasDeviceIds
       ? body.deviceIds.filter((d: unknown): d is string => typeof d === "string" && d.length > 0)
@@ -123,10 +124,19 @@ export async function PATCH(
             }
           }
 
+          const current = await tx.image.findUnique({ where: { id: imageId }, select: { imageType: true } });
+          const typeChanged = data.imageType !== undefined && current !== null && data.imageType !== current.imageType;
+          // 배경·프레임·스티커(뱅크 타입)의 지점 연결은 "노출 목록 + 순서"라 지점별 선택 API로만 바꾼다 —
+          // 여기서 통째로 교체하면 순서(sortOrder)가 초기화되고 최대 개수도 우회된다.
+          const isBank = current !== null && BANK_IMAGE_TYPES.has(current.imageType);
+
           if (Object.keys(data).length > 0) {
             await tx.image.update({ where: { id: imageId }, data });
           }
-          if (hasDeviceIds) {
+          if (typeChanged) {
+            // 타입이 바뀌면 이전 타입 노출 목록의 연결을 끊는다(새 타입 목록에 몰래 끼어들지 않도록).
+            await tx.imageDevice.deleteMany({ where: { imageId } });
+          } else if (hasDeviceIds && !isBank) {
             await tx.imageDevice.deleteMany({ where: { imageId } });
             if (deviceIds.length > 0) {
               await tx.imageDevice.createMany({

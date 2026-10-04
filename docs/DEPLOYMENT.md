@@ -40,14 +40,24 @@ COOKIE_SECURE=false
 
 ### PayApp 결제 (선택)
 
+판매자 ID·상품명·수신 전화번호·피드백/리턴 URL·결제 수단은 **관리자 → 결제 설정**에서 지점별로 입력한다.
+적용 우선순위는 **지점 설정 → 전역 설정 → 아래 환경변수**이며, 환경변수는 관리자 화면에서 비워 둔 항목의 기본값으로만 쓰인다.
+(관리자에서 입력한 PayApp 값은 키오스크용 공개 설정 조회 API에는 노출되지 않는다.)
+
 ```env
 PAYAPP_USERID=viswave
-PAYAPP_SHOPNAME=AR-pic
 PAYAPP_GOODNAME=AR-pic 촬영
 PAYAPP_RECVPHONE=01000000000
 PAYAPP_FEEDBACK_URL=https://your-domain.com/api/payments/feedback
 PAYAPP_RETURN_URL=https://your-domain.com/payment/return
+# 결제 수단 제한(콤마 구분, 예: card,kakaopay). 비우면 판매자 계정에서 가능한 수단 전체.
+PAYAPP_OPENPAYTYPE=
+# 피드백 위변조 검증용 연동 KEY/VALUE(PayApp 판매자 관리자에서 발급) — 비밀값이라 환경변수로만 설정한다.
+PAYAPP_LINKKEY=
+PAYAPP_LINKVAL=
 ```
+
+> 상점명(shopname)은 PayApp JS 결제창 전용 파라미터라 서버 결제요청(REST)에는 쓰이지 않아 설정 항목에서 제외했다.
 
 ---
 

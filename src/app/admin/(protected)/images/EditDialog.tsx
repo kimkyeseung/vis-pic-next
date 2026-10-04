@@ -12,7 +12,6 @@ interface Image {
   id: number;
   name: string;
   filename: string;
-  deviceIds: string[];
   imageType: number;
   effectFilename?: string | null;
   effectDuration?: number | null;
@@ -28,15 +27,9 @@ interface Image {
   focalY?: number;
 }
 
-interface DeviceOption {
-  deviceId: string;
-  name: string;
-}
-
 interface EditDialogProps {
   image: Image;
   imageBaseUrl: string;
-  devices: DeviceOption[];
   onClose: () => void;
   onSaved: () => void;
 }
@@ -47,14 +40,13 @@ const isVideo = (filename: string) =>
 export default function EditDialog({
   image,
   imageBaseUrl,
-  devices,
   onClose,
   onSaved,
 }: EditDialogProps) {
   const isFrame = image.imageType === FRAME_IMAGE_TYPE;
   const isBackground = image.imageType === BACKGROUND_IMAGE_TYPE;
 
-  // 공통 폼(이름·타입·적용 장치) + 저장/삭제 — useImageEditForm 참고.
+  // 공통 폼(이름·타입) + 저장/삭제 — useImageEditForm 참고.
   const form = useImageEditForm(image, onSaved);
 
   // ── 프레임(인쇄 배경) 전용: 포컬(인화지 배치 기준점) ──
@@ -159,40 +151,6 @@ export default function EditDialog({
             </select>
             <p className="mt-1 text-sm text-gray-500">
               잘못된 탭에 올린 이미지를 여기서 옮길 수 있습니다.
-            </p>
-          </div>
-
-          <div>
-            <label className="mb-2 block text-gray-300">적용 장치</label>
-            {devices.length === 0 ? (
-              <p className="text-sm text-gray-500">
-                등록된 장치가 없어 모든 장치에 적용됩니다.
-              </p>
-            ) : (
-              <div className="space-y-2 rounded-lg border border-gray-600 bg-gray-700 p-3">
-                {devices.map((d) => (
-                  <label
-                    key={d.deviceId}
-                    className="flex cursor-pointer items-center gap-3 rounded px-2 py-1.5 hover:bg-gray-600"
-                  >
-                    <input
-                      type="checkbox"
-                      checked={form.selectedDeviceIds.includes(d.deviceId)}
-                      onChange={() => form.toggleDevice(d.deviceId)}
-                      className="h-4 w-4 accent-blue-500"
-                    />
-                    <span className="text-white">
-                      {d.name}
-                      <span className="ml-2 text-xs text-gray-400">{d.deviceId}</span>
-                    </span>
-                  </label>
-                ))}
-              </div>
-            )}
-            <p className="mt-1 text-sm text-gray-500">
-              {form.selectedDeviceIds.length === 0
-                ? "선택하지 않으면 모든 장치에 적용됩니다."
-                : `${form.selectedDeviceIds.length}개 장치에만 적용됩니다.`}
             </p>
           </div>
 

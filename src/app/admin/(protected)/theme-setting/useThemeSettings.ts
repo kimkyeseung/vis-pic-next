@@ -13,7 +13,7 @@ import {
   wallpaperPageName,
   OVERLAY_NAME_CAMERA,
 } from "@/constants/images";
-import { BUTTON_ROLES, buttonImageOptionKeys, parseButtonImageOptions } from "@/lib/deviceConfig";
+import { BUTTON_ROLES, buttonImageOptionKeys, parseButtonImageOptions, parseIntSafe } from "@/lib/deviceConfig";
 import type { ButtonImageOptions, ButtonRole } from "@/types";
 import type { Asset } from "./AssetUploader";
 
@@ -122,7 +122,8 @@ export function useThemeSettings(deviceId: string | null) {
         setBgColor(s.THEME_BG_COLOR || "#2a2a2a");
         setGlowEnabled(s.THEME_BTN_GLOW_ENABLED !== "0");
         setGlowColor(s.THEME_BTN_GLOW_COLOR || "#6c6fb4");
-        setGlowSize(parseInt(s.THEME_BTN_GLOW_SIZE || "", 10) || 28);
+        // 0(글로우 번짐 없음)도 유효한 값 — `|| 28`로 쓰면 0이 28로 바뀌어 다음 저장 때 덮어써진다.
+        setGlowSize(parseIntSafe(s.THEME_BTN_GLOW_SIZE || "", 28));
         setCaptureTextColor(s.THEME_BTN_TEXT_COLOR_CAPTURE || "#2a2a2a");
         setNextTextColor(s.THEME_BTN_TEXT_COLOR_NEXT || "#ffffff");
         setPaymentTextColor(s.THEME_BTN_TEXT_COLOR_PAYMENT || "#ffffff");
@@ -177,7 +178,8 @@ export function useThemeSettings(deviceId: string | null) {
     }
   };
 
-  // 단일 이미지 애셋 업로드(한 장만 유지) / 제거 — 배경화면·로고 공통
+  // 단일 이미지 애셋 업로드(한 장만 유지) / 제거 — 배경화면·로고 공통.
+  // 새 이미지 업로드가 성공한 뒤에 기존 이미지를 지운다 — 먼저 지우면 업로드 실패 시 기존 이미지까지 잃는다.
   const uploadAsset = (
     type: number,
     name: string,
@@ -188,9 +190,6 @@ export function useThemeSettings(deviceId: string | null) {
     setBusy(true);
     setMessage("");
     try {
-      if (current) {
-        await fetch(`/api/admin/images/${current.id}/`, { method: "DELETE" }).catch(() => {});
-      }
       const form = new FormData();
       form.append("file", file);
       form.append("name", name);
@@ -201,6 +200,10 @@ export function useThemeSettings(deviceId: string | null) {
         const err = await res.json().catch(() => ({}));
         flash(`업로드 실패: ${err.error || res.status}`);
         return;
+      }
+      // 같은 name 슬롯에 잠시 두 장이 공존하지만 목록이 최신순이라 loadAsset은 새 이미지를 고른다.
+      if (current) {
+        await fetch(`/api/admin/images/${current.id}/`, { method: "DELETE" }).catch(() => {});
       }
       setCurrent(await loadAsset(type, name));
       flash("업로드되었습니다.");

@@ -26,11 +26,6 @@ interface ImageType {
   name: string;
 }
 
-interface DeviceOption {
-  deviceId: string;
-  name: string;
-}
-
 const formatSize = (bytes: number): string => {
   if (bytes < 1024) return `${bytes} B`;
   const units = ["KB", "MB", "GB"];
@@ -51,7 +46,6 @@ export default function ImagesPage() {
   const [imageBaseUrl, setImageBaseUrl] = useState<string>("");
   const [sizes, setSizes] = useState<Record<number, number | null>>({});
   const [downloadingId, setDownloadingId] = useState<number | null>(null);
-  const [devices, setDevices] = useState<DeviceOption[]>([]);
   const [editingImage, setEditingImage] = useState<Image | null>(null);
   // 전체 이미지 vs 선택 장치에 적용되는 이미지만 보기
   const { selectedDevice } = useAdmin();
@@ -88,18 +82,6 @@ export default function ImagesPage() {
       }
     };
     loadImageBaseUrl();
-
-    const loadDevices = async () => {
-      try {
-        const res = await fetch("/api/devices/");
-        if (!res.ok) return;
-        const data = await res.json();
-        setDevices(data.devices || []);
-      } catch {
-        // 장치 목록 없이도 편집(전체 적용)은 가능
-      }
-    };
-    loadDevices();
   }, []);
 
   const fetchImages = async (typeId: number) => {
@@ -307,7 +289,6 @@ export default function ImagesPage() {
           deviceId={currentDeviceId}
           deviceName={selectedDevice?.name ?? null}
           imageBaseUrl={imageBaseUrl}
-          devices={devices}
           imageType={selectedType}
           maxActive={isFrameTab ? MAX_ACTIVE_FRAMES : isStickerTab ? MAX_ACTIVE_STICKERS : MAX_ACTIVE_BACKGROUNDS}
           apiSlug={isFrameTab ? "frames" : isStickerTab ? "stickers" : "backgrounds"}
@@ -424,7 +405,6 @@ export default function ImagesPage() {
         <EditDialog
           image={editingImage}
           imageBaseUrl={imageBaseUrl}
-          devices={devices}
           onClose={() => setEditingImage(null)}
           onSaved={() => {
             setEditingImage(null);

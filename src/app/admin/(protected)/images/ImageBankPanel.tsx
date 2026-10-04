@@ -4,11 +4,6 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import EditDialog from "./EditDialog";
 import { toBankImage, type Bg, type BankImage } from "@/lib/bankImage";
 
-interface DeviceOption {
-  deviceId: string;
-  name: string;
-}
-
 const isVideo = (f: string) => f.endsWith(".mp4") || f.endsWith(".webm");
 
 function Media({ bg, baseUrl }: { bg: Bg; baseUrl: string }) {
@@ -34,7 +29,6 @@ export default function ImageBankPanel({
   deviceId,
   deviceName,
   imageBaseUrl,
-  devices,
   imageType,
   maxActive,
   apiSlug,
@@ -43,7 +37,6 @@ export default function ImageBankPanel({
   deviceId: string | null;
   deviceName: string | null;
   imageBaseUrl: string;
-  devices: DeviceOption[];
   imageType: number;
   maxActive: number;
   apiSlug: string;
@@ -263,7 +256,6 @@ export default function ImageBankPanel({
         <EditDialog
           image={editing}
           imageBaseUrl={imageBaseUrl}
-          devices={devices}
           onClose={() => setEditing(null)}
           onSaved={handleEdited}
         />

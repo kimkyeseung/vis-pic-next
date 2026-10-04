@@ -32,18 +32,20 @@ export async function POST(request: NextRequest) {
         "PayApp feedback received without PAYAPP_LINKKEY/PAYAPP_LINKVAL configured — feedback authenticity cannot be verified"
       );
     }
-    const expectedUserId = process.env.PAYAPP_USERID;
-    if (expectedUserId && formData.get("userid") !== expectedUserId) {
-      console.warn("PayApp feedback rejected: userid mismatch", { orderId });
-      return new Response("FAIL", { status: 403 });
-    }
-
     const payment = await prisma.payappPayment.findUnique({
       where: { orderId },
     });
 
     if (!payment) {
       return new Response("FAIL", { status: 404 });
+    }
+
+    // 판매자 ID는 지점별 관리자 설정으로 바뀔 수 있으므로, 결제요청 시 실제로 사용해 저장해 둔
+    // 판매자 ID(payment.userid)와 비교한다. 저장값이 없는 예전 건만 환경변수로 비교한다.
+    const expectedUserId = payment.userid || process.env.PAYAPP_USERID;
+    if (expectedUserId && formData.get("userid") !== expectedUserId) {
+      console.warn("PayApp feedback rejected: userid mismatch", { orderId });
+      return new Response("FAIL", { status: 403 });
     }
 
     // 결제요청 시 저장해 둔 PayApp 결제번호·금액과 교차 검증

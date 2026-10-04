@@ -14,7 +14,7 @@ function feedbackBody(fields: Record<string, string>) {
   return new URLSearchParams(fields).toString();
 }
 
-async function createPendingPayment(overrides: Partial<{ amount: number; mulNo: string }> = {}) {
+async function createPendingPayment(overrides: Partial<{ amount: number; mulNo: string; userid: string }> = {}) {
   const orderId = `probe-${Date.now()}-${Math.random().toString(36).slice(2)}`;
   return prisma.payappPayment.create({
     data: {
@@ -24,6 +24,7 @@ async function createPendingPayment(overrides: Partial<{ amount: number; mulNo: 
       goodname: "테스트 상품",
       status: "pending",
       mulNo: overrides.mulNo ?? "TESTMUL0001",
+      userid: overrides.userid ?? null,
     },
   });
 }
@@ -42,13 +43,43 @@ describe("POST /api/payments/feedback — 위조 방지 검증", () => {
     expect(res.status).toBe(400);
   });
 
-  it.skipIf(!REAL_USERID)("userid가 일치하지 않으면 403 (orderId가 존재하지 않아도)", async () => {
+  // 판매자 ID는 지점별 관리자 설정으로 바뀔 수 있어, 결제요청 때 실제로 쓴 값(payment.userid)과 비교한다.
+  it("userid가 결제요청 때 쓴 판매자 ID와 다르면 403이고 결제 상태는 바뀌지 않는다", async () => {
+    const payment = await createPendingPayment({ mulNo: "REALMUL333", userid: "probe-seller-a" });
     const res = await fetch(`${BASE}/api/payments/feedback/`, {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: feedbackBody({ var1: "probe-nonexistent-userid-check", pay_state: "4", userid: "forged-userid" }),
+      body: feedbackBody({
+        var1: payment.orderId,
+        pay_state: "4",
+        mul_no: payment.mulNo!,
+        price: String(payment.amount),
+        userid: "forged-userid",
+      }),
     });
     expect(res.status).toBe(403);
+
+    const after = await prisma.payappPayment.findUnique({ where: { orderId: payment.orderId } });
+    expect(after?.status).toBe("pending");
+  });
+
+  it("결제요청 때 저장한 판매자 ID(환경변수와 달라도)와 일치하면 결제완료로 갱신된다", async () => {
+    const payment = await createPendingPayment({ mulNo: "REALMUL444", userid: "probe-seller-db" });
+    const res = await fetch(`${BASE}/api/payments/feedback/`, {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: feedbackBody({
+        var1: payment.orderId,
+        pay_state: "4",
+        mul_no: payment.mulNo!,
+        price: String(payment.amount),
+        userid: "probe-seller-db",
+      }),
+    });
+    expect(res.status).toBe(200);
+
+    const after = await prisma.payappPayment.findUnique({ where: { orderId: payment.orderId } });
+    expect(after?.status).toBe("paid");
   });
 
   it("존재하지 않는 orderId는 404", async () => {

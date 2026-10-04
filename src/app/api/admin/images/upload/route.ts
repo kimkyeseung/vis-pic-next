@@ -3,7 +3,7 @@ import prisma from "@/lib/db";
 import { uploadImage, getImageBaseUrl } from "@/lib/storage";
 import { requireAdmin } from "@/lib/adminAuth";
 import { defaultActiveForNewImage } from "@/lib/imageActive";
-import { FRAME_IMAGE_TYPE, STICKER_IMAGE_TYPE } from "@/constants/images";
+import { BANK_IMAGE_TYPES, FRAME_IMAGE_TYPE, STICKER_IMAGE_TYPE } from "@/constants/images";
 import { normalizeFrameToLandscape } from "@/lib/frameOrientation";
 
 const ALLOWED_EXTENSIONS = ["jpg", "jpeg", "png", "gif", "mp4", "webp"];
@@ -22,10 +22,11 @@ export async function POST(request: NextRequest) {
     const name = formData.get("name") as string;
     const imageType = parseInt(formData.get("imageType") as string) || 1;
 
-    // deviceIds: JSON 배열 문자열. 비어 있으면 모든 디바이스에 적용된다.
+    // deviceIds: JSON 배열 문자열 — 테마 이미지(지점 전용) 연결용. 배경·프레임·스티커(뱅크 타입)는
+    // 지점 노출을 노출 목록 API로만 바꾸므로 무시한다(여기서 연결하면 최대 개수·순서를 우회한다).
     let targetDeviceIds: string[] = [];
     const deviceIdsRaw = formData.get("deviceIds");
-    if (typeof deviceIdsRaw === "string" && deviceIdsRaw) {
+    if (typeof deviceIdsRaw === "string" && deviceIdsRaw && !BANK_IMAGE_TYPES.has(imageType)) {
       try {
         const parsed = JSON.parse(deviceIdsRaw);
         if (Array.isArray(parsed)) {

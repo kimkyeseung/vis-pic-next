@@ -417,10 +417,10 @@ useSceneSyncReceiver → BroadcastChannel.onmessage(state)   ※ 레거시
 |--------|------|------|
 | GET | `/api/image/list/[imageType]` | 이미지 목록 (1=촬영 배경, 2=프레임/인쇄 배경, 3=스티커, 5=배경화면·화면별 배경·촬영 오버레이, 6=로고, 7=버튼). `?device_id=X` 필터, `&linked=1`=해당 지점 연결분만 |
 | GET | `/api/images/url` | 이미지 베이스 URL (Supabase Storage) |
-| POST | `/api/admin/images/upload` | 이미지 업로드 (최대 50MB, `deviceIds`로 지점 연결) — 서버 경유 업로드 |
+| POST | `/api/admin/images/upload` | 이미지 업로드 (최대 50MB) — 서버 경유 업로드. `deviceIds` 지점 연결은 테마 이미지(5·6·7)에만 적용, 배경·프레임·스티커는 무시(지점 노출은 노출 목록 API로만) |
 | POST | `/api/admin/images/presign` | Supabase Storage 직접 업로드용 서명 URL 발급 (미설정 시 `{mode:"local"}` 폴백) |
-| POST | `/api/admin/images/register` | presign 업로드 완료 후 DB 이미지 레코드 등록 (`deviceIds`로 지점 연결) |
-| PATCH | `/api/admin/images/[id]` | 이미지 메타데이터 수정 (이름·활성·초점·이펙트 지속시간 등) |
+| POST | `/api/admin/images/register` | presign 업로드 완료 후 DB 이미지 레코드 등록 (`deviceIds`는 upload와 동일 규칙) |
+| PATCH | `/api/admin/images/[id]` | 이미지 메타데이터 수정 (이름·타입·초점·이펙트 등). 배경·프레임·스티커는 `deviceIds`를 무시(노출 순서 보존)하고, 타입을 바꾸면 기존 지점 노출 연결을 끊는다 |
 | DELETE | `/api/admin/images/[id]` | 이미지 삭제 (연결된 이펙트 영상 파일도 함께 정리) |
 | POST · DELETE | `/api/admin/images/[id]/effect` | 배경(type 1)의 동작 트리거 **이펙트 영상** 업로드/교체·제거 (mp4·webm, §26) |
 
@@ -1089,15 +1089,25 @@ open_camera_window(x, y, width, height)
 | 4 | 결제 완료 |
 | 5 | 환불/취소 |
 
-### 결제 환경 변수
+### 결제 연동 설정
+
+관리자 **결제 설정**(`/admin/payment`)의 PayApp 연동 항목으로 지점별 설정한다. `POST /api/payments/request`는
+**지점 설정(DeviceSetting) → 전역 설정(Setting) → 환경변수** 순으로 값을 찾는다(`src/lib/payapp.ts`).
+같은 이름의 환경변수는 관리자에서 비워 둔 항목의 기본값이다.
 
 ```
-PAYAPP_USERID          # PayApp 계정 ID
-PAYAPP_GOODNAME        # 상품명 (예: "AR-pic 촬영")
+PAYAPP_USERID          # PayApp 판매자 ID
+PAYAPP_GOODNAME        # 상품명 (기본 "AR-pic 촬영")
 PAYAPP_RECVPHONE       # 수신 전화번호
-PAYAPP_FEEDBACK_URL    # 콜백 URL
+PAYAPP_FEEDBACK_URL    # 콜백 URL (/api/payments/feedback)
 PAYAPP_RETURN_URL      # 결제 완료 후 리다이렉트 URL
+PAYAPP_OPENPAYTYPE     # 결제 수단 제한(콤마 구분, 예: card,kakaopay). 비우면 전체
 ```
+
+- `PAYAPP_*` 설정은 인증 없이 열린 설정 조회 API(`/api/setting`, `/api/device/[id]/settings`)에서 **관리자 세션일 때만** 내려간다.
+- 피드백 위변조 검증용 `PAYAPP_LINKKEY`/`PAYAPP_LINKVAL`은 비밀값이라 **환경변수 전용**이다.
+- 피드백의 `userid`는 결제요청 때 실제로 사용해 저장한 판매자 ID(`payment.userid`)와 비교한다(지점별 판매자 ID 지원).
+- 상점명(shopname)은 PayApp JS 결제창 전용 파라미터라 REST 결제요청에 쓰이지 않아 설정 항목이 없다.
 
 ---
 
@@ -1282,12 +1292,17 @@ SUPABASE_SERVICE_ROLE_KEY=[service-role-key]
 
 ### PayApp
 
+관리자 결제 설정에서 비워 둔 항목의 기본값(§결제 연동 설정).
+
 ```env
 PAYAPP_USERID=[계정ID]
 PAYAPP_GOODNAME=AR-pic 촬영
 PAYAPP_RECVPHONE=[전화번호]
 PAYAPP_FEEDBACK_URL=https://[도메인]/api/payments/feedback
 PAYAPP_RETURN_URL=https://[도메인]/payment/return
+PAYAPP_OPENPAYTYPE=
+PAYAPP_LINKKEY=[연동KEY]
+PAYAPP_LINKVAL=[연동VALUE]
 ```
 
 ### 기타
@@ -1389,7 +1404,7 @@ npm run tauri:build
 | 인화 설정 | `/admin/print-setting` | 인화지 크기, 모드별 사진 크기·간격·4방향 여백, 배경 이미지, 프린터 선택. 설정값 실시간 미리보기 + 용지 초과 경고 |
 | 촬영 설정 | `/admin/capture-setting` | 카운트다운, 촬영 횟수, 배경 제거 모드(AI/크로마키/크로마키 OBS 방식/off), 크로마키 색상(컬러피커), AI 배경제거 세부 설정 9종(경계 침식·부드러움·블러·두께·떨림 억제, 손 구제, 인물 추적 크롭·여유, 처리 해상도) — 각 항목에 추천값 표시, 카메라 실시간 미리보기 (§12 참고) |
 | 타이머 설정 | `/admin/timer-setting` | 유휴 타임아웃, 촬영 자동 타이머, 인화 자동 복귀 타이머 |
-| 결제 설정 | `/admin/payment` | PayApp 활성화, 금액, 단말 모드 설정 (전역 적용, 디바이스 설정이 우선) |
+| 결제 설정 | `/admin/payment` | 결제 사용, 1장당 가격, 결제 방식, PayApp 연동(판매자 ID·상품명·수신 전화번호·피드백/리턴 URL·결제 수단) — 지점 설정이 전역·환경변수보다 우선 |
 | 결제 내역 | `/admin/payment-history` | 거래 이력 조회 |
 
 - 이미지 타입(배경=1, 프레임=2, 스티커=3)은 `/api/admin/image-types` 조회 시
@@ -1457,7 +1472,7 @@ npm run tauri:build
 ### 배경화면 (wallpaper, type 5) / 로고 (logo, type 6)
 
 - 기존 이미지 업로드/목록/삭제 API 재사용. **업로드 시 선택 지점에 연결**(`deviceIds: [지점]`)해
-  **지점 전용**으로 저장하고, **한 장만 유지**(새 업로드 전 기존 것 삭제).
+  **지점 전용**으로 저장하고, **한 장만 유지**(새 업로드가 성공한 뒤 기존 것 삭제 — 실패 시 기존 이미지 보존).
 - 조회는 **지점 연결분만**(`/api/image/list/{5|6}/?device_id=X&linked=1`) — 목록 API의 `linked=1`
   파라미터는 "전체 디바이스용 제외, 해당 지점 연결분만"을 의미한다.
 - 배경화면은 같은 imageType 5 안에서 **`name`으로 슬롯**을 구분한다(`src/constants/images.ts`):

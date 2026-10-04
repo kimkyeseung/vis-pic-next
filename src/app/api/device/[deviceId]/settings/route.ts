@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/db";
 import { requireAdmin } from "@/lib/adminAuth";
+import { isPayappSettingKey } from "@/lib/payapp";
 
 export async function GET(
   request: NextRequest,
@@ -23,8 +24,11 @@ export async function GET(
       );
     }
 
+    // 이 API는 키오스크가 인증 없이 읽는다 — PayApp 연동 값(판매자 ID·전화번호 등)은 관리자에게만 내보낸다.
+    const isAdmin = !(await requireAdmin());
     const settings: Record<string, string> = {};
     for (const setting of device.settings) {
+      if (!isAdmin && isPayappSettingKey(setting.name)) continue;
       settings[setting.name] = setting.value;
     }
 

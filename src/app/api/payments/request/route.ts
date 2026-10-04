@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/db";
+import { getPayappConfig } from "@/lib/payapp";
 
 export async function POST(request: NextRequest) {
   try {
@@ -15,7 +16,9 @@ export async function POST(request: NextRequest) {
     }
 
     const orderId = `arpic-${deviceId}-${Date.now()}`;
-    const goodname = process.env.PAYAPP_GOODNAME || "AR-pic 촬영";
+    // 관리자 결제 설정(지점 ← 전역)에 저장한 값을 쓰고, 비어 있는 항목만 환경변수로 폴백한다.
+    const payapp = await getPayappConfig(deviceId);
+    const { goodname } = payapp;
 
     const payment = await prisma.payappPayment.create({
       data: {
@@ -29,10 +32,7 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    const payappUserId = process.env.PAYAPP_USERID;
-    const recvphone = process.env.PAYAPP_RECVPHONE;
-    const feedbackurl = process.env.PAYAPP_FEEDBACK_URL;
-    const returnurl = process.env.PAYAPP_RETURN_URL;
+    const { userid: payappUserId, recvphone, feedbackurl, returnurl, openpaytype } = payapp;
 
     if (!payappUserId || !recvphone || !feedbackurl || !returnurl) {
       return NextResponse.json({
@@ -53,6 +53,8 @@ export async function POST(request: NextRequest) {
     params.append("returnurl", returnurl);
     params.append("var1", orderId);
     params.append("var2", deviceId);
+    // 결제수단 제한(콤마 구분, 예: "card,kakaopay"). 비우면 판매자 계정에서 가능한 수단이 모두 열린다.
+    if (openpaytype) params.append("openpaytype", openpaytype);
 
     try {
       const payappRes = await fetch("https://api.payapp.kr/oapi/apiLoad.html", {
