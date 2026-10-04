@@ -1501,16 +1501,18 @@ npm run tauri:build
 
 ### 버튼 이미지 (button, type 7)
 
-- 대형 강조 버튼(촬영하기·다음으로·결제하기)별 배경 이미지. name `button_capture`·`button_next`·
-  `button_payment`로 구분, 지점 연결·한 장 유지는 배경화면과 동일. 버튼별 텍스트 색은
-  `THEME_BTN_TEXT_COLOR_{CAPTURE|NEXT|PAYMENT}`.
+- 대형 강조 버튼(촬영하기·다음으로·결제하기)별 배경 이미지. **가로/세로 화면용을 따로** 올린다 —
+  name `button_capture`·`button_next`·`button_payment`(가로용, 예전 단일 업로드와 호환)와 뒤에 `_pt`를 붙인
+  세로용(`buttonImageName(role, portrait)`). **한쪽만 올리면 그 이미지를 양쪽 화면에 사용**(배경화면 가로/세로와
+  같은 폴백). 지점 연결·슬롯당 한 장 유지는 배경화면과 동일. 버튼별 텍스트 색은 `THEME_BTN_TEXT_COLOR_{CAPTURE|NEXT|PAYMENT}`.
 - **이미지가 있는 버튼은 고정 크기** — `BUTTON_IMAGE_SIZE`(가로 화면 **544×116px**, 세로 화면
   **736×160px**, 기존 단색 버튼 실측값과 동일해 이미지 유무로 레이아웃이 흔들리지 않음). 관리자 버튼
-  카드에 "권장 이미지 크기"로 같은 값을 안내한다.
+  카드의 가로/세로 슬롯에 각 크기를 안내한다.
+- 이미지는 버튼 크기에 **꽉 채워** 표시(`background-size: 100% 100%`) — 방향별로 맞춰 만들면 원본 비율 그대로,
+  한쪽 이미지를 양쪽에 쓰면 두 크기의 비율 차(약 2%)만큼만 늘어난다(cover처럼 잘리거나 contain처럼 빈 띠가 생기지 않음).
 - 버튼별 표시 옵션(`ButtonImageOptions`, `parseButtonImageOptions()`):
-  - `THEME_BTN_IMAGE_ONLY_{ROLE}` — **이미지만 표시**. 단색 배경·그림자·라운드·hover 광택을 없애고
-    이미지를 `contain`(잘림 없음)으로 표시 → 투명 PNG가 그대로 보인다. **미설정 시 켬**("0"이면 끔 →
-    단색 버튼 위에 `cover`로 채우는 이전 동작).
+  - `THEME_BTN_IMAGE_ONLY_{ROLE}` — **이미지만 표시**. 단색 배경·그림자·라운드·hover 광택을 없애
+    투명 PNG가 그대로 보인다. **미설정 시 켬**("0"이면 끔 → 단색 버튼 위에 이미지를 채움).
   - `THEME_BTN_HIDE_TEXT_{ROLE}` — **버튼 텍스트 숨김**(이미지에 글자가 포함된 경우). "1"일 때만 켬.
 - 구현: service 루트(`.service-theme`)에 `data-btn-img-{role}`·`data-btn-imgonly-{role}`·
   `data-btn-hidetext-{role}` 속성과 `--btn-img-w/h` 변수를 내리고, `globals.css`의 언레이어드 규칙이

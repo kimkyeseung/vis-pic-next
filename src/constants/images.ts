@@ -55,6 +55,16 @@ export const BUTTON_NAME_CAPTURE = "button_capture";
 export const BUTTON_NAME_NEXT = "button_next";
 export const BUTTON_NAME_PAYMENT = "button_payment";
 
+/**
+ * 버튼 이미지 슬롯 이름 — 가로/세로 화면용을 따로 올린다(버튼 고정 크기가 화면 방향마다 달라서).
+ * 가로용은 기존 이름 그대로(예전 단일 업로드가 가로용으로 이어지도록), 세로용은 뒤에 "_pt".
+ * 한쪽만 올리면 서비스는 그 이미지를 양쪽 화면에 쓴다(배경화면 가로/세로 슬롯과 같은 규칙).
+ */
+export function buttonImageName(role: "capture" | "next" | "payment", portrait: boolean): string {
+  const base = role === "capture" ? BUTTON_NAME_CAPTURE : role === "next" ? BUTTON_NAME_NEXT : BUTTON_NAME_PAYMENT;
+  return portrait ? `${base}_pt` : base;
+}
+
 // 버튼 이미지를 올리면 버튼이 이 고정 크기(px, 1920×1080 / 1080×1920 스테이지 기준)로 바뀐다.
 // 관리자 화면에 권장 이미지 크기로 그대로 안내되므로, 디자이너는 이 크기로 제작하면 된다.
 // 값은 기존 단색 버튼(SERVICE_BIG_BUTTON_CLASS)의 실측 크기와 같게 잡아 이미지 유무로 레이아웃이 흔들리지 않게 했다.

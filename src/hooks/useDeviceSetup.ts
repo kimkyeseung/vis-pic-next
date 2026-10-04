@@ -1,8 +1,8 @@
 import { useState, useEffect } from "react";
-import type { DeviceConfig, BGImage } from "@/types";
+import type { DeviceConfig, BGImage, ButtonRole } from "@/types";
 import { parseIntSafe, parseBgRemovalMode, parsePaymentTerminalMode, parseCaptureModes, parseCameraResolution, clampPercent, clampSigned, parseSegmentProcessScale, parseButtonImageOptions } from "@/lib/deviceConfig";
 import { DEFAULT_CAMERA_RESOLUTION } from "@/constants/camera";
-import { LOGO_IMAGE_TYPE, WALLPAPER_IMAGE_TYPE, BUTTON_IMAGE_TYPE, WALLPAPER_NAME_LANDSCAPE, WALLPAPER_NAME_PORTRAIT, WALLPAPER_NAME_SUB_LANDSCAPE, WALLPAPER_NAME_SUB_PORTRAIT, BUTTON_NAME_CAPTURE, BUTTON_NAME_NEXT, BUTTON_NAME_PAYMENT, WALLPAPER_PAGE_STEPS, wallpaperPageName, OVERLAY_NAME_CAMERA } from "@/constants/images";
+import { LOGO_IMAGE_TYPE, WALLPAPER_IMAGE_TYPE, BUTTON_IMAGE_TYPE, WALLPAPER_NAME_LANDSCAPE, WALLPAPER_NAME_PORTRAIT, WALLPAPER_NAME_SUB_LANDSCAPE, WALLPAPER_NAME_SUB_PORTRAIT, buttonImageName, WALLPAPER_PAGE_STEPS, wallpaperPageName, OVERLAY_NAME_CAMERA } from "@/constants/images";
 
 // 결제 화면 인쇄 매수 선택지(고정). 가격 = 1장당 가격(PAYMENT_AMOUNT) × 수량.
 const PAYMENT_QUANTITIES = [1, 2, 4];
@@ -30,6 +30,12 @@ async function withRetry(signal: AbortSignal, task: () => Promise<boolean>): Pro
     if (signal.aborted) return;
   }
 }
+
+const EMPTY_BUTTON_IMAGES: Record<ButtonRole, { landscape: string | null; portrait: string | null }> = {
+  capture: { landscape: null, portrait: null },
+  next: { landscape: null, portrait: null },
+  payment: { landscape: null, portrait: null },
+};
 
 const DEFAULT_CONFIG: DeviceConfig = {
   deviceId: "test",
@@ -101,9 +107,8 @@ export function useDeviceSetup(deviceId: string) {
   const [pageWallpaperUrls, setPageWallpaperUrls] = useState<Record<string, string>>({});
   const [cameraOverlayUrl, setCameraOverlayUrl] = useState<string | null>(null);
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
-  const [captureButtonImageUrl, setCaptureButtonImageUrl] = useState<string | null>(null);
-  const [nextButtonImageUrl, setNextButtonImageUrl] = useState<string | null>(null);
-  const [paymentButtonImageUrl, setPaymentButtonImageUrl] = useState<string | null>(null);
+  // 버튼별 가로/세로 화면용 이미지 URL(미설정은 null). 화면 방향에 맞는 쪽 선택·폴백은 서비스 페이지가 한다.
+  const [buttonImageUrls, setButtonImageUrls] = useState<Record<ButtonRole, { landscape: string | null; portrait: string | null }>>(EMPTY_BUTTON_IMAGES);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -296,9 +301,11 @@ export function useDeviceSetup(deviceId: string) {
           const img = list.find((i) => i.name === name);
           return img && data.baseUrl ? `${data.baseUrl}/${img.filename}` : null;
         };
-        setCaptureButtonImageUrl(pick(BUTTON_NAME_CAPTURE));
-        setNextButtonImageUrl(pick(BUTTON_NAME_NEXT));
-        setPaymentButtonImageUrl(pick(BUTTON_NAME_PAYMENT));
+        const urls = { ...EMPTY_BUTTON_IMAGES };
+        for (const role of ["capture", "next", "payment"] as const) {
+          urls[role] = { landscape: pick(buttonImageName(role, false)), portrait: pick(buttonImageName(role, true)) };
+        }
+        setButtonImageUrls(urls);
       } catch (err) {
         if ((err as Error).name === "AbortError") return;
         retry();
@@ -315,5 +322,5 @@ export function useDeviceSetup(deviceId: string) {
     return () => controller.abort();
   }, [deviceId]);
 
-  return { config, backgroundImages, printBgImages, imageBaseUrl, printSettings, wallpaperUrl, wallpaperPortraitUrl, wallpaperSubUrl, wallpaperSubPortraitUrl, pageWallpaperUrls, cameraOverlayUrl, logoUrl, captureButtonImageUrl, nextButtonImageUrl, paymentButtonImageUrl };
+  return { config, backgroundImages, printBgImages, imageBaseUrl, printSettings, wallpaperUrl, wallpaperPortraitUrl, wallpaperSubUrl, wallpaperSubPortraitUrl, pageWallpaperUrls, cameraOverlayUrl, logoUrl, buttonImageUrls };
 }

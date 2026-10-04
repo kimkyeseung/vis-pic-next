@@ -46,7 +46,7 @@ function ServiceContent() {
     return () => mq.removeEventListener("change", update);
   }, []);
 
-  const { config, backgroundImages, printBgImages, imageBaseUrl, printSettings, wallpaperUrl, wallpaperPortraitUrl, wallpaperSubUrl, wallpaperSubPortraitUrl, pageWallpaperUrls, cameraOverlayUrl, logoUrl, captureButtonImageUrl, nextButtonImageUrl, paymentButtonImageUrl } = useDeviceSetup(deviceId);
+  const { config, backgroundImages, printBgImages, imageBaseUrl, printSettings, wallpaperUrl, wallpaperPortraitUrl, wallpaperSubUrl, wallpaperSubPortraitUrl, pageWallpaperUrls, cameraOverlayUrl, logoUrl, buttonImageUrls: buttonImageSlots } = useDeviceSetup(deviceId);
   const flow = usePhotoFlow(deviceId, config, printBgImages);
   const { monitors, syncEnabled, setSyncEnabled, selectedMonitorIndex, setSelectedMonitorIndex } = useTauriMonitor();
   const { idleRemaining, clearIdleTimer, paused: idlePaused, togglePause: toggleIdlePause } = useIdleTimer(
@@ -195,7 +195,12 @@ function ServiceContent() {
       ?? pickWallpaper(wallpaperSubUrl, wallpaperSubPortraitUrl);
   // 버튼 이미지가 있는 버튼은 고정 크기 + (옵션) 이미지만 표시 / 텍스트 숨김.
   // 루트의 data-* 속성으로 globals.css 규칙을 켠다(버튼을 렌더하는 각 Section은 몰라도 된다).
-  const buttonImageUrls = { capture: captureButtonImageUrl, next: nextButtonImageUrl, payment: paymentButtonImageUrl };
+  // 화면 방향에 맞는 버튼 이미지(가로/세로용), 한쪽만 있으면 그 이미지를 양쪽에 쓴다(배경화면과 같은 규칙).
+  const buttonImageUrls = {
+    capture: pickWallpaper(buttonImageSlots.capture.landscape, buttonImageSlots.capture.portrait),
+    next: pickWallpaper(buttonImageSlots.next.landscape, buttonImageSlots.next.portrait),
+    payment: pickWallpaper(buttonImageSlots.payment.landscape, buttonImageSlots.payment.portrait),
+  };
   const buttonDataAttrs: Record<string, string> = {};
   for (const role of ["capture", "next", "payment"] as const) {
     if (!buttonImageUrls[role]) continue;
@@ -209,9 +214,9 @@ function ServiceContent() {
     ...(config.themePrimaryColor ? { ["--theme-primary"]: config.themePrimaryColor } : {}),
     // 대형 강조 버튼(촬영하기·다음·결제하기) 배경 이미지. 버튼별 별도 업로드, 미설정 시
     // globals.css 폴백으로 기존 단색 유지.
-    ...(captureButtonImageUrl ? { ["--theme-btn-capture-image"]: `url(${captureButtonImageUrl})` } : {}),
-    ...(nextButtonImageUrl ? { ["--theme-btn-next-image"]: `url(${nextButtonImageUrl})` } : {}),
-    ...(paymentButtonImageUrl ? { ["--theme-btn-payment-image"]: `url(${paymentButtonImageUrl})` } : {}),
+    ...(buttonImageUrls.capture ? { ["--theme-btn-capture-image"]: `url(${buttonImageUrls.capture})` } : {}),
+    ...(buttonImageUrls.next ? { ["--theme-btn-next-image"]: `url(${buttonImageUrls.next})` } : {}),
+    ...(buttonImageUrls.payment ? { ["--theme-btn-payment-image"]: `url(${buttonImageUrls.payment})` } : {}),
     ["--btn-img-w"]: `${buttonImageSize.width}px`,
     ["--btn-img-h"]: `${buttonImageSize.height}px`,
     // 버튼별 텍스트 색상. 버튼 배경(단색/이미지)에 맞춰 관리자가 지정.

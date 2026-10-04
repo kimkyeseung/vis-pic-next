@@ -6,9 +6,7 @@ import {
   WALLPAPER_NAME_PORTRAIT,
   WALLPAPER_NAME_SUB_LANDSCAPE,
   WALLPAPER_NAME_SUB_PORTRAIT,
-  BUTTON_NAME_CAPTURE,
-  BUTTON_NAME_NEXT,
-  BUTTON_NAME_PAYMENT,
+  buttonImageName,
   WALLPAPER_PAGE_STEPS,
   wallpaperPageName,
   OVERLAY_NAME_CAMERA,
@@ -28,6 +26,8 @@ const NAMED_WALLPAPER_SLOTS = [
   ...WALLPAPER_PAGE_STEPS.flatMap(({ step }) => [wallpaperPageName(step, false), wallpaperPageName(step, true)]),
   OVERLAY_NAME_CAMERA,
 ];
+// imageType 7 안의 버튼 이미지 슬롯 — 버튼별 가로/세로 화면용.
+const BUTTON_SLOTS = BUTTON_ROLES.flatMap((role) => [buttonImageName(role, false), buttonImageName(role, true)]);
 
 /**
  * 테마 관리 페이지의 데이터 계층 — 색상 설정 로드/저장, 배경화면·로고·버튼 이미지 애셋의
@@ -59,9 +59,9 @@ export function useThemeSettings(deviceId: string | null) {
   const [wallpaperSubLs, setWallpaperSubLs] = useState<Asset>(null);
   const [wallpaperSubPt, setWallpaperSubPt] = useState<Asset>(null);
   const [logo, setLogo] = useState<Asset>(null);
-  const [captureButtonImage, setCaptureButtonImage] = useState<Asset>(null);
-  const [nextButtonImage, setNextButtonImage] = useState<Asset>(null);
-  const [paymentButtonImage, setPaymentButtonImage] = useState<Asset>(null);
+  // 버튼 이미지 — 슬롯 이름(buttonImageName(role, portrait))을 키로 한 맵.
+  const [buttonAssets, setButtonAssets] = useState<Record<string, Asset>>({});
+  const [buttonBusy, setButtonBusy] = useState<Record<string, boolean>>({});
   const [captureTextColor, setCaptureTextColor] = useState("#2a2a2a");
   const [nextTextColor, setNextTextColor] = useState("#ffffff");
   const [paymentTextColor, setPaymentTextColor] = useState("#ffffff");
@@ -76,9 +76,6 @@ export function useThemeSettings(deviceId: string | null) {
   const [wallpaperSubLsBusy, setWallpaperSubLsBusy] = useState(false);
   const [wallpaperSubPtBusy, setWallpaperSubPtBusy] = useState(false);
   const [logoBusy, setLogoBusy] = useState(false);
-  const [captureButtonImageBusy, setCaptureButtonImageBusy] = useState(false);
-  const [nextButtonImageBusy, setNextButtonImageBusy] = useState(false);
-  const [paymentButtonImageBusy, setPaymentButtonImageBusy] = useState(false);
   const [message, setMessage] = useState("");
   // 로드 시점의 실효값(전역←지점). 저장 시 바뀐 키만 지점에 저장하는 기준 — 다른 설정 화면과 같은 규칙.
   const baselineRef = useRef<Record<string, string>>({});
@@ -120,7 +117,7 @@ export function useThemeSettings(deviceId: string | null) {
       setLoading(true);
       try {
         // 색상: 전역 기본값 ← 이 지점 오버라이드 병합
-        const [g, d, wpLs, wpPt, wpSubLs, wpSubPt, lg, btnCapture, btnNext, btnPayment, named] = await Promise.all([
+        const [g, d, wpLs, wpPt, wpSubLs, wpSubPt, lg, buttons, named] = await Promise.all([
           fetch("/api/setting/").then((r) => r.json()).catch(() => ({})),
           fetch(`/api/device/${deviceId}/settings/`).then((r) => r.json()).catch(() => ({})),
           loadAsset(WALLPAPER_TYPE, WALLPAPER_NAME_LANDSCAPE),
@@ -128,9 +125,7 @@ export function useThemeSettings(deviceId: string | null) {
           loadAsset(WALLPAPER_TYPE, WALLPAPER_NAME_SUB_LANDSCAPE),
           loadAsset(WALLPAPER_TYPE, WALLPAPER_NAME_SUB_PORTRAIT),
           loadAsset(LOGO_TYPE),
-          loadAsset(BUTTON_TYPE, BUTTON_NAME_CAPTURE),
-          loadAsset(BUTTON_TYPE, BUTTON_NAME_NEXT),
-          loadAsset(BUTTON_TYPE, BUTTON_NAME_PAYMENT),
+          loadAssetsByName(BUTTON_TYPE, BUTTON_SLOTS),
           loadAssetsByName(WALLPAPER_TYPE, NAMED_WALLPAPER_SLOTS),
         ]);
         if (cancelled) return;
@@ -153,9 +148,7 @@ export function useThemeSettings(deviceId: string | null) {
         setWallpaperSubLs(wpSubLs);
         setWallpaperSubPt(wpSubPt);
         setLogo(lg);
-        setCaptureButtonImage(btnCapture);
-        setNextButtonImage(btnNext);
-        setPaymentButtonImage(btnPayment);
+        setButtonAssets(buttons);
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -292,6 +285,26 @@ export function useThemeSettings(deviceId: string | null) {
   const removeNamed = (name: string) =>
     removeAsset(namedAssets[name] ?? null, setNamedAsset(name), setNamedBusyFor(name));
 
+  // 버튼 이미지 슬롯(role × 가로/세로)용 업로드/제거.
+  const setButtonAsset = (name: string) => (a: Asset) => setButtonAssets((prev) => ({ ...prev, [name]: a }));
+  const setButtonBusyFor = (name: string) => (b: boolean) => setButtonBusy((prev) => ({ ...prev, [name]: b }));
+  const uploadButton = (role: ButtonRole) => (portrait: boolean) => {
+    const name = buttonImageName(role, portrait);
+    return uploadAsset(BUTTON_TYPE, name, buttonAssets[name] ?? null, setButtonAsset(name), setButtonBusyFor(name));
+  };
+  const removeButton = (role: ButtonRole) => (portrait: boolean) => {
+    const name = buttonImageName(role, portrait);
+    return removeAsset(buttonAssets[name] ?? null, setButtonAsset(name), setButtonBusyFor(name));
+  };
+  const buttonSlot = (role: ButtonRole) => ({
+    landscape: buttonAssets[buttonImageName(role, false)] ?? null,
+    portrait: buttonAssets[buttonImageName(role, true)] ?? null,
+    busy: {
+      landscape: !!buttonBusy[buttonImageName(role, false)],
+      portrait: !!buttonBusy[buttonImageName(role, true)],
+    },
+  });
+
   return {
     textColor, setTextColor,
     primaryColor, setPrimaryColor,
@@ -304,9 +317,6 @@ export function useThemeSettings(deviceId: string | null) {
     wallpaperSubLs, wallpaperSubLsBusy,
     wallpaperSubPt, wallpaperSubPtBusy,
     logo, logoBusy,
-    captureButtonImage, captureButtonImageBusy,
-    nextButtonImage, nextButtonImageBusy,
-    paymentButtonImage, paymentButtonImageBusy,
     captureTextColor, setCaptureTextColor,
     nextTextColor, setNextTextColor,
     paymentTextColor, setPaymentTextColor,
@@ -315,12 +325,11 @@ export function useThemeSettings(deviceId: string | null) {
     uploadAsset, removeAsset,
     setWallpaperLsBusy, setWallpaperPtBusy, setLogoBusy,
     setWallpaperSubLsBusy, setWallpaperSubPtBusy,
-    setCaptureButtonImageBusy, setNextButtonImageBusy, setPaymentButtonImageBusy,
     setWallpaperLs, setWallpaperPt, setLogo,
     setWallpaperSubLs, setWallpaperSubPt,
-    setCaptureButtonImage, setNextButtonImage, setPaymentButtonImage,
     WALLPAPER_TYPE, LOGO_TYPE, BUTTON_TYPE,
     buttonImageOptions, setButtonImageOption,
     namedAssets, namedBusy, uploadNamed, removeNamed,
+    buttonSlot, uploadButton, removeButton,
   };
 }

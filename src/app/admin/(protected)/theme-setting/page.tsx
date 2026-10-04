@@ -8,9 +8,6 @@ import {
   WALLPAPER_NAME_PORTRAIT,
   WALLPAPER_NAME_SUB_LANDSCAPE,
   WALLPAPER_NAME_SUB_PORTRAIT,
-  BUTTON_NAME_CAPTURE,
-  BUTTON_NAME_NEXT,
-  BUTTON_NAME_PAYMENT,
 } from "@/constants/images";
 import { useThemeSettings } from "./useThemeSettings";
 import { AssetUploader, AssetUploaderRow } from "./AssetUploader";
@@ -133,17 +130,18 @@ export default function ThemeSettingPage() {
         <div className="px-6 pt-5 pb-1">
           <h3 className="text-white font-semibold text-base">버튼 이미지 · 텍스트 색상</h3>
           <p className="text-gray-500 text-xs mt-1">
-            촬영·다음·결제 버튼의 배경 이미지와 글자 색상입니다. 이미지를 올리면 버튼이 아래 안내된 고정 크기로 바뀌므로 그 크기로 제작하세요. &apos;이미지만 표시&apos;를 켜면 단색 배경 없이 이미지가 잘림 없이 그대로 보이고, 끄면 단색 버튼 위에 이미지를 꽉 채웁니다. 미설정 시 기본 단색 버튼이 사용됩니다. (옵션은 아래 &apos;설정 저장&apos;을 눌러야 반영됩니다)
+            촬영·다음·결제 버튼의 배경 이미지와 글자 색상입니다. 이미지를 올리면 버튼이 화면 방향별 고정 크기(아래 안내)로 바뀌고, 이미지는 그 크기에 꽉 채워집니다 — 가로·세로용을 각 크기로 따로 만들면 가장 깔끔하고, 한쪽만 올리면 그 이미지가 양쪽에 쓰입니다. &apos;이미지만 표시&apos;를 켜면 단색 배경·그림자 없이 이미지만, 끄면 단색 버튼 위에 이미지가 보입니다. 미설정 시 기본 단색 버튼이 사용됩니다. (옵션은 아래 &apos;설정 저장&apos;을 눌러야 반영됩니다)
           </p>
         </div>
 
         <ButtonThemeRow
           title="촬영하기"
           description="촬영 화면의 '촬영하기' 버튼."
-          asset={t.captureButtonImage}
-          onUpload={t.uploadAsset(t.BUTTON_TYPE, BUTTON_NAME_CAPTURE, t.captureButtonImage, t.setCaptureButtonImage, t.setCaptureButtonImageBusy)}
-          onRemove={t.removeAsset(t.captureButtonImage, t.setCaptureButtonImage, t.setCaptureButtonImageBusy)}
-          busy={t.captureButtonImageBusy}
+          landscape={t.buttonSlot("capture").landscape}
+          portrait={t.buttonSlot("capture").portrait}
+          onUpload={t.uploadButton("capture")}
+          onRemove={t.removeButton("capture")}
+          busy={t.buttonSlot("capture").busy}
           textColor={t.captureTextColor}
           onTextColorChange={t.setCaptureTextColor}
           options={t.buttonImageOptions.capture}
@@ -153,10 +151,11 @@ export default function ThemeSettingPage() {
         <ButtonThemeRow
           title="다음으로"
           description="각 단계 화면의 '다음으로' 버튼."
-          asset={t.nextButtonImage}
-          onUpload={t.uploadAsset(t.BUTTON_TYPE, BUTTON_NAME_NEXT, t.nextButtonImage, t.setNextButtonImage, t.setNextButtonImageBusy)}
-          onRemove={t.removeAsset(t.nextButtonImage, t.setNextButtonImage, t.setNextButtonImageBusy)}
-          busy={t.nextButtonImageBusy}
+          landscape={t.buttonSlot("next").landscape}
+          portrait={t.buttonSlot("next").portrait}
+          onUpload={t.uploadButton("next")}
+          onRemove={t.removeButton("next")}
+          busy={t.buttonSlot("next").busy}
           textColor={t.nextTextColor}
           onTextColorChange={t.setNextTextColor}
           options={t.buttonImageOptions.next}
@@ -166,10 +165,11 @@ export default function ThemeSettingPage() {
         <ButtonThemeRow
           title="결제하기"
           description="결제 화면의 '결제하기' 버튼."
-          asset={t.paymentButtonImage}
-          onUpload={t.uploadAsset(t.BUTTON_TYPE, BUTTON_NAME_PAYMENT, t.paymentButtonImage, t.setPaymentButtonImage, t.setPaymentButtonImageBusy)}
-          onRemove={t.removeAsset(t.paymentButtonImage, t.setPaymentButtonImage, t.setPaymentButtonImageBusy)}
-          busy={t.paymentButtonImageBusy}
+          landscape={t.buttonSlot("payment").landscape}
+          portrait={t.buttonSlot("payment").portrait}
+          onUpload={t.uploadButton("payment")}
+          onRemove={t.removeButton("payment")}
+          busy={t.buttonSlot("payment").busy}
           textColor={t.paymentTextColor}
           onTextColorChange={t.setPaymentTextColor}
           options={t.buttonImageOptions.payment}

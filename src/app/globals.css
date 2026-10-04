@@ -374,12 +374,16 @@ body {
 }
 
 /* 대형 강조 버튼 이미지(테마관리 업로드) — 버튼별로 따로 업로드한 이미지를 단색 배경 위에
-   덮어씌운다. 미설정(변수 없음) 시 none이라 기존 단색 배경이 그대로 보인다. */
+   덮어씌운다. 미설정(변수 없음) 시 none이라 기존 단색 배경이 그대로 보인다.
+   버튼은 이미지가 있으면 화면 방향별 고정 크기(--btn-img-w/h)라, 이미지를 그 크기에 정확히 꽉 채운다(100% 100%) —
+   가로/세로용을 따로 올리면 원본 비율 그대로, 한쪽만 올려 양쪽에 쓰면 두 크기의 비율 차(약 2%)만큼만 늘어난다.
+   (cover는 그 차이만큼 가장자리를 잘라 이미지 속 글자가 잘릴 수 있고, contain은 빈 띠가 생긴다) */
 .service-button.btn-role-capture,
 .service-button.btn-role-next,
 .service-button.btn-role-payment {
-  background-size: cover;
+  background-size: 100% 100%;
   background-position: center;
+  background-repeat: no-repeat;
 }
 .service-button.btn-role-capture { background-image: var(--theme-btn-capture-image, none); }
 .service-button.btn-role-next { background-image: var(--theme-btn-next-image, none); }
@@ -387,7 +391,7 @@ body {
 
 /* 버튼 이미지가 있는 버튼 — 서비스 루트(.service-theme)의 data-btn-* 속성으로 켠다(service/page.tsx).
    · data-btn-img-*      : 고정 크기(--btn-img-w/h = BUTTON_IMAGE_SIZE, 관리자에 권장 크기로 안내)
-   · data-btn-imgonly-*  : 이미지만 표시 — 단색 배경·그림자·라운드·hover 광택 제거, 이미지는 잘림 없이(contain)
+   · data-btn-imgonly-*  : 이미지만 표시 — 단색 배경·그림자·라운드·hover 광택 제거(이미지는 버튼 크기에 꽉 채움)
    · data-btn-hidetext-* : 버튼 텍스트 숨김(이미지에 글자가 들어 있을 때)
    이 규칙들은 레이어 밖(언레이어드)이라 SERVICE_BIG_BUTTON_CLASS의 Tailwind 패딩/최소폭보다 우선한다. */
 .service-theme[data-btn-img-capture] .btn-role-capture,
@@ -402,8 +406,6 @@ body {
 .service-theme[data-btn-imgonly-next] .btn-role-next,
 .service-theme[data-btn-imgonly-payment] .btn-role-payment {
   background-color: transparent;
-  background-size: contain;
-  background-repeat: no-repeat;
   box-shadow: none;
   border-radius: 0;
 }
