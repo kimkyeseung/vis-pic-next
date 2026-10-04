@@ -409,6 +409,12 @@ body {
   box-shadow: none;
   border-radius: 0;
 }
+/* 누르는 동안의 글로우도 사각 그림자 대신 PNG 투명도를 따라가는 drop-shadow로(이미지 모양대로 빛난다). */
+.service-theme[data-btn-img-capture] .btn-role-capture:active,
+.service-theme[data-btn-img-next] .btn-role-next:active,
+.service-theme[data-btn-img-payment] .btn-role-payment:active {
+  filter: drop-shadow(0 0 calc(var(--btn-glow-size, 0px) / 2) var(--btn-glow-color, transparent));
+}
 .service-theme[data-btn-img-capture] .btn-role-capture::before,
 .service-theme[data-btn-img-next] .btn-role-next::before,
 .service-theme[data-btn-img-payment] .btn-role-payment::before {

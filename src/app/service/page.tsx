@@ -85,6 +85,46 @@ function ServiceContent() {
       // 글로우 비활성(변수 미주입) 시 펄스도 없음
       if (!glowColor || !glowSize || glowSize === "0px") return;
       const rect = btn.getBoundingClientRect();
+      // 테마 버튼 이미지가 있는 버튼은 사각 링 대신 **버튼 PNG 모양**으로 번지는 글로우를 붙인다 —
+      // 글로우 색으로 칠한 요소를 버튼 이미지로 마스킹(투명 영역 제외)하고 blur·확대하며 사라지게 한다.
+      // 서비스 루트(.service-theme) 안에 z-index:-1로 붙여 버튼 뒤(배경화면 위)에서 번지므로 이미지를 가리지 않고,
+      // 루트는 단계가 바뀌어도 유지돼 화면 전환 후에도 끝까지 재생된다. 루트는 transform: scale()된 스테이지라
+      // 좌표를 스테이지 px로 환산한다. 스타일·애니메이션은 CSS 파일에 두지 않고 인라인 + Web Animations로
+      // 넣는다(CSS가 로드·갱신되지 않아도 효과가 사라지지 않게).
+      const root = btn.closest(".service-theme") as HTMLElement | null;
+      const bgImage = cs.backgroundImage;
+      if (root && bgImage && bgImage.startsWith("url(")) {
+        const rootRect = root.getBoundingClientRect();
+        const scale = rootRect.width / root.offsetWidth || 1;
+        const size = parseFloat(glowSize) || 24;
+        const shape = document.createElement("div");
+        Object.assign(shape.style, {
+          position: "absolute",
+          pointerEvents: "none",
+          zIndex: "-1",
+          left: `${(rect.left - rootRect.left) / scale}px`,
+          top: `${(rect.top - rootRect.top) / scale}px`,
+          width: `${rect.width / scale}px`,
+          height: `${rect.height / scale}px`,
+          backgroundColor: glowColor,
+        });
+        for (const [k, v] of [["mask-image", bgImage], ["mask-size", "100% 100%"], ["mask-repeat", "no-repeat"]]) {
+          shape.style.setProperty(k, v);
+          shape.style.setProperty(`-webkit-${k}`, v);
+        }
+        root.appendChild(shape);
+        const anim = shape.animate(
+          [
+            { filter: `blur(${size / 3}px)`, transform: "scale(1.03)", opacity: 0.9 },
+            { filter: `blur(${size}px)`, transform: "scale(1.18)", opacity: 0 },
+          ],
+          { duration: 550, easing: "ease-out", fill: "forwards" },
+        );
+        const remove = () => shape.remove();
+        anim.onfinish = remove;
+        window.setTimeout(remove, 900);
+        return;
+      }
       const ring = document.createElement("div");
       ring.className = "btn-glow-ripple";
       ring.style.left = `${rect.left}px`;
