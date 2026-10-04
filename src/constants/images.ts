@@ -99,12 +99,6 @@ export const DEFAULT_EFFECT_GESTURE = "Victory";
 export function normalizeEffectGesture(v: string | null | undefined): string {
   return EFFECT_TRIGGER_GESTURES.some((g) => g.value === v) ? (v as string) : DEFAULT_EFFECT_GESTURE;
 }
-/** 제스처 값에 해당하는 안내용 이모지 — label의 "설명 이모지" 표기에서 이모지만 뽑아 쓴다. */
-export function getGestureEmoji(gesture: string): string | null {
-  const g = EFFECT_TRIGGER_GESTURES.find((x) => x.value === gesture);
-  if (!g) return null;
-  return g.label.split(" ").pop() ?? null;
-}
 // 관리자가 지속시간을 지정하지 않은 배경의 기본 최대 재생 시간(초).
 export const DEFAULT_EFFECT_DURATION = 4;
 // 관리자 설정 UI에서 허용하는 지속시간 범위(초).

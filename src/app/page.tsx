@@ -119,7 +119,6 @@ export default function Home() {
             onClick={openDevicePicker}
             className="service-button flex-col gap-3 w-52 min-h-44 p-6 text-xl rounded-2xl"
           >
-            <span className="text-3xl opacity-80">📸</span>
             <span className="tracking-wide">서비스 화면</span>
           </button>
 
@@ -127,7 +126,6 @@ export default function Home() {
             href="/admin"
             className="service-button flex-col gap-3 w-52 min-h-44 p-6 text-xl rounded-2xl"
           >
-            <span className="text-3xl opacity-80">⚙️</span>
             <span className="tracking-wide">관리자 화면</span>
           </Link>
         </div>

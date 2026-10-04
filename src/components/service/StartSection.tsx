@@ -40,7 +40,6 @@ export function StartSection({
           className="flex items-center gap-4 text-white text-6xl portrait:text-7xl font-extrabold animate-soft-blink select-none max-w-[1728px] portrait:max-w-[972px] text-center"
           style={{ textShadow: "0 2px 15px rgba(0,0,0,0.5)" }}
         >
-          <span className="inline-block text-5xl portrait:text-6xl">&#128070;</span>
           {/* whitespace-pre-line: 번역문에 \n이 있으면(현재 일본어만) 그 지점에서 줄바꿈,
               없으면 기존처럼 한 줄. leading-none으로 2줄일 때도 줄간격이 벌어지지 않게 한다. */}
           <span className="whitespace-pre-line leading-none">{t("start.touch")}</span>
@@ -84,7 +83,7 @@ export function StartSection({
         className="absolute bottom-6 right-6 text-white/30 hover:text-white/70 transition-colors text-sm px-3 py-2 rounded-lg"
         onClick={(e) => { e.stopPropagation(); setShowSettings((v) => !v); }}
       >
-        &#9881; 출력 설정
+        출력 설정
       </button>
 
       {/* 서브 모니터 출력 설정 패널 */}

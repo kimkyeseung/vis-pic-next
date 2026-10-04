@@ -4,7 +4,6 @@ import { useState, useEffect, useMemo, useRef } from "react";
 import type { DeviceConfig, BGImage, Sticker } from "@/types";
 import type { MaskTuning } from "@/lib/segmentMask";
 import { FALLBACK_BACKGROUNDS } from "@/constants/frames";
-import { DEFAULT_EFFECT_GESTURE, getGestureEmoji } from "@/constants/images";
 import { getCameraResolution } from "@/constants/camera";
 import { useFrameSender } from "@/hooks/useSceneSync";
 import { CircularTimer } from "@/components/service/CircularTimer";
@@ -193,7 +192,6 @@ export function CameraSection({
   // 안내 박스(2단 레이아웃)만 강제로 보여준다 — currentBgEffect 자체(영상 로드·제스처
   // 감지 등 실제 동작)는 건드리지 않고 표시용 파생값만 대체한다.
   const showGestureHint = !!currentBgEffect || previewForceGestureHint;
-  const gestureHintEmoji = getGestureEmoji(currentBgEffect?.gesture ?? DEFAULT_EFFECT_GESTURE) ?? "🤚";
 
   return (
     <section
@@ -418,7 +416,7 @@ export function CameraSection({
           onClick={handleManualCapture}
           style={countdown !== null || photos.length >= maxPhotos ? { opacity: 0.5, pointerEvents: "none" } : {}}
         >
-          &#128248; {t("camera.shoot")}
+          {t("camera.shoot")}
         </button>
       </div>
 
@@ -429,7 +427,6 @@ export function CameraSection({
         addSticker={addSticker}
         imageBaseUrl={imageBaseUrl}
         showGestureHint={showGestureHint}
-        gestureHintEmoji={gestureHintEmoji}
         maxPhotos={maxPhotos}
         photosCount={photos.length}
       />

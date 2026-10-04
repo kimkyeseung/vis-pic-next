@@ -14,12 +14,10 @@ function openDebugUrl(url: string) {
  * stretch되고 QR이 남은 세로 공간에 맞춰 반응형으로 축소된다(라벨은 고정, QR 박스만 늘고 줆). */
 export function QRDownloadCard({
   url,
-  emoji,
   label,
   matchHeight,
 }: {
   url: string;
-  emoji: string;
   label: string;
   matchHeight: boolean;
 }) {
@@ -38,7 +36,6 @@ export function QRDownloadCard({
   return (
     // 세로(portrait)에선 카드를 좌우로 꽉 채우고(flex-1) QR·라벨을 키운다(시안 대응).
     <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-8 border border-white/20 text-center flex flex-col items-center min-w-0 portrait:flex-1">
-      <div className="text-4xl portrait:text-5xl mb-2 shrink-0">{emoji}</div>
       <p className="text-white text-2xl portrait:text-3xl font-semibold mb-4 portrait:mb-6 shrink-0">{label}</p>
       {matchHeight ? (
         // 남은 세로 공간 안에서 정사각형을 유지(폭·높이 둘 다 auto + max-h/max-w)해야

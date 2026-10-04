@@ -16,7 +16,6 @@ export function CameraSidePanel({
   addSticker,
   imageBaseUrl,
   showGestureHint,
-  gestureHintEmoji,
   maxPhotos,
   photosCount,
 }: {
@@ -26,7 +25,6 @@ export function CameraSidePanel({
   addSticker: (src: string) => void;
   imageBaseUrl: string;
   showGestureHint: boolean;
-  gestureHintEmoji: string;
   maxPhotos: number;
   photosCount: number;
 }) {
@@ -100,8 +98,7 @@ export function CameraSidePanel({
           위아래 박스(스티커 패널·남은 촬영 횟수)와 같은 너비로 보이도록 w-full로 맞춘다.
           items-start로 스티커 패널 바로 아래에 붙여 사이 간격을 좁힌다(남는 세로 공간은 아래로).
           현재 배경에 동작 트리거 이펙트가 설정돼 있으면, 같은 박스를 절반으로 나눠 아래쪽에
-          그 제스처 안내를 추가한다(제스처에 매칭되는 이모지가 있으면 이모지로 표시).
-          두 안내가 함께 뜰 때는(칸이 좁아지므로) 이모지·문구를 가로로 나란히 배치한다.
+          그 제스처 안내 문구를 추가한다(안내 문구 앞 이모지는 쓰지 않는다).
           min-h-0을 주지 않아 내용(특히 영·일·중 등 문구가 길어지는 언어)보다 작게 찌그러들지
           않게 한다 — 예전엔 min-h-0 때문에 공간이 부족하면 이 박스가 눌려 아래 "남은 촬영
           횟수" 박스와 겹쳐 보이는 버그가 있었다. */}
@@ -109,28 +106,22 @@ export function CameraSidePanel({
         <div className="w-full rounded-2xl overflow-hidden border border-[var(--theme-primary,#6c6fb4)]/50 bg-[var(--theme-primary,#6c6fb4)]/10">
           {/* 세로 모드는 두 안내가 한 박스 안에 나란히 들어가 py-6이면 높이가 넘쳐 아래
               박스와 겹쳤다 — 세로에서만 py-3으로 줄인다(가로는 원래대로 유지). */}
-          <div className={showGestureHint ? "flex items-center justify-center gap-4 px-6 py-6 portrait:py-3" : "text-center px-6 py-6 portrait:py-3"}>
-            <div className={showGestureHint ? "text-5xl leading-none shrink-0 animate-soft-blink select-none" : "text-5xl leading-none mb-2 animate-soft-blink select-none"} aria-hidden>✋</div>
+          <div className="text-center px-6 py-6 portrait:py-3">
             {/* break-keep(word-break: keep-all)를 쓰지 않는다 — 한국어/영어는 공백 기준으로
                 잘 줄바꿈되지만, 일본어·중국어 문구는 공백이 없어 keep-all이면 줄바꿈 지점을
                 못 찾아 박스 밖으로 넘쳐 overflow-hidden에 잘려 보이는 문제가 있었다. */}
             {/* whitespace-pre-line: 번역문에 \n이 있으면 그 지점에서 줄바꿈. 한국어는 자동
                 줄바꿈에 맡기면 좁은 화면에서 단어 중간이 끊겨 보일 수 있어 어절 경계에
                 \n을 미리 넣어 항상 깔끔하게 2줄로 보이게 한다. */}
-            {/* 이모지 글리프 자체의 좌우 여백이 비대칭이라(폰트 내장), justify-center로
-                그룹을 중앙 정렬해도 텍스트가 한쪽으로 쏠려 보인다 — px-4로 상쇄. */}
-            <p className={`text-white font-extrabold text-xl leading-snug whitespace-pre-line ${showGestureHint ? "text-left px-4" : ""}`}>
+            <p className="text-white font-extrabold text-xl leading-snug whitespace-pre-line">
               {t("camera.palmHint")}
             </p>
           </div>
           {showGestureHint && (
-            <div className="flex items-center justify-center gap-4 px-6 py-6 portrait:py-3 border-t border-[var(--theme-primary,#6c6fb4)]/30">
-              <div className="text-5xl leading-none shrink-0 select-none" aria-hidden>
-                {gestureHintEmoji}
-              </div>
+            <div className="text-center px-6 py-6 portrait:py-3 border-t border-[var(--theme-primary,#6c6fb4)]/30">
               {/* 영어 번역문은 \n으로 2줄에 균형 있게 나뉘도록 강제한다 — 그냥 두면 자동
                   줄바꿈이 3줄로 떨어져(위 손바닥 안내는 2줄인데) 박스 높이가 들쭉날쭉해 보였다. */}
-              <p className="text-white font-extrabold text-xl leading-snug whitespace-pre-line text-left px-4">
+              <p className="text-white font-extrabold text-xl leading-snug whitespace-pre-line">
                 {t("camera.effectHint")}
               </p>
             </div>
