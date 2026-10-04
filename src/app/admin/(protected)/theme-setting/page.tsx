@@ -1,6 +1,8 @@
 "use client";
 
+import { useState } from "react";
 import { useAdmin } from "@/app/admin/AdminContext";
+import { ThemePreviewModal } from "./ThemePreviewModal";
 import { PageWallpaperCard } from "./PageWallpaperCard";
 import {
   OVERLAY_NAME_CAMERA,
@@ -18,17 +20,26 @@ export default function ThemeSettingPage() {
   const { selectedDevice } = useAdmin();
   const deviceId = selectedDevice?.deviceId ?? null;
   const t = useThemeSettings(deviceId);
+  const [previewOpen, setPreviewOpen] = useState(false);
 
   if (t.loading) return <div className="text-gray-400">로딩중...</div>;
   if (!selectedDevice) return <div className="p-8 bg-gray-800 rounded-xl text-center text-gray-400">상단에서 지점을 선택하세요.</div>;
 
   return (
     <div className="max-w-3xl space-y-4">
-      <div className="mb-6">
-        <h2 className="text-2xl font-bold text-white">테마 관리</h2>
-        <p className="mt-1 text-sm text-gray-500">
-          <span className="text-white font-medium">{selectedDevice.name}</span> 지점 테마입니다. (배경화면·로고·버튼 이미지·색상)
-        </p>
+      <div className="mb-6 flex items-start justify-between gap-4">
+        <div>
+          <h2 className="text-2xl font-bold text-white">테마 관리</h2>
+          <p className="mt-1 text-sm text-gray-500">
+            <span className="text-white font-medium">{selectedDevice.name}</span> 지점 테마입니다. (배경화면·로고·버튼 이미지·색상)
+          </p>
+        </div>
+        <button
+          onClick={() => setPreviewOpen(true)}
+          className="shrink-0 px-4 py-2 bg-purple-600 text-white rounded-lg text-sm font-semibold hover:bg-purple-700 transition-colors"
+        >
+          미리보기
+        </button>
       </div>
 
       {/* 배경화면 · 첫(대기) 화면 — 가로/세로 두 장을 한 카드에 묶는다. */}
@@ -130,7 +141,7 @@ export default function ThemeSettingPage() {
         <div className="px-6 pt-5 pb-1">
           <h3 className="text-white font-semibold text-base">버튼 이미지 · 텍스트 색상</h3>
           <p className="text-gray-500 text-xs mt-1">
-            촬영·다음·결제 버튼의 배경 이미지와 글자 색상입니다. 이미지를 올리면 버튼이 화면 방향별 고정 크기(아래 안내)로 바뀌고, 이미지는 그 크기에 꽉 채워집니다 — 가로·세로용을 각 크기로 따로 만들면 가장 깔끔하고, 한쪽만 올리면 그 이미지가 양쪽에 쓰입니다. &apos;이미지만 표시&apos;를 켜면 단색 배경·그림자 없이 이미지만, 끄면 단색 버튼 위에 이미지가 보입니다. 미설정 시 기본 단색 버튼이 사용됩니다. (옵션은 아래 &apos;설정 저장&apos;을 눌러야 반영됩니다)
+            촬영·다음·결제 버튼의 배경 이미지와 글자 색상입니다. 이미지를 올리면 버튼이 화면 방향별 고정 크기(아래 안내)로 바뀌고, 이미지는 그 크기에 꽉 채워집니다 — 가로·세로용을 각 크기로 따로 만들면 가장 깔끔하고, 한쪽만 올리면 그 이미지가 양쪽에 쓰입니다. 이미지를 올린 버튼은 단색 배경·그림자 없이 이미지만 보이므로(투명 PNG는 투명 그대로) 버튼 모양까지 이미지에 담아 제작하세요. 미설정 시 기본 단색 버튼이 사용됩니다. (텍스트 숨김 옵션은 아래 &apos;설정 저장&apos;을 눌러야 반영됩니다)
           </p>
         </div>
 
@@ -300,8 +311,16 @@ export default function ThemeSettingPage() {
         >
           {t.saving ? "저장 중..." : "설정 저장"}
         </button>
-        <span className="ml-3 text-gray-500 text-xs">이미지는 업로드 즉시 반영됩니다. 색상·버튼 옵션은 저장해야 반영됩니다.</span>
+        <button
+          onClick={() => setPreviewOpen(true)}
+          className="ml-3 px-5 py-3 bg-gray-700 text-gray-200 rounded-lg font-semibold hover:bg-gray-600 transition-colors"
+        >
+          미리보기
+        </button>
+        <span className="ml-3 text-gray-500 text-xs">이미지는 업로드 즉시 반영됩니다. 색상·버튼 옵션은 저장해야 반영됩니다(미리보기엔 저장 전 값도 보입니다).</span>
       </div>
+
+      {previewOpen && <ThemePreviewModal t={t} onClose={() => setPreviewOpen(false)} />}
     </div>
   );
 }

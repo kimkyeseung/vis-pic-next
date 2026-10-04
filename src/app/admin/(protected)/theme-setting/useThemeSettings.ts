@@ -181,15 +181,15 @@ export function useThemeSettings(deviceId: string | null) {
       ...Object.fromEntries(BUTTON_ROLES.flatMap((role) => {
         const k = buttonImageOptionKeys(role);
         const o = buttonImageOptions[role];
-        return [[k.imageOnly, o.imageOnly ? "1" : "0"], [k.hideText, o.hideText ? "1" : "0"]];
+        return [[k.hideText, o.hideText ? "1" : "0"]];
       })),
     };
     // 바뀐 키만 지점에 저장한다 — 매번 전부 저장하면 건드리지 않은 값까지 지점 설정으로 굳어 전역 기본값 변경이 안 따라온다.
     // 기준값이 없는(저장된 적 없는) 키는 화면에 보인 기본값과 같아도 서비스 기본값과 같으므로 건너뛴다.
     const DEFAULTS = parseButtonImageOptions({});
     const defaultFor = (k: string): string | undefined => {
-      const role = BUTTON_ROLES.find((r) => buttonImageOptionKeys(r).imageOnly === k || buttonImageOptionKeys(r).hideText === k);
-      if (role) return buttonImageOptionKeys(role).imageOnly === k ? (DEFAULTS[role].imageOnly ? "1" : "0") : (DEFAULTS[role].hideText ? "1" : "0");
+      const role = BUTTON_ROLES.find((r) => buttonImageOptionKeys(r).hideText === k);
+      if (role) return DEFAULTS[role].hideText ? "1" : "0";
       return THEME_DEFAULTS[k];
     };
     const payload: Record<string, string> = {};

@@ -125,8 +125,6 @@ export interface DeviceConfig {
 export type ButtonRole = "capture" | "next" | "payment";
 
 export interface ButtonImageOptions {
-  /** 이미지만 표시 — 버튼 단색 배경·그림자·라운드를 없애 투명 PNG가 그대로 보이게 한다. 미설정 시 켬. */
-  imageOnly: boolean;
   /** 버튼 텍스트 숨김 — 이미지에 글자가 들어 있을 때. 미설정 시 끔. */
   hideText: boolean;
 }

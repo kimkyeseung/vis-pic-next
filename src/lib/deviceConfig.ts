@@ -84,18 +84,20 @@ export function clampSigned(value: number, min = -100, max = 100): number {
 
 export const BUTTON_ROLES: readonly ButtonRole[] = ["capture", "next", "payment"];
 
-/** 버튼별 이미지 표시 옵션 설정 키. 예: THEME_BTN_IMAGE_ONLY_CAPTURE / THEME_BTN_HIDE_TEXT_NEXT */
+/**
+ * 버튼별 이미지 표시 옵션 설정 키. 예: THEME_BTN_HIDE_TEXT_NEXT
+ * (버튼 이미지는 항상 "이미지만 표시"라 예전 THEME_BTN_IMAGE_ONLY_* 키는 더 이상 읽지 않는다.)
+ */
 export function buttonImageOptionKeys(role: ButtonRole) {
-  const suffix = role.toUpperCase();
-  return { imageOnly: `THEME_BTN_IMAGE_ONLY_${suffix}`, hideText: `THEME_BTN_HIDE_TEXT_${suffix}` };
+  return { hideText: `THEME_BTN_HIDE_TEXT_${role.toUpperCase()}` };
 }
 
-/** 설정 맵 → 버튼별 이미지 옵션. 이미지만 표시는 미설정 시 켬("0"일 때만 끔), 텍스트 숨김은 "1"일 때만 켬. */
+/** 설정 맵 → 버튼별 이미지 옵션. 텍스트 숨김은 "1"일 때만 켬. */
 export function parseButtonImageOptions(s: Record<string, string | undefined>): Record<ButtonRole, ButtonImageOptions> {
   const out = {} as Record<ButtonRole, ButtonImageOptions>;
   for (const role of BUTTON_ROLES) {
     const k = buttonImageOptionKeys(role);
-    out[role] = { imageOnly: s[k.imageOnly] !== "0", hideText: s[k.hideText] === "1" };
+    out[role] = { hideText: s[k.hideText] === "1" };
   }
   return out;
 }

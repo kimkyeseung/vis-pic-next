@@ -61,7 +61,7 @@ Tailwind CSS v4의 토큰 기반 방식이라 별도 `tailwind.config.js`는 없
 주입되는 런타임 변수: `--theme-text`(글자색)·`--theme-primary`(강조색) 외에, 배경은 대기화면과
 그 외 단계에 각각 지정한 wallpaper(cover, 나머지 단계는 화면별 → 공통 순)·미설정 화면은 `THEME_BG_COLOR` 단색,
 버튼 탭 글로우는 `--btn-glow-color`/`--btn-glow-size`로 제어한다. 버튼 이미지는 `--theme-btn-{role}-image`와
-고정 크기 `--btn-img-w/h`, 그리고 루트의 `data-btn-img|imgonly|hidetext-{role}` 속성으로 표시 방식이 바뀐다
+고정 크기 `--btn-img-w/h`, 그리고 루트의 `data-btn-img|hidetext-{role}` 속성으로 표시 방식이 바뀐다(이미지가 있으면 항상 이미지만 표시)
 (모두 관리자 **테마 관리**에서 지점별 설정 — SPEC §25).
 
 ## 5. 기타 토큰

@@ -25,7 +25,7 @@ import { DebugProvider, useDebug, useSecretTap } from "@/components/service/Debu
 import { DebugOverlay } from "@/components/service/DebugOverlay";
 import { DebugLayoutGuide } from "@/components/service/DebugLayoutGuide";
 import type { Step } from "@/types";
-import { BUTTON_IMAGE_SIZE, wallpaperPageName, type WallpaperPageStep } from "@/constants/images";
+import { buildServiceTheme } from "@/lib/serviceTheme";
 
 // 개발(next dev = localhost) 여부. 빌드 시점에 인라인되는 상수라 SSR/클라이언트가 일치하고,
 // 배포된 키오스크(production 빌드)에서는 항상 false → 손님 화면엔 뒤로가기 버튼이 안 뜬다.
@@ -180,63 +180,22 @@ function ServiceContent() {
     build: process.env.NEXT_PUBLIC_BUILD_DATE,
   };
 
-  // 테마관리에서 설정한 배경화면/글자색을 서비스 화면 전체에 적용 (어드민 화면에는 미적용).
-  // 글자색은 --theme-text 변수로 내려 globals.css의 .service-theme 규칙이 본문 흰 텍스트를 치환한다.
-  // 배경화면 이미지는 첫 화면(start)과 나머지 단계에 각각 따로 설정한다(관리자 > 테마 관리).
-  // 나머지 단계는 CSS 캐스케이드처럼 "화면별 이미지 → 공통(나머지 화면) 이미지 → 배경 단색" 순으로 적용.
-  const isFirstPage = currentStep === "start";
-  // 화면 방향에 맞는 배경화면 선택. 해당 방향 이미지가 없으면 반대 방향 이미지로 폴백(하위호환).
-  const pickWallpaper = (ls: string | null | undefined, pt: string | null | undefined) =>
-    (isPortrait ? (pt ?? ls) : (ls ?? pt)) ?? null;
-  const pageStep = currentStep as WallpaperPageStep;
-  const activeWallpaper = isFirstPage
-    ? pickWallpaper(wallpaperUrl, wallpaperPortraitUrl)
-    : pickWallpaper(pageWallpaperUrls[wallpaperPageName(pageStep, false)], pageWallpaperUrls[wallpaperPageName(pageStep, true)])
-      ?? pickWallpaper(wallpaperSubUrl, wallpaperSubPortraitUrl);
-  // 버튼 이미지가 있는 버튼은 고정 크기 + (옵션) 이미지만 표시 / 텍스트 숨김.
-  // 루트의 data-* 속성으로 globals.css 규칙을 켠다(버튼을 렌더하는 각 Section은 몰라도 된다).
-  // 화면 방향에 맞는 버튼 이미지(가로/세로용), 한쪽만 있으면 그 이미지를 양쪽에 쓴다(배경화면과 같은 규칙).
-  const buttonImageUrls = {
-    capture: pickWallpaper(buttonImageSlots.capture.landscape, buttonImageSlots.capture.portrait),
-    next: pickWallpaper(buttonImageSlots.next.landscape, buttonImageSlots.next.portrait),
-    payment: pickWallpaper(buttonImageSlots.payment.landscape, buttonImageSlots.payment.portrait),
-  };
-  const buttonDataAttrs: Record<string, string> = {};
-  for (const role of ["capture", "next", "payment"] as const) {
-    if (!buttonImageUrls[role]) continue;
-    buttonDataAttrs[`data-btn-img-${role}`] = "";
-    if (config.btnImageOptions[role].imageOnly) buttonDataAttrs[`data-btn-imgonly-${role}`] = "";
-    if (config.btnImageOptions[role].hideText) buttonDataAttrs[`data-btn-hidetext-${role}`] = "";
-  }
-  const buttonImageSize = isPortrait ? BUTTON_IMAGE_SIZE.portrait : BUTTON_IMAGE_SIZE.landscape;
-  const themeStyle: React.CSSProperties = {
-    ...(config.themeTextColor ? { ["--theme-text"]: config.themeTextColor } : {}),
-    ...(config.themePrimaryColor ? { ["--theme-primary"]: config.themePrimaryColor } : {}),
-    // 대형 강조 버튼(촬영하기·다음·결제하기) 배경 이미지. 버튼별 별도 업로드, 미설정 시
-    // globals.css 폴백으로 기존 단색 유지.
-    ...(buttonImageUrls.capture ? { ["--theme-btn-capture-image"]: `url(${buttonImageUrls.capture})` } : {}),
-    ...(buttonImageUrls.next ? { ["--theme-btn-next-image"]: `url(${buttonImageUrls.next})` } : {}),
-    ...(buttonImageUrls.payment ? { ["--theme-btn-payment-image"]: `url(${buttonImageUrls.payment})` } : {}),
-    ["--btn-img-w"]: `${buttonImageSize.width}px`,
-    ["--btn-img-h"]: `${buttonImageSize.height}px`,
-    // 버튼별 텍스트 색상. 버튼 배경(단색/이미지)에 맞춰 관리자가 지정.
-    ...(config.btnCaptureTextColor ? { ["--theme-btn-capture-text"]: config.btnCaptureTextColor } : {}),
-    ...(config.btnNextTextColor ? { ["--theme-btn-next-text"]: config.btnNextTextColor } : {}),
-    ...(config.btnPaymentTextColor ? { ["--theme-btn-payment-text"]: config.btnPaymentTextColor } : {}),
-    // 버튼 탭 글로우 (--btn-glow-*). 비활성 시 주입 안 함 → globals.css 폴백으로 글로우 없음.
-    ...(config.btnGlowEnabled
-      ? { ["--btn-glow-color"]: config.btnGlowColor, ["--btn-glow-size"]: `${config.btnGlowSize}px` }
-      : {}),
-    backgroundColor: config.themeBgColor,
-    ...(activeWallpaper
-      ? {
-          backgroundImage: `url(${activeWallpaper})`,
-          backgroundSize: "cover",
-          backgroundPosition: "center",
-          backgroundRepeat: "no-repeat",
-        }
-      : {}),
-  } as React.CSSProperties;
+  // 테마관리에서 설정한 배경화면·글자색·버튼 이미지 등을 서비스 화면 전체에 적용 (어드민 화면에는 미적용).
+  // 계산은 관리자 테마 미리보기와 공유하는 buildServiceTheme(src/lib/serviceTheme.ts)이 한다.
+  const { style: themeStyle, dataAttrs: buttonDataAttrs } = buildServiceTheme({
+    step: currentStep,
+    portrait: isPortrait,
+    textColor: config.themeTextColor,
+    primaryColor: config.themePrimaryColor,
+    bgColor: config.themeBgColor,
+    glow: { enabled: config.btnGlowEnabled, color: config.btnGlowColor, size: config.btnGlowSize },
+    buttonTextColors: { capture: config.btnCaptureTextColor, next: config.btnNextTextColor, payment: config.btnPaymentTextColor },
+    buttonOptions: config.btnImageOptions,
+    buttonImages: buttonImageSlots,
+    firstWallpaper: { landscape: wallpaperUrl, portrait: wallpaperPortraitUrl },
+    subWallpaper: { landscape: wallpaperSubUrl, portrait: wallpaperSubPortraitUrl },
+    pageWallpapers: pageWallpaperUrls,
+  });
 
   return (
     <div

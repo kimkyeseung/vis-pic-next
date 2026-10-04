@@ -40,7 +40,6 @@ function OrientationSlot({
   fallbackLabel,
   title,
   textColor,
-  options,
   onUpload,
   onRemove,
   busy,
@@ -53,7 +52,6 @@ function OrientationSlot({
   fallbackLabel: string;
   title: string;
   textColor: string;
-  options: ButtonImageOptions;
   onUpload: (file: File) => void;
   onRemove: () => void;
   busy: boolean;
@@ -70,8 +68,8 @@ function OrientationSlot({
         className={`${previewWidthClass} rounded-lg border border-gray-600 overflow-hidden flex items-center justify-center relative`}
         style={{
           aspectRatio: `${size.width} / ${size.height}`,
-          // 투명 영역 확인용 체크무늬(이미지만 표시일 때)
-          background: shown && options.imageOnly
+          // 버튼 이미지는 항상 이미지만 표시(단색 배경 없음) — 투명 영역 확인용 체크무늬
+          background: shown
             ? "repeating-conic-gradient(#3a3a3a 0% 25%, #2a2a2a 0% 50%) 50% / 16px 16px"
             : "#2a2a2a",
         }}
@@ -165,7 +163,6 @@ export function ButtonThemeRow({
           fallbackLabel="세로용 이미지 사용"
           title={title}
           textColor={textColor}
-          options={options}
           onUpload={onUpload(false)}
           onRemove={onRemove(false)}
           busy={busy.landscape}
@@ -179,7 +176,6 @@ export function ButtonThemeRow({
           fallbackLabel="가로용 이미지 사용"
           title={title}
           textColor={textColor}
-          options={options}
           onUpload={onUpload(true)}
           onRemove={onRemove(true)}
           busy={busy.portrait}
@@ -187,12 +183,6 @@ export function ButtonThemeRow({
       </div>
       {hasAny && (
         <div className="space-y-3 mb-4">
-          <SwitchRow
-            label="이미지만 표시"
-            hint="버튼 단색 배경·그림자·둥근 모서리를 없애 이미지(투명 PNG 포함)만 보이게 합니다."
-            checked={options.imageOnly}
-            onChange={(v) => onOptionChange("imageOnly", v)}
-          />
           <SwitchRow
             label="버튼 텍스트 숨기기"
             hint="이미지에 글자가 이미 들어 있을 때 켜세요."

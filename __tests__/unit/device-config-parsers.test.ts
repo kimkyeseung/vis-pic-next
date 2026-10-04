@@ -158,21 +158,21 @@ describe("parseCameraResolution (카메라 화질 티어)", () => {
 });
 
 describe("parseButtonImageOptions (버튼 이미지 표시 옵션)", () => {
-  it("미설정 시 이미지만 표시는 켬, 텍스트 숨김은 끔", () => {
+  it("미설정 시 텍스트 숨김은 끔", () => {
     const o = parseButtonImageOptions({});
-    expect(o.capture).toEqual({ imageOnly: true, hideText: false });
-    expect(o.next).toEqual({ imageOnly: true, hideText: false });
-    expect(o.payment).toEqual({ imageOnly: true, hideText: false });
+    expect(o.capture).toEqual({ hideText: false });
+    expect(o.next).toEqual({ hideText: false });
+    expect(o.payment).toEqual({ hideText: false });
   });
 
-  it("버튼별 키를 따로 읽는다", () => {
+  it("버튼별 키를 따로 읽고, 예전 '이미지만 표시' 키(THEME_BTN_IMAGE_ONLY_*)는 무시한다", () => {
     const o = parseButtonImageOptions({
       THEME_BTN_IMAGE_ONLY_NEXT: "0",
       THEME_BTN_HIDE_TEXT_PAYMENT: "1",
     });
-    expect(o.capture).toEqual({ imageOnly: true, hideText: false });
-    expect(o.next).toEqual({ imageOnly: false, hideText: false });
-    expect(o.payment).toEqual({ imageOnly: true, hideText: true });
+    expect(o.capture).toEqual({ hideText: false });
+    expect(o.next).toEqual({ hideText: false });
+    expect(o.payment).toEqual({ hideText: true });
   });
 });
 
