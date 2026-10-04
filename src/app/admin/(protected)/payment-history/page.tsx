@@ -26,14 +26,12 @@ const STATUS_LABEL: Record<string, string> = {
   pending: "대기중",
   paid: "결제완료",
   refunded: "환불",
-  failed: "실패",
 };
 
 const STATUS_CLASS: Record<string, string> = {
   pending: "bg-yellow-900/50 text-yellow-300",
   paid: "bg-green-900/50 text-green-300",
   refunded: "bg-blue-900/50 text-blue-300",
-  failed: "bg-red-900/50 text-red-300",
 };
 
 export default function PaymentHistoryPage() {
@@ -41,7 +39,14 @@ export default function PaymentHistoryPage() {
   const [pagination, setPagination] = useState<Pagination>({ total: 0, page: 1, limit: 20, totalPages: 0 });
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState("");
+  // 입력칸 값(deviceInput)은 즉시, 실제 조회 조건(deviceFilter)은 입력이 멈춘 뒤 반영 — 글자마다 요청하지 않게.
+  const [deviceInput, setDeviceInput] = useState("");
   const [deviceFilter, setDeviceFilter] = useState("");
+  const [paidTotal, setPaidTotal] = useState(0);
+  useEffect(() => {
+    const t = setTimeout(() => setDeviceFilter(deviceInput.trim()), 300);
+    return () => clearTimeout(t);
+  }, [deviceInput]);
 
   const fetchPayments = async (page = 1) => {
     setLoading(true);
@@ -55,6 +60,7 @@ export default function PaymentHistoryPage() {
       const data = await res.json();
       setPayments(data.payments || []);
       setPagination(data.pagination);
+      setPaidTotal(data.paidTotal ?? 0);
     } catch (error) {
       console.error("Failed to fetch payments:", error);
     } finally {
@@ -69,15 +75,14 @@ export default function PaymentHistoryPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [statusFilter, deviceFilter]);
 
-  const totalAmount = payments.filter((p) => p.status === "paid").reduce((sum, p) => sum + p.amount, 0);
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h2 className="text-2xl font-bold text-white">결제 내역</h2>
         <div className="text-gray-400 text-sm">
-          조회된 결제완료 합계:{" "}
-          <span className="text-green-400 font-semibold">{totalAmount.toLocaleString()}원</span>
+          조회 조건 전체 결제완료 합계:{" "}
+          <span className="text-green-400 font-semibold">{paidTotal.toLocaleString()}원</span>
         </div>
       </div>
 
@@ -92,13 +97,12 @@ export default function PaymentHistoryPage() {
           <option value="pending">대기중</option>
           <option value="paid">결제완료</option>
           <option value="refunded">환불</option>
-          <option value="failed">실패</option>
         </select>
         <input
           type="text"
-          value={deviceFilter}
-          onChange={(e) => setDeviceFilter(e.target.value)}
-          placeholder="장치 ID 검색"
+          value={deviceInput}
+          onChange={(e) => setDeviceInput(e.target.value)}
+          placeholder="장치 ID·지점명 검색"
           className="px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white text-sm focus:outline-none focus:border-blue-500 w-48"
         />
         <span className="text-gray-500 text-sm self-center">총 {pagination.total}건</span>

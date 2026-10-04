@@ -1,12 +1,13 @@
 "use client";
 
+import { useState } from "react";
 import { useAdminDeviceSettings } from "@/hooks/useAdminDeviceSettings";
 
 const SECTIONS = [
   {
     key: "basic",
     label: "기본 타이머",
-    description: "화면 유휴 시 자동으로 이전 단계로 이동하는 타이머입니다. (프레임·배경·선택·인화배경 단계에 적용)",
+    description: "화면에서 일정 시간 입력이 없으면 기본값을 자동 선택해 다음 단계로 진행합니다. (프레임·배경·사진 선택·인화 배경 단계에 적용, 0이면 비활성)",
     fields: [
       { name: "IDLE_TIMEOUT_SECONDS", label: "유휴 타임아웃 (초)", placeholder: "기본 30" },
     ],
@@ -33,6 +34,21 @@ const FIELD_NAMES = SECTIONS.flatMap((s) => s.fields.map((f) => f.name));
 
 export default function TimerSettingPage() {
   const { selectedDevice, settings, update, save, loading, saving, message } = useAdminDeviceSettings();
+  const [validationError, setValidationError] = useState("");
+
+  // 빈 값은 기본값 사용. 그 외엔 0 이상의 정수만 허용(0 = 비활성).
+  const handleSave = () => {
+    const invalid = SECTIONS.flatMap((s) => s.fields).filter((f) => {
+      const raw = (settings[f.name] ?? "").trim();
+      return raw !== "" && !(Number.isInteger(Number(raw)) && Number(raw) >= 0);
+    });
+    if (invalid.length > 0) {
+      setValidationError(`0 이상의 정수만 입력할 수 있습니다: ${invalid.map((f) => f.label).join(", ")}`);
+      return;
+    }
+    setValidationError("");
+    save(FIELD_NAMES);
+  };
 
   if (loading) return <div className="text-gray-400">로딩중...</div>;
   if (!selectedDevice) return <div className="p-8 bg-gray-800 rounded-xl text-center text-gray-400">상단에서 지점을 선택하세요.</div>;
@@ -73,6 +89,10 @@ export default function TimerSettingPage() {
         </div>
       ))}
 
+      {validationError && (
+        <div className="p-4 rounded-lg bg-red-900/50 border border-red-500 text-red-300">{validationError}</div>
+      )}
+
       {message && (
         <div className={`p-4 rounded-lg ${message.includes("실패") ? "bg-red-900/50 border border-red-500 text-red-300" : "bg-green-900/50 border border-green-500 text-green-300"}`}>
           {message}
@@ -81,7 +101,7 @@ export default function TimerSettingPage() {
 
       <div className="sticky bottom-0 py-4 bg-[#2a2a2a]">
         <button
-          onClick={() => save(FIELD_NAMES)}
+          onClick={handleSave}
           disabled={saving}
           className="px-8 py-3 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition-colors disabled:opacity-50"
         >

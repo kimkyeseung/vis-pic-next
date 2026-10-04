@@ -94,8 +94,10 @@ export async function POST(
     }
 
     // 설정을 병렬로 upsert (순차 처리 시 원격 DB 왕복이 개수만큼 누적되어 느림)
+    // 값이 null이면 이 지점의 오버라이드를 지워 전역 설정(없으면 코드 기본값)을 따르게 한다(전역 POST와 같은 규칙).
     await Promise.all(
       Object.entries(body).map(([name, value]) => {
+        if (value === null) return prisma.deviceSetting.deleteMany({ where: { deviceId, name } });
         if (typeof value !== "string") return null;
         return prisma.deviceSetting.upsert({
           where: { deviceId_name: { deviceId, name } },

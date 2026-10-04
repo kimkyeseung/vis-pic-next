@@ -22,7 +22,7 @@ export function useImageEditForm(image: ImageBase, onSaved: () => void) {
   const [deleting, setDeleting] = useState(false);
 
   const handleDelete = async () => {
-    if (!confirm("이 이미지를 삭제하시겠습니까? 되돌릴 수 없습니다.")) return;
+    if (!confirm("이 이미지를 삭제하시겠습니까? 이 이미지를 노출 중인 모든 지점에서 함께 빠지며 되돌릴 수 없습니다.")) return;
     setDeleting(true);
     try {
       const res = await fetch(`/api/admin/images/${image.id}/`, { method: "DELETE" });

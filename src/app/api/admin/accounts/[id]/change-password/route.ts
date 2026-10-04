@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/db";
 import { requireAdmin } from "@/lib/adminAuth";
+import { validateAdminPassword } from "@/lib/accountRules";
 import bcrypt from "bcryptjs";
 
 export async function POST(
@@ -19,8 +20,9 @@ export async function POST(
   try {
     const { password } = await request.json();
 
-    if (!password) {
-      return NextResponse.json({ error: "새 비밀번호를 입력해주세요." }, { status: 400 });
+    const invalid = validateAdminPassword(password);
+    if (invalid) {
+      return NextResponse.json({ error: invalid }, { status: 400 });
     }
 
     const account = await prisma.adminAccount.findUnique({ where: { id: accountId } });

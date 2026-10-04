@@ -42,9 +42,13 @@ export default function DevicesPage() {
       if (res.ok) {
         setDevices(devices.filter((d) => d.id !== id));
         refreshDevices();
+      } else {
+        const data = await res.json().catch(() => ({}));
+        alert(data.error || "삭제에 실패했습니다.");
       }
     } catch (error) {
       console.error("Failed to delete device:", error);
+      alert("서버 연결에 실패했습니다.");
     }
   };
 
@@ -179,6 +183,10 @@ export default function DevicesPage() {
             <h3 className="text-lg font-bold text-white mb-4">
               장치 복제: {cloneTarget.name}
             </h3>
+            <p className="text-gray-400 text-xs mb-4 -mt-2">
+              결제·촬영·타이머·인화·테마 색상 등 <span className="text-gray-200">지점 설정값</span>만 복사됩니다.
+              노출 배경·프레임·스티커, 테마 이미지(배경화면·로고·버튼), 실행 비밀번호는 복사되지 않으니 복제 후 따로 지정하세요.
+            </p>
             <div className="space-y-4">
               <div>
                 <label className="block text-gray-400 text-sm mb-1">새 장치 ID</label>

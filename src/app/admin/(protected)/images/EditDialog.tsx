@@ -172,15 +172,14 @@ export default function EditDialog({
 
         <div className="flex items-center justify-between gap-2 border-t border-gray-700 p-4">
           <div>
-            {isFrame && (
-              <button
-                onClick={form.handleDelete}
-                disabled={form.saving || form.deleting}
-                className="rounded-lg bg-red-700/80 px-4 py-2 text-white hover:bg-red-600 disabled:opacity-50"
-              >
-                {form.deleting ? "삭제중…" : "이미지 삭제"}
-              </button>
-            )}
+            {/* 배경·프레임·스티커 모두 여기서만 삭제할 수 있다(노출 목록 화면엔 삭제 버튼이 없다). */}
+            <button
+              onClick={form.handleDelete}
+              disabled={form.saving || form.deleting}
+              className="rounded-lg bg-red-700/80 px-4 py-2 text-white hover:bg-red-600 disabled:opacity-50"
+            >
+              {form.deleting ? "삭제중…" : "이미지 삭제"}
+            </button>
           </div>
           <div className="flex gap-2">
             <button

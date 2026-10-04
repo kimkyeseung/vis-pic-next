@@ -62,6 +62,9 @@ export async function PUT(
     if (invalid) {
       return NextResponse.json({ error: invalid }, { status: 400 });
     }
+    if (isActive !== undefined && typeof isActive !== "boolean") {
+      return NextResponse.json({ error: "isActive must be boolean" }, { status: 400 });
+    }
 
     // password 처리:
     //  - 문자열(비어있지 않음) → 새 비밀번호로 해시 저장
@@ -108,18 +111,26 @@ export async function DELETE(
       return NextResponse.json({ error: "Invalid ID" }, { status: 400 });
     }
 
-    // Delete related settings first
-    await prisma.deviceSetting.deleteMany({
-      where: {
-        device: {
-          id: deviceId,
-        },
-      },
-    });
+    const device = await prisma.device.findUnique({ where: { id: deviceId }, select: { deviceId: true } });
+    if (!device) {
+      return NextResponse.json({ error: "Device not found" }, { status: 404 });
+    }
+    // 결제 내역은 지점을 참조(FK)하고 회계 기록이라 지우지 않는다 — 내역이 있으면 삭제를 거부하고 비활성화를 안내한다.
+    // (예전엔 설정을 먼저 지운 뒤 지점 삭제가 FK로 실패해 설정만 사라지고 500이 났다.)
+    const paymentCount = await prisma.payappPayment.count({ where: { deviceId: device.deviceId } });
+    if (paymentCount > 0) {
+      return NextResponse.json(
+        { error: `결제 내역(${paymentCount}건)이 있는 지점은 삭제할 수 없습니다. 장치 편집에서 '활성'을 꺼 주세요.` },
+        { status: 409 },
+      );
+    }
 
-    await prisma.device.delete({
-      where: { id: deviceId },
-    });
+    // 설정 삭제와 지점 삭제를 한 트랜잭션으로 묶어 중간 실패 시 설정만 사라지지 않게 한다.
+    // (이미지 연결 ImageDevice는 onDelete: Cascade로 함께 정리된다)
+    await prisma.$transaction([
+      prisma.deviceSetting.deleteMany({ where: { deviceId: device.deviceId } }),
+      prisma.device.delete({ where: { id: deviceId } }),
+    ]);
 
     return NextResponse.json({ success: true });
   } catch (error) {

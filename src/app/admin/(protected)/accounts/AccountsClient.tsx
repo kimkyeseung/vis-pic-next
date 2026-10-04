@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { ADMIN_PASSWORD_MIN_LENGTH, validateAdminPassword } from "@/lib/accountRules";
 
 interface Account {
   id: number;
@@ -68,11 +69,32 @@ export function AccountsClient({ currentAdminId }: AccountsClientProps) {
   const handleNameBlur = async (account: Account) => {
     const newName = editingName[account.id] ?? account.name ?? "";
     if (newName === (account.name ?? "")) return;
-    await fetch(`/api/admin/accounts/${account.id}`, {
+    const res = await fetch(`/api/admin/accounts/${account.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ key: "name", value: newName || null }),
     });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      alert(data.error || "이름 저장에 실패했습니다.");
+    }
+    setEditingName((prev) => { const next = { ...prev }; delete next[account.id]; return next; });
+    fetchAccounts();
+  };
+
+  // 계정 활성/비활성 전환 — 비활성 계정은 로그인할 수 없다(자기 계정은 서버가 거부).
+  const handleToggleActive = async (account: Account) => {
+    const next = !account.isActive;
+    if (!next && !confirm(`'${account.username}' 계정을 비활성화하면 로그인할 수 없습니다. 계속할까요?`)) return;
+    const res = await fetch(`/api/admin/accounts/${account.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ key: "isActive", value: next }),
+    });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      alert(data.error || "상태 변경에 실패했습니다.");
+    }
     fetchAccounts();
   };
 
@@ -102,6 +124,8 @@ export function AccountsClient({ currentAdminId }: AccountsClientProps) {
 
   const handleAddSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    const pwInvalid = validateAdminPassword(addForm.password);
+    if (pwInvalid) { setAddError(pwInvalid); return; }
     setAddError("");
     setAddLoading(true);
     try {
@@ -123,6 +147,8 @@ export function AccountsClient({ currentAdminId }: AccountsClientProps) {
   const handlePwSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!pwModal) return;
+    const pwInvalid = validateAdminPassword(pwForm.password);
+    if (pwInvalid) { setPwError(pwInvalid); return; }
     if (pwForm.password !== pwForm.confirm) {
       setPwError("비밀번호가 일치하지 않습니다.");
       return;
@@ -266,14 +292,21 @@ export function AccountsClient({ currentAdminId }: AccountsClientProps) {
                         value={nameVal}
                         onChange={(e) => setEditingName((prev) => ({ ...prev, [account.id]: e.target.value }))}
                         onBlur={() => handleNameBlur(account)}
+                        maxLength={64}
                         className="bg-transparent border-b border-transparent hover:border-gray-500 focus:border-blue-500 text-white text-sm focus:outline-none w-full"
                         placeholder="이름 없음"
                       />
                     </td>
                     <td className="px-4 py-3">
-                      <span className={`text-xs px-2 py-1 rounded-full ${account.isActive ? "bg-green-900 text-green-300" : "bg-red-900 text-red-300"}`}>
+                      <button
+                        type="button"
+                        onClick={() => handleToggleActive(account)}
+                        disabled={isSelf}
+                        title={isSelf ? "자신의 계정은 비활성화할 수 없습니다." : account.isActive ? "클릭하여 비활성화" : "클릭하여 활성화"}
+                        className={`text-xs px-2 py-1 rounded-full disabled:cursor-not-allowed ${account.isActive ? "bg-green-900 text-green-300 hover:bg-green-800" : "bg-red-900 text-red-300 hover:bg-red-800"} disabled:hover:bg-green-900`}
+                      >
                         {account.isActive ? "활성" : "비활성"}
-                      </span>
+                      </button>
                     </td>
                     <td className="px-4 py-3 text-gray-400">
                       {new Date(account.createdAt).toLocaleDateString("ko-KR")}
@@ -346,6 +379,7 @@ export function AccountsClient({ currentAdminId }: AccountsClientProps) {
                   type="text"
                   value={addForm.username}
                   onChange={(e) => setAddForm((f) => ({ ...f, username: e.target.value }))}
+                  maxLength={64}
                   required
                   className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white text-sm focus:outline-none focus:border-blue-500"
                 />
@@ -356,6 +390,8 @@ export function AccountsClient({ currentAdminId }: AccountsClientProps) {
                   type="password"
                   value={addForm.password}
                   onChange={(e) => setAddForm((f) => ({ ...f, password: e.target.value }))}
+                  minLength={ADMIN_PASSWORD_MIN_LENGTH}
+                  placeholder={`${ADMIN_PASSWORD_MIN_LENGTH}자 이상`}
                   required
                   className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white text-sm focus:outline-none focus:border-blue-500"
                 />
@@ -366,6 +402,7 @@ export function AccountsClient({ currentAdminId }: AccountsClientProps) {
                   type="text"
                   value={addForm.name}
                   onChange={(e) => setAddForm((f) => ({ ...f, name: e.target.value }))}
+                  maxLength={64}
                   className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white text-sm focus:outline-none focus:border-blue-500"
                 />
               </div>
@@ -404,6 +441,8 @@ export function AccountsClient({ currentAdminId }: AccountsClientProps) {
                   type="password"
                   value={pwForm.password}
                   onChange={(e) => setPwForm((f) => ({ ...f, password: e.target.value }))}
+                  minLength={ADMIN_PASSWORD_MIN_LENGTH}
+                  placeholder={`${ADMIN_PASSWORD_MIN_LENGTH}자 이상`}
                   required
                   className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white text-sm focus:outline-none focus:border-blue-500"
                 />

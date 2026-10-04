@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/db";
 import { requireAdmin, getAdminId } from "@/lib/adminAuth";
+import { validateAdminName } from "@/lib/accountRules";
 
 export async function PATCH(
   request: NextRequest,
@@ -22,6 +23,19 @@ export async function PATCH(
     if (!["name", "isActive"].includes(key)) {
       return NextResponse.json({ error: "Invalid field" }, { status: 400 });
     }
+    if (key === "isActive") {
+      if (typeof value !== "boolean") {
+        return NextResponse.json({ error: "isActive must be boolean" }, { status: 400 });
+      }
+      // 자기 계정을 비활성화하면 즉시 로그아웃되고 다시 들어올 수 없다.
+      if (value === false && (await getAdminId()) === accountId) {
+        return NextResponse.json({ error: "자신의 계정은 비활성화할 수 없습니다." }, { status: 400 });
+      }
+    }
+    if (key === "name") {
+      const invalid = validateAdminName(value);
+      if (invalid) return NextResponse.json({ error: invalid }, { status: 400 });
+    }
 
     const account = await prisma.adminAccount.findUnique({ where: { id: accountId } });
     if (!account) {
@@ -30,7 +44,7 @@ export async function PATCH(
 
     const updated = await prisma.adminAccount.update({
       where: { id: accountId },
-      data: { [key]: value },
+      data: key === "name" ? { name: typeof value === "string" && value.trim() ? value.trim() : null } : { isActive: value },
       select: { id: true, username: true, name: true, isActive: true, createdAt: true },
     });
 

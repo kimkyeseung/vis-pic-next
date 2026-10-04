@@ -15,6 +15,7 @@ export default function DeviceEditPage({
   const [device, setDevice] = useState<DeviceWithSettings | null>(null);
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
+  const [isActive, setIsActive] = useState(true);
   const [newPassword, setNewPassword] = useState("");
   const [removePassword, setRemovePassword] = useState(false);
   const [error, setError] = useState("");
@@ -31,6 +32,7 @@ export default function DeviceEditPage({
           setDevice(data.device);
           setName(data.device.name);
           setDescription(data.device.description || "");
+          setIsActive(data.device.isActive);
         }
       } catch (error) {
         console.error("Failed to fetch device:", error);
@@ -55,6 +57,7 @@ export default function DeviceEditPage({
         body: JSON.stringify({
           name,
           description,
+          isActive,
           // 비밀번호: 제거 체크 시 null(잠금 해제), 새 값 입력 시 그 값, 둘 다 아니면 미포함(유지).
           ...(removePassword ? { password: null } : newPassword.length > 0 ? { password: newPassword } : {}),
         }),
@@ -132,6 +135,24 @@ export default function DeviceEditPage({
               className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-blue-500"
             />
           </div>
+        </div>
+
+        <div className="p-6 bg-gray-800 rounded-xl space-y-3">
+          <h3 className="text-lg font-semibold text-white border-b border-gray-700 pb-3">
+            운영 상태
+          </h3>
+          <label className="flex items-center gap-3 cursor-pointer text-gray-300">
+            <input
+              type="checkbox"
+              checked={isActive}
+              onChange={(e) => setIsActive(e.target.checked)}
+              className="h-4 w-4 accent-blue-500"
+            />
+            <span>활성 (키오스크 시작 화면의 지점 목록에 표시)</span>
+          </label>
+          <p className="text-sm text-gray-500">
+            끄면 키오스크 시작 화면에서 이 지점을 선택할 수 없습니다. 설정·이미지는 그대로 유지됩니다.
+          </p>
         </div>
 
         <div className="p-6 bg-gray-800 rounded-xl space-y-4">

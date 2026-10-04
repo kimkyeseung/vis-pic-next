@@ -402,7 +402,7 @@ useSceneSyncReceiver → BroadcastChannel.onmessage(state)   ※ 레거시
 | 메서드 | 경로 | 설명 |
 |--------|------|------|
 | GET | `/api/device/[deviceId]/settings` | 디바이스 설정 조회 |
-| POST | `/api/device/[deviceId]/settings` | 디바이스 설정 업데이트 (지점별 오버라이드) |
+| POST | `/api/device/[deviceId]/settings` | 디바이스 설정 업데이트 (지점별 오버라이드). 값 `null`이면 그 키의 지점 오버라이드를 삭제해 전역 설정(없으면 코드 기본값)을 따름 — 결제·촬영·타이머 설정 화면에서 칸을 비우고 저장할 때 사용 |
 | GET · PUT | `/api/device/[deviceId]/backgrounds` | 이 지점 선택 배경(순서대로, 최대 6) 조회·교체 (`{ imageIds }`) — 뱅크 모델(§5 Step 4) |
 | GET · PUT | `/api/device/[deviceId]/frames` | 이 지점 선택 프레임(순서대로) 조회·교체 — 뱅크 모델 |
 | GET · PUT | `/api/device/[deviceId]/stickers` | 이 지점 선택 스티커(순서대로, 최대 20) 조회·교체 — 뱅크 모델(§14) |
@@ -431,17 +431,17 @@ useSceneSyncReceiver → BroadcastChannel.onmessage(state)   ※ 레거시
 | POST | `/api/admin/login` | 관리자 로그인 (iron-session 봉인 세션 쿠키 발급, §23) |
 | POST | `/api/admin/logout` | 관리자 로그아웃 (세션 쿠키 삭제) |
 | GET | `/api/admin/devices` | 디바이스 목록 |
-| POST | `/api/admin/devices` | 디바이스 생성 |
+| POST | `/api/admin/devices` | 디바이스 생성 — ID는 영문·숫자·`-`·`_` 1~64자, 이름 128자·설명 255자 이하 (`validateDeviceInput`) |
 | GET | `/api/admin/devices/[id]` | 디바이스 상세 |
-| POST | `/api/admin/devices/[id]` | 디바이스 수정 |
-| POST | `/api/admin/devices/clone` | 디바이스 설정 복제 |
+| PUT · DELETE | `/api/admin/devices/[id]` | 디바이스 수정(이름·설명·활성·실행 비밀번호) / 삭제 — 결제 내역이 있는 지점은 삭제 거부(409, 비활성화 안내), 설정 삭제와 지점 삭제는 한 트랜잭션 |
+| POST | `/api/admin/devices/clone` | 디바이스 설정 복제 (지점 설정값만 — 노출 이미지·테마 이미지·비밀번호는 복사 안 함). ID 규칙은 생성과 동일 |
 | GET | `/api/admin/image-types` | 이미지 타입 목록 (기본 3종 upsert 보장, §23) |
 | GET | `/api/admin/accounts` | 관리자 계정 목록 |
-| POST | `/api/admin/accounts` | 관리자 계정 생성 |
-| PATCH | `/api/admin/accounts/[id]` | 계정 수정 (활성 여부 등) |
+| POST | `/api/admin/accounts` | 관리자 계정 생성 (아이디는 앞뒤 공백 제거 후 중복 검사, 비밀번호 8자 이상 — `src/lib/accountRules.ts`) |
+| PATCH | `/api/admin/accounts/[id]` | 계정 수정 (`name` 또는 `isActive`(boolean)). 자기 계정 비활성화는 거부 |
 | DELETE | `/api/admin/accounts/[id]` | 계정 삭제 |
 | POST | `/api/admin/accounts/[id]/change-password` | 계정 비밀번호 변경 |
-| GET | `/api/admin/payments` | 결제 내역 조회 (페이지네이션, `status`·`deviceId` 필터) |
+| GET | `/api/admin/payments` | 결제 내역 조회 (페이지네이션, `status` 필터, `deviceId`=장치 ID·지점명 부분 일치). 응답 `paidTotal`=조회 조건 전체의 결제완료 합계 |
 
 ### 결제
 
@@ -1397,9 +1397,9 @@ npm run tauri:build
 | 메뉴 | 경로 | 주요 기능 |
 |------|------|---------|
 | 대시보드 | `/admin` | 요약 화면 |
-| 계정 관리 | `/admin/accounts` | 관리자 계정 추가·삭제·비밀번호 변경 (`AdminAccount` 테이블) |
-| 디바이스 관리 | `/admin/devices`, `/devices/new`, `/devices/[id]` | 생성, 편집, 복제 (활성/비활성 상태 배지 UI는 제거됨 — 필요 시 DB 직접 수정) |
-| 이미지 관리 | `/admin/images`, `/images/upload` | 배경/프레임/스티커 탭별 조회·삭제·업로드(프레임·스티커는 PNG·JPG만), MP4/WebM 영상 미리보기. 배경·프레임·스티커는 지점별 뱅크 UI로 노출 선택 |
+| 계정 관리 | `/admin/accounts` | 관리자 계정 추가·삭제·비밀번호 변경(8자 이상), 활성/비활성 전환(상태 배지 클릭, 자기 계정 제외 — 비활성 계정은 로그인 불가) (`AdminAccount` 테이블) |
+| 디바이스 관리 | `/admin/devices`, `/devices/new`, `/devices/[id]` | 생성, 편집(운영 상태 활성/비활성 포함 — 비활성 지점은 키오스크 시작 화면 목록·진입 검증에서 제외), 복제, 삭제(결제 내역 있으면 불가) |
+| 이미지 관리 | `/admin/images`, `/images/upload` | 배경/프레임/스티커 탭 — 모두 지점별 노출 목록(뱅크) UI로 노출 선택·순서 관리. 편집창에서 이름·타입·포컬(프레임)·이펙트(배경, 영상 업로드 후 세부 설정 표시)·삭제. 업로드(프레임·스티커는 PNG·JPG만)는 뱅크에만 추가되고 지점 노출은 목록에서 지정 |
 | 테마 관리 | `/admin/theme-setting` | 지점별 배경화면(첫 화면·공통·**화면별**)·로고·**촬영 안내 오버레이**·**버튼 이미지**(고정 크기 안내·이미지만 표시·텍스트 숨김), 글자색·강조(primary)색, **버튼 탭 글로우**(on/off·색·세기) 설정 (§25) |
 | 인화 설정 | `/admin/print-setting` | 인화지 크기, 모드별 사진 크기·간격·4방향 여백, 배경 이미지, 프린터 선택. 설정값 실시간 미리보기 + 용지 초과 경고 |
 | 촬영 설정 | `/admin/capture-setting` | 카운트다운, 촬영 횟수, 배경 제거 모드(AI/크로마키/크로마키 OBS 방식/off), 크로마키 색상(컬러피커), AI 배경제거 세부 설정 9종(경계 침식·부드러움·블러·두께·떨림 억제, 손 구제, 인물 추적 크롭·여유, 처리 해상도) — 각 항목에 추천값 표시, 카메라 실시간 미리보기 (§12 참고) |

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { HexColorPicker } from "react-colorful";
+import { isValidHexColor } from "./useThemeSettings";
 
 /** 색상 선택 행 (스와치 + 팝오버 피커 + hex 입력). 테마 관리 페이지 전역에서 재사용. */
 export function ColorRow({
@@ -14,6 +15,7 @@ export function ColorRow({
   children?: React.ReactNode;
 }) {
   const [open, setOpen] = useState(false);
+  const invalid = !isValidHexColor(color);
   return (
     <div className="flex items-center gap-4">
       <div className="relative">
@@ -36,7 +38,9 @@ export function ColorRow({
         type="text"
         value={color}
         onChange={(e) => onChange(e.target.value)}
-        className="px-3 py-2 w-32 bg-gray-700 border border-gray-600 rounded-lg text-white text-sm font-mono focus:outline-none focus:border-blue-500"
+        aria-invalid={invalid}
+        title={invalid ? "#RRGGBB 형식으로 입력하세요" : undefined}
+        className={`px-3 py-2 w-32 bg-gray-700 border rounded-lg text-white text-sm font-mono focus:outline-none ${invalid ? "border-red-500 focus:border-red-500" : "border-gray-600 focus:border-blue-500"}`}
         placeholder="#000000"
       />
       {children}

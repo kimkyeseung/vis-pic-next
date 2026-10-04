@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   WALLPAPER_NAME_LANDSCAPE,
   WALLPAPER_NAME_PORTRAIT,
@@ -17,6 +17,9 @@ import { BUTTON_ROLES, buttonImageOptionKeys, parseButtonImageOptions, parseIntS
 import type { ButtonImageOptions, ButtonRole } from "@/types";
 import type { Asset } from "./AssetUploader";
 
+/** 색상 칸 형식 — 피커가 내는 #rrggbb와 줄임형 #rgb만 허용(그 외 문자열은 서비스 CSS에서 무시돼 색이 안 바뀐다). */
+export const isValidHexColor = (v: string) => /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(v.trim());
+
 const WALLPAPER_TYPE = 5;
 const LOGO_TYPE = 6;
 const BUTTON_TYPE = 7;
@@ -31,6 +34,19 @@ const NAMED_WALLPAPER_SLOTS = [
  * 업로드/제거를 전부 담당한다. JSX는 이 훅이 반환하는 값을 `AssetUploader`/`ButtonThemeRow`/
  * `ColorRow`에 그대로 꽂기만 하면 된다.
  */
+// 화면 초기값(=서비스 기본값, useDeviceSetup DEFAULT_CONFIG와 동일). 저장된 적 없는 키의 변경 판단 기준.
+const THEME_DEFAULTS: Record<string, string> = {
+  THEME_TEXT_COLOR: "#ffffff",
+  THEME_PRIMARY_COLOR: "#6c6fb4",
+  THEME_BG_COLOR: "#2a2a2a",
+  THEME_BTN_GLOW_ENABLED: "1",
+  THEME_BTN_GLOW_COLOR: "#6c6fb4",
+  THEME_BTN_GLOW_SIZE: "28",
+  THEME_BTN_TEXT_COLOR_CAPTURE: "#2a2a2a",
+  THEME_BTN_TEXT_COLOR_NEXT: "#ffffff",
+  THEME_BTN_TEXT_COLOR_PAYMENT: "#ffffff",
+};
+
 export function useThemeSettings(deviceId: string | null) {
   const [textColor, setTextColor] = useState("#ffffff");
   const [primaryColor, setPrimaryColor] = useState("#6c6fb4");
@@ -64,6 +80,8 @@ export function useThemeSettings(deviceId: string | null) {
   const [nextButtonImageBusy, setNextButtonImageBusy] = useState(false);
   const [paymentButtonImageBusy, setPaymentButtonImageBusy] = useState(false);
   const [message, setMessage] = useState("");
+  // 로드 시점의 실효값(전역←지점). 저장 시 바뀐 키만 지점에 저장하는 기준 — 다른 설정 화면과 같은 규칙.
+  const baselineRef = useRef<Record<string, string>>({});
 
   const flash = (msg: string) => {
     setMessage(msg);
@@ -117,6 +135,7 @@ export function useThemeSettings(deviceId: string | null) {
         ]);
         if (cancelled) return;
         const s = { ...(g.settings || {}), ...(d.settings || {}) };
+        baselineRef.current = s;
         setTextColor(s.THEME_TEXT_COLOR || "#ffffff");
         setPrimaryColor(s.THEME_PRIMARY_COLOR || "#6c6fb4");
         setBgColor(s.THEME_BG_COLOR || "#2a2a2a");
@@ -147,29 +166,54 @@ export function useThemeSettings(deviceId: string | null) {
 
   const handleSaveColors = async () => {
     if (!deviceId) { flash("먼저 상단에서 지점을 선택하세요."); return; }
+    const colors: Array<[string, string]> = [
+      ["글자 색상", textColor], ["강조 색상", primaryColor], ["배경 단색", bgColor], ["글로우 색상", glowColor],
+      ["촬영하기 글자색", captureTextColor], ["다음으로 글자색", nextTextColor], ["결제하기 글자색", paymentTextColor],
+    ];
+    const badColors = colors.filter(([, v]) => !isValidHexColor(v)).map(([label]) => label);
+    if (badColors.length > 0) {
+      flash(`저장 실패: 색상 코드는 #RRGGBB 형식이어야 합니다 (${badColors.join(", ")})`);
+      return;
+    }
+    const intended: Record<string, string> = {
+      THEME_TEXT_COLOR: textColor,
+      THEME_PRIMARY_COLOR: primaryColor,
+      THEME_BG_COLOR: bgColor,
+      THEME_BTN_GLOW_ENABLED: glowEnabled ? "1" : "0",
+      THEME_BTN_GLOW_COLOR: glowColor,
+      THEME_BTN_GLOW_SIZE: String(glowSize),
+      THEME_BTN_TEXT_COLOR_CAPTURE: captureTextColor,
+      THEME_BTN_TEXT_COLOR_NEXT: nextTextColor,
+      THEME_BTN_TEXT_COLOR_PAYMENT: paymentTextColor,
+      ...Object.fromEntries(BUTTON_ROLES.flatMap((role) => {
+        const k = buttonImageOptionKeys(role);
+        const o = buttonImageOptions[role];
+        return [[k.imageOnly, o.imageOnly ? "1" : "0"], [k.hideText, o.hideText ? "1" : "0"]];
+      })),
+    };
+    // 바뀐 키만 지점에 저장한다 — 매번 전부 저장하면 건드리지 않은 값까지 지점 설정으로 굳어 전역 기본값 변경이 안 따라온다.
+    // 기준값이 없는(저장된 적 없는) 키는 화면에 보인 기본값과 같아도 서비스 기본값과 같으므로 건너뛴다.
+    const DEFAULTS = parseButtonImageOptions({});
+    const defaultFor = (k: string): string | undefined => {
+      const role = BUTTON_ROLES.find((r) => buttonImageOptionKeys(r).imageOnly === k || buttonImageOptionKeys(r).hideText === k);
+      if (role) return buttonImageOptionKeys(role).imageOnly === k ? (DEFAULTS[role].imageOnly ? "1" : "0") : (DEFAULTS[role].hideText ? "1" : "0");
+      return THEME_DEFAULTS[k];
+    };
+    const payload: Record<string, string> = {};
+    for (const [k, v] of Object.entries(intended)) {
+      const base = baselineRef.current[k] ?? defaultFor(k);
+      if (v !== base) payload[k] = v;
+    }
+    if (Object.keys(payload).length === 0) { flash("변경사항이 없습니다."); return; }
     setSaving(true);
     setMessage("");
     try {
       const res = await fetch(`/api/device/${deviceId}/settings/`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          THEME_TEXT_COLOR: textColor,
-          THEME_PRIMARY_COLOR: primaryColor,
-          THEME_BG_COLOR: bgColor,
-          THEME_BTN_GLOW_ENABLED: glowEnabled ? "1" : "0",
-          THEME_BTN_GLOW_COLOR: glowColor,
-          THEME_BTN_GLOW_SIZE: String(glowSize),
-          THEME_BTN_TEXT_COLOR_CAPTURE: captureTextColor,
-          THEME_BTN_TEXT_COLOR_NEXT: nextTextColor,
-          THEME_BTN_TEXT_COLOR_PAYMENT: paymentTextColor,
-          ...Object.fromEntries(BUTTON_ROLES.flatMap((role) => {
-            const k = buttonImageOptionKeys(role);
-            const o = buttonImageOptions[role];
-            return [[k.imageOnly, o.imageOnly ? "1" : "0"], [k.hideText, o.hideText ? "1" : "0"]];
-          })),
-        }),
+        body: JSON.stringify(payload),
       });
+      if (res.ok) Object.assign(baselineRef.current, payload);
       flash(res.ok ? "설정이 저장되었습니다." : "저장 실패");
     } catch {
       flash("서버 연결 실패");
