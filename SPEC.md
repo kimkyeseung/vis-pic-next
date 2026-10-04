@@ -895,8 +895,10 @@ PRINTER_NAME             # 출력 프린터 이름 (비우면 기본 프린터)
 - `WIDTH`/`HEIGHT` 미설정 시 4:3 비율 자동 배치 폴백
 - 슬롯이 인화지를 벗어나면 `overflow` 플래그 → 미리보기에 빨간 슬롯 + 경고 배너 표시
 - **사진 배치는 cover(슬롯 비율에 맞춰 center-crop)** — 사진의 보이는 비율 = 슬롯 비율(`MODE_{ID}_WIDTH:HEIGHT`). 슬롯이 4:3이 아니면 4:3 카메라 사진이 상하/좌우로 잘린다
-- **프레임 업로드 시 자동 가로화**: 세로(높이>너비, EXIF 회전 반영) 프레임 이미지는 업로드 API가
-  시계방향 90° 회전해 가로로 저장한다(`src/lib/frameOrientation.ts`, PNG는 PNG·JPG는 quality 95).
+- **프레임 업로드 시 자동 가로화**: 세로(높이>너비, EXIF 회전 반영) 프레임 이미지는 시계방향 90° 회전해
+  가로로 저장한다(`src/lib/frameOrientation.ts`, PNG는 PNG·JPG는 quality 95). 두 업로드 경로 모두 적용 —
+  서버 경유 `POST /api/admin/images/upload`는 저장 전에, 브라우저 직접 업로드(presign → Storage PUT →
+  `POST /api/admin/images/register`)는 register 단계에서 Storage 파일을 내려받아 회전 후 같은 파일명으로 덮어쓴다.
   이미 올라가 있는 세로 프레임은 재업로드해야 적용된다
 - **프레임(인쇄 배경) 이미지 회전**: 프레임 디자인은 가로 기준이며, 세로 용지 모드(`orientation:"portrait"` — 2x1·2x4·4x1)에서는 합성·미리보기(`FramedPreview`) 모두 프레임 이미지를 **90° 회전**해 용지 방향에 맞춘다(슬롯 좌표는 이미 용지 방향 기준이라 프레임 이미지만 회전)
 

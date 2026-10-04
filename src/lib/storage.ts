@@ -47,6 +47,19 @@ export async function uploadImage(
   return { filename };
 }
 
+/** Supabase Storage에서 파일을 내려받는다(업로드 후 서버 가공용). 미설정·실패 시 throw. */
+export async function downloadImage(filename: string): Promise<Buffer> {
+  const supabase = getSupabaseClient();
+  if (!supabase) {
+    throw new Error("Supabase Storage is not configured");
+  }
+  const { data, error } = await supabase.storage.from(BUCKET_NAME).download(filename);
+  if (error || !data) {
+    throw new Error(`Supabase Storage download failed: ${error?.message ?? "no data"}`);
+  }
+  return Buffer.from(await data.arrayBuffer());
+}
+
 /**
  * Delete an image from Supabase Storage (best-effort).
  */

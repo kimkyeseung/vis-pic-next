@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/db";
 import { requireAdmin } from "@/lib/adminAuth";
-import { getImageBaseUrl } from "@/lib/storage";
+import { getImageBaseUrl, downloadImage, uploadImage } from "@/lib/storage";
+import { FRAME_IMAGE_TYPE } from "@/constants/images";
+import { normalizeFrameToLandscape } from "@/lib/frameOrientation";
 import { defaultActiveForNewImage } from "@/lib/imageActive";
 
 export async function POST(request: NextRequest) {
@@ -22,6 +24,14 @@ export async function POST(request: NextRequest) {
 
     const truncatedName = String(name).slice(0, 32);
     const resolvedType = parseInt(imageType) || 1;
+
+    // 프레임은 가로 디자인 전제 — 브라우저가 스토리지에 직접 올린(presign) 파일을 내려받아
+    // 세로면 시계방향 90° 회전 후 같은 파일명으로 덮어쓴다(upload 라우트와 동일 규칙).
+    if (resolvedType === FRAME_IMAGE_TYPE) {
+      const ext = String(filename).split(".").pop()?.toLowerCase() ?? "";
+      const { buffer, rotated } = await normalizeFrameToLandscape(await downloadImage(filename), ext);
+      if (rotated) await uploadImage(buffer, filename);
+    }
 
     const image = await prisma.image.create({
       data: {
