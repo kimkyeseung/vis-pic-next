@@ -34,28 +34,10 @@ export function StartSection({
           이 스테이지는 transform: scale()로 축소되는데 vw는 그 transform 영향을 안 받고 실제
           브라우저 뷰포트 기준으로 계산돼, 실기기 해상도가 디자인 캔버스와 정확히 안 맞으면
           (거의 항상 그렇다) 의도한 비율보다 좁아져 안내 문구가 줄바꿈되는 문제가 있었다. */}
-      {/* 언어 버튼이 있으면 **버튼 줄이 화면 정가운데**에 오도록, 버튼 줄만 흐름에 두고(section이 가운데 정렬)
-          안내 문구는 그 위(bottom-full), 로고는 그 아래(top-full)에 절대 위치로 붙인다 — 예전엔 문구+버튼+로고
-          덩어리 전체를 가운데에 맞춰 버튼 줄이 가로 화면 8px 위·세로 화면 15px 아래로 어긋났다.
-          언어 버튼이 없으면(결제 사용 지점) 문구+로고를 한 덩어리로 가운데에 둔다. 간격(mt/mb)은 두 경우 같다. */}
+      {/* 언어 버튼이 있으면 **버튼 줄이 화면 정가운데**에 오도록 버튼 줄만 흐름에 두고(section이 가운데 정렬),
+          로고는 그 아래(top-full)에 절대 위치로 붙인다. 언어 버튼이 없으면(결제 사용 지점) 로고만 가운데에 둔다.
+          "화면을 터치해주세요" 안내는 화면 하단(bottom-16)에 따로 둔다 — 아래 블록 참고. */}
       <div className="main-container relative flex flex-col items-center max-w-[1766px] portrait:max-w-[994px]">
-        {/* 버튼 대신 깜빡이는 안내 문구 — 화면 아무 곳이나 터치하면 시작(section onClick).
-            절대 위치일 때 폭이 버튼 줄 폭으로 줄어 줄바꿈되지 않도록 예전 max-w와 같은 고정 폭 박스 안에서 가운데 정렬. */}
-        <div
-          className={showLanguage
-            ? "absolute bottom-full left-1/2 -translate-x-1/2 mb-12 portrait:mb-8 w-[1728px] portrait:w-[972px] flex justify-center"
-            : "flex justify-center max-w-[1728px] portrait:max-w-[972px]"}
-        >
-          <div
-            className="flex items-center gap-4 text-white text-6xl portrait:text-7xl font-extrabold animate-soft-blink select-none text-center"
-            style={{ textShadow: "0 2px 15px rgba(0,0,0,0.5)" }}
-          >
-            {/* whitespace-pre-line: 번역문에 \n이 있으면(현재 일본어만) 그 지점에서 줄바꿈,
-                없으면 기존처럼 한 줄. leading-none으로 2줄일 때도 줄간격이 벌어지지 않게 한다. */}
-            <span className="whitespace-pre-line leading-none">{t("start.touch")}</span>
-          </div>
-        </div>
-
         {/* 언어 선택 — 결제 화면으로 이동. 결제 비활성 시에만 여기 표시.
             이 화면은 배경화면(밝은 이미지일 수 있음) 위에 얹히므로 결제 화면의 반투명 스타일
             (bg-white/10 · text-white/60)을 쓰지 않는다. 비선택 버튼도 불투명 단색 배경 + 인라인
@@ -83,16 +65,26 @@ export function StartSection({
         )}
         <img
           src="/static/viswave_logo.png"
-          className={`opacity-80 max-w-[50vw] mt-24 portrait:mt-12 ${showLanguage ? "absolute top-full left-1/2 -translate-x-1/2" : ""}`}
+          className={`opacity-80 max-w-[50vw] ${showLanguage ? "absolute top-full left-1/2 -translate-x-1/2 mt-24 portrait:mt-12" : ""}`}
           style={{ width: "200px" }}
           alt="Viswave"
           onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
         />
       </div>
 
-      <div className="absolute bottom-16 text-center text-gray-500 text-xl animate-fadeInUp" style={{ animationDelay: "1s" }}>
-        <p className="mb-2">{t("start.hint")}</p>
-        <p className="animate-blink">{t("start.waiting")}</p>
+      {/* 깜빡이는 터치 안내 — 화면 하단 가운데. 예전 "화면 아무 곳이나 터치하여 시작하세요" 자리(bottom-16)에서
+          화면 높이의 7%만큼 올린 위치(bottom: 4rem + 7%, %는 화면 높이 기준이라 가로·세로 모두 같은 비율). 화면 아무 곳이나
+          터치하면 시작(section onClick). 폭은 vw가 아닌 스테이지 기준 고정 px로 제한한다(스테이지가 transform: scale로
+          축소돼 vw는 실제 뷰포트 기준이라 의도보다 좁아져 줄바꿈될 수 있다). */}
+      <div className="absolute bottom-[calc(4rem+7%)] left-1/2 -translate-x-1/2 w-[1728px] portrait:w-[972px] flex justify-center pointer-events-none">
+        <div
+          className="text-white text-6xl portrait:text-7xl font-extrabold animate-soft-blink select-none text-center"
+          style={{ textShadow: "0 2px 15px rgba(0,0,0,0.5)" }}
+        >
+          {/* whitespace-pre-line: 번역문에 \n이 있으면(현재 일본어만) 그 지점에서 줄바꿈,
+              없으면 한 줄. leading-none으로 2줄일 때도 줄간격이 벌어지지 않게 한다. */}
+          <span className="whitespace-pre-line leading-none">{t("start.touch")}</span>
+        </div>
       </div>
 
       {/* 운영자 설정 버튼 */}

@@ -9,8 +9,6 @@ export const LOCALES: Array<{ code: Locale; label: string }> = [
 
 const ko = {
   "start.touch": "화면을 터치해주세요",
-  "start.hint": "화면 아무 곳이나 터치하여 시작하세요",
-  "start.waiting": "● 대기중 ●",
 
   "payment.title": "결제",
   "payment.selectQuantity": "결제를 완료해 주세요",
@@ -82,8 +80,6 @@ export type MessageKey = keyof typeof ko;
 
 const en: Record<MessageKey, string> = {
   "start.touch": "Touch the screen",
-  "start.hint": "Touch anywhere on the screen to start",
-  "start.waiting": "● Waiting ●",
 
   "payment.title": "Payment",
   "payment.selectQuantity": "Please complete\n your payment",
@@ -157,8 +153,6 @@ const ja: Record<MessageKey, string> = {
   // 다른 언어와 달리 972px 폭에 한 줄로 안 들어가서(실측 확인) 의도적으로 2줄 처리 —
   // StartSection.tsx의 whitespace-pre-line이 이 \n을 줄바꿈으로 그대로 반영한다.
   "start.touch": "画面を\nタッチしてください",
-  "start.hint": "画面のどこでもタッチして開始できます",
-  "start.waiting": "● 待機中 ●",
 
   "payment.title": "決済",
   "payment.selectQuantity": "決済を完了してください",
@@ -226,8 +220,6 @@ const ja: Record<MessageKey, string> = {
 
 const zh: Record<MessageKey, string> = {
   "start.touch": "请触摸屏幕",
-  "start.hint": "触摸屏幕任意位置即可开始",
-  "start.waiting": "● 待机中 ●",
 
   "payment.title": "支付",
   "payment.selectQuantity": "请完成支付",
