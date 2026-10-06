@@ -217,8 +217,8 @@ export default function ThemeSettingPage() {
         />
       </div>
 
-      {/* 배경 단색 */}
-      <div className="bg-gray-800 rounded-xl border border-gray-700">
+      {/* 색상 — 배경 단색 · 강조(Primary) · 글자 색상을 한 카드에 묶는다. */}
+      <div className="bg-gray-800 rounded-xl border border-gray-700 divide-y divide-gray-700">
         <div className="px-6 pt-5 pb-6">
           <h3 className="text-white font-semibold text-base mb-1">배경 단색</h3>
           <p className="text-gray-500 text-xs mb-4">
@@ -231,10 +231,7 @@ export default function ThemeSettingPage() {
             />
           </ColorRow>
         </div>
-      </div>
 
-      {/* Primary 컬러 */}
-      <div className="bg-gray-800 rounded-xl border border-gray-700">
         <div className="px-6 pt-5 pb-6">
           <h3 className="text-white font-semibold text-base mb-1">강조(Primary) 색상</h3>
           <p className="text-gray-500 text-xs mb-4">
@@ -255,10 +252,7 @@ export default function ThemeSettingPage() {
             </div>
           </ColorRow>
         </div>
-      </div>
 
-      {/* 글자 색상 */}
-      <div className="bg-gray-800 rounded-xl border border-gray-700">
         <div className="px-6 pt-5 pb-6">
           <h3 className="text-white font-semibold text-base mb-1">글자 색상</h3>
           <p className="text-gray-500 text-xs mb-4">

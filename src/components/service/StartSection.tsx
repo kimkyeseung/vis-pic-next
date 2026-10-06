@@ -78,7 +78,10 @@ export function StartSection({
           축소돼 vw는 실제 뷰포트 기준이라 의도보다 좁아져 줄바꿈될 수 있다). */}
       <div className="absolute bottom-[calc(4rem+7%)] left-1/2 -translate-x-1/2 w-[1728px] portrait:w-[972px] flex justify-center pointer-events-none">
         <div
-          className="text-white text-6xl portrait:text-7xl font-extrabold animate-soft-blink select-none text-center"
+          className={`text-white font-extrabold animate-soft-blink select-none text-center ${
+            // 일본어는 한 줄로 길어 다른 언어보다 살짝 작게(60→52px, 세로 72→64px). Yu Gothic은 글자 아래 여백이 커서 0.18em 내려 맞춘다. 클래스는 리터럴로 둬야 Tailwind가 인식한다.
+            lang === "ja" ? "text-[3.25rem] portrait:text-[4rem] translate-y-[0.18em]" : "text-6xl portrait:text-7xl"
+          }`}
           style={{ textShadow: "0 2px 15px rgba(0,0,0,0.5)" }}
         >
           {/* whitespace-pre-line: 번역문에 \n이 있으면 그 지점에서 줄바꿈, 없으면 한 줄
