@@ -15,6 +15,7 @@ import { useThemeSettings } from "./useThemeSettings";
 import { AssetUploader, AssetUploaderRow } from "./AssetUploader";
 import { ButtonThemeRow } from "./ButtonThemeRow";
 import { ColorRow } from "./ColorRow";
+import { ButtonGlowPreview } from "./ButtonGlowPreview";
 
 export default function ThemeSettingPage() {
   const { selectedDevice } = useAdmin();
@@ -283,17 +284,11 @@ export default function ThemeSettingPage() {
                   className="w-full accent-blue-500"
                 />
               </div>
-              <div className="flex items-center gap-3 pt-1">
-                <span className="text-gray-400 text-xs">미리보기</span>
-                <span
-                  className="px-6 py-3 rounded-xl text-white font-bold"
-                  style={{ background: t.primaryColor, boxShadow: `0 0 ${t.glowSize}px 6px ${t.glowColor}` }}
-                >
-                  버튼
-                </span>
-              </div>
             </div>
           )}
+          <div className="mt-5">
+            <ButtonGlowPreview t={t} />
+          </div>
         </div>
       </div>
 
