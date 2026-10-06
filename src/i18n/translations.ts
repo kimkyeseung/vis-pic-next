@@ -152,7 +152,7 @@ const en: Record<MessageKey, string> = {
 const ja: Record<MessageKey, string> = {
   // 다른 언어와 달리 972px 폭에 한 줄로 안 들어가서(실측 확인) 의도적으로 2줄 처리 —
   // StartSection.tsx의 whitespace-pre-line이 이 \n을 줄바꿈으로 그대로 반영한다.
-  "start.touch": "画面を\nタッチしてください",
+  "start.touch": "画面をタッチしてください",
 
   "payment.title": "決済",
   "payment.selectQuantity": "決済を完了してください",
@@ -182,7 +182,7 @@ const ja: Record<MessageKey, string> = {
   "camera.bgChange": "背景を変更できます！",
   "camera.stickerPrompt": "ステッカーを追加してみましょう！",
   "camera.remaining": "残り撮影回数 {n}",
-  "camera.palmHint": "手のひらを広げると自動で撮影されます！",
+  "camera.palmHint": "手のひらを広げると自動撮影！",
   "camera.effectHint": "このジェスチャーで特別なエフェクトが流れます！",
   "camera.noStickers": "アップロードされたステッカーがありません",
   "camera.clearStickers": "すべて削除",

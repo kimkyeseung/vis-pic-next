@@ -81,8 +81,8 @@ export function StartSection({
           className="text-white text-6xl portrait:text-7xl font-extrabold animate-soft-blink select-none text-center"
           style={{ textShadow: "0 2px 15px rgba(0,0,0,0.5)" }}
         >
-          {/* whitespace-pre-line: 번역문에 \n이 있으면(현재 일본어만) 그 지점에서 줄바꿈,
-              없으면 한 줄. leading-none으로 2줄일 때도 줄간격이 벌어지지 않게 한다. */}
+          {/* whitespace-pre-line: 번역문에 \n이 있으면 그 지점에서 줄바꿈, 없으면 한 줄
+              (현재는 모든 언어가 한 줄). leading-none으로 2줄일 때도 줄간격이 벌어지지 않게 한다. */}
           <span className="whitespace-pre-line leading-none">{t("start.touch")}</span>
         </div>
       </div>
