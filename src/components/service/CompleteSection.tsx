@@ -147,11 +147,11 @@ export function CompleteSection({
           transform이 걸린 안쪽 div를 기준으로 잡으면 QR 로드로 콘텐츠 높이가 커질 때
           버튼이 아래로 밀려 내려가므로, section 직속에 두어 위치를 고정한다. */}
       {compositeImage && printStatus === "ready" && (
-        <ServiceNav onPrev={onPrev} onNext={handlePrint} nextKey="complete.print" />
+        <ServiceNav onPrev={onPrev} onNext={handlePrint} nextKey="complete.print" role="print" />
       )}
       {compositeImage && printStatus === "done" && (
         <div className="absolute bottom-16 left-1/2 -translate-x-1/2 z-20">
-          <button className={`service-button nav-next-lg ${SERVICE_BIG_BUTTON_CLASS}`} onClick={onRestart}>
+          <button className={`service-button nav-next-lg btn-role-restart ${SERVICE_BIG_BUTTON_CLASS}`} onClick={onRestart}>
             {t("complete.restart")}
           </button>
         </div>

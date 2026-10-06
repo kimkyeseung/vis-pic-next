@@ -170,7 +170,7 @@ function ServiceContent() {
     primaryColor: config.themePrimaryColor,
     bgColor: config.themeBgColor,
     glow: { enabled: config.btnGlowEnabled, color: config.btnGlowColor, size: config.btnGlowSize },
-    buttonTextColors: { capture: config.btnCaptureTextColor, next: config.btnNextTextColor, payment: config.btnPaymentTextColor },
+    buttonTextColors: { capture: config.btnCaptureTextColor, next: config.btnNextTextColor, payment: config.btnPaymentTextColor, print: config.btnPrintTextColor, restart: config.btnRestartTextColor },
     buttonOptions: config.btnImageOptions,
     buttonImages: buttonImageSlots,
     firstWallpaper: { landscape: wallpaperUrl, portrait: wallpaperPortraitUrl },

@@ -14,11 +14,14 @@ export function ServiceNav({
   onNext,
   nextKey = "common.next",
   nextDisabled = false,
+  role = "next",
 }: {
   onNext: () => void;
   /** 다음 버튼 라벨 키 (예: 완료 화면은 "complete.print") */
   nextKey?: MessageKey;
   nextDisabled?: boolean;
+  /** 테마 버튼 이미지·글자색 슬롯 — 기본 "next"(다음으로), 완료 화면의 인쇄 버튼은 "print". */
+  role?: "next" | "print";
   // 하위호환용 — 더 이상 렌더하지 않지만 호출부가 넘겨도 무시한다.
   onPrev?: () => void;
   prevKey?: MessageKey;
@@ -29,7 +32,7 @@ export function ServiceNav({
   return (
     <div className="absolute bottom-16 left-1/2 -translate-x-1/2 z-20">
       <button
-        className={`service-button nav-next-lg btn-role-next ${SERVICE_BIG_BUTTON_CLASS}`}
+        className={`service-button nav-next-lg btn-role-${role} ${SERVICE_BIG_BUTTON_CLASS}`}
         onClick={onNext}
         style={nextDisabled ? { opacity: 0.5, pointerEvents: "none" } : {}}
       >

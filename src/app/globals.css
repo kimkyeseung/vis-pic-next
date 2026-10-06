@@ -380,7 +380,9 @@ body {
    (cover는 그 차이만큼 가장자리를 잘라 이미지 속 글자가 잘릴 수 있고, contain은 빈 띠가 생긴다) */
 .service-button.btn-role-capture,
 .service-button.btn-role-next,
-.service-button.btn-role-payment {
+.service-button.btn-role-payment,
+.service-button.btn-role-print,
+.service-button.btn-role-restart {
   background-size: 100% 100%;
   background-position: center;
   background-repeat: no-repeat;
@@ -388,6 +390,8 @@ body {
 .service-button.btn-role-capture { background-image: var(--theme-btn-capture-image, none); }
 .service-button.btn-role-next { background-image: var(--theme-btn-next-image, none); }
 .service-button.btn-role-payment { background-image: var(--theme-btn-payment-image, none); }
+.service-button.btn-role-print { background-image: var(--theme-btn-print-image, none); }
+.service-button.btn-role-restart { background-image: var(--theme-btn-restart-image, none); }
 
 /* 버튼 이미지가 있는 버튼 — 서비스 루트(.service-theme)의 data-btn-* 속성으로 켠다(service/page.tsx).
    · data-btn-img-*      : 고정 크기(--btn-img-w/h = BUTTON_IMAGE_SIZE, 관리자에 권장 크기로 안내) +
@@ -396,7 +400,9 @@ body {
    이 규칙들은 레이어 밖(언레이어드)이라 SERVICE_BIG_BUTTON_CLASS의 Tailwind 패딩/최소폭보다 우선한다. */
 .service-theme[data-btn-img-capture] .btn-role-capture,
 .service-theme[data-btn-img-next] .btn-role-next,
-.service-theme[data-btn-img-payment] .btn-role-payment {
+.service-theme[data-btn-img-payment] .btn-role-payment,
+.service-theme[data-btn-img-print] .btn-role-print,
+.service-theme[data-btn-img-restart] .btn-role-restart {
   width: var(--btn-img-w);
   height: var(--btn-img-h);
   min-width: 0;
@@ -404,7 +410,9 @@ body {
 }
 .service-theme[data-btn-img-capture] .btn-role-capture,
 .service-theme[data-btn-img-next] .btn-role-next,
-.service-theme[data-btn-img-payment] .btn-role-payment {
+.service-theme[data-btn-img-payment] .btn-role-payment,
+.service-theme[data-btn-img-print] .btn-role-print,
+.service-theme[data-btn-img-restart] .btn-role-restart {
   background-color: transparent;
   box-shadow: none;
   border-radius: 0;
@@ -413,19 +421,25 @@ body {
    단색 버튼의 box-shadow(blur=size, spread 6px)와 세기가 비슷하도록 같은 그림자를 두 겹 쌓는다(drop-shadow엔 spread가 없다). */
 .service-theme[data-btn-img-capture] .btn-role-capture:active,
 .service-theme[data-btn-img-next] .btn-role-next:active,
-.service-theme[data-btn-img-payment] .btn-role-payment:active {
+.service-theme[data-btn-img-payment] .btn-role-payment:active,
+.service-theme[data-btn-img-print] .btn-role-print:active,
+.service-theme[data-btn-img-restart] .btn-role-restart:active {
   filter:
     drop-shadow(0 0 calc(var(--btn-glow-size, 0px) / 2) var(--btn-glow-color, transparent))
     drop-shadow(0 0 calc(var(--btn-glow-size, 0px) / 2) var(--btn-glow-color, transparent));
 }
 .service-theme[data-btn-img-capture] .btn-role-capture::before,
 .service-theme[data-btn-img-next] .btn-role-next::before,
-.service-theme[data-btn-img-payment] .btn-role-payment::before {
+.service-theme[data-btn-img-payment] .btn-role-payment::before,
+.service-theme[data-btn-img-print] .btn-role-print::before,
+.service-theme[data-btn-img-restart] .btn-role-restart::before {
   display: none;
 }
 .service-theme[data-btn-hidetext-capture] .btn-role-capture,
 .service-theme[data-btn-hidetext-next] .btn-role-next,
-.service-theme[data-btn-hidetext-payment] .btn-role-payment {
+.service-theme[data-btn-hidetext-payment] .btn-role-payment,
+.service-theme[data-btn-hidetext-print] .btn-role-print,
+.service-theme[data-btn-hidetext-restart] .btn-role-restart {
   font-size: 0;
 }
 
@@ -433,6 +447,8 @@ body {
 .service-button.btn-role-capture { color: var(--theme-btn-capture-text, var(--color-surface)); }
 .service-button.btn-role-next { color: var(--theme-btn-next-text, #ffffff); }
 .service-button.btn-role-payment { color: var(--theme-btn-payment-text, #ffffff); }
+.service-button.btn-role-print { color: var(--theme-btn-print-text, #ffffff); }
+.service-button.btn-role-restart { color: var(--theme-btn-restart-text, #ffffff); }
 @media (orientation: portrait) {
   .nav-button { min-height: 150px; padding: 32px 72px; font-size: 2.1em; }
 }

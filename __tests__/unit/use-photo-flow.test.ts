@@ -60,6 +60,8 @@ const baseConfig: DeviceConfig = {
   btnCaptureTextColor: "#2a2a2a",
   btnNextTextColor: "#ffffff",
   btnPaymentTextColor: "#ffffff",
+  btnPrintTextColor: "#ffffff",
+  btnRestartTextColor: "#ffffff",
   btnImageOptions: parseButtonImageOptions({}),
 };
 

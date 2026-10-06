@@ -125,6 +125,8 @@ function makeConfig(paymentEnabled: boolean): DeviceConfig {
     btnCaptureTextColor: "#2a2a2a",
     btnNextTextColor: "#ffffff",
     btnPaymentTextColor: "#ffffff",
+    btnPrintTextColor: "#ffffff",
+    btnRestartTextColor: "#ffffff",
     btnImageOptions: parseButtonImageOptions({}),
   };
 }

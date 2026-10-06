@@ -117,12 +117,16 @@ export interface DeviceConfig {
   btnNextTextColor: string;
   /** '결제하기' 버튼 텍스트 색상. 미설정 시 #ffffff. */
   btnPaymentTextColor: string;
+  /** '인쇄하기' 버튼 텍스트 색상. 미설정 시 #ffffff. */
+  btnPrintTextColor: string;
+  /** '처음으로 돌아가기' 버튼 텍스트 색상. 미설정 시 #ffffff. */
+  btnRestartTextColor: string;
   /** 버튼 이미지 표시 옵션(버튼별). 이미지가 업로드된 버튼에만 의미가 있다. */
   btnImageOptions: Record<ButtonRole, ButtonImageOptions>;
 }
 
 /** 테마 이미지를 지정할 수 있는 대형 강조 버튼 종류. */
-export type ButtonRole = "capture" | "next" | "payment";
+export type ButtonRole = "capture" | "next" | "payment" | "print" | "restart";
 
 export interface ButtonImageOptions {
   /** 버튼 텍스트 숨김 — 이미지에 글자가 들어 있을 때. 미설정 시 끔. */

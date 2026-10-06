@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import type { DeviceConfig, BGImage, ButtonRole } from "@/types";
-import { parseIntSafe, parseBgRemovalMode, parsePaymentTerminalMode, parseCaptureModes, parseCameraResolution, clampPercent, clampSigned, parseSegmentProcessScale, parseButtonImageOptions } from "@/lib/deviceConfig";
+import { parseIntSafe, parseBgRemovalMode, parsePaymentTerminalMode, parseCaptureModes, parseCameraResolution, clampPercent, clampSigned, parseSegmentProcessScale, parseButtonImageOptions, BUTTON_ROLES } from "@/lib/deviceConfig";
 import { DEFAULT_CAMERA_RESOLUTION } from "@/constants/camera";
 import { LOGO_IMAGE_TYPE, WALLPAPER_IMAGE_TYPE, BUTTON_IMAGE_TYPE, WALLPAPER_NAME_LANDSCAPE, WALLPAPER_NAME_PORTRAIT, WALLPAPER_NAME_SUB_LANDSCAPE, WALLPAPER_NAME_SUB_PORTRAIT, buttonImageName, WALLPAPER_PAGE_STEPS, wallpaperPageName, OVERLAY_NAME_CAMERA } from "@/constants/images";
 
@@ -35,6 +35,8 @@ const EMPTY_BUTTON_IMAGES: Record<ButtonRole, { landscape: string | null; portra
   capture: { landscape: null, portrait: null },
   next: { landscape: null, portrait: null },
   payment: { landscape: null, portrait: null },
+  print: { landscape: null, portrait: null },
+  restart: { landscape: null, portrait: null },
 };
 
 const DEFAULT_CONFIG: DeviceConfig = {
@@ -90,6 +92,8 @@ const DEFAULT_CONFIG: DeviceConfig = {
   btnCaptureTextColor: "#2a2a2a",
   btnNextTextColor: "#ffffff",
   btnPaymentTextColor: "#ffffff",
+  btnPrintTextColor: "#ffffff",
+  btnRestartTextColor: "#ffffff",
   btnImageOptions: parseButtonImageOptions({}),
 };
 
@@ -194,6 +198,8 @@ export function useDeviceSetup(deviceId: string) {
           btnCaptureTextColor: s.THEME_BTN_TEXT_COLOR_CAPTURE || "#2a2a2a",
           btnNextTextColor: s.THEME_BTN_TEXT_COLOR_NEXT || "#ffffff",
           btnPaymentTextColor: s.THEME_BTN_TEXT_COLOR_PAYMENT || "#ffffff",
+          btnPrintTextColor: s.THEME_BTN_TEXT_COLOR_PRINT || "#ffffff",
+          btnRestartTextColor: s.THEME_BTN_TEXT_COLOR_RESTART || "#ffffff",
           btnImageOptions: parseButtonImageOptions(s),
         });
         return true;
@@ -302,7 +308,7 @@ export function useDeviceSetup(deviceId: string) {
           return img && data.baseUrl ? `${data.baseUrl}/${img.filename}` : null;
         };
         const urls = { ...EMPTY_BUTTON_IMAGES };
-        for (const role of ["capture", "next", "payment"] as const) {
+        for (const role of BUTTON_ROLES) {
           urls[role] = { landscape: pick(buttonImageName(role, false)), portrait: pick(buttonImageName(role, true)) };
         }
         setButtonImageUrls(urls);

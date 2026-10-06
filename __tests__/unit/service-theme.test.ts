@@ -9,9 +9,9 @@ const base = (over: Partial<ServiceThemeInput> = {}): ServiceThemeInput => ({
   primaryColor: "#6c6fb4",
   bgColor: "#2a2a2a",
   glow: { enabled: true, color: "#6c6fb4", size: 28 },
-  buttonTextColors: { capture: "#111111", next: undefined, payment: undefined },
+  buttonTextColors: { capture: "#111111", next: undefined, payment: undefined, print: undefined, restart: undefined },
   buttonOptions: parseButtonImageOptions({}),
-  buttonImages: { capture: {}, next: {}, payment: {} },
+  buttonImages: { capture: {}, next: {}, payment: {}, print: {}, restart: {} },
   firstWallpaper: {},
   subWallpaper: {},
   pageWallpapers: {},
@@ -40,7 +40,7 @@ describe("buildServiceTheme — 서비스·관리자 미리보기 공용 테마 
   });
 
   it("버튼 이미지가 한쪽만 있어도 양쪽 화면에 쓰이고, 버튼 크기는 화면 방향을 따른다", () => {
-    const input = base({ buttonImages: { capture: { landscape: "cap.png" }, next: {}, payment: {} } });
+    const input = base({ buttonImages: { capture: { landscape: "cap.png" }, next: {}, payment: {}, print: {}, restart: {} } });
     const portrait = buildServiceTheme({ ...input, portrait: true });
     expect(css(portrait.style)["--theme-btn-capture-image"]).toBe("url(cap.png)");
     expect(css(portrait.style)["--btn-img-w"]).toBe("736px");
@@ -52,7 +52,7 @@ describe("buildServiceTheme — 서비스·관리자 미리보기 공용 테마 
     const opts = parseButtonImageOptions({ THEME_BTN_HIDE_TEXT_CAPTURE: "1" });
     const { dataAttrs } = buildServiceTheme(base({
       buttonOptions: opts,
-      buttonImages: { capture: { portrait: "p.png" }, next: { landscape: "n.png" }, payment: {} },
+      buttonImages: { capture: { portrait: "p.png" }, next: { landscape: "n.png" }, payment: {}, print: {}, restart: {} },
     }));
     expect(dataAttrs).toEqual({
       "data-btn-img-capture": "",

@@ -50,7 +50,7 @@ export function ThemePreviewModal({ t, onClose }: { t: ReturnType<typeof useThem
     primaryColor: t.primaryColor,
     bgColor: t.bgColor,
     glow: { enabled: t.glowEnabled, color: t.glowColor, size: t.glowSize },
-    buttonTextColors: { capture: t.captureTextColor, next: t.nextTextColor, payment: t.paymentTextColor },
+    buttonTextColors: { capture: t.captureTextColor, next: t.nextTextColor, payment: t.paymentTextColor, print: t.printTextColor, restart: t.restartTextColor },
     buttonOptions: t.buttonImageOptions,
     buttonImages,
     firstWallpaper: { landscape: t.wallpaperLs?.url, portrait: t.wallpaperPt?.url },

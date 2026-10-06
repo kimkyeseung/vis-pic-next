@@ -30,7 +30,7 @@ export function pickOriented(urls: OrientedUrls, portrait: boolean): string | nu
   return (portrait ? (pt ?? ls) : (ls ?? pt)) ?? null;
 }
 
-const ROLES: readonly ButtonRole[] = ["capture", "next", "payment"];
+const ROLES: readonly ButtonRole[] = ["capture", "next", "payment", "print", "restart"];
 
 /**
  * 테마 관리 설정 → 서비스 루트(.service-theme)에 줄 style(CSS 변수·배경)과 data-* 속성.

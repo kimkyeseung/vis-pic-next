@@ -142,7 +142,7 @@ export default function ThemeSettingPage() {
         <div className="px-6 pt-5 pb-1">
           <h3 className="text-white font-semibold text-base">버튼 이미지 · 텍스트 색상</h3>
           <p className="text-gray-500 text-xs mt-1">
-            촬영·다음·결제 버튼의 배경 이미지와 글자 색상입니다. 이미지를 올리면 버튼이 화면 방향별 고정 크기(아래 안내)로 바뀌고, 이미지는 그 크기에 꽉 채워집니다 — 가로·세로용을 각 크기로 따로 만들면 가장 깔끔하고, 한쪽만 올리면 그 이미지가 양쪽에 쓰입니다. 이미지를 올린 버튼은 단색 배경·그림자 없이 이미지만 보이므로(투명 PNG는 투명 그대로) 버튼 모양까지 이미지에 담아 제작하세요. 미설정 시 기본 단색 버튼이 사용됩니다. (텍스트 숨김 옵션은 아래 &apos;설정 저장&apos;을 눌러야 반영됩니다)
+            촬영·다음·결제·인쇄·처음으로 버튼의 배경 이미지와 글자 색상입니다. 이미지를 올리면 버튼이 화면 방향별 고정 크기(아래 안내)로 바뀌고, 이미지는 그 크기에 꽉 채워집니다 — 가로·세로용을 각 크기로 따로 만들면 가장 깔끔하고, 한쪽만 올리면 그 이미지가 양쪽에 쓰입니다. 이미지를 올린 버튼은 단색 배경·그림자 없이 이미지만 보이므로(투명 PNG는 투명 그대로) 버튼 모양까지 이미지에 담아 제작하세요. 미설정 시 기본 단색 버튼이 사용됩니다. (텍스트 숨김 옵션은 아래 &apos;설정 저장&apos;을 눌러야 반영됩니다)
           </p>
         </div>
 
@@ -186,6 +186,34 @@ export default function ThemeSettingPage() {
           onTextColorChange={t.setPaymentTextColor}
           options={t.buttonImageOptions.payment}
           onOptionChange={(k, v) => t.setButtonImageOption("payment", k, v)}
+        />
+
+        <ButtonThemeRow
+          title="인쇄하기"
+          description="완료 화면의 '인쇄하기' 버튼."
+          landscape={t.buttonSlot("print").landscape}
+          portrait={t.buttonSlot("print").portrait}
+          onUpload={t.uploadButton("print")}
+          onRemove={t.removeButton("print")}
+          busy={t.buttonSlot("print").busy}
+          textColor={t.printTextColor}
+          onTextColorChange={t.setPrintTextColor}
+          options={t.buttonImageOptions.print}
+          onOptionChange={(k, v) => t.setButtonImageOption("print", k, v)}
+        />
+
+        <ButtonThemeRow
+          title="처음으로 돌아가기"
+          description="완료 화면(인쇄 후)의 '처음으로 돌아가기' 버튼."
+          landscape={t.buttonSlot("restart").landscape}
+          portrait={t.buttonSlot("restart").portrait}
+          onUpload={t.uploadButton("restart")}
+          onRemove={t.removeButton("restart")}
+          busy={t.buttonSlot("restart").busy}
+          textColor={t.restartTextColor}
+          onTextColorChange={t.setRestartTextColor}
+          options={t.buttonImageOptions.restart}
+          onOptionChange={(k, v) => t.setButtonImageOption("restart", k, v)}
         />
       </div>
 

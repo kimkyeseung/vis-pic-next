@@ -49,19 +49,28 @@ export function wallpaperPageName(step: WallpaperPageStep, portrait: boolean): s
 // 화면 표시용이며 촬영본에는 합성되지 않는다. 같은 imageType 5 안에서 name으로 구분.
 export const OVERLAY_NAME_CAMERA = "overlay_camera";
 
-// 대형 강조 버튼(촬영하기·다음·결제하기) 배경 이미지도 같은 imageType(7) 안에서
+// 대형 강조 버튼(촬영하기·다음·결제하기·인쇄하기·처음으로) 배경 이미지도 같은 imageType(7) 안에서
 // name으로 구분해 버튼별로 따로 업로드한다.
 export const BUTTON_NAME_CAPTURE = "button_capture";
 export const BUTTON_NAME_NEXT = "button_next";
 export const BUTTON_NAME_PAYMENT = "button_payment";
+export const BUTTON_NAME_PRINT = "button_print";
+export const BUTTON_NAME_RESTART = "button_restart";
 
 /**
  * 버튼 이미지 슬롯 이름 — 가로/세로 화면용을 따로 올린다(버튼 고정 크기가 화면 방향마다 달라서).
  * 가로용은 기존 이름 그대로(예전 단일 업로드가 가로용으로 이어지도록), 세로용은 뒤에 "_pt".
  * 한쪽만 올리면 서비스는 그 이미지를 양쪽 화면에 쓴다(배경화면 가로/세로 슬롯과 같은 규칙).
  */
-export function buttonImageName(role: "capture" | "next" | "payment", portrait: boolean): string {
-  const base = role === "capture" ? BUTTON_NAME_CAPTURE : role === "next" ? BUTTON_NAME_NEXT : BUTTON_NAME_PAYMENT;
+const BUTTON_NAME_BY_ROLE = {
+  capture: BUTTON_NAME_CAPTURE,
+  next: BUTTON_NAME_NEXT,
+  payment: BUTTON_NAME_PAYMENT,
+  print: BUTTON_NAME_PRINT,
+  restart: BUTTON_NAME_RESTART,
+} as const;
+export function buttonImageName(role: keyof typeof BUTTON_NAME_BY_ROLE, portrait: boolean): string {
+  const base = BUTTON_NAME_BY_ROLE[role];
   return portrait ? `${base}_pt` : base;
 }
 

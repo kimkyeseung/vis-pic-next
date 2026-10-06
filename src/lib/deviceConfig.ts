@@ -82,7 +82,7 @@ export function clampSigned(value: number, min = -100, max = 100): number {
   return Math.min(max, Math.max(min, value));
 }
 
-export const BUTTON_ROLES: readonly ButtonRole[] = ["capture", "next", "payment"];
+export const BUTTON_ROLES: readonly ButtonRole[] = ["capture", "next", "payment", "print", "restart"];
 
 /**
  * 버튼별 이미지 표시 옵션 설정 키. 예: THEME_BTN_HIDE_TEXT_NEXT

@@ -45,6 +45,8 @@ const THEME_DEFAULTS: Record<string, string> = {
   THEME_BTN_TEXT_COLOR_CAPTURE: "#2a2a2a",
   THEME_BTN_TEXT_COLOR_NEXT: "#ffffff",
   THEME_BTN_TEXT_COLOR_PAYMENT: "#ffffff",
+  THEME_BTN_TEXT_COLOR_PRINT: "#ffffff",
+  THEME_BTN_TEXT_COLOR_RESTART: "#ffffff",
 };
 
 export function useThemeSettings(deviceId: string | null) {
@@ -65,6 +67,8 @@ export function useThemeSettings(deviceId: string | null) {
   const [captureTextColor, setCaptureTextColor] = useState("#2a2a2a");
   const [nextTextColor, setNextTextColor] = useState("#ffffff");
   const [paymentTextColor, setPaymentTextColor] = useState("#ffffff");
+  const [printTextColor, setPrintTextColor] = useState("#ffffff");
+  const [restartTextColor, setRestartTextColor] = useState("#ffffff");
   const [buttonImageOptions, setButtonImageOptions] = useState<Record<ButtonRole, ButtonImageOptions>>(parseButtonImageOptions({}));
   // 화면별 배경화면·안내 오버레이 — 슬롯이 많아 name(wallpaperPageName / OVERLAY_NAME_CAMERA)을 키로 한 맵으로 관리.
   const [namedAssets, setNamedAssets] = useState<Record<string, Asset>>({});
@@ -141,6 +145,8 @@ export function useThemeSettings(deviceId: string | null) {
         setCaptureTextColor(s.THEME_BTN_TEXT_COLOR_CAPTURE || "#2a2a2a");
         setNextTextColor(s.THEME_BTN_TEXT_COLOR_NEXT || "#ffffff");
         setPaymentTextColor(s.THEME_BTN_TEXT_COLOR_PAYMENT || "#ffffff");
+        setPrintTextColor(s.THEME_BTN_TEXT_COLOR_PRINT || "#ffffff");
+        setRestartTextColor(s.THEME_BTN_TEXT_COLOR_RESTART || "#ffffff");
         setButtonImageOptions(parseButtonImageOptions(s));
         setNamedAssets(named);
         setWallpaperLs(wpLs);
@@ -162,6 +168,7 @@ export function useThemeSettings(deviceId: string | null) {
     const colors: Array<[string, string]> = [
       ["글자 색상", textColor], ["강조 색상", primaryColor], ["배경 단색", bgColor], ["글로우 색상", glowColor],
       ["촬영하기 글자색", captureTextColor], ["다음으로 글자색", nextTextColor], ["결제하기 글자색", paymentTextColor],
+      ["인쇄하기 글자색", printTextColor], ["처음으로 글자색", restartTextColor],
     ];
     const badColors = colors.filter(([, v]) => !isValidHexColor(v)).map(([label]) => label);
     if (badColors.length > 0) {
@@ -178,6 +185,8 @@ export function useThemeSettings(deviceId: string | null) {
       THEME_BTN_TEXT_COLOR_CAPTURE: captureTextColor,
       THEME_BTN_TEXT_COLOR_NEXT: nextTextColor,
       THEME_BTN_TEXT_COLOR_PAYMENT: paymentTextColor,
+      THEME_BTN_TEXT_COLOR_PRINT: printTextColor,
+      THEME_BTN_TEXT_COLOR_RESTART: restartTextColor,
       ...Object.fromEntries(BUTTON_ROLES.flatMap((role) => {
         const k = buttonImageOptionKeys(role);
         const o = buttonImageOptions[role];
@@ -320,6 +329,8 @@ export function useThemeSettings(deviceId: string | null) {
     captureTextColor, setCaptureTextColor,
     nextTextColor, setNextTextColor,
     paymentTextColor, setPaymentTextColor,
+    printTextColor, setPrintTextColor,
+    restartTextColor, setRestartTextColor,
     loading, saving, message,
     handleSaveColors,
     uploadAsset, removeAsset,

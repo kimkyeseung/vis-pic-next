@@ -10,18 +10,20 @@ import type { ButtonRole } from "@/types";
 import type { useThemeSettings } from "./useThemeSettings";
 
 const STAGE_W = 800;
-const GAP = 48;
-const PAD = 56;
+const GAP = 32;
+const PAD = 40;
 
 // 서비스의 실제 버튼과 같은 클래스 — 이미지 유무·색·글로우가 서비스 화면과 똑같이 적용된다.
 const ROLE_META: Record<ButtonRole, { label: string; className: string }> = {
   capture: { label: "촬영하기", className: "btn-role-capture" },
   next: { label: "다음으로", className: "nav-next-lg btn-role-next" },
   payment: { label: "결제하기", className: "nav-next-lg btn-role-payment" },
+  print: { label: "인쇄하기", className: "nav-next-lg btn-role-print" },
+  restart: { label: "처음으로 돌아가기", className: "nav-next-lg btn-role-restart" },
 };
 
 /**
- * 버튼 글로우 미리보기 — 촬영·다음·결제 버튼을 서비스와 같은 테마로 그려 두고, 눌러 보면(마우스/터치)
+ * 버튼 글로우 미리보기 — 촬영·다음·결제·인쇄·처음으로 버튼을 서비스와 같은 테마로 그려 두고, 눌러 보면(마우스/터치)
  * 실제 서비스와 같은 글로우(누르는 동안 + 탭 후 퍼짐)가 재생된다.
  * 업로드한 버튼 이미지, 버튼 글자색, 강조(버튼) 색, 글로우 색·세기, 텍스트 숨김 옵션, 배경이 저장 전 현재 값으로 즉시 반영된다.
  */
@@ -56,7 +58,7 @@ export function ButtonGlowPreview({ t }: { t: ReturnType<typeof useThemeSettings
     primaryColor: t.primaryColor,
     bgColor: t.bgColor,
     glow: { enabled: t.glowEnabled, color: t.glowColor, size: t.glowSize },
-    buttonTextColors: { capture: t.captureTextColor, next: t.nextTextColor, payment: t.paymentTextColor },
+    buttonTextColors: { capture: t.captureTextColor, next: t.nextTextColor, payment: t.paymentTextColor, print: t.printTextColor, restart: t.restartTextColor },
     buttonOptions: t.buttonImageOptions,
     buttonImages,
     firstWallpaper: { landscape: t.wallpaperLs?.url, portrait: t.wallpaperPt?.url },
