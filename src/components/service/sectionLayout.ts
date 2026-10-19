@@ -11,13 +11,18 @@ import type { Locale } from "@/i18n/translations";
  * 인식한다(동적 조합 `pt-[${n}px]` 금지 — ROWS_CLASS와 동일한 이유, SectionShell.tsx 참고).
  */
 export function getServiceSectionClass(lang: Locale): string {
-  // 언어별 타이틀 길이/줄바꿈 차이에 맞춰 세로(1080×1920) 상단 여백을 보정한다.
-  // 영문 ≈9%(≈173px), 일본어 ≈10.5%(≈202px), 그 외(한국어·중국어)는 ≈15% 중심(≈245px 여백).
-  const pt =
-    lang === "en" ? "portrait:pt-[173px]" :
+  return `w-full h-full grid justify-items-center relative z-10 pt-14 ${getServicePortraitTopClass(lang)} pb-52 portrait:pb-40`;
+}
+
+/**
+ * 세로(1080×1920) 화면 타이틀 상단 여백 — 언어별 타이틀 길이/줄바꿈 차이에 맞춰 보정한다.
+ * 영문 ≈9%(≈173px), 일본어 ≈10.5%(≈202px), 그 외(한국어·중국어)는 ≈15% 중심(≈245px 여백).
+ * 섹션 껍데기를 따로 쓰는 완료 화면도 타이틀 위치를 맞추려고 이 값만 가져다 쓴다.
+ */
+export function getServicePortraitTopClass(lang: Locale): string {
+  return lang === "en" ? "portrait:pt-[173px]" :
     lang === "ja" ? "portrait:pt-[202px]" :
     "portrait:pt-[245px]";
-  return `w-full h-full grid justify-items-center relative z-10 pt-14 ${pt} pb-52 portrait:pb-40`;
 }
 
 /**

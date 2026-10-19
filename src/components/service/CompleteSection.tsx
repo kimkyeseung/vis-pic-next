@@ -4,7 +4,7 @@ import type { BGImage } from "@/types";
 import { useLanguage } from "@/i18n/LanguageContext";
 import { ServiceNav } from "./ServiceNav";
 import { SectionTitle } from "./SectionShell";
-import { SERVICE_BIG_BUTTON_CLASS } from "./sectionLayout";
+import { SERVICE_BIG_BUTTON_CLASS, getServicePortraitTopClass } from "./sectionLayout";
 import { useCompositeGeneration } from "./complete/useCompositeGeneration";
 import { useResultLayout } from "./complete/useResultLayout";
 import { QRDownloadCard } from "./complete/QRDownloadCard";
@@ -50,7 +50,7 @@ export function CompleteSection({
   onPrev: () => void;
   onRestart: () => void;
 }) {
-  const { t } = useLanguage();
+  const { lang, t } = useLanguage();
 
   // 합성 이미지 생성 + QR 업로드 + 인쇄 — useCompositeGeneration 참고.
   const { printStatus, printError, qrPhotoUrl, qrGifUrl, qrExpiryDate, handlePrint } = useCompositeGeneration({
@@ -65,16 +65,18 @@ export function CompleteSection({
   });
 
   return (
-    <section ref={sectionRef} className="w-full h-full flex flex-col items-center justify-start pt-14 pb-52 portrait:justify-center portrait:pt-0 portrait:pb-0 relative z-10">
-      <div className="w-full flex-1 flex flex-col text-center animate-fadeInUp portrait:flex-none portrait:px-16">
-        {/* 타이틀은 다른 페이지처럼 상단 고정(pt-14 — getServiceSectionClass와 동일). 본문은 아래 flex-1 영역에서 중앙 정렬한다. */}
+    <section ref={sectionRef} className={`w-full h-full flex flex-col items-center justify-start pt-14 pb-52 ${getServicePortraitTopClass(lang)} portrait:pb-40 relative z-10`}>
+      <div className="w-full flex-1 min-h-0 flex flex-col text-center animate-fadeInUp portrait:px-16">
+        {/* 타이틀은 다른 페이지처럼 상단 고정(가로 pt-14, 세로는 언어별 상단 여백 — getServiceSectionClass와 동일)
+            하고 크기도 같게 둔다. 본문은 아래 flex-1 영역에서 중앙 정렬한다. */}
         {(printStatus === "ready" || printStatus === "done") && compositeImage && (
-          <SectionTitle className="portrait:text-5xl break-keep mb-16 portrait:mb-8">
+          <SectionTitle className="break-keep mb-16 portrait:mb-8">
             {printStatus === "done" ? t("complete.done") : t("complete.ready")}
           </SectionTitle>
         )}
-        {/* 남은 세로 공간에서 본문(미리보기·QR·로딩·에러)을 중앙 정렬. 세로 화면은 flex-none으로 기존 스택 유지. */}
-        <div className="w-full flex-1 min-h-0 flex flex-col items-center justify-center portrait:flex-none">
+        {/* 남은 세로 공간에서 본문(미리보기·QR·로딩·에러)을 중앙 정렬. 공간이 모자라면
+            (justify-center-safe) 위로 넘쳐 타이틀을 덮지 않고 아래로만 넘친다. */}
+        <div className="w-full flex-1 min-h-0 flex flex-col items-center justify-center-safe">
         {printStatus === "compositing" && (
           <>
             <div className="w-20 h-20 border-4 border-white/20 border-t-blue-500 rounded-full animate-spin mx-auto mb-8" />
@@ -89,8 +91,11 @@ export function CompleteSection({
             <div className={`flex justify-center gap-10 mb-6 w-full max-w-[1600px] mx-auto portrait:flex-col portrait:items-center portrait:gap-8 portrait:w-full ${matchHeight ? "items-start" : "items-center"}`}>
               <div className="flex-1 flex justify-center min-w-0 portrait:w-full">
                 <div ref={previewBoxRef} className="rounded-2xl overflow-hidden" style={{ boxShadow: "0 20px 50px rgba(0,0,0,0.4)" }}>
-                  {/* 스테이지 고정 높이(가로 1080·세로 1920) 기준 px 상한 — 레터박스(창≠스테이지)에서도 정확. */}
-                  <img src={compositeImage} alt="Composite" className={`${photoMaxHClass} portrait:max-h-[883px] portrait:max-w-full w-auto object-contain block`} />
+                  {/* 스테이지 고정 높이(가로 1080·세로 1920) 기준 px 상한 — 레터박스(창≠스테이지)에서도 정확.
+                      세로 화면 540px: 타이틀이 다른 화면과 같은 상단 위치·크기로 고정된 상태에서, 세로 결과물(2컷 등)
+                      + 2줄 타이틀(한국어 245px 시작) + QR 카드 + 인쇄 완료 문구까지 들어가도 하단 버튼(위쪽 끝
+                      1696px)과 겹치지 않는 높이. 예전 883px은 세로 결과물에서 QR·기한 표시가 버튼 뒤로 들어갔다. */}
+                  <img src={compositeImage} alt="Composite" className={`${photoMaxHClass} portrait:max-h-[540px] portrait:max-w-full w-auto object-contain block`} />
                 </div>
               </div>
 
