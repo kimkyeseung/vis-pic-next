@@ -215,7 +215,7 @@
 ### Step 1: START
 
 - 스플래시 화면 ("Touch to start" 애니메이션)
-- **언어 선택 버튼**: 한국어/English/日本語/中文 (§24) — 대기 화면 복귀 시 한국어로 초기화
+- **언어 선택 버튼**: 한국어/English/日本語/中文 (§24) — 결제 비활성 시에만 표시(결제 활성 시 결제 화면에 있음). 대기 화면 복귀 시 한국어로 초기화
 - 우측 상단 빌드 시각 표시 (`NEXT_PUBLIC_BUILD_DATE`, §22)
 - 운영자 설정 패널: 서브 모니터 출력 ON/OFF, 모니터 선택
 - Tauri 환경 감지 (`__TAURI_INTERNALS__` in window)
@@ -266,6 +266,10 @@
 - WebRTC `getUserMedia`로 카메라 스트림 획득 — **해상도는 관리자 설정 `CAMERA_RESOLUTION`**(가장 낮음 320×240 ~ 4K 2880×2160, 모두 4:3, 미설정 시 FHD). ideal 제약이라 카메라 미지원 시 가장 가까운 값으로 대체 (§11)
 - 레이아웃(레이아웃 V3): 제목 · 카메라 프리뷰(4:3) · 배경 변경 패널 · 스티커 패널을 CSS Grid 영역으로 배치
   — 세로 화면은 프리뷰 아래 배경/스티커 2분할, 가로 화면은 배경·프리뷰·스티커 3열(컨테이너 실제 비율로 방향 판단)
+  — 가로 화면의 스티커 칸은 우상단 자동 촬영 타이머와 겹치지 않도록 `pt-12`만큼 내려 배치
+- **촬영 안내 박스**(스티커 패널 아래): 깜빡이는 ✋ + 손바닥 촬영 안내 문구. 현재 배경에 동작 트리거
+  이펙트가 있으면 박스를 반으로 나눠 아래쪽에 **그 제스처 이모지**(`getGestureEmoji` — `EFFECT_TRIGGER_GESTURES`
+  label에서 추출, 없으면 🤚) + 이펙트 안내 문구를 추가한다(두 안내가 함께 뜨면 이모지·문구 가로 배치)
 - **배경 변경 패널**: 촬영 중 배경 즉시 변경 가능
   (`onBackgroundSelect` → flow의 `selectedBackground` 갱신 → 프리뷰·서브 모니터 실시간 반영,
   배경제거 `off` 모드에서는 숨김)
@@ -307,6 +311,13 @@
 5. 인쇄 버튼 → `print_image` Tauri 명령어 호출 (전역 설정 `PRINTER_NAME` 사용, 비어 있으면 기본 프린터)
 6. 재시작 버튼 → Step 1으로 리셋
 
+- **레이아웃**: 타이틀은 다른 화면과 같은 크기(`SectionTitle`)·위치(가로 `pt-14`, 세로는
+  `getServicePortraitTopClass`의 언어별 상단 여백)로 고정하고, 본문(사진 미리보기·QR 카드·다운로드
+  기한 표시)은 남은 영역에서 중앙 정렬한다(`justify-center-safe` — 넘치면 아래로만).
+  세로 화면은 본문 영역이 하단 버튼 위에서 끝나도록 하단 여백 240px, 사진 최대 높이 540px로
+  제한해 4개 언어·가로/세로 결과물·인쇄 완료 문구까지 버튼과 겹치지 않는다.
+- "24시간 동안 다운로드 가능" 기한 표시는 `text-sm`의 2배 크기(1.75rem × `--type-scale`).
+
 ※ 프린터 목록 조회(`get_printers`)는 관리자 인화 설정 페이지에서 사용된다.
 
 ---
@@ -329,7 +340,7 @@
 | `FramedPreview.tsx` | 선택 프레임 위에 사진 슬롯 배치 미리보기 (CompleteSection과 동일 배경 우선순위) |
 | `SectionShell.tsx` | 서비스 화면 공통 3단 껍데기(타이틀·본문·다음 버튼) + `SectionTitle`. Background/Frame/PrintBg/Select가 사용. 타이틀 스타일을 한 곳에서 관리 |
 | `ServiceNav.tsx` | 서비스 화면 공통 "다음" 버튼 (하단 중앙 절대배치, 촬영하기와 동일 크기 = `SERVICE_BIG_BUTTON_CLASS`) |
-| `CircularTimer.tsx` | 원형 카운트다운 — frame·background·select·printbg는 유휴 타임아웃, complete는 인화 자동복귀 타이머로 표시 (start·payment·camera 제외) |
+| `CircularTimer.tsx` | 원형 카운트다운 — frame·background·select·printbg는 유휴 타임아웃, complete는 인화 자동복귀 타이머, camera는 자동 촬영 타이머로 표시 (start·payment 제외). 모두 같은 위치·크기(화면 우상단 `top-16 right-16`, 108px) |
 | `CameraStreamer.tsx` | 카메라 상시 웜업 + 서브 모니터 프레임 전송 (배경 합성 포함, §15) |
 | `FloatingElements.tsx` | 배경 데코레이션 애니메이션 |
 | `DebugContext.tsx` / `DebugOverlay.tsx` / `DebugGridOverlay.tsx` | 숨겨진 디버그 모드 — 토글·진단 패널·그리드 시각화 (§27) |
@@ -1449,8 +1460,12 @@ npm run tauri:build
 
 ### 동작
 
-- **언어 선택**: 대기 화면(StartSection) 터치 버튼 아래 4개 버튼.
-  버튼 클릭은 화면 터치(시작)로 전파되지 않는다.
+- **언어 선택**: 결제 화면(PaymentSection) 매수 선택 위 4개 버튼. 결제 비활성 시에만
+  대기 화면(StartSection)에 표시되며, 이때 버튼 클릭은 화면 터치(시작)로 전파되지 않는다.
+- **폰트**: `LanguageContext`가 `<html lang>`을 바꾸면 `globals.css`의 `:lang(zh)`/`:lang(ja)`
+  규칙이 CJK 고딕 폰트를 우선 적용한다(Pretendard가 한자를 일부만 커버해 명조로 섞이는 것 방지).
+  단, **언어 선택 버튼(`.lang-option`)은 선택 언어와 무관하게 기본 폰트(`--font-sans`)로 고정**해
+  언어를 바꿔도 버튼 글꼴이 바뀌지 않는다.
 - **초기화**: 대기 화면(`currentStep === "start"`)으로 돌아오면 다음 손님을
   위해 한국어로 자동 리셋 (service page의 effect).
 - **적용 범위**: 손님이 보는 서비스 플로우 전체 — 대기/결제/프레임/배경/

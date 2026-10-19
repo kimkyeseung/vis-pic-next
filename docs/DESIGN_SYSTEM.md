@@ -72,6 +72,10 @@ Tailwind CSS v4의 토큰 기반 방식이라 별도 `tailwind.config.js`는 없
 | `--radius-card` | `rounded-card` |
 | `--radius-btn` | `rounded-btn` |
 
+**언어별 폰트**: 중국어·일본어 선택 시 `:lang(zh)`/`:lang(ja)` 규칙이 `--font-sans` 대신 CJK 고딕 스택을
+적용한다. 언어 선택 버튼처럼 언어와 무관하게 글꼴을 고정해야 하는 요소는 `.lang-option` 클래스를 붙인다
+(`:lang` 규칙과 명시도가 같아 `globals.css`에서 반드시 그 뒤에 정의 — SPEC §24).
+
 ## 6. 컴포넌트에서 쓰는 법 (권장)
 
 앞으로 새 마크업은 raw 값 대신 시맨틱 유틸리티를 쓰면 일관성이 유지된다.
