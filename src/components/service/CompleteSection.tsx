@@ -65,10 +65,12 @@ export function CompleteSection({
   });
 
   return (
-    <section ref={sectionRef} className={`w-full h-full flex flex-col items-center justify-start pt-14 pb-52 ${getServicePortraitTopClass(lang)} portrait:pb-40 relative z-10`}>
+    <section ref={sectionRef} className={`w-full h-full flex flex-col items-center justify-start pt-14 pb-52 ${getServicePortraitTopClass(lang)} portrait:pb-[240px] relative z-10`}>
       <div className="w-full flex-1 min-h-0 flex flex-col text-center animate-fadeInUp portrait:px-16">
         {/* 타이틀은 다른 페이지처럼 상단 고정(가로 pt-14, 세로는 언어별 상단 여백 — getServiceSectionClass와 동일)
-            하고 크기도 같게 둔다. 본문은 아래 flex-1 영역에서 중앙 정렬한다. */}
+            하고 크기도 같게 둔다. 본문은 아래 flex-1 영역에서 중앙 정렬한다.
+            세로 하단 여백 240px = 하단 고정 버튼(위쪽 끝 1696px) 위까지만 본문 영역으로 쓴다 — pb-40(160px)이면
+            본문 영역이 버튼 뒤까지 잡혀, 중앙 정렬된 본문 아래쪽(기한 표시·인쇄 완료 문구)이 버튼과 겹쳤다. */}
         {(printStatus === "ready" || printStatus === "done") && compositeImage && (
           <SectionTitle className="break-keep mb-16 portrait:mb-8">
             {printStatus === "done" ? t("complete.done") : t("complete.ready")}
@@ -108,7 +110,8 @@ export function CompleteSection({
                   </div>
 
                   {qrExpiryDate && (
-                    <div className="flex items-center gap-2 bg-black/40 px-4 py-2 rounded-full text-sm">
+                    // 글자·여백 모두 text-sm 기준의 2배(1.75rem = 0.875rem × 2, --type-scale 반영).
+                    <div className="flex items-center gap-4 bg-black/40 px-8 py-4 rounded-full text-[calc(1.75rem*var(--type-scale))]">
                       <span className="text-gray-300">
                         {t("complete.expiry")}
                       </span>
