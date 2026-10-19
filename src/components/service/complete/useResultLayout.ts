@@ -52,7 +52,9 @@ export function useResultLayout({
   const matchHeight = !stacked && previewH != null;
   // 세로 프레임(2컷 등)은 사진 쪽이 지나치게 길어 QR 영역과 비율이 안 맞으므로, 좌우
   // 배치일 때만 사진 쪽 상한을 더 낮춰 QR 카드와 비슷한 높이로 맞춘다.
-  const photoMaxHClass = !isLandscapeResult && !stacked ? "max-h-[550px]" : "max-h-[650px]";
+  // 500px: 그 아래 다운로드 기한 표시(78px)와 인쇄 완료 문구까지 들어가도 하단 "처음으로" 버튼
+  // (위쪽 끝 899px)과 겹치지 않는 높이 — 550px일 땐 인쇄 완료 문구가 버튼 뒤로 15px 들어갔다.
+  const photoMaxHClass = !isLandscapeResult && !stacked ? "max-h-[500px]" : "max-h-[650px]";
 
   return { sectionRef, previewBoxRef, previewH, matchHeight, photoMaxHClass };
 }

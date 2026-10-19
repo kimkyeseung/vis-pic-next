@@ -39,9 +39,10 @@ export function CameraSidePanel({
     // 잘려 안 보였다. 스티커 그리드 자체는 이미 shrink-0(위)이라 컬럼 밖으로 안 넘치고,
     // 8개 초과 스크롤은 그리드 박스 자체의 overflow-y-auto로 별도 처리된다.
     // 가로 화면은 이 컬럼 상단이 화면 우상단 자동 촬영 타이머(top-16, 108px → 아래 끝 172px)와 같은
-    // 높이라 "스티커를 추가해 보세요!" 제목이 타이머 원에 겹쳤다 — pt-12로 컬럼 전체를 타이머 아래로 내린다.
+    // 높이라 "스티커를 추가해 보세요!" 제목이 타이머 원에 겹쳤다 — pt-10(제목 위쪽 끝 176px)으로 컬럼 전체를
+    // 타이머 아래로 내린다. 더 내리면 "남은 촬영 횟수" 박스가 좌측 배경 썸네일 끝선(628px)보다 내려간다.
     // 세로는 컬럼이 화면 아래쪽에 있어 겹치지 않으므로 portrait:pt-0.
-    <div className="flex flex-col min-h-0 pl-4 pt-12 portrait:pt-0" style={{ gridArea: "sticker" }}>
+    <div className="flex flex-col min-h-0 pl-4 pt-10 portrait:pt-0" style={{ gridArea: "sticker" }}>
       <h3 className="text-white text-2xl font-bold text-center mb-4 shrink-0">{t("camera.stickerPrompt")}</h3>
 
       {/* 스티커 패널 (상시 노출) — shrink-0: 이 래퍼가 min-h-0라 부모(stickerCol)의
@@ -111,9 +112,12 @@ export function CameraSidePanel({
       <div className="flex-1 portrait:flex-0 flex items-start mb-2 portrait:mb-4">
         <div className="w-full rounded-2xl overflow-hidden border border-[var(--theme-primary,#6c6fb4)]/50 bg-[var(--theme-primary,#6c6fb4)]/10">
           {/* 세로 모드는 두 안내가 한 박스 안에 나란히 들어가 py-6이면 높이가 넘쳐 아래
-              박스와 겹쳤다 — 세로에서만 py-3으로 줄인다(가로는 원래대로 유지). */}
-          <div className={showGestureHint ? "flex items-center justify-center gap-4 px-6 py-6 portrait:py-3" : "text-center px-6 py-6 portrait:py-3"}>
-            <div className={showGestureHint ? "text-5xl leading-none shrink-0 animate-soft-blink select-none" : "text-5xl leading-none mb-2 animate-soft-blink select-none"} aria-hidden>✋</div>
+              박스와 겹쳤다 — 세로에서만 py-3으로 줄인다.
+              가로는 "남은 촬영 횟수" 박스를 좌측 배경 썸네일 끝선(mb-[212px])에 맞추려고 높이를 줄인다 —
+              ✋를 항상 문구 옆에 두고(제스처 안내와 같은 가로 배치) 위아래 여백을 py-4로. 세로에서
+              제스처 안내가 없을 땐 예전처럼 ✋를 문구 위에 가운데 정렬한다(portrait:block). */}
+          <div className={showGestureHint ? "flex items-center justify-center gap-4 px-6 py-4 portrait:py-3" : "flex items-center justify-center gap-4 px-6 py-4 portrait:block portrait:text-center portrait:py-3"}>
+            <div className={showGestureHint ? "text-5xl leading-none shrink-0 animate-soft-blink select-none" : "text-5xl leading-none shrink-0 portrait:mb-2 animate-soft-blink select-none"} aria-hidden>✋</div>
             {/* break-keep(word-break: keep-all)를 쓰지 않는다 — 한국어/영어는 공백 기준으로
                 잘 줄바꿈되지만, 일본어·중국어 문구는 공백이 없어 keep-all이면 줄바꿈 지점을
                 못 찾아 박스 밖으로 넘쳐 overflow-hidden에 잘려 보이는 문제가 있었다. */}
@@ -122,12 +126,12 @@ export function CameraSidePanel({
                 \n을 미리 넣어 항상 깔끔하게 2줄로 보이게 한다. */}
             {/* 이모지 글리프 자체의 좌우 여백이 비대칭이라(폰트 내장), justify-center로
                 그룹을 중앙 정렬해도 텍스트가 한쪽으로 쏠려 보인다 — px-4로 상쇄. */}
-            <p className={`text-white font-extrabold text-xl leading-snug whitespace-pre-line ${showGestureHint ? "text-left px-4" : ""}`}>
+            <p className={`text-white font-extrabold text-xl leading-snug whitespace-pre-line ${showGestureHint ? "text-left px-4" : "text-left px-4 portrait:text-center portrait:px-0"}`}>
               {t("camera.palmHint")}
             </p>
           </div>
           {showGestureHint && (
-            <div className="flex items-center justify-center gap-4 px-6 py-6 portrait:py-3 border-t border-[var(--theme-primary,#6c6fb4)]/30">
+            <div className="flex items-center justify-center gap-4 px-6 py-4 portrait:py-3 border-t border-[var(--theme-primary,#6c6fb4)]/30">
               <div className="text-5xl leading-none shrink-0 select-none" aria-hidden>
                 {gestureHintEmoji}
               </div>
