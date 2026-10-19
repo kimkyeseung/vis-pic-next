@@ -38,7 +38,10 @@ export function CameraSidePanel({
     // 이 컬럼 우측 끝(페이지 패딩선)에 딱 붙어 있어, overflow가 있으면 글로우가 그대로
     // 잘려 안 보였다. 스티커 그리드 자체는 이미 shrink-0(위)이라 컬럼 밖으로 안 넘치고,
     // 8개 초과 스크롤은 그리드 박스 자체의 overflow-y-auto로 별도 처리된다.
-    <div className="flex flex-col min-h-0 pl-4" style={{ gridArea: "sticker" }}>
+    // 가로 화면은 이 컬럼 상단이 화면 우상단 자동 촬영 타이머(top-16, 108px → 아래 끝 172px)와 같은
+    // 높이라 "스티커를 추가해 보세요!" 제목이 타이머 원에 겹쳤다 — pt-12로 컬럼 전체를 타이머 아래로 내린다.
+    // 세로는 컬럼이 화면 아래쪽에 있어 겹치지 않으므로 portrait:pt-0.
+    <div className="flex flex-col min-h-0 pl-4 pt-12 portrait:pt-0" style={{ gridArea: "sticker" }}>
       <h3 className="text-white text-2xl font-bold text-center mb-4 shrink-0">{t("camera.stickerPrompt")}</h3>
 
       {/* 스티커 패널 (상시 노출) — shrink-0: 이 래퍼가 min-h-0라 부모(stickerCol)의

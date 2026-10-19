@@ -392,16 +392,6 @@ export function CameraSection({
               {segmenterError && <div className="text-xs mt-1 opacity-80 break-all">{segmenterError}</div>}
             </div>
           )}
-          {autoTimer !== null && countdown === null && photos.length < maxPhotos && (
-            <CircularTimer
-              value={autoTimer}
-              total={config.cameraAutoTimerSeconds}
-              size={72}
-              positionClass="top-4 right-4"
-              onLongPress={toggleAutoTimerPause}
-              paused={autoTimerPaused}
-            />
-          )}
           {countdown !== null && (
             <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
               <span className="text-[200px] font-extrabold text-white animate-countdown" key={countdown} style={{ textShadow: "0 0 60px rgba(255,255,255,0.5)" }}>
@@ -410,6 +400,17 @@ export function CameraSection({
             </div>
           )}
         </div>
+
+      {/* 자동 촬영 타이머 — 다른 단계의 타이머(service/page.tsx)와 같은 크기·위치(화면 우상단 top-16 right-16)로
+          맞추려고 카메라 미리보기 박스 밖, section(화면 전체 기준) 직속에 둔다. */}
+      {autoTimer !== null && countdown === null && photos.length < maxPhotos && (
+        <CircularTimer
+          value={autoTimer}
+          total={config.cameraAutoTimerSeconds}
+          onLongPress={toggleAutoTimerPause}
+          paused={autoTimerPaused}
+        />
+      )}
 
       {/* 촬영하기 — 하단 중앙. 다른 단계의 다음 버튼(ServiceNav)과 같은 위치(bottom-16, 가로·세로 동일)에 맞춘다. */}
       <div className="absolute bottom-16 left-1/2 -translate-x-1/2 z-20">
