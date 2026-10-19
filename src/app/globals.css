@@ -94,6 +94,12 @@ body {
   font-family: 'Yu Gothic', 'Meiryo', 'Hiragino Sans', 'Noto Sans CJK JP', 'Noto Sans JP', sans-serif;
 }
 
+/* 언어 선택 버튼(시작·결제 화면)은 선택 언어와 무관하게 기본 폰트로 고정한다.
+   위 :lang 규칙과 명시도가 같으므로 반드시 그 뒤에 둔다. */
+.lang-option {
+  font-family: var(--font-sans);
+}
+
 /* 테마 글자색: 서비스 화면(.service-theme) 내부의 흰색 본문 텍스트를 관리자가 지정한
    색(--theme-text)으로 치환한다. 미설정 시 #ffffff 폴백.
    자체 배경색을 가진 요소(예: 흰 배경의 .service-button = 어두운 글자, 색 버튼의 인라인

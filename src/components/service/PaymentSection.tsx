@@ -145,7 +145,7 @@ export function PaymentSection({
             {LOCALES.map(({ code, label }) => (
               <button
                 key={code}
-                className={`px-[5.25rem] py-9 portrait:px-8 portrait:py-8 rounded-2xl text-[3.375rem] portrait:text-5xl font-semibold transition-colors shadow-lg border-4 ${
+                className={`lang-option px-[5.25rem] py-9 portrait:px-8 portrait:py-8 rounded-2xl text-[3.375rem] portrait:text-5xl font-semibold transition-colors shadow-lg border-4 ${
                   lang === code
                     ? "bg-white text-gray-900"
                     : "bg-[#3f3f46] border-[#8a8a95] hover:bg-[#52525b]"
