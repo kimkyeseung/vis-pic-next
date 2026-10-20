@@ -120,6 +120,44 @@ npm run tauri:build
 - `src-tauri/target/release/bundle/msi/AR-pic_0.1.0_x64_en-US.msi`
 - `src-tauri/target/release/bundle/nsis/AR-pic_0.1.0_x64-setup.exe`
 
+### macOS 빌드
+
+macOS에서도 같은 명령(`npm run tauri:build`)으로 빌드한다. **크로스 빌드는 안 된다** — 서버 번들에 빌드 PC의
+Node 실행 파일(`process.execPath`)과 그 OS용 Prisma 엔진·sharp 네이티브 모듈이 그대로 들어가므로, 반드시
+배포 대상과 같은 OS·아키텍처(Apple Silicon이면 arm64 Mac)에서 `npm install`부터 새로 해야 한다.
+Windows에서 받은 `node_modules`를 복사해 쓰면 macOS용 네이티브 모듈이 없어 실패한다.
+
+준비물: Xcode Command Line Tools(`xcode-select --install`), Rust(rustup), Node.js, 프로젝트 루트의 `.env*`(§1).
+
+출력 위치:
+- `src-tauri/target/release/bundle/macos/AR-pic.app`
+- `src-tauri/target/release/bundle/dmg/AR-pic_0.1.0_aarch64.dmg`
+
+플랫폼별 차이(코드상 처리됨):
+
+| 항목 | Windows | macOS |
+|---|---|---|
+| 번들 형식 | NSIS (`tauri.conf.json`) | app + dmg (`tauri.macos.conf.json`이 `bundle.targets`를 덮어씀) |
+| server.zip 생성 (`prepare-tauri.mjs` 7단계) | PowerShell `Compress-Archive` | `zip -r` (유닉스 권한 비트 보존) + `unzip -Z1`로 필수 항목·`node.exe` 실행 권한 검증 |
+| Node 런타임 | `node.exe` | 파일 이름은 똑같이 `node.exe`(실제로는 macOS용 Node 바이너리) |
+| 압축 해제 위치 | `%LOCALAPPDATA%\ar-pic\server` | `~/Library/Application Support/ar-pic/server`, 해제 시 실행 권한 복원 |
+| Prisma 엔진 | `*.dll.node`만 남김 | `*.dylib.node`만 남김 |
+| sharp | `@img/sharp-win32-*/lib` 복사 | 추가로 `@img/sharp-libvips-darwin-*` 패키지 복사 |
+| MediaPipe 모델 다운로드 | PowerShell WebClient | `curl` |
+| 카메라 권한 | WebView2 권한 핸들러로 자동 허용 | `src-tauri/Info.plist`의 `NSCameraUsageDescription` → 첫 실행 시 시스템 권한 팝업에서 허용 |
+
+macOS 제약·주의사항:
+- **서명·공증 없음.** 지금 설정으로 만든 `.app`/`.dmg`는 서명되지 않아, 다른 Mac에서 다운로드해 열면 Gatekeeper가
+  "손상되었거나 확인되지 않은 개발자" 경고로 막는다. 우클릭 → 열기, 또는 `xattr -dr com.apple.quarantine /Applications/AR-pic.app`로
+  우회할 수 있다. 정식 배포하려면 Apple Developer ID 서명·공증(`APPLE_SIGNING_IDENTITY` 등 Tauri 환경변수)이 필요하며 아직 설정하지 않았다.
+- **프린터 목록·카메라 장치 목록 조회는 Windows 전용**이다. macOS에서는 실제 장치 대신 `Default Printer`/`Default Camera`라는
+  고정 항목 하나만 돌아온다. 인화는 `lp -d <프린터 이름>` 경로가 있으나 실제 프린터로 검증되지 않았고, 고정 항목
+  `Default Printer`를 그대로 선택하면 그런 이름의 CUPS 프린터가 없어 실패한다. 용지·광택지 설정 등 Windows 인쇄 설정도 적용되지 않는다.
+- 앱 재시작 시 3001 포트를 점유한 이전 Node 프로세스를 정리하는 단계도 Windows에서만 동작한다. 강제 종료 후 서버가 뜨지 않으면
+  `lsof -ti :3001 | xargs kill`로 정리한다.
+- 지원 macOS 최소 버전은 번들에 들어가는 Node 버전의 요구사항을 따른다(예: Node 24는 macOS 13.5 이상).
+- 키오스크 단축키(F11, Ctrl+Alt+F4)는 macOS 키보드에서 fn·Control 조합으로 눌러야 할 수 있다.
+
 ### Tauri 개발 모드
 
 ```bash

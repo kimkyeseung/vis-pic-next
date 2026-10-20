@@ -1,6 +1,7 @@
-import { execSync } from "child_process";
-import { cpSync, rmSync, existsSync, copyFileSync, writeFileSync, readdirSync, readFileSync } from "fs";
+import { execSync, execFileSync } from "child_process";
+import { cpSync, rmSync, existsSync, copyFileSync, writeFileSync, readdirSync, readFileSync, chmodSync } from "fs";
 import { join, dirname, sep } from "path";
+import { homedir } from "os";
 import { fileURLToPath } from "url";
 import { parse as parseEnv } from "dotenv";
 
@@ -122,7 +123,12 @@ function flattenStandalone(serverDir) {
 }
 
 // 0. 이전 추출 데이터 무효화 (재실행 시 새 server.zip 압축 해제 강제)
-const localAppData = process.env.LOCALAPPDATA || join(dirname(fileURLToPath(import.meta.url)), "..");
+// lib.rs의 dirs::data_local_dir()과 같은 위치
+// (Windows: %LOCALAPPDATA%, macOS: ~/Library/Application Support)
+const localAppData =
+  process.platform === "darwin"
+    ? join(homedir(), "Library", "Application Support")
+    : process.env.LOCALAPPDATA || join(dirname(fileURLToPath(import.meta.url)), "..");
 const versionFile = join(localAppData, "ar-pic", ".version");
 if (existsSync(versionFile)) {
   rmSync(versionFile);
@@ -187,14 +193,20 @@ if (existsSync(cacheDir)) {
   rmSync(cacheDir, { recursive: true, force: true });
 }
 
-// Prisma 정리: 임시 파일(.tmpXXXX)과 비Windows 플랫폼 바이너리 제거
+// Prisma 정리: 임시 파일(.tmpXXXX)과 다른 플랫폼용 엔진 바이너리 제거
 // (빌드 후 남은 쓰레기 파일 — 각 19MB × 여러 개로 zip 크기를 급증시킴)
+// 빌드하는 OS의 엔진만 남긴다: Windows는 *.dll.node, macOS는 *.dylib.node.
+// macOS에서 .dylib까지 지우면 자기 엔진이 사라져 첫 DB 쿼리에서 죽는다.
+const otherPlatformEngine =
+  process.platform === "darwin"
+    ? /\.(so|dll)(\.\w+)?\.node$/
+    : /\.(so|dylib)(\.\w+)?\.node$/;
 const prismaClientDir = join(SERVER_DIR, "node_modules", ".prisma", "client");
 if (existsSync(prismaClientDir)) {
   for (const entry of readdirSync(prismaClientDir)) {
     const isTemp = /\.tmp\d+$/.test(entry);
-    const isNonWindows = /\.(so|dylib)(\.\w+)?\.node$/.test(entry);
-    if (isTemp || isNonWindows) {
+    const isOtherPlatform = otherPlatformEngine.test(entry);
+    if (isTemp || isOtherPlatform) {
       rmSync(join(prismaClientDir, entry));
     }
   }
@@ -204,6 +216,9 @@ if (existsSync(prismaClientDir)) {
 console.log("[4/7] Copying Node.js runtime...");
 const nodeExeDest = join(SERVER_DIR, "node.exe");
 copyFileSync(process.execPath, nodeExeDest);
+// macOS에서도 이름은 node.exe로 통일한다(lib.rs·필수 파일 검사가 이 이름을 쓴다).
+// 복사 과정에서 실행 비트가 빠질 수 있어 명시적으로 준다.
+if (process.platform !== "win32") chmodSync(nodeExeDest, 0o755);
 console.log(`  Copied ${process.execPath} (${process.version})`);
 
 // 5. Sharp native DLLs (file tracer only copies the .node file, not the companion DLLs)
@@ -216,6 +231,18 @@ if (existsSync(sharpLibSrc)) {
   console.log(`  Copied ${sharpPkg}/lib`);
 } else {
   console.warn(`  Warning: ${sharpPkg}/lib not found, skipping`);
+}
+// macOS의 sharp는 libvips를 별도 패키지(@img/sharp-libvips-*)로 두고 rpath로
+// 불러온다. 트레이서가 이 dylib을 따라가지 못하므로 패키지째 복사한다.
+// (Windows는 sharp-win32-*/lib에 DLL이 함께 있어 이 패키지가 없다 — 건너뜀)
+const libvipsPkg = `sharp-libvips-${process.platform}-${process.arch}`;
+const libvipsSrc = join(ROOT, "node_modules", "@img", libvipsPkg);
+if (existsSync(libvipsSrc)) {
+  cpSync(libvipsSrc, join(SERVER_DIR, "node_modules", "@img", libvipsPkg), {
+    recursive: true,
+    dereference: true,
+  });
+  console.log(`  Copied @img/${libvipsPkg}`);
 }
 
 // 6. Environment files
@@ -252,20 +279,21 @@ for (const f of REQUIRED_AT_ROOT) {
 
 const zipPath = join(ROOT, "src-tauri", "server.zip");
 if (existsSync(zipPath)) rmSync(zipPath);
-// Write a temp PS1 to avoid shell quoting issues with long paths.
-// Must include a UTF-8 BOM: Windows PowerShell 5.1 reads BOM-less .ps1 files using the
-// system ANSI codepage, which mangles non-ASCII characters in ROOT (e.g. Korean usernames)
-// and makes Compress-Archive resolve a garbled/nonexistent path (fails with a null Join-Path arg).
-//
-// $ErrorActionPreference와 명시적 exit 1이 반드시 필요하다: Compress-Archive의
-// 오류는 대부분 non-terminating이라 그대로 두면 파일이 빠진 채로도 종료 코드가
-// 0이고, execSync는 성공으로 판단한다. 압축 후 필수 항목을 다시 확인해
-// "조용히 불완전한 아카이브"가 exe에 임베드되는 것을 막는다.
-const required = REQUIRED_AT_ROOT.map((f) => `'${f}'`).join(", ");
-const tmpPs1 = join(ROOT, "src-tauri", "_zip_tmp.ps1");
-writeFileSync(
-  tmpPs1,
-  `﻿$ErrorActionPreference = 'Stop'
+if (process.platform === "win32") {
+  // Write a temp PS1 to avoid shell quoting issues with long paths.
+  // Must include a UTF-8 BOM: Windows PowerShell 5.1 reads BOM-less .ps1 files using the
+  // system ANSI codepage, which mangles non-ASCII characters in ROOT (e.g. Korean usernames)
+  // and makes Compress-Archive resolve a garbled/nonexistent path (fails with a null Join-Path arg).
+  //
+  // $ErrorActionPreference와 명시적 exit 1이 반드시 필요하다: Compress-Archive의
+  // 오류는 대부분 non-terminating이라 그대로 두면 파일이 빠진 채로도 종료 코드가
+  // 0이고, execSync는 성공으로 판단한다. 압축 후 필수 항목을 다시 확인해
+  // "조용히 불완전한 아카이브"가 exe에 임베드되는 것을 막는다.
+  const required = REQUIRED_AT_ROOT.map((f) => `'${f}'`).join(", ");
+  const tmpPs1 = join(ROOT, "src-tauri", "_zip_tmp.ps1");
+  writeFileSync(
+    tmpPs1,
+    `﻿$ErrorActionPreference = 'Stop'
 try {
     Compress-Archive -Path "${SERVER_DIR}\\*" -DestinationPath "${zipPath}" -Force
 } catch {
@@ -289,9 +317,30 @@ try {
     $zip.Dispose()
 }
 `
-);
-execSync(`powershell -NoProfile -ExecutionPolicy Bypass -File "${tmpPs1}"`, { stdio: "inherit" });
-rmSync(tmpPs1);
+  );
+  execSync(`powershell -NoProfile -ExecutionPolicy Bypass -File "${tmpPs1}"`, { stdio: "inherit" });
+  rmSync(tmpPs1);
+} else {
+  // macOS: Info-ZIP(zip)은 유닉스 권한 비트를 항목에 기록한다. lib.rs가 해제할 때
+  // 이 비트로 실행 권한을 복원하므로 node.exe가 실행 가능한 채로 풀린다.
+  // cwd를 번들 루트로 두고 "."을 넣어야 항목 이름이 server.js처럼 루트 기준이 된다.
+  execFileSync("zip", ["-r", "-q", "-X", zipPath, "."], { cwd: SERVER_DIR, stdio: "inherit" });
+
+  const names = execFileSync("unzip", ["-Z1", zipPath], { encoding: "utf8", maxBuffer: 64 * 1024 * 1024 })
+    .split("\n")
+    .filter(Boolean);
+  for (const f of REQUIRED_AT_ROOT) {
+    if (!names.includes(f)) {
+      throw new Error(`server.zip에 ${f} 가 없습니다 (항목 ${names.length}개)`);
+    }
+  }
+  // 권한 비트가 빠지면 해제 후 node.exe를 실행할 수 없다(EACCES) — 미리 확인한다.
+  const nodeMode = execFileSync("zipinfo", [zipPath, "node.exe"], { encoding: "utf8" }).trim();
+  if (!/^-..x/.test(nodeMode)) {
+    throw new Error(`server.zip의 node.exe에 실행 권한이 없습니다: ${nodeMode}`);
+  }
+  console.log(`  Verified ${names.length} entries`);
+}
 console.log(`  Created server.zip`);
 
 console.log("\nDone — server.zip embedded into binary at next cargo build.");

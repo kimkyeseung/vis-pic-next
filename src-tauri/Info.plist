@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <!-- macOS 번들 전용(Windows 빌드에는 쓰이지 않음). 이 키가 없으면 WKWebView의
+       getUserMedia가 카메라 권한을 요청하지 못하고 촬영 화면이 카메라 없이 뜬다. -->
+  <key>NSCameraUsageDescription</key>
+  <string>AR-pic 촬영을 위해 카메라를 사용합니다.</string>
+</dict>
+</plist>

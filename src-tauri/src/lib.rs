@@ -222,8 +222,20 @@ fn download_file(url: &str, dest: &std::path::Path) -> Result<(), String> {
     }
     #[cfg(not(target_os = "windows"))]
     {
-        let _ = url;
-        Err("Windows 전용 기능입니다".to_string())
+        // macOS 기본 탑재 curl. -f: HTTP 오류(404 등)를 실패로 처리해
+        // 오류 페이지가 모델 파일로 저장되는 것을 막는다.
+        let tmp = download_tmp_path(dest);
+        let status = Command::new("curl")
+            .args(["-fsSL", "--retry", "2", "-o"])
+            .arg(&tmp)
+            .arg(url)
+            .status()
+            .map_err(|e| e.to_string())?;
+        if !status.success() {
+            let _ = std::fs::remove_file(&tmp);
+            return Err(format!("{url} 다운로드 실패"));
+        }
+        std::fs::rename(&tmp, dest).map_err(|e| e.to_string())
     }
 }
 
@@ -339,7 +351,7 @@ fn extract_server_archive<F: FnMut(u8)>(
                 "아카이브에 허용되지 않는 경로가 있습니다".into(),
             ));
         };
-        let out = server_dir.join(rel);
+        let out = server_dir.join(&rel);
 
         if entry.is_dir() {
             std::fs::create_dir_all(&out)?;
@@ -350,6 +362,19 @@ fn extract_server_archive<F: FnMut(u8)>(
             let mut dst = std::fs::File::create(&out)?;
             std::io::copy(&mut entry, &mut dst)?;
             written += entry.size();
+
+            // macOS: File::create는 0o644로 만들어 실행 비트가 사라진다.
+            // zip(Info-ZIP)이 기록한 유닉스 권한을 되살리고, node.exe는 권한 정보가
+            // 없더라도 반드시 실행 가능해야 하므로 0o755를 보장한다.
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::PermissionsExt;
+                let mut mode = entry.unix_mode().map(|m| m & 0o777).unwrap_or(0o644);
+                if rel == std::path::Path::new("node.exe") {
+                    mode |= 0o755;
+                }
+                std::fs::set_permissions(&out, std::fs::Permissions::from_mode(mode))?;
+            }
         }
 
         // eval은 메인 스레드로 디스패치되므로 1,800여 번 부르면 이벤트 루프가 막힌다.
