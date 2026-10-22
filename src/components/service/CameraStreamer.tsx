@@ -233,12 +233,19 @@ export function CameraStreamer({
         if (cancelled) return;
         const vision = await FilesetResolver.forVisionTasks("/static/mediapipe/wasm");
         if (cancelled) return;
-        const seg = await ImageSegmenter.createFromOptions(vision, {
-          baseOptions: { modelAssetPath: "/static/mediapipe/model/selfie_multiclass_256x256.tflite" },
-          runningMode: "VIDEO",
-          outputCategoryMask: false,
-          outputConfidenceMasks: true,
-        });
+        // 촬영 화면(useMediapipeSegmentation)과 같은 델리게이트를 쓴다 — 기본 GPU(WebGL), 운영자가 디버그
+        // 토글로 CPU를 고른 경우에만 CPU. delegate를 생략하면 CPU(WASM)로 떠서 추론마다 메인 스레드를
+        // 수십 ms 막아 촬영 외 단계의 서브 모니터만 심하게 끊겼다. GPU 생성이 실패하면 CPU로 폴백한다.
+        let gpu = true;
+        try { gpu = localStorage.getItem("photobooth_seg_delegate") !== "cpu"; } catch {}
+        const create = (delegate: "GPU" | "CPU") =>
+          ImageSegmenter.createFromOptions(vision, {
+            baseOptions: { modelAssetPath: "/static/mediapipe/model/selfie_multiclass_256x256.tflite", delegate },
+            runningMode: "VIDEO",
+            outputCategoryMask: false,
+            outputConfidenceMasks: true,
+          });
+        const seg = gpu ? await create("GPU").catch(() => create("CPU")) : await create("CPU");
         if (cancelled) { seg.close(); return; }
         segmenterRef.current = seg as unknown as Segmenter;
       } catch {
@@ -342,7 +349,13 @@ export function CameraStreamer({
           animFrame = requestAnimationFrame(tick);
           if (video.readyState < 2 || !video.videoWidth) return;
           // 전송 대상이 없으면 합성 연산을 생략하고 카메라만 켜둔 채 대기
-          if (!frameChannelRef.current) return;
+          const channel = frameChannelRef.current;
+          if (!channel) return;
+          // 이 컴포넌트는 화면에 그리지 않고 송출만 한다 → 보낼 프레임(100ms 간격, 직전 전송 완료)만
+          // 합성한다. 예전엔 rAF마다(60Hz) 크로마키 픽셀 루프·마스크 합성을 돌리고 6장 중 1장만 보내,
+          // 버려지는 합성이 메인 스레드를 점유해 서비스 화면과 서브 모니터가 함께 버벅였다.
+          const now = performance.now();
+          if (now - lastSentRef.current <= 100 || channel.isBusy()) return;
 
           const w = video.videoWidth;
           const h = video.videoHeight;
@@ -421,7 +434,6 @@ export function CameraStreamer({
             try {
               offCtx.drawImage(video, 0, 0, pw, ph);
 
-              const now = performance.now();
               // 다음 추론이 볼 크롭. 해상도가 바뀌면 이전 ROI가 프레임 밖을 가리킬 수 있어 버린다.
               const prev = roiRef.current;
               const crop =
@@ -497,11 +509,7 @@ export function CameraStreamer({
             drawRaw(cw, ch);
           }
 
-          const now = performance.now();
-          // 직전 프레임이 아직 전송 중이면 sendCanvas가 건너뛰므로(false) 그땐 다음 rAF에 다시 시도한다.
-          if (frameChannelRef.current && now - lastSentRef.current > 100) {
-            if (frameChannelRef.current.sendCanvas(canvas, 0.85)) lastSentRef.current = now;
-          }
+          if (channel.sendCanvas(canvas, 0.85)) lastSentRef.current = now;
         };
 
         animFrame = requestAnimationFrame(tick);

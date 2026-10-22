@@ -9,6 +9,8 @@ export type FrameChannel = {
    * 캔버스 비트맵은 호출 시점에 복사되므로, 호출 직후 같은 캔버스를 다시 써도 된다.
    */
   sendCanvas: (canvas: HTMLCanvasElement, quality: number) => boolean;
+  /** 직전 프레임이 아직 인코딩·전송 중이면 true — 호출부가 보낼 수 없는 프레임의 합성을 건너뛰는 데 쓴다. */
+  isBusy: () => boolean;
 };
 
 // ── 프레임 채널 (CameraSection → output 페이지) ─────────────────
@@ -48,6 +50,7 @@ export function useFrameSender(enabled: boolean) {
         );
         return true;
       },
+      isBusy: () => inFlight,
     };
     return () => {
       disposed = true;
